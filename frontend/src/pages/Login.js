@@ -38,7 +38,7 @@ export const Login = () => {
       if (user.role === 'admin') {
         navigate('/admin');
       } else {
-        navigate(from);
+        navigate('/mis-aplicaciones');
       }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al iniciar sesión');
