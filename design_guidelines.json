@@ -1,0 +1,163 @@
+{
+  "brand_identity": {
+    "name": "Billennium System",
+    "persona": "The Modern Efficiency Architect",
+    "mission": "Transforming Ecuadorian SMEs into digital powerhouses through clean, reliable software.",
+    "emotional_tone": "Professional, Trustworthy, Efficient, Modern, Clear",
+    "archetype": "Swiss & High-Contrast (Authority, Clarity, Truth)",
+    "target_audience": "Business owners, administrators, accountants in Ecuador"
+  },
+  "typography": {
+    "primary_font": "Outfit",
+    "secondary_font": "Inter",
+    "font_weights": {
+      "light": 300,
+      "normal": 400,
+      "medium": 500,
+      "bold": 700,
+      "black": 900
+    },
+    "heading_styles": {
+      "h1": "text-5xl md:text-7xl font-bold tracking-tight text-slate-900 dark:text-white leading-tight",
+      "h2": "text-4xl md:text-5xl font-semibold tracking-tight text-slate-900 dark:text-white",
+      "h3": "text-2xl md:text-3xl font-medium text-slate-900 dark:text-white",
+      "overline": "text-sm font-bold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400"
+    },
+    "body_styles": {
+      "base": "text-base md:text-lg text-slate-600 dark:text-slate-300 leading-relaxed",
+      "small": "text-sm text-slate-500 dark:text-slate-400",
+      "large": "text-xl text-slate-700 dark:text-slate-200 leading-relaxed"
+    }
+  },
+  "colors": {
+    "palette_name": "Billennium Blue Trust",
+    "primary": {
+      "DEFAULT": "#0F172A",
+      "foreground": "#F8FAFC",
+      "description": "Slate 900 - Deep, authoritative blue-black for main actions and heavy text."
+    },
+    "brand": {
+      "DEFAULT": "#0056D2",
+      "light": "#38BDF8",
+      "dark": "#1E3A8A",
+      "description": "Electric Royal Blue for primary buttons and active states. Sky Blue (Celeste) for accents."
+    },
+    "secondary": {
+      "DEFAULT": "#F1F5F9",
+      "foreground": "#0F172A",
+      "description": "Slate 100 - Soft grey for backgrounds and secondary buttons."
+    },
+    "accent": {
+      "DEFAULT": "#38BDF8",
+      "foreground": "#0F172A",
+      "description": "Sky Blue - used for highlights, icons, and gradients."
+    },
+    "background": {
+      "light": "#FFFFFF",
+      "dark": "#020617",
+      "subtle": "#F8FAFC"
+    },
+    "gradients": {
+      "hero": "bg-gradient-to-br from-slate-900 to-blue-900",
+      "card_hover": "hover:bg-gradient-to-br hover:from-white hover:to-blue-50 dark:hover:from-slate-900 dark:hover:to-slate-800",
+      "text_highlight": "bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-500"
+    }
+  },
+  "layout_grid": {
+    "container": "container mx-auto px-4 md:px-8 max-w-7xl",
+    "section_spacing": "py-20 md:py-32",
+    "grid_bento_home": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8",
+    "grid_features": "grid grid-cols-1 md:grid-cols-12 gap-8",
+    "grid_dashboard": "grid grid-cols-1 md:grid-cols-4 gap-6",
+    "card_style": "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 group"
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-blue-600 hover:bg-blue-700 text-white rounded-full px-8 py-4 font-semibold shadow-lg shadow-blue-500/20 transition-all hover:scale-105 active:scale-95",
+      "secondary": "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full px-8 py-4 font-medium transition-all",
+      "outline": "border-2 border-slate-200 dark:border-slate-700 hover:border-blue-500 text-slate-900 dark:text-white rounded-full px-8 py-4 font-medium transition-all"
+    },
+    "cards": {
+      "product_card": "relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 hover:border-blue-500/50 transition-all duration-300 group h-full flex flex-col justify-between",
+      "feature_icon": "w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"
+    },
+    "inputs": {
+      "default": "flex h-12 w-full rounded-lg border border-slate-200 bg-transparent px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950"
+    }
+  },
+  "motion": {
+    "library": "framer-motion",
+    "install_command": "yarn add framer-motion",
+    "principles": {
+      "hover": "scale: 1.02, transition: { duration: 0.2 }",
+      "tap": "scale: 0.98",
+      "page_load": "opacity: 0, y: 20 -> opacity: 1, y: 0 (staggered)",
+      "scroll": "viewport: { once: true, margin: '-100px' }"
+    }
+  },
+  "assets": {
+    "images": {
+      "logo": "https://customer-assets.emergentagent.com/job_04fdc029-61d0-4460-bdef-63f93c1202df/artifacts/3p4r9si5_billennium.jpg",
+      "restoflow_hero": "https://customer-assets.emergentagent.com/job_pymes-ecuador/artifacts/3d5ddad3_RestoFlow.jpg",
+      "cloud_tech": "https://customer-assets.emergentagent.com/job_pymes-ecuador/artifacts/rfson65i_BillenniumWeb.jpg",
+      "restoflow_context": "https://images.pexels.com/photos/12935053/pexels-photo-12935053.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "logistics_import": "https://images.pexels.com/photos/1117210/pexels-photo-1117210.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "security_lock": "https://images.unsplash.com/photo-1767972464040-8bfee42d7bed?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHw0fHxjeWJlcnNlY3VyaXR5JTIwZGF0YSUyMHByb3RlY3Rpb24lMjBsb2NrfGVufDB8fHx8MTc3MTg1ODY4N3ww&ixlib=rb-4.1.0&q=85",
+      "dashboard_finance": "https://images.pexels.com/photos/7873568/pexels-photo-7873568.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "team_meeting": "https://images.pexels.com/photos/8117466/pexels-photo-8117466.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "generic_office": "https://images.pexels.com/photos/5324991/pexels-photo-5324991.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940"
+    },
+    "icons": {
+      "library": "lucide-react",
+      "restoflow": "UtensilsCrossed",
+      "sentinel": "Smartphone",
+      "imports": "Ship",
+      "lopdp": "ShieldCheck",
+      "facturacion": "FileText",
+      "dashboard": "BarChart3"
+    }
+  },
+  "page_specifics": {
+    "home": {
+      "hero_style": "Split Layout: Left Text (H1 + Sub + CTA), Right 3D/Image. Background: Subtle grid pattern.",
+      "product_grid": "Bento Grid 3x2. Each card must have a distinct hover color accent.",
+      "benefits": "Zig-zag layout (Image Left/Text Right, then alternate)."
+    },
+    "products_summary": {
+      "layout": "Grid of 6 Cards with 'Learn More' buttons.",
+      "header": "Simple, centered text 'Nuestras Soluciones'."
+    },
+    "product_detail": {
+      "layout": "Sticky Sidebar Navigation (Features, Pricing, FAQ) on Desktop. Single column on Mobile.",
+      "pricing": "3-Tier Card System. Middle card (Popular) popped out with Blue Border and Shadow."
+    },
+    "dashboard_admin": {
+      "layout": "Sidebar Layout (Left Nav, Main Content).",
+      "style": "Clean, white background, sparse borders, high data density."
+    }
+  },
+  "universal_guidelines": {
+    "do_not_use": [
+      "Gradients for text body",
+      "Center alignment for long text blocks",
+      "Generic 'Lorem Ipsum' - use real context",
+      "Default browser scrollbars - use 'lenis' or custom CSS"
+    ],
+    "must_do": [
+      "Use data-testid on all interactive elements (buttons, inputs, links)",
+      "Ensure contrast ratio > 4.5:1 for all text",
+      "Add hover states to ALL interactive elements",
+      "Use 'gap' for spacing, never 'margin' on children"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Install framer-motion: `yarn add framer-motion`",
+    "Install lucide-react: `yarn add lucide-react`",
+    "Use the provided image URLs strictly.",
+    "The admin panel must be functional (mocked backend is fine if needed, but UI must be real).",
+    "For the 'RestoFlow' page, use the 'restaurant_hero' image as the main visual.",
+    "For 'Contact', include the WhatsApp link: https://wa.me/593980136389",
+    "Create a 'Layout' component that wraps all public pages (Header/Footer).",
+    "Create a separate 'AdminLayout' for the dashboard."
+  ]
+}
