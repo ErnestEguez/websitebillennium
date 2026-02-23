@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
   Users, 
-  Building2, 
   CreditCard, 
   MessageSquare, 
   Menu, 
@@ -21,7 +20,6 @@ const LOGO_URL = "https://customer-assets.emergentagent.com/job_04fdc029-61d0-44
 const sidebarLinks = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/suscripciones', label: 'Suscripciones', icon: CreditCard },
-  { href: '/admin/empresas', label: 'Empresas', icon: Building2 },
   { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
   { href: '/admin/mensajes', label: 'Mensajes', icon: MessageSquare },
 ];
