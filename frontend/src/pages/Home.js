@@ -17,7 +17,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 
-const HERO_IMAGE = "https://images.pexels.com/photos/7688336/pexels-photo-7688336.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2";
+const HERO_IMAGE = "https://customer-assets.emergentagent.com/job_pymes-ecuador/artifacts/rfson65i_BillenniumWeb.jpg";
 
 const products = [
   {
@@ -161,13 +161,13 @@ export const Home = () => {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="hidden lg:block"
             >
-              <div className="relative">
-                <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl blur-2xl opacity-20"></div>
+              <div className="relative overflow-hidden rounded-2xl">
+                <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-cyan-500 blur-2xl opacity-20"></div>
                 <img
                   src={HERO_IMAGE}
                   alt="Billennium System - Software en la nube"
-                  className="relative rounded-2xl shadow-2xl w-full object-cover"
-                  style={{ maxHeight: '500px' }}
+                  className="relative w-full object-cover object-bottom shadow-2xl"
+                  style={{ height: '450px' }}
                 />
               </div>
             </motion.div>
