@@ -17,7 +17,7 @@ import {
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 
-const HERO_IMAGE = "https://customer-assets.emergentagent.com/job_pymes-ecuador/artifacts/rfson65i_BillenniumWeb.jpg";
+const HERO_IMAGE = "https://images.pexels.com/photos/7688336/pexels-photo-7688336.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2";
 
 const products = [
   {
