@@ -17,7 +17,6 @@ const LOGO_URL = "https://customer-assets.emergentagent.com/job_04fdc029-61d0-44
 const navLinks = [
   { href: '/', label: 'Inicio' },
   { href: '/productos', label: 'Productos' },
-  { href: '/planes', label: 'Planes' },
   { href: '/nosotros', label: 'Nosotros' },
   { href: '/contacto', label: 'Contacto' },
 ];
@@ -38,8 +37,8 @@ const Header = () => {
       <div className="container mx-auto px-4 md:px-8 max-w-7xl">
         <div className="flex items-center justify-between h-20">
           <Link to="/" className="flex items-center gap-3" data-testid="logo-link">
-            <img src={LOGO_URL} alt="Billennium System" className="h-12 w-12 rounded-full object-cover" />
-            <span className="font-bold text-xl text-slate-900 hidden sm:block">Billennium System</span>
+            <img src={LOGO_URL} alt="Billennium System" className="h-14 w-14 object-contain transform -rotate-12 hover:rotate-0 transition-transform duration-300" />
+            <span className="font-bold text-xl text-slate-900 hidden sm:block italic">Billennium System</span>
           </Link>
 
           <nav className="hidden lg:flex items-center gap-8">
