@@ -580,6 +580,60 @@ async def update_subscription(subscription_id: str, update_data: SubscriptionUpd
     
     return {"message": "Suscripción actualizada correctamente"}
 
+class AdminSubscriptionCreate(BaseModel):
+    user_id: str
+    product_id: str
+    plan_name: str
+
+@api_router.post("/admin/subscriptions/create")
+async def admin_create_subscription(sub_data: AdminSubscriptionCreate, admin: dict = Depends(get_admin_user)):
+    # Find user
+    user = await db.users.find_one({"id": sub_data.user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Find product
+    product = None
+    for p in PRODUCTS:
+        if p["id"] == sub_data.product_id:
+            product = p
+            break
+    
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    
+    # Check if already subscribed
+    existing = await db.subscriptions.find_one({
+        "user_id": sub_data.user_id,
+        "product_id": sub_data.product_id,
+        "status": {"$ne": "cancelled"}
+    })
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="El usuario ya tiene este producto asignado")
+    
+    subscription = Subscription(
+        user_id=user["id"],
+        user_email=user["email"],
+        user_name=user["name"],
+        company_name=user.get("company_name"),
+        product_id=sub_data.product_id,
+        product_name=product["name"],
+        plan_name=sub_data.plan_name,
+        billing_cycle="monthly",
+        is_enabled=True,
+        status="active"
+    )
+    
+    sub_dict = subscription.model_dump()
+    sub_dict["created_at"] = datetime.now(timezone.utc).isoformat()
+    sub_dict["enabled_at"] = datetime.now(timezone.utc).isoformat()
+    sub_dict["enabled_by"] = admin["email"]
+    
+    await db.subscriptions.insert_one(sub_dict)
+    
+    return {"message": "Producto agregado correctamente"}
+
 # ============== CONTACT ROUTES ==============
 
 @api_router.post("/contact", response_model=ContactMessage)
