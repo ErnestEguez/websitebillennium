@@ -13,13 +13,13 @@ import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MySubscriptions from "./pages/MySubscriptions";
+import UserDashboard from "./pages/UserDashboard";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/Dashboard";
 import AdminSubscriptions from "./pages/admin/Subscriptions";
 import AdminUsers from "./pages/admin/Users";
 import AdminMessages from "./pages/admin/Messages";
-import AdminCompanies from "./pages/admin/Companies";
 
 // Public Page Wrapper
 const PublicPage = ({ children }) => (
@@ -45,13 +45,13 @@ function App() {
           
           {/* User Routes */}
           <Route path="/mis-suscripciones" element={<MySubscriptions />} />
+          <Route path="/mis-aplicaciones" element={<UserDashboard />} />
           
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/suscripciones" element={<AdminSubscriptions />} />
           <Route path="/admin/usuarios" element={<AdminUsers />} />
           <Route path="/admin/mensajes" element={<AdminMessages />} />
-          <Route path="/admin/empresas" element={<AdminCompanies />} />
         </Routes>
         <Toaster position="top-right" richColors />
       </BrowserRouter>
