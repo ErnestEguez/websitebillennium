@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { Users, CreditCard, MessageSquare, Building2, TrendingUp, Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import AdminLayout from '../components/AdminLayout';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import AdminLayout from '../../components/AdminLayout';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 

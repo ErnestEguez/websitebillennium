@@ -2,21 +2,21 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { Building2, Search, Plus, Settings, Check, X } from 'lucide-react';
-import { Card, CardContent } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
-import { Input } from '../components/ui/input';
-import { Switch } from '../components/ui/switch';
-import { Label } from '../components/ui/label';
+import { Card, CardContent } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Badge } from '../../components/ui/badge';
+import { Input } from '../../components/ui/input';
+import { Switch } from '../../components/ui/switch';
+import { Label } from '../../components/ui/label';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '../components/ui/dialog';
-import { Checkbox } from '../components/ui/checkbox';
-import AdminLayout from '../components/AdminLayout';
+} from '../../components/ui/dialog';
+import { Checkbox } from '../../components/ui/checkbox';
+import AdminLayout from '../../components/AdminLayout';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
