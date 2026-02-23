@@ -84,8 +84,8 @@ const Header = () => {
                     </>
                   )}
                   <DropdownMenuItem asChild>
-                    <Link to="/mis-suscripciones" className="cursor-pointer" data-testid="my-subscriptions-link">
-                      Mis Suscripciones
+                    <Link to="/mis-aplicaciones" className="cursor-pointer" data-testid="my-apps-link">
+                      Mis Aplicaciones
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -148,8 +148,8 @@ const Header = () => {
                           <Button variant="outline" className="w-full">Panel Admin</Button>
                         </Link>
                       )}
-                      <Link to="/mis-suscripciones" onClick={() => setIsOpen(false)}>
-                        <Button variant="outline" className="w-full">Mis Suscripciones</Button>
+                      <Link to="/mis-aplicaciones" onClick={() => setIsOpen(false)}>
+                        <Button variant="outline" className="w-full">Mis Aplicaciones</Button>
                       </Link>
                       <Button variant="destructive" onClick={handleLogout} className="w-full">
                         Cerrar Sesión
