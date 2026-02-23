@@ -166,8 +166,8 @@ export const Home = () => {
                 <img
                   src={HERO_IMAGE}
                   alt="Billennium System - Software en la nube"
-                  className="relative w-full object-cover object-bottom shadow-2xl"
-                  style={{ height: '450px' }}
+                  className="relative w-full shadow-2xl"
+                  style={{ marginTop: '-80px', height: '530px', objectFit: 'cover', objectPosition: 'center bottom' }}
                 />
               </div>
             </motion.div>
