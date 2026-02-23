@@ -1,53 +1,61 @@
-import { useEffect } from "react";
-import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import { AuthProvider } from "./context/AuthContext";
+import { Toaster } from "./components/ui/sonner";
+import Layout from "./components/Layout";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+// Public Pages
+import Home from "./pages/Home";
+import Products from "./pages/Products";
+import ProductDetail from "./pages/ProductDetail";
+import Planes from "./pages/Planes";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import MySubscriptions from "./pages/MySubscriptions";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+// Admin Pages
+import AdminDashboard from "./pages/admin/Dashboard";
+import AdminSubscriptions from "./pages/admin/Subscriptions";
+import AdminUsers from "./pages/admin/Users";
+import AdminMessages from "./pages/admin/Messages";
+import AdminCompanies from "./pages/admin/Companies";
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+// Public Page Wrapper
+const PublicPage = ({ children }) => (
+  <Layout>{children}</Layout>
+);
 
 function App() {
   return (
-    <div className="App">
+    <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
+          {/* Public Routes */}
+          <Route path="/" element={<PublicPage><Home /></PublicPage>} />
+          <Route path="/productos" element={<PublicPage><Products /></PublicPage>} />
+          <Route path="/productos/:slug" element={<PublicPage><ProductDetail /></PublicPage>} />
+          <Route path="/planes" element={<PublicPage><Planes /></PublicPage>} />
+          <Route path="/nosotros" element={<PublicPage><About /></PublicPage>} />
+          <Route path="/contacto" element={<PublicPage><Contact /></PublicPage>} />
+          
+          {/* Auth Routes (no layout) */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* User Routes */}
+          <Route path="/mis-suscripciones" element={<MySubscriptions />} />
+          
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/suscripciones" element={<AdminSubscriptions />} />
+          <Route path="/admin/usuarios" element={<AdminUsers />} />
+          <Route path="/admin/mensajes" element={<AdminMessages />} />
+          <Route path="/admin/empresas" element={<AdminCompanies />} />
         </Routes>
+        <Toaster position="top-right" richColors />
       </BrowserRouter>
-    </div>
+    </AuthProvider>
   );
 }
 
