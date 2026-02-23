@@ -166,7 +166,8 @@ export const Home = () => {
                 <img
                   src={HERO_IMAGE}
                   alt="Billennium System - Software en la nube"
-                  className="relative rounded-2xl shadow-2xl w-full"
+                  className="relative rounded-2xl shadow-2xl w-full object-cover"
+                  style={{ maxHeight: '500px' }}
                 />
               </div>
             </motion.div>
