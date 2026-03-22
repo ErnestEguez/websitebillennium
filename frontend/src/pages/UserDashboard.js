@@ -43,7 +43,7 @@ const productConfig = {
     name: 'Módulo de Importaciones',
     icon: Ship,
     color: 'bg-cyan-50 text-cyan-600',
-    url: null,
+    url: 'https://import-cloud.vercel.app/',
     description: 'Control de importaciones'
   },
   lopdp: {
