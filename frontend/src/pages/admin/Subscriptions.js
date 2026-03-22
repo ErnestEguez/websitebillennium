@@ -36,7 +36,7 @@ const PLANS = {
   restoflow: ['Emprendedor', 'Empresarial', 'Corporativo'],
   sentinel: ['Básico', 'Profesional', 'Corporativo'],
   importaciones: ['Estándar', 'Profesional'],
-  lopdp: ['PYME', 'Empresarial'],
+  lopdp: ['PYME', 'Profesional'],
   facturacion: ['Básico', 'Profesional', 'Empresarial'],
   dashboard: ['Básico', 'Profesional'],
   'plataforma-ferias': ['Estándar'],

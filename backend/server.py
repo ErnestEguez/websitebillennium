@@ -175,7 +175,7 @@ PRODUCTS = [
             {
                 "name": "Emprendedor",
                 "price_before": 40,
-                "price_now": 20,
+                "price_now": 30,
                 "billing": "mensual",
                 "features": ["1 local", "1 usuario administrador", "3 usuarios meseros", "Facturación electrónica básica", "Reportes estándar", "Soporte básico"]
             },
@@ -253,7 +253,7 @@ PRODUCTS = [
             {
                 "name": "Estándar",
                 "price_before": 80,
-                "price_now": 45,
+                "price_now": 35,
                 "billing": "mensual",
                 "features": ["Hasta 50 importaciones/mes", "1 usuario", "Control de órdenes de compra", "Seguimiento de embarques", "Cálculo de costos básico", "Reportes estándar"]
             },
@@ -285,14 +285,14 @@ PRODUCTS = [
             {
                 "name": "PYME",
                 "price_before": 60,
-                "price_now": 35,
+                "price_now": 79,
                 "billing": "mensual",
                 "features": ["Hasta 500 registros", "1 usuario administrador", "Inventario de datos", "Gestión de consentimientos básica", "Portal ARCO", "Documentación legal básica"]
             },
             {
-                "name": "Empresarial",
+                "name": "Profesional",
                 "price_before": 120,
-                "price_now": 70,
+                "price_now": 150,
                 "billing": "mensual",
                 "popular": True,
                 "features": ["Registros ilimitados", "Hasta 5 usuarios", "Todo lo del Plan PYME", "Registro de tratamientos completo", "Alertas de cumplimiento", "Reportes de auditoría", "Soporte prioritario"]

@@ -26,7 +26,7 @@ const products = [
     color: 'from-orange-500 to-red-500',
     bgColor: 'bg-orange-50',
     iconColor: 'text-orange-600',
-    priceFrom: 20,
+    priceFrom: 30,
   },
   {
     id: 'pedidos-sentinel',
@@ -52,7 +52,7 @@ const products = [
     color: 'from-cyan-500 to-blue-500',
     bgColor: 'bg-cyan-50',
     iconColor: 'text-cyan-600',
-    priceFrom: 45,
+    priceFrom: 35,
   },
   {
     id: 'lopdp',
@@ -65,7 +65,7 @@ const products = [
     color: 'from-green-500 to-emerald-500',
     bgColor: 'bg-green-50',
     iconColor: 'text-green-600',
-    priceFrom: 35,
+    priceFrom: 79,
   },
   {
     id: 'facturacion-electronica',

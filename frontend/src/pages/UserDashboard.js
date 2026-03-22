@@ -29,7 +29,7 @@ const productConfig = {
     name: 'RestoFlow',
     icon: UtensilsCrossed,
     color: 'bg-orange-50 text-orange-600',
-    url: 'https://pedidosbillennium.vercel.app/',
+    url: 'https://mi-restaurante-2026.vercel.app/',
     description: 'Gestión integral de restaurantes'
   },
   sentinel: {
@@ -57,7 +57,7 @@ const productConfig = {
     name: 'Facturación Electrónica',
     icon: FileText,
     color: 'bg-purple-50 text-purple-600',
-    url: null,
+    url: 'https://quickinvoice.vercel.app/',
     description: 'Comprobantes electrónicos SRI'
   },
   dashboard: {
