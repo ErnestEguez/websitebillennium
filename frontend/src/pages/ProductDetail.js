@@ -248,12 +248,21 @@ export const ProductDetail = () => {
                 {product.description}
               </p>
               <div className="flex flex-wrap gap-4">
-                <a href="#planes">
-                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700" data-testid="btn-ver-planes">
-                    Ver Planes
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </a>
+                {product.plans && product.plans.length > 0 ? (
+                  <a href="#planes">
+                    <Button size="lg" className="bg-blue-600 hover:bg-blue-700" data-testid="btn-ver-planes">
+                      Ver Planes
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </a>
+                ) : (
+                  <Link to="/contacto">
+                    <Button size="lg" className="bg-blue-600 hover:bg-blue-700" data-testid="btn-cotizar">
+                      Cotizar a medida
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                )}
                 <Link to="/contacto">
                   <Button size="lg" variant="outline" className="border-slate-600 text-white hover:bg-slate-800" data-testid="btn-solicitar-demo">
                     Solicitar Demo
@@ -416,7 +425,7 @@ export const ProductDetail = () => {
                       </div>
 
                       <ul className="space-y-3 mb-8">
-                        {plan.features.map((feature, j) => (
+                        {plan.features?.map((feature, j) => (
                           <li key={j} className="flex items-start gap-2 text-sm">
                             <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
                             <span className="text-slate-600">{feature}</span>

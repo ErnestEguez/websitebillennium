@@ -38,6 +38,7 @@ const saasAdvantages = [
 export const Planes = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState('restoflow');
   const [subscribing, setSubscribing] = useState(false);
   const { user, token } = useAuth();
@@ -48,11 +49,14 @@ export const Planes = () => {
   }, []);
 
   const fetchProducts = async () => {
+    setLoading(true);
+    setError(false);
     try {
       const response = await axios.get(`${API}/products`);
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -88,8 +92,21 @@ export const Planes = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50 text-center">
+        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6">
+           <span className="text-2xl font-bold">!</span>
+        </div>
+        <h2 className="text-3xl font-bold text-slate-900 mb-4">Problema de conexión</h2>
+        <p className="text-lg text-slate-600 mb-8 max-w-md">No hemos podido cargar los planes en este momento. Por favor, verifica tu conexión o intenta de nuevo.</p>
+        <Button size="lg" onClick={fetchProducts} className="bg-blue-600 hover:bg-blue-700">Reintentar</Button>
       </div>
     );
   }
@@ -173,56 +190,68 @@ export const Planes = () => {
                 </motion.div>
 
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
-                  {product.plans.map((plan, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.1 }}
-                    >
-                      <Card className={`h-full ${plan.popular ? 'border-2 border-blue-500 shadow-xl relative' : 'border-slate-200'}`}>
-                        {plan.popular && (
-                          <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                            <Badge className="bg-blue-600 text-white">Más Popular</Badge>
-                          </div>
-                        )}
-                        <CardHeader className="text-center pb-2">
-                          <CardTitle className="text-xl">{plan.name}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="text-center mb-6">
-                            <div className="flex items-center justify-center gap-2 mb-2">
-                              <span className="text-slate-400 line-through text-lg">${plan.price_before}</span>
-                              <Badge variant="destructive" className="bg-red-500">-50%</Badge>
+                  {(!product.plans || product.plans.length === 0) ? (
+                    <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 shadow-sm mt-4">
+                      <h3 className="text-xl font-semibold text-slate-900 mb-3">Plan Personalizado</h3>
+                      <p className="text-slate-600 max-w-lg mx-auto mb-8">
+                        Este producto o servicio requiere una cotización a medida según las necesidades específicas de tu negocio.
+                      </p>
+                      <Link to="/contacto">
+                        <Button className="bg-blue-600 hover:bg-blue-700">Contáctanos para más información</Button>
+                      </Link>
+                    </div>
+                  ) : (
+                    product.plans.map((plan, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                      >
+                        <Card className={`h-full ${plan.popular ? 'border-2 border-blue-500 shadow-xl relative' : 'border-slate-200'}`}>
+                          {plan.popular && (
+                            <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                              <Badge className="bg-blue-600 text-white">Más Popular</Badge>
                             </div>
-                            <div className="flex items-baseline justify-center">
-                              <span className="text-4xl font-bold text-slate-900">${plan.price_now}</span>
-                              <span className="text-slate-500 ml-1">/{plan.billing}</span>
+                          )}
+                          <CardHeader className="text-center pb-2">
+                            <CardTitle className="text-xl">{plan.name}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="text-center mb-6">
+                              <div className="flex items-center justify-center gap-2 mb-2">
+                                <span className="text-slate-400 line-through text-lg">${plan.price_before}</span>
+                                <Badge variant="destructive" className="bg-red-500">-50%</Badge>
+                              </div>
+                              <div className="flex items-baseline justify-center">
+                                <span className="text-4xl font-bold text-slate-900">${plan.price_now}</span>
+                                <span className="text-slate-500 ml-1">/{plan.billing}</span>
+                              </div>
                             </div>
-                          </div>
 
-                          <ul className="space-y-3 mb-8">
-                            {plan.features.map((feature, j) => (
-                              <li key={j} className="flex items-start gap-2 text-sm">
-                                <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
-                                <span className="text-slate-600">{feature}</span>
-                              </li>
-                            ))}
-                          </ul>
+                            <ul className="space-y-3 mb-8">
+                              {plan.features?.map((feature, j) => (
+                                <li key={j} className="flex items-start gap-2 text-sm">
+                                  <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                  <span className="text-slate-600">{feature}</span>
+                                </li>
+                              ))}
+                            </ul>
 
-                          <Button
-                            className={`w-full ${plan.popular ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
-                            variant={plan.popular ? 'default' : 'outline'}
-                            onClick={() => handleSubscribe(product.id, plan.name)}
-                            disabled={subscribing}
-                            data-testid={`subscribe-${product.id}-${plan.name.toLowerCase().replace(' ', '-')}`}
-                          >
-                            {subscribing ? 'Procesando...' : 'Comenzar Ahora'}
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
+                            <Button
+                              className={`w-full ${plan.popular ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                              variant={plan.popular ? 'default' : 'outline'}
+                              onClick={() => handleSubscribe(product.id, plan.name)}
+                              disabled={subscribing}
+                              data-testid={`subscribe-${product.id}-${plan.name.toLowerCase().replace(' ', '-')}`}
+                            >
+                              {subscribing ? 'Procesando...' : 'Comenzar Ahora'}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))
+                  )}
                 </div>
               </TabsContent>
             ))}
