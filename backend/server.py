@@ -29,6 +29,15 @@ JWT_EXPIRATION_HOURS = 24
 # Create the main app
 app = FastAPI(title="Billennium System API")
 
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust this to specific domains in production if needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
