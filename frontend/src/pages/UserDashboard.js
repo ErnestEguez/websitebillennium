@@ -57,7 +57,7 @@ const productConfig = {
     name: 'Facturación Electrónica',
     icon: FileText,
     color: 'bg-purple-50 text-purple-600',
-    url: 'https://quickinvoice.vercel.app/',
+    url: 'https://quickinvoice-puce.vercel.app/login',
     description: 'Comprobantes electrónicos SRI'
   },
   dashboard: {
