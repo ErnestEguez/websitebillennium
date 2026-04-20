@@ -44,3 +44,6 @@ htmlcov/
 # Temporary
 *.tmp
 *.temp
+
+.vercel
+.env*.local

@@ -9,7 +9,7 @@ import { Input } from '../../components/ui/input';
 import AdminLayout from '../../components/AdminLayout';
 import { toast } from 'sonner';
 
-const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+const API = '/api';
 
 export const AdminMessages = () => {
   const [messages, setMessages] = useState([]);

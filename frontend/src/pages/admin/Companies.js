@@ -19,7 +19,7 @@ import { Checkbox } from '../../components/ui/checkbox';
 import AdminLayout from '../../components/AdminLayout';
 import { toast } from 'sonner';
 
-const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+const API = '/api';
 
 const PRODUCTS = [
   { id: 'restoflow', name: 'RestoFlow' },
