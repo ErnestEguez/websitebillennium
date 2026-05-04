@@ -766,6 +766,17 @@ APP_URLS = {
     "sentinel": os.environ.get("PEDIDOS_APP_URL", "http://localhost:5173"),
 }
 
+@api_router.get("/debug/env")
+def debug_env():
+    """Endpoint temporal de diagnóstico — eliminar después de verificar."""
+    return {
+        "PEDIDOS_APP_URL": os.environ.get("PEDIDOS_APP_URL", "NO CONFIGURADA - usando localhost"),
+        "PEDIDOS_APP_URL_resolved": APP_URLS.get("sentinel"),
+        "SUPABASE_URL_set": bool(os.environ.get("SUPABASE_URL")),
+        "SUPABASE_KEY_set": bool(os.environ.get("SUPABASE_KEY")),
+        "JWT_SECRET_set": bool(os.environ.get("JWT_SECRET")),
+    }
+
 @api_router.get("/auth/app-token")
 def get_app_token(
     product_id: str,
