@@ -30,7 +30,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
-const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+const API = '/api';
 
 const iconMap = {
   UtensilsCrossed,

@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/badge';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 
-const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+const API = '/api';
 
 const statusConfig = {
   pending: { label: 'Pendiente', icon: Clock, color: 'bg-yellow-100 text-yellow-800' },
