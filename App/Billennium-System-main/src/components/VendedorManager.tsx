@@ -9,7 +9,11 @@ interface PortalUser {
   company_name: string | null;
 }
 
-const PORTAL_API = import.meta.env.VITE_PORTAL_API_URL || 'http://localhost:8000';
+// Producción: usa proxy Vercel mismo origen (/portal-api → billenniumsystem.com/api)
+// Desarrollo: usa localhost:8000/api directamente
+const PORTAL_API_BASE = import.meta.env.VITE_PORTAL_API_URL
+  ? `${import.meta.env.VITE_PORTAL_API_URL}/api`
+  : '/portal-api';
 
 export function VendedorManager() {
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
@@ -117,7 +121,7 @@ export function VendedorManager() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sin sesión activa en App Pedidos');
 
-      const res = await fetch(`${PORTAL_API}/api/apps/sentinel/available-users`, {
+      const res = await fetch(`${PORTAL_API_BASE}/apps/sentinel/available-users`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
 
@@ -146,7 +150,7 @@ export function VendedorManager() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sin sesión activa');
 
-      const res = await fetch(`${PORTAL_API}/api/apps/sentinel/vendedores`, {
+      const res = await fetch(`${PORTAL_API_BASE}/apps/sentinel/vendedores`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,

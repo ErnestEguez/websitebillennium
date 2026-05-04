@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/portal-api/(.*)",
+      "destination": "https://billenniumsystem.com/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
