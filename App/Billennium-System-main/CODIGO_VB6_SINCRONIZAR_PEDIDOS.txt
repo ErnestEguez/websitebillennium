@@ -1,0 +1,462 @@
+' ============================================================
+' CÓDIGO VB6 PARA SINCRONIZAR PEDIDOS DESDE SUPABASE
+' ============================================================
+' IMPORTANTE: Este código debe ir en un MÓDULO (.bas)
+' Agrega referencia: Microsoft WinHTTP Services, version 5.1
+' Agrega referencia: Microsoft ActiveX Data Objects 2.x Library
+' ============================================================
+
+Option Explicit
+
+' CONFIGURACIÓN - MODIFICA ESTOS VALORES
+Private Const SUPABASE_URL As String = "https://nxcngfxiubexepmintwf.supabase.co"
+Private Const SUPABASE_KEY As String = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54Y25nZnhpdWJleGVwbWludHdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNjM5ODgsImV4cCI6MjA4MTYzOTk4OH0.iQtSmiYgAmiWMr1Uo-xhleMEBa8vwVXZVkp8-TbaRWU"
+
+' UUID de tu empresa (obtenerlo del Admin Panel)
+Private Const CodigoUUID As String = "a7699557-aba1-4405-a992-2a751e51060a"
+
+' Cadena de conexión a tu SQL Server local
+' MODIFICA ESTO según tu base de datos
+Private Const CONN_STRING As String = "Provider=SQLOLEDB;Data Source=tu_servidor;Initial Catalog=tu_bd;User ID=usuario;Password=password;"
+
+' ============================================================
+' FUNCIÓN PRINCIPAL: Sincronizar Pedidos desde Supabase al ERP
+' ============================================================
+Public Function SincronizarPedidos() As Integer
+    On Error GoTo ErrorHandler
+
+    Debug.Print "=== INICIANDO SINCRONIZACIÓN DE PEDIDOS ==="
+
+    Dim http As Object
+    Dim url As String
+    Dim jsonResponse As String
+    Dim statusCode As Long
+    Dim pedidosImportados As Integer
+    Dim i As Integer
+
+    pedidosImportados = 0
+
+    ' Consultar pedidos pendientes en Supabase
+    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+
+    url = SUPABASE_URL & "/rest/v1/pedido_cabecera?empresa_id=eq." & CodigoUUID & "&sincronizada=eq.false&select=*"
+    Debug.Print "  URL: " & url
+
+    http.Open "GET", url, False
+    http.SetRequestHeader "apikey", SUPABASE_KEY
+    http.SetRequestHeader "Authorization", "Bearer " & SUPABASE_KEY
+    http.SetRequestHeader "Content-Type", "application/json"
+
+    http.Send
+
+    statusCode = http.Status
+    If statusCode <> 200 Then
+        Debug.Print "  ERROR HTTP: " & statusCode
+        Debug.Print "  Respuesta: " & http.responseText
+        SincronizarPedidos = 0
+        Exit Function
+    End If
+
+    jsonResponse = http.responseText
+    Debug.Print "  Respuesta de Supabase: " & Left(jsonResponse, 200)
+
+    ' Verificar si hay pedidos
+    If jsonResponse = "[]" Or jsonResponse = "" Then
+        Debug.Print "  No hay pedidos pendientes de sincronizar"
+        SincronizarPedidos = 0
+        Exit Function
+    End If
+
+    ' Parsear y procesar cada pedido
+    Dim arrPedidos() As String
+    Dim pedidoJson As String
+    Dim pedidoId As String
+    Dim pedidoNumero As String
+
+    ' Remover corchetes externos
+    jsonResponse = Mid(jsonResponse, 2, Len(jsonResponse) - 2)
+
+    ' Dividir por objetos JSON
+    arrPedidos = SplitPedidos(jsonResponse)
+
+    Debug.Print "  Total de pedidos encontrados: " & UBound(arrPedidos) + 1
+
+    ' Procesar cada pedido
+    For i = 0 To UBound(arrPedidos)
+        pedidoJson = arrPedidos(i)
+
+        ' Extraer ID del pedido
+        pedidoId = ExtraerValor(pedidoJson, "id")
+        pedidoNumero = ExtraerValor(pedidoJson, "numero")
+
+        Debug.Print "  Procesando pedido: " & pedidoNumero & " (ID: " & pedidoId & ")"
+
+        ' Importar el pedido completo
+        If ImportarPedidoCompleto(pedidoJson, pedidoId) Then
+            ' Marcar como sincronizado
+            If MarcarPedidoSincronizado(pedidoId) Then
+                pedidosImportados = pedidosImportados + 1
+                Debug.Print "    ✓ Pedido " & pedidoNumero & " sincronizado correctamente"
+            Else
+                Debug.Print "    ✗ Error marcando pedido " & pedidoNumero & " como sincronizado"
+            End If
+        Else
+            Debug.Print "    ✗ Error importando pedido " & pedidoNumero
+        End If
+    Next i
+
+    Debug.Print "=== SINCRONIZACIÓN COMPLETADA ==="
+    Debug.Print "  Total sincronizados: " & pedidosImportados
+
+    SincronizarPedidos = pedidosImportados
+    Exit Function
+
+ErrorHandler:
+    Debug.Print "ERROR en SincronizarPedidos: " & Err.Description
+    SincronizarPedidos = 0
+End Function
+
+' ============================================================
+' FUNCIÓN: Dividir JSON en array de objetos
+' ============================================================
+Private Function SplitPedidos(jsonArray As String) As String()
+    Dim resultado() As String
+    Dim pos As Long
+    Dim nivel As Integer
+    Dim inicio As Long
+    Dim i As Long
+    Dim contador As Integer
+    Dim char As String
+
+    contador = 0
+    nivel = 0
+    inicio = 1
+
+    ' Primera pasada: contar objetos
+    For i = 1 To Len(jsonArray)
+        char = Mid(jsonArray, i, 1)
+        If char = "{" Then
+            nivel = nivel + 1
+        ElseIf char = "}" Then
+            nivel = nivel - 1
+            If nivel = 0 Then
+                contador = contador + 1
+            End If
+        End If
+    Next i
+
+    If contador = 0 Then
+        ReDim resultado(0)
+        resultado(0) = ""
+        SplitPedidos = resultado
+        Exit Function
+    End If
+
+    ' Redimensionar array
+    ReDim resultado(contador - 1)
+
+    ' Segunda pasada: extraer objetos
+    contador = 0
+    nivel = 0
+    inicio = 1
+
+    For i = 1 To Len(jsonArray)
+        char = Mid(jsonArray, i, 1)
+
+        If char = "{" Then
+            If nivel = 0 Then inicio = i
+            nivel = nivel + 1
+        ElseIf char = "}" Then
+            nivel = nivel - 1
+            If nivel = 0 Then
+                resultado(contador) = Mid(jsonArray, inicio, i - inicio + 1)
+                contador = contador + 1
+            End If
+        End If
+    Next i
+
+    SplitPedidos = resultado
+End Function
+
+' ============================================================
+' FUNCIÓN: Extraer valor de un campo JSON
+' ============================================================
+Private Function ExtraerValor(jsonObj As String, campo As String) As String
+    Dim patron As String
+    Dim posInicio As Long
+    Dim posFin As Long
+    Dim valor As String
+
+    ' Buscar el patrón "campo":"valor" o "campo":valor
+    patron = """" & campo & """:"
+    posInicio = InStr(jsonObj, patron)
+
+    If posInicio = 0 Then
+        ExtraerValor = ""
+        Exit Function
+    End If
+
+    ' Avanzar después del patrón
+    posInicio = posInicio + Len(patron)
+
+    ' Saltar espacios
+    Do While Mid(jsonObj, posInicio, 1) = " "
+        posInicio = posInicio + 1
+    Loop
+
+    ' Verificar si es un string (empieza con ")
+    If Mid(jsonObj, posInicio, 1) = """" Then
+        ' Es un string
+        posInicio = posInicio + 1
+        posFin = InStr(posInicio, jsonObj, """")
+        valor = Mid(jsonObj, posInicio, posFin - posInicio)
+    Else
+        ' Es un número, booleano o null
+        posFin = InStr(posInicio, jsonObj, ",")
+        If posFin = 0 Then posFin = InStr(posInicio, jsonObj, "}")
+        valor = Trim(Mid(jsonObj, posInicio, posFin - posInicio))
+    End If
+
+    ExtraerValor = valor
+End Function
+
+' ============================================================
+' FUNCIÓN: Importar pedido completo con sus detalles
+' ============================================================
+Private Function ImportarPedidoCompleto(pedidoJson As String, pedidoId As String) As Boolean
+    On Error GoTo ErrorHandler
+
+    Dim conn As ADODB.Connection
+    Dim cmd As ADODB.Command
+    Dim rs As ADODB.Recordset
+    Dim http As Object
+    Dim url As String
+    Dim detallesJson As String
+
+    ' Extraer datos de la cabecera
+    Dim numero As String
+    Dim rucCliente As String
+    Dim nombreCliente As String
+    Dim vendedorId As String
+    Dim formaPago As String
+    Dim observaciones As String
+    Dim subtotal As Double
+    Dim impuesto As Double
+    Dim total As Double
+
+    numero = ExtraerValor(pedidoJson, "numero")
+    rucCliente = ExtraerValor(pedidoJson, "ruc_cliente")
+    nombreCliente = ExtraerValor(pedidoJson, "nombre_cliente")
+    vendedorId = ExtraerValor(pedidoJson, "vendedor_id")
+    formaPago = ExtraerValor(pedidoJson, "forma_pago")
+    observaciones = ExtraerValor(pedidoJson, "observaciones")
+
+    subtotal = Val(Replace(ExtraerValor(pedidoJson, "subtotal"), ".", ","))
+    impuesto = Val(Replace(ExtraerValor(pedidoJson, "impuesto"), ".", ","))
+    total = Val(Replace(ExtraerValor(pedidoJson, "total"), ".", ","))
+
+    Debug.Print "    Importando cabecera..."
+    Debug.Print "      Cliente: " & nombreCliente
+    Debug.Print "      Total: " & Format(total, "0.00")
+
+    ' Conectar a SQL Server local
+    Set conn = New ADODB.Connection
+    conn.ConnectionString = CONN_STRING
+    conn.Open
+    conn.BeginTrans
+
+    ' PASO 1: Insertar cabecera del pedido
+    ' MODIFICA ESTA CONSULTA según tu tabla
+    Set cmd = New ADODB.Command
+    cmd.ActiveConnection = conn
+    cmd.CommandText = "INSERT INTO PedidoCabecera (Numero, RUC, NombreCliente, VendedorID, FormaPago, Observaciones, Subtotal, Impuesto, Total, Fecha, Origen) " & _
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), 'TABLET')"
+
+    cmd.Parameters.Append cmd.CreateParameter("numero", adVarChar, adParamInput, 50, numero)
+    cmd.Parameters.Append cmd.CreateParameter("ruc", adVarChar, adParamInput, 20, rucCliente)
+    cmd.Parameters.Append cmd.CreateParameter("nombre", adVarChar, adParamInput, 200, nombreCliente)
+    cmd.Parameters.Append cmd.CreateParameter("vendedor", adVarChar, adParamInput, 20, IIf(vendedorId = "null" Or vendedorId = "", "VEN001", vendedorId))
+    cmd.Parameters.Append cmd.CreateParameter("forma_pago", adVarChar, adParamInput, 100, formaPago)
+    cmd.Parameters.Append cmd.CreateParameter("observaciones", adVarChar, adParamInput, 500, observaciones)
+    cmd.Parameters.Append cmd.CreateParameter("subtotal", adDouble, adParamInput, , subtotal)
+    cmd.Parameters.Append cmd.CreateParameter("impuesto", adDouble, adParamInput, , impuesto)
+    cmd.Parameters.Append cmd.CreateParameter("total", adDouble, adParamInput, , total)
+
+    cmd.Execute
+
+    Debug.Print "    Cabecera insertada. Obteniendo detalles..."
+
+    ' PASO 2: Obtener detalles del pedido desde Supabase
+    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+    url = SUPABASE_URL & "/rest/v1/pedido_detalle?pedido_id=eq." & pedidoId & "&select=*"
+
+    http.Open "GET", url, False
+    http.SetRequestHeader "apikey", SUPABASE_KEY
+    http.SetRequestHeader "Authorization", "Bearer " & SUPABASE_KEY
+    http.Send
+
+    If http.Status <> 200 Then
+        Debug.Print "    ERROR obteniendo detalles: " & http.Status
+        conn.RollbackTrans
+        conn.Close
+        ImportarPedidoCompleto = False
+        Exit Function
+    End If
+
+    detallesJson = http.responseText
+    Debug.Print "    Detalles JSON: " & Left(detallesJson, 200)
+
+    ' PASO 3: Insertar detalles
+    If detallesJson <> "[]" And detallesJson <> "" Then
+        If Not InsertarDetallesPedido(conn, numero, detallesJson) Then
+            conn.RollbackTrans
+            conn.Close
+            ImportarPedidoCompleto = False
+            Exit Function
+        End If
+    End If
+
+    ' Confirmar transacción
+    conn.CommitTrans
+    conn.Close
+
+    ImportarPedidoCompleto = True
+    Exit Function
+
+ErrorHandler:
+    Debug.Print "    ERROR en ImportarPedidoCompleto: " & Err.Description
+    If Not conn Is Nothing Then
+        If conn.State = adStateOpen Then
+            conn.RollbackTrans
+            conn.Close
+        End If
+    End If
+    ImportarPedidoCompleto = False
+End Function
+
+' ============================================================
+' FUNCIÓN: Insertar detalles del pedido
+' ============================================================
+Private Function InsertarDetallesPedido(conn As ADODB.Connection, numeroPedido As String, detallesJson As String) As Boolean
+    On Error GoTo ErrorHandler
+
+    Dim arrDetalles() As String
+    Dim detalleJson As String
+    Dim cmd As ADODB.Command
+    Dim i As Integer
+
+    Dim articuloId As String
+    Dim descripcion As String
+    Dim cantidad As Double
+    Dim precioUnitario As Double
+    Dim descuento As Double
+    Dim subtotal As Double
+
+    ' Remover corchetes
+    detallesJson = Mid(detallesJson, 2, Len(detallesJson) - 2)
+
+    ' Dividir detalles
+    arrDetalles = SplitPedidos(detallesJson)
+
+    Debug.Print "    Insertando " & (UBound(arrDetalles) + 1) & " detalles..."
+
+    For i = 0 To UBound(arrDetalles)
+        detalleJson = arrDetalles(i)
+
+        articuloId = ExtraerValor(detalleJson, "articulo_id")
+        descripcion = ExtraerValor(detalleJson, "descripcion")
+        cantidad = Val(Replace(ExtraerValor(detalleJson, "cantidad"), ".", ","))
+        precioUnitario = Val(Replace(ExtraerValor(detalleJson, "precio_unitario"), ".", ","))
+        descuento = Val(Replace(ExtraerValor(detalleJson, "descuento"), ".", ","))
+        subtotal = Val(Replace(ExtraerValor(detalleJson, "subtotal"), ".", ","))
+
+        ' MODIFICA ESTA CONSULTA según tu tabla
+        Set cmd = New ADODB.Command
+        cmd.ActiveConnection = conn
+        cmd.CommandText = "INSERT INTO PedidoDetalle (NumeroPedido, ArticuloID, Descripcion, Cantidad, PrecioUnitario, Descuento, Subtotal) " & _
+                          "VALUES (?, ?, ?, ?, ?, ?, ?)"
+
+        cmd.Parameters.Append cmd.CreateParameter("numero", adVarChar, adParamInput, 50, numeroPedido)
+        cmd.Parameters.Append cmd.CreateParameter("articulo", adVarChar, adParamInput, 50, articuloId)
+        cmd.Parameters.Append cmd.CreateParameter("descripcion", adVarChar, adParamInput, 200, descripcion)
+        cmd.Parameters.Append cmd.CreateParameter("cantidad", adDouble, adParamInput, , cantidad)
+        cmd.Parameters.Append cmd.CreateParameter("precio", adDouble, adParamInput, , precioUnitario)
+        cmd.Parameters.Append cmd.CreateParameter("descuento", adDouble, adParamInput, , descuento)
+        cmd.Parameters.Append cmd.CreateParameter("subtotal", adDouble, adParamInput, , subtotal)
+
+        cmd.Execute
+
+        Debug.Print "      - " & descripcion & " x " & cantidad
+    Next i
+
+    InsertarDetallesPedido = True
+    Exit Function
+
+ErrorHandler:
+    Debug.Print "    ERROR en InsertarDetallesPedido: " & Err.Description
+    InsertarDetallesPedido = False
+End Function
+
+' ============================================================
+' FUNCIÓN: Marcar pedido como sincronizado en Supabase
+' ============================================================
+Private Function MarcarPedidoSincronizado(pedidoId As String) As Boolean
+    On Error GoTo ErrorHandler
+
+    Dim http As Object
+    Dim url As String
+    Dim jsonData As String
+
+    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+
+    url = SUPABASE_URL & "/rest/v1/pedido_cabecera?id=eq." & pedidoId
+    jsonData = "{""sincronizada"":true}"
+
+    http.Open "PATCH", url, False
+    http.SetRequestHeader "apikey", SUPABASE_KEY
+    http.SetRequestHeader "Authorization", "Bearer " & SUPABASE_KEY
+    http.SetRequestHeader "Content-Type", "application/json"
+    http.SetRequestHeader "Prefer", "return=minimal"
+
+    http.Send jsonData
+
+    If http.Status >= 200 And http.Status < 300 Then
+        MarcarPedidoSincronizado = True
+    Else
+        Debug.Print "    ERROR marcando como sincronizado. Status: " & http.Status
+        MarcarPedidoSincronizado = False
+    End If
+
+    Exit Function
+
+ErrorHandler:
+    Debug.Print "    ERROR en MarcarPedidoSincronizado: " & Err.Description
+    MarcarPedidoSincronizado = False
+End Function
+
+' ============================================================
+' FUNCIÓN: Ejecutar desde un botón o Timer
+' ============================================================
+Public Sub EjecutarSincronizacionPedidos()
+    Dim total As Integer
+
+    total = SincronizarPedidos()
+
+    If total > 0 Then
+        MsgBox "Se sincronizaron " & total & " pedidos correctamente", vbInformation, "Sincronización Completada"
+    Else
+        MsgBox "No hay pedidos pendientes de sincronizar", vbInformation, "Sincronización"
+    End If
+End Sub
+
+' ============================================================
+' FUNCIÓN: Ejecutar automáticamente cada X minutos con Timer
+' ============================================================
+' Agregar un Timer al formulario con Interval = 300000 (5 minutos)
+Public Sub Timer_SincronizacionPedidos_Timer()
+    Dim total As Integer
+    total = SincronizarPedidos()
+    If total > 0 Then
+        Debug.Print "✓ Timer: " & total & " pedidos sincronizados automáticamente"
+    End If
+End Sub

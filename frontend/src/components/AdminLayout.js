@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  Users, 
-  CreditCard, 
-  MessageSquare, 
-  Menu, 
-  X, 
+import {
+  LayoutDashboard,
+  Users,
+  CreditCard,
+  MessageSquare,
+  Menu,
+  X,
   LogOut,
   Home,
-  ChevronRight
+  ChevronRight,
+  AppWindow
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
@@ -19,6 +20,7 @@ const LOGO_URL = "https://customer-assets.emergentagent.com/job_04fdc029-61d0-44
 
 const sidebarLinks = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/aplicaciones', label: 'Aplicaciones', icon: AppWindow },
   { href: '/admin/suscripciones', label: 'Suscripciones', icon: CreditCard },
   { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
   { href: '/admin/mensajes', label: 'Mensajes', icon: MessageSquare },

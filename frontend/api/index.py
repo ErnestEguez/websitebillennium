@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
+import secrets
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
@@ -13,8 +14,9 @@ import jwt
 import bcrypt
 from supabase import create_client, Client
 
+# Load .env file for local development
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / '.env', override=True)
 
 # ============== SUPABASE CLIENT ==============
 SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://dummy.supabase.co')
@@ -755,6 +757,238 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
         "total_messages": len(msgs_all),
         "unread_messages": sum(1 for m in msgs_all if not m["is_read"]),
         "total_companies": total_companies,
+    }
+
+# ============== SSO — MAGIC LINK para Apps ==============
+
+# Mapa de product_id → URL de producción de la App
+APP_URLS = {
+    "sentinel": os.environ.get("PEDIDOS_APP_URL", "http://localhost:5173"),
+}
+
+@api_router.get("/auth/app-token")
+def get_app_token(
+    product_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Genera un magic link de Supabase Auth para que el usuario del Portal
+    entre a la App sin necesidad de un segundo login.
+    """
+    if product_id not in APP_URLS:
+        raise HTTPException(status_code=400, detail=f"Producto '{product_id}' no soporta SSO aún")
+
+    sub = supabase.table("subscriptions").select("id").eq(
+        "user_id", current_user["id"]
+    ).eq("product_id", product_id).eq("status", "active").eq("is_enabled", True).execute()
+
+    if not sub.data:
+        raise HTTPException(status_code=403, detail="No tienes acceso activo a esta aplicación")
+
+    redirect_url = APP_URLS[product_id]
+
+    try:
+        result = supabase.auth.admin.generate_link({
+            "type": "magiclink",
+            "email": current_user["email"],
+            "options": {"redirect_to": redirect_url}
+        })
+        return {"url": result.properties.action_link}
+    except Exception as e:
+        logger.error(f"Error generating magic link for {current_user['email']}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al generar acceso: {str(e)}")
+
+@api_router.get("/admin/apps/{product_id}/enter")
+def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
+    """
+    Genera un magic link para que el admin del Portal entre directamente
+    al AdminPanel de la App indicada. Crea el vendedor admin si no existe.
+    """
+    if product_id not in APP_URLS:
+        raise HTTPException(status_code=400, detail=f"La aplicación '{product_id}' no soporta acceso admin aún")
+
+    email = admin["email"]
+    name = admin["name"]
+
+    # 1. Obtener o crear usuario en Supabase Auth
+    supabase_user_id = None
+    try:
+        id_result = supabase.rpc('get_user_id_by_email', {'p_email': email}).execute()
+        if id_result.data:
+            supabase_user_id = str(id_result.data)
+    except Exception:
+        pass
+
+    if not supabase_user_id:
+        create_result = supabase.auth.admin.create_user({
+            "email": email,
+            "email_confirm": True,
+            "password": secrets.token_urlsafe(16),
+            "user_metadata": {"name": name}
+        })
+        supabase_user_id = str(create_result.user.id)
+        logger.info(f"Admin Supabase Auth user created: {email} → {supabase_user_id}")
+
+    # 2. Garantizar vendedor admin en pedidosbillennium
+    existing = supabase.schema('pedidosbillennium').table('vendedores').select('id, is_admin').eq('id', supabase_user_id).execute()
+
+    if existing.data:
+        if not existing.data[0].get('is_admin'):
+            supabase.schema('pedidosbillennium').table('vendedores').update({'is_admin': True}).eq('id', supabase_user_id).execute()
+            logger.info(f"Vendedor upgraded to admin: {email}")
+    else:
+        empresa = supabase.schema('pedidosbillennium').table('empresas').select('id').limit(1).execute()
+        empresa_id = empresa.data[0]['id'] if empresa.data else None
+        supabase.schema('pedidosbillennium').table('vendedores').insert({
+            "id": supabase_user_id,
+            "nombre": name,
+            "email": email,
+            "activo": True,
+            "empresa_id": empresa_id,
+            "is_admin": True,
+            "is_office": False,
+        }).execute()
+        logger.info(f"Admin vendedor created in pedidosbillennium: {email}")
+
+    # 3. Generar magic link
+    try:
+        result = supabase.auth.admin.generate_link({
+            "type": "magiclink",
+            "email": email,
+            "options": {"redirect_to": APP_URLS[product_id]}
+        })
+        return {"url": result.properties.action_link, "app": product_id}
+    except Exception as e:
+        logger.error(f"Error generating admin magic link for {email}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al generar acceso: {str(e)}")
+
+# ============== APP INTEGRATIONS — SENTINEL (Pedidos Billennium) ==============
+
+class CreateVendedorFromPortalRequest(BaseModel):
+    portal_user_id: str
+    empresa_id: str
+    codven_erp: Optional[int] = None
+    is_office: bool = False
+
+def get_supabase_app_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verifica un JWT de Supabase Auth y que el usuario sea admin en pedidosbillennium."""
+    try:
+        token = credentials.credentials
+        user_response = supabase.auth.get_user(token)
+        if not user_response or not user_response.user:
+            raise HTTPException(status_code=401, detail="Token de Supabase inválido")
+        supabase_user_id = str(user_response.user.id)
+        vendedor = supabase.schema('pedidosbillennium').table('vendedores').select('id, is_admin').eq('id', supabase_user_id).execute()
+        v_data = vendedor.data[0] if vendedor.data else None
+        if not v_data or not v_data.get('is_admin'):
+            raise HTTPException(status_code=403, detail="No tienes permisos de administrador en App Pedidos")
+        return user_response.user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating Supabase token: {e}")
+        raise HTTPException(status_code=401, detail="Error de autenticación con Supabase")
+
+@api_router.get("/apps/sentinel/available-users")
+def get_sentinel_available_users(app_admin=Depends(get_supabase_app_admin)):
+    """
+    Devuelve usuarios del Portal con suscripción sentinel activa
+    que aún NO tienen registro en pedidosbillennium.vendedores.
+    """
+    subs = supabase.table("subscriptions").select(
+        "user_id, user_email, user_name, company_name"
+    ).eq("product_id", "sentinel").eq("status", "active").eq("is_enabled", True).execute()
+
+    if not subs.data:
+        return []
+
+    existing = supabase.schema('pedidosbillennium').table('vendedores').select('email').execute()
+    existing_emails = {v['email'] for v in (existing.data or [])}
+
+    return [
+        {
+            "id": s["user_id"],
+            "name": s["user_name"],
+            "email": s["user_email"],
+            "company_name": s.get("company_name"),
+        }
+        for s in subs.data
+        if s["user_email"] not in existing_emails
+    ]
+
+@api_router.post("/apps/sentinel/vendedores")
+def create_sentinel_vendedor(
+    data: CreateVendedorFromPortalRequest,
+    app_admin=Depends(get_supabase_app_admin)
+):
+    """
+    Crea usuario en Supabase Auth + registro en pedidosbillennium.vendedores
+    para un usuario del Portal que tiene suscripción sentinel activa.
+    """
+    user_result = supabase.table("users").select("id, email, name").eq("id", data.portal_user_id).execute()
+    if not user_result.data:
+        raise HTTPException(status_code=404, detail="Usuario del Portal no encontrado")
+    portal_user = user_result.data[0]
+
+    sub_check = supabase.table("subscriptions").select("id").eq(
+        "user_id", data.portal_user_id
+    ).eq("product_id", "sentinel").eq("status", "active").eq("is_enabled", True).execute()
+    if not sub_check.data:
+        raise HTTPException(status_code=403, detail="El usuario no tiene suscripción activa de Pedidos Sentinel")
+
+    empresa_check = supabase.schema('pedidosbillennium').table('empresas').select('id, nombre_comercial').eq('id', data.empresa_id).execute()
+    empresa_data = empresa_check.data[0] if empresa_check.data else None
+    if not empresa_data:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada en App Pedidos")
+
+    email = portal_user["email"]
+    name = portal_user["name"]
+    temp_password = secrets.token_urlsafe(12)
+    supabase_user_id = None
+
+    try:
+        create_result = supabase.auth.admin.create_user({
+            "email": email,
+            "email_confirm": True,
+            "password": temp_password,
+            "user_metadata": {"name": name}
+        })
+        supabase_user_id = str(create_result.user.id)
+        logger.info(f"Supabase Auth user created: {email} → {supabase_user_id}")
+    except Exception as e:
+        if any(k in str(e).lower() for k in ["already", "exists", "registered"]):
+            try:
+                id_result = supabase.rpc('get_user_id_by_email', {'p_email': email}).execute()
+                supabase_user_id = str(id_result.data)
+                temp_password = None
+                logger.info(f"Supabase Auth user already exists: {email} → {supabase_user_id}")
+            except Exception as e2:
+                raise HTTPException(status_code=500, detail=f"No se pudo obtener el ID del usuario existente: {str(e2)}")
+        else:
+            raise HTTPException(status_code=500, detail=f"Error al crear usuario en Supabase Auth: {str(e)}")
+
+    existing_vendedor = supabase.schema('pedidosbillennium').table('vendedores').select('id').eq('id', supabase_user_id).execute()
+    if existing_vendedor.data and len(existing_vendedor.data) > 0:
+        raise HTTPException(status_code=400, detail="Este usuario ya tiene un perfil de vendedor en App Pedidos")
+
+    supabase.schema('pedidosbillennium').table('vendedores').insert({
+        "id": supabase_user_id,
+        "nombre": name,
+        "email": email,
+        "telefono": None,
+        "activo": True,
+        "empresa_id": data.empresa_id,
+        "is_admin": False,
+        "is_office": data.is_office,
+        "codven_erp": data.codven_erp,
+    }).execute()
+
+    logger.info(f"Vendedor created: {email} → empresa {empresa_data['nombre_comercial']}")
+
+    return {
+        "message": f"Acceso creado para {name}",
+        "email": email,
+        "empresa": empresa_data['nombre_comercial'],
     }
 
 # ============== ROOT ==============

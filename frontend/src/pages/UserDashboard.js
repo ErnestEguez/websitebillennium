@@ -20,7 +20,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../context/AuthContext';
 
-const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+const API = '/api';
 
 const LOGO_URL = "/billennium-logo.png";
 
@@ -36,7 +36,7 @@ const productConfig = {
     name: 'Pedidos Sentinel',
     icon: Smartphone,
     color: 'bg-blue-50 text-blue-600',
-    url: 'https://pedidosbillennium.vercel.app/',
+    url: process.env.REACT_APP_PEDIDOS_URL || 'https://pedidosbillennium.vercel.app/',
     description: 'Toma de pedidos móvil'
   },
   importaciones: {
@@ -79,6 +79,7 @@ const productConfig = {
 export const UserDashboard = () => {
   const [subscriptions, setSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [ssoLoading, setSsoLoading] = useState(null);
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -106,6 +107,25 @@ export const UserDashboard = () => {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  // Productos que usan SSO (magic link) en vez de URL directa
+  const SSO_PRODUCTS = ['sentinel'];
+
+  const handleSsoAccess = async (productId) => {
+    setSsoLoading(productId);
+    try {
+      const response = await axios.get(`${API}/auth/app-token`, {
+        params: { product_id: productId },
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      window.open(response.data.url, '_blank');
+    } catch (error) {
+      console.error('Error generando acceso SSO:', error);
+      alert('No se pudo generar el acceso. Intenta de nuevo.');
+    } finally {
+      setSsoLoading(null);
+    }
   };
 
   // Get enabled products
@@ -206,7 +226,17 @@ export const UserDashboard = () => {
                           {config.description}
                         </p>
 
-                        {hasUrl ? (
+                        {SSO_PRODUCTS.includes(productId) ? (
+                          <Button
+                            className="w-full bg-blue-600 hover:bg-blue-700"
+                            onClick={() => handleSsoAccess(productId)}
+                            disabled={ssoLoading === productId}
+                            data-testid={`access-${productId}`}
+                          >
+                            {ssoLoading === productId ? 'Abriendo...' : 'Acceder'}
+                            <ExternalLink className="h-4 w-4 ml-2" />
+                          </Button>
+                        ) : hasUrl ? (
                           <a href={config.url} target="_blank" rel="noopener noreferrer">
                             <Button className="w-full bg-blue-600 hover:bg-blue-700" data-testid={`access-${productId}`}>
                               Acceder
