@@ -122,7 +122,7 @@ export function VendedorManager() {
       if (!session) throw new Error('Sin sesión activa en App Pedidos');
 
       const res = await fetch(`${PORTAL_API_BASE}/apps/sentinel/available-users`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        headers: { 'X-Auth-Token': session.access_token },
       });
 
       if (!res.ok) {
@@ -153,7 +153,7 @@ export function VendedorManager() {
       const res = await fetch(`${PORTAL_API_BASE}/apps/sentinel/vendedores`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'X-Auth-Token': session.access_token,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

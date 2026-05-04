@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -881,10 +881,12 @@ class CreateVendedorFromPortalRequest(BaseModel):
     codven_erp: Optional[int] = None
     is_office: bool = False
 
-def get_supabase_app_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Verifica un JWT de Supabase Auth y que el usuario sea admin en pedidosbillennium."""
+def get_supabase_app_admin(x_auth_token: str = Header(None)):
+    """Verifica JWT de Supabase enviado en X-Auth-Token (evita que Vercel strip Authorization)."""
+    if not x_auth_token:
+        raise HTTPException(status_code=401, detail="Token requerido")
     try:
-        token = credentials.credentials
+        token = x_auth_token
         user_response = supabase.auth.get_user(token)
         if not user_response or not user_response.user:
             raise HTTPException(status_code=401, detail="Token de Supabase inválido")
