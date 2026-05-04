@@ -29,7 +29,7 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
 # Create the main app
-app = FastAPI(title="Billennium System API")
+app = FastAPI(title="Billennium System API", redirect_slashes=False)
 
 # Configure CORS
 app.add_middleware(
