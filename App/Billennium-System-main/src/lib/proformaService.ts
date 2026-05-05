@@ -71,6 +71,8 @@ export const proformaService = {
         direccion: cliente.direccion || null,
         provincia: cliente.provincia || null,
         ciudad: cliente.ciudad || null,
+        latitud: cliente.latitud ?? null,
+        longitud: cliente.longitud ?? null,
         activo: true
       })
       .select()

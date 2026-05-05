@@ -52,9 +52,22 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
   const [detalles, setDetalles] = useState<DetalleItem[]>([]);
   const [sugerenciasAi, setSugerenciasAi] = useState<AiSuggestion[]>([]);
   const [cargandoAi, setCargandoAi] = useState(false);
+  const [capturandoGeo, setCapturandoGeo] = useState(false);
   const [showUtilidad, setShowUtilidad] = useState<boolean>(() => {
     return localStorage.getItem('pedidos_showUtilidad') !== 'false';
   });
+
+  const capturarGeolocalizacion = (): Promise<{ lat: number; lng: number } | null> => {
+    return new Promise(resolve => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      setCapturandoGeo(true);
+      navigator.geolocation.getCurrentPosition(
+        pos => { setCapturandoGeo(false); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+        ()  => { setCapturandoGeo(false); resolve(null); },
+        { timeout: 8000, maximumAge: 60000 }
+      );
+    });
+  };
 
   const toggleUtilidad = () => {
     const next = !showUtilidad;
@@ -328,6 +341,7 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       const service = tipoDocumento === 'pedido' ? pedidoService : proformaService;
 
       if (!clienteEncontrado) {
+        const geo = await capturarGeolocalizacion();
         await service.createCliente({
           ruc: rucCliente,
           nombres_completos: nombreCliente,
@@ -337,6 +351,8 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
           direccion: direccionCliente || null,
           provincia: provinciaCliente || null,
           ciudad: ciudadCliente || null,
+          latitud: geo?.lat ?? null,
+          longitud: geo?.lng ?? null,
         });
       } else {
         await service.updateCliente(rucCliente, {
@@ -886,14 +902,26 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
         </div>
       )}
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-4">
+        {capturandoGeo && (
+          <span className="flex items-center gap-1.5 text-sm text-blue-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Capturando ubicación GPS…
+          </span>
+        )}
+        {!clienteEncontrado && !capturandoGeo && rucCliente.length >= 10 && (
+          <span className="flex items-center gap-1.5 text-xs text-gray-400">
+            <MapPin className="h-3.5 w-3.5" />
+            Se grabará la ubicación GPS al guardar
+          </span>
+        )}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || capturandoGeo}
           className="flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {proformaEditando ? <Save className="h-5 w-5 mr-2" /> : <Plus className="h-5 w-5 mr-2" />}
-          {loading ? 'Guardando...' : (proformaEditando ? 'Guardar Cambios' : tipoDocumento === 'pedido' ? 'Crear Pedido' : 'Crear Proforma')}
+          {capturandoGeo ? 'Capturando GPS…' : loading ? 'Guardando...' : (proformaEditando ? 'Guardar Cambios' : tipoDocumento === 'pedido' ? 'Crear Pedido' : 'Crear Proforma')}
         </button>
       </div>
     </form>
