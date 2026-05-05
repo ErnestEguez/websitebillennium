@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, User, ChevronDown } from 'lucide-react';
 import { chatService, ChatMessage } from '../lib/chatService';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+
+const GEO_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 
 export function ChatBubble() {
     const { vendedor } = useAuth();
@@ -12,8 +15,28 @@ export function ChatBubble() {
     const [hasNewMessage, setHasNewMessage] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    // Enviar ubicación actual al servidor
+    const actualizarUbicacion = (id: string) => {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                await supabase
+                    .from('vendedores')
+                    .update({
+                        ultima_latitud: pos.coords.latitude,
+                        ultima_longitud: pos.coords.longitude,
+                        ultima_ubicacion_at: new Date().toISOString(),
+                    })
+                    .eq('id', id);
+            },
+            () => { /* silencioso */ },
+            { timeout: 8000, maximumAge: 30000 }
+        );
+    };
+
     useEffect(() => {
         let subscription: any = null;
+        let geoInterval: ReturnType<typeof setInterval> | null = null;
 
         const initChat = async () => {
             if (!vendedor || !vendedor.empresa_id) return;
@@ -40,6 +63,9 @@ export function ChatBubble() {
 
         if (vendedor && !vendedor.is_office && !vendedor.is_admin) {
             initChat();
+            // Capturar ubicación al iniciar y cada 5 min
+            actualizarUbicacion(vendedor.id);
+            geoInterval = setInterval(() => actualizarUbicacion(vendedor.id), GEO_INTERVAL_MS);
         }
 
         // Cleanup cuando el componente se desmonte
@@ -48,6 +74,7 @@ export function ChatBubble() {
                 console.log('🔴 Limpiando suscripción de chat');
                 subscription.unsubscribe();
             }
+            if (geoInterval) clearInterval(geoInterval);
         };
     }, [vendedor]);
 

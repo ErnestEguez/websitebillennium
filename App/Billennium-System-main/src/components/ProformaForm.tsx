@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Trash2, DollarSign, TrendingUp, Loader2, Save } from 'lucide-react';
+import { Search, Plus, Trash2, DollarSign, TrendingUp, Loader2, Save, Eye, EyeOff, MapPin } from 'lucide-react';
 import { proformaService, calcularUtilidad } from '../lib/proformaService';
 import { pedidoService } from '../lib/pedidoService';
 import type { Vendedor, Articulo, Cliente, ProformaCompleta, Empresa } from '../lib/supabase';
@@ -39,6 +39,9 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
   const [correoCliente, setCorreoCliente] = useState('');
   const [telefonoCliente, setTelefonoCliente] = useState('');
   const [clienteEncontrado, setClienteEncontrado] = useState<Cliente | null>(null);
+  const [direccionCliente, setDireccionCliente] = useState('');
+  const [provinciaCliente, setProvinciaCliente] = useState('');
+  const [ciudadCliente, setCiudadCliente] = useState('');
   const [buscandoCliente, setBuscandoCliente] = useState(false);
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [clientesSugeridos, setClientesSugeridos] = useState<Cliente[]>([]);
@@ -48,6 +51,15 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
   const [detalles, setDetalles] = useState<DetalleItem[]>([]);
   const [sugerenciasAi, setSugerenciasAi] = useState<AiSuggestion[]>([]);
   const [cargandoAi, setCargandoAi] = useState(false);
+  const [showUtilidad, setShowUtilidad] = useState<boolean>(() => {
+    return localStorage.getItem('pedidos_showUtilidad') !== 'false';
+  });
+
+  const toggleUtilidad = () => {
+    const next = !showUtilidad;
+    setShowUtilidad(next);
+    localStorage.setItem('pedidos_showUtilidad', String(next));
+  };
 
   useEffect(() => {
     cargarVendedores();
@@ -125,6 +137,9 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       setNombreCliente('');
       setCorreoCliente('');
       setTelefonoCliente('');
+      setDireccionCliente('');
+      setProvinciaCliente('');
+      setCiudadCliente('');
       return;
     }
 
@@ -139,12 +154,18 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
         setNombreNegocio((cliente as any).nombre_negocio || '');
         setCorreoCliente(cliente.correo || '');
         setTelefonoCliente(cliente.telefono || '');
+        setDireccionCliente(cliente.direccion || '');
+        setProvinciaCliente(cliente.provincia || '');
+        setCiudadCliente(cliente.ciudad || '');
       } else {
         setClienteEncontrado(null);
         setNombreCliente('');
         setNombreNegocio('');
         setCorreoCliente('');
         setTelefonoCliente('');
+        setDireccionCliente('');
+        setProvinciaCliente('');
+        setCiudadCliente('');
       }
     } catch (err) {
       console.error('Error buscando cliente:', err);
@@ -176,6 +197,9 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
     setNombreNegocio((cliente as any).nombre_negocio || '');
     setCorreoCliente(cliente.correo || '');
     setTelefonoCliente(cliente.telefono || '');
+    setDireccionCliente(cliente.direccion || '');
+    setProvinciaCliente(cliente.provincia || '');
+    setCiudadCliente(cliente.ciudad || '');
     setBusquedaCliente('');
     setClientesSugeridos([]);
   };
@@ -190,6 +214,9 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       setNombreNegocio('');
       setCorreoCliente('');
       setTelefonoCliente('');
+      setDireccionCliente('');
+      setProvinciaCliente('');
+      setCiudadCliente('');
     }
   };
 
@@ -371,6 +398,9 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       setNombreNegocio('');
       setCorreoCliente('');
       setTelefonoCliente('');
+      setDireccionCliente('');
+      setProvinciaCliente('');
+      setCiudadCliente('');
       setClienteEncontrado(null);
       setVendedorId('');
       setFormaPago('');
@@ -547,6 +577,41 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
             />
           </div>
 
+          {clienteEncontrado && (provinciaCliente || ciudadCliente || direccionCliente) && (
+            <div className="md:col-span-2">
+              <div className="flex items-center gap-1.5 mb-2 text-sm font-medium text-gray-700">
+                <MapPin className="h-4 w-4 text-blue-500" />
+                Ubicación del cliente
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {provinciaCliente && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Provincia</label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+                      {provinciaCliente}
+                    </div>
+                  </div>
+                )}
+                {ciudadCliente && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Ciudad</label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+                      {ciudadCliente}
+                    </div>
+                  </div>
+                )}
+                {direccionCliente && (
+                  <div className={!provinciaCliente && !ciudadCliente ? 'md:col-span-3' : ''}>
+                    <label className="block text-xs text-gray-500 mb-1">Dirección</label>
+                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+                      {direccionCliente}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Forma de Pago
@@ -589,7 +654,22 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       </div>
 
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-4 text-gray-800">Artículos</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Artículos</h2>
+          <button
+            type="button"
+            onClick={toggleUtilidad}
+            title={showUtilidad ? 'Ocultar columna Utilidad' : 'Mostrar columna Utilidad'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+              showUtilidad
+                ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+            }`}
+          >
+            {showUtilidad ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            Utilidad
+          </button>
+        </div>
 
         <div className="mb-4 relative">
           <div className="relative">
@@ -668,7 +748,7 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Precio</th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Costo</th>
                   <th className="px-3 py-2 text-center text-xs font-medium text-gray-700">IVA</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Utilidad</th>
+                  {showUtilidad && <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Utilidad</th>}
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Subtotal</th>
                   <th className="px-3 py-2"></th>
                 </tr>
@@ -710,13 +790,14 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
                       <td className="px-3 py-2 text-center text-sm text-gray-600">
                         {detalle.tasa_iva}%
                       </td>
-                      <td className="px-3 py-2 text-right">
-                        <span className={`inline-flex items-center text-sm font-medium ${utilidad > 0 ? 'text-green-600' : utilidad < 0 ? 'text-red-600' : 'text-gray-600'
-                          }`}>
-                          <TrendingUp className="h-4 w-4 mr-1" />
-                          {utilidad.toFixed(1)}%
-                        </span>
-                      </td>
+                      {showUtilidad && (
+                        <td className="px-3 py-2 text-right">
+                          <span className={`inline-flex items-center text-sm font-medium ${utilidad > 0 ? 'text-green-600' : utilidad < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                            <TrendingUp className="h-4 w-4 mr-1" />
+                            {utilidad.toFixed(1)}%
+                          </span>
+                        </td>
+                      )}
                       <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
                         ${subtotal.toFixed(2)}
                       </td>

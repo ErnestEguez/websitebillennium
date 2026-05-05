@@ -17,6 +17,9 @@ export interface Vendedor {
   is_admin?: boolean;
   is_office?: boolean;
   codven_erp?: number | null;
+  ultima_latitud?: number | null;
+  ultima_longitud?: number | null;
+  ultima_ubicacion_at?: string | null;
 }
 
 export interface Empresa {
@@ -87,6 +90,11 @@ export interface Cliente {
   correo: string | null;
   telefono: string | null;
   activo: boolean;
+  direccion?: string | null;
+  provincia?: string | null;
+  ciudad?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
 }
 
 export interface ProformaCompleta extends ProformaCabecera {

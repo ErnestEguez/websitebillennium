@@ -1,7 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, User, Send, Search, Trash2 } from 'lucide-react';
+import { MessageSquare, User, Send, Search, Trash2, MapPin, Map } from 'lucide-react';
 import { chatService, ChatRoom, ChatMessage } from '../lib/chatService';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix default marker icon path broken by bundlers
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow });
 
 export function OficinaDashboard() {
     const { vendedor: oficinaUser, signOut } = useAuth();
@@ -12,6 +23,8 @@ export function OficinaDashboard() {
     const [loading, setLoading] = useState(true);
     const [busqueda, setBusqueda] = useState('');
     const [showDeleteMenu, setShowDeleteMenu] = useState(false);
+    const [showMap, setShowMap] = useState(false);
+    const [vendedorUbicacion, setVendedorUbicacion] = useState<{ lat: number; lng: number; at: string } | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -22,6 +35,26 @@ export function OficinaDashboard() {
         if (selectedRoom) {
             console.log('🏢 Oficina: Cargando room', selectedRoom.id);
             loadMessages(selectedRoom.id);
+            setShowMap(false);
+            setVendedorUbicacion(null);
+
+            // Cargar ubicación del vendedor
+            if (selectedRoom.vendedor_id) {
+                supabase
+                    .from('vendedores')
+                    .select('ultima_latitud,ultima_longitud,ultima_ubicacion_at')
+                    .eq('id', selectedRoom.vendedor_id)
+                    .maybeSingle()
+                    .then(({ data }) => {
+                        if (data?.ultima_latitud && data?.ultima_longitud) {
+                            setVendedorUbicacion({
+                                lat: data.ultima_latitud,
+                                lng: data.ultima_longitud,
+                                at: data.ultima_ubicacion_at || '',
+                            });
+                        }
+                    });
+            }
 
             const subscription = chatService.subscribeToMessages(selectedRoom.id, (msg) => {
                 console.log('🏢 Oficina: Nuevo mensaje recibido', msg);
@@ -192,12 +225,32 @@ export function OficinaDashboard() {
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-gray-900">{selectedRoom.vendedor?.nombre}</h3>
-                                    <p className="text-xs text-green-500 flex items-center">
-                                        <span className="h-1.5 w-1.5 bg-green-500 rounded-full mr-1.5" />
-                                        Chat de soporte activo
-                                    </p>
+                                    {vendedorUbicacion ? (
+                                        <p className="text-xs text-blue-500 flex items-center gap-1">
+                                            <MapPin className="h-3 w-3" />
+                                            {new Date(vendedorUbicacion.at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                        </p>
+                                    ) : (
+                                        <p className="text-xs text-green-500 flex items-center">
+                                            <span className="h-1.5 w-1.5 bg-green-500 rounded-full mr-1.5" />
+                                            Chat de soporte activo
+                                        </p>
+                                    )}
                                 </div>
                             </div>
+
+                            <div className="flex items-center gap-2">
+                            {/* Map toggle button */}
+                            {vendedorUbicacion && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMap(v => !v)}
+                                    className={`p-2 rounded-lg transition-colors ${showMap ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}
+                                    title={showMap ? 'Ocultar mapa' : 'Ver ubicación en mapa'}
+                                >
+                                    <Map className="h-5 w-5" />
+                                </button>
+                            )}
 
                             {/* Delete Messages Button */}
                             <div className="relative">
@@ -242,7 +295,30 @@ export function OficinaDashboard() {
                                     </div>
                                 )}
                             </div>
+                            </div>{/* end flex items-center gap-2 */}
                         </div>
+
+                        {/* Mapa de ubicación */}
+                        {showMap && vendedorUbicacion && (
+                            <div className="h-64 border-b border-gray-100">
+                                <MapContainer
+                                    center={[vendedorUbicacion.lat, vendedorUbicacion.lng]}
+                                    zoom={15}
+                                    style={{ height: '100%', width: '100%' }}
+                                >
+                                    <TileLayer
+                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                    />
+                                    <Marker position={[vendedorUbicacion.lat, vendedorUbicacion.lng]}>
+                                        <Popup>
+                                            <strong>{selectedRoom.vendedor?.nombre}</strong><br />
+                                            {new Date(vendedorUbicacion.at).toLocaleString()}
+                                        </Popup>
+                                    </Marker>
+                                </MapContainer>
+                            </div>
+                        )}
 
                         {/* Messages */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50/30">

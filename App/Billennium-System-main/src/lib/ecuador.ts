@@ -1,0 +1,28 @@
+export const PROVINCIAS_CIUDADES: Record<string, string[]> = {
+  'Azuay':                      ['Cuenca','Gualaceo','Paute','Sigsig','Girón','Santa Isabel','Pucará','Nabón','Oña','Chordeleg','El Pan','Guachapala','Camilo Ponce Enríquez','Sevilla de Oro'],
+  'Bolívar':                    ['Guaranda','Chillanes','San Miguel','Caluma','Echeandía','Chimbo','Las Naves'],
+  'Cañar':                      ['Azogues','Biblián','Cañar','La Troncal','El Tambo','Déleg','Suscal'],
+  'Carchi':                     ['Tulcán','Bolívar','Espejo','Mira','Montúfar','San Pedro de Huaca'],
+  'Chimborazo':                 ['Riobamba','Alausí','Chambo','Chunchi','Colta','Cumandá','Guamote','Guano','Pallatanga','Penipe','Pallatanga'],
+  'Cotopaxi':                   ['Latacunga','La Maná','Pangua','Pujilí','Salcedo','Saquisilí','Sigchos'],
+  'El Oro':                     ['Machala','Arenillas','Atahualpa','Balsas','Chilla','El Guabo','Huaquillas','Las Lajas','Marcabelí','Pasaje','Piñas','Portovelo','Santa Rosa','Zaruma'],
+  'Esmeraldas':                 ['Esmeraldas','Atacames','Eloy Alfaro','Muisne','Quinindé','Rioverde','San Lorenzo'],
+  'Galápagos':                  ['Puerto Baquerizo Moreno','Puerto Ayora','Puerto Villamil'],
+  'Guayas':                     ['Guayaquil','Alfredo Baquerizo Moreno','Balao','Balzar','Colimes','Coronel Marcelino Maridueña','Daule','Durán','El Empalme','El Triunfo','General Antonio Elizalde','Isidro Ayora','Lomas de Sargentillo','Milagro','Naranjal','Naranjito','Nobol','Palestina','Pedro Carbo','Playas','Samborondón','Santa Lucía','Simón Bolívar','Yaguachi'],
+  'Imbabura':                   ['Ibarra','Antonio Ante','Cotacachi','Otavalo','Pimampiro','San Miguel de Urcuquí'],
+  'Loja':                       ['Loja','Calvas','Catamayo','Célica','Chaguarpamba','Espíndola','Gonzanamá','Macará','Olmedo','Paltas','Pindal','Quilanga','Saraguro','Sozoranga','Zapotillo'],
+  'Los Ríos':                   ['Babahoyo','Baba','Buena Fe','Mocache','Montalvo','Palenque','Pueblo Viejo','Quevedo','Urdaneta','Valencia','Ventanas','Vinces'],
+  'Manabí':                     ['Portoviejo','Bolívar','Chone','El Carmen','Flavio Alfaro','Jama','Jaramijó','Jipijapa','Junín','Manta','Montecristi','Olmedo','Paján','Pedernales','Pichincha','Rocafuerte','San Vicente','Santa Ana','Sucre','Tosagua','24 de Mayo'],
+  'Morona Santiago':            ['Macas','Gualaquiza','Huamboya','Limón Indanza','Logroño','Palora','San Juan Bosco','Santiago','Sucúa','Taisha','Tiwintza'],
+  'Napo':                       ['Tena','Archidona','El Chaco','Quijos','Carlos Julio Arosemena Tola'],
+  'Orellana':                   ['Puerto Francisco de Orellana','Aguarico','La Joya de los Sachas','Loreto'],
+  'Pastaza':                    ['Puyo','Arajuno','Mera','Santa Clara'],
+  'Pichincha':                  ['Quito','Cayambe','Mejía','Pedro Moncayo','Pedro Vicente Maldonado','Puerto Quito','Rumiñahui','San Miguel de los Bancos'],
+  'Santa Elena':                ['Santa Elena','La Libertad','Salinas'],
+  'Santo Domingo de los Tsáchilas': ['Santo Domingo','La Concordia'],
+  'Sucumbíos':                  ['Nueva Loja','Cascales','Cuyabeno','Gonzalo Pizarro','Putumayo','Shushufindi','Sucumbíos'],
+  'Tungurahua':                 ['Ambato','Baños de Agua Santa','Cevallos','Mocha','Patate','Píllaro','Quero','Tisaleo'],
+  'Zamora Chinchipe':           ['Zamora','Centinela del Cóndor','Chinchipe','El Pangui','Nangaritza','Palanda','Paquisha','Yacuambi','Yantzaza'],
+};
+
+export const PROVINCIAS = Object.keys(PROVINCIAS_CIUDADES).sort();
