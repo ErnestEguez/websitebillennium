@@ -53,6 +53,7 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
   const [sugerenciasAi, setSugerenciasAi] = useState<AiSuggestion[]>([]);
   const [cargandoAi, setCargandoAi] = useState(false);
   const [capturandoGeo, setCapturandoGeo] = useState(false);
+  const [geoCapturada, setGeoCapturada] = useState<{ lat: number; lng: number } | null>(null);
   const [showUtilidad, setShowUtilidad] = useState<boolean>(() => {
     return localStorage.getItem('pedidos_showUtilidad') !== 'false';
   });
@@ -64,9 +65,18 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       navigator.geolocation.getCurrentPosition(
         pos => { setCapturandoGeo(false); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
         ()  => { setCapturandoGeo(false); resolve(null); },
-        { timeout: 8000, maximumAge: 60000 }
+        { timeout: 10000, maximumAge: 0 }
       );
     });
+  };
+
+  const handleCapturarGeoManual = async () => {
+    const geo = await capturarGeolocalizacion();
+    if (geo) {
+      setGeoCapturada(geo);
+    } else {
+      alert('No se pudo obtener la ubicación. Verifica que el GPS esté activo y el navegador tenga permiso.');
+    }
   };
 
   const toggleUtilidad = () => {
@@ -341,7 +351,8 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       const service = tipoDocumento === 'pedido' ? pedidoService : proformaService;
 
       if (!clienteEncontrado) {
-        const geo = await capturarGeolocalizacion();
+        // Usar GPS ya capturado manualmente, o intentar captura automática
+        const geo = geoCapturada ?? await capturarGeolocalizacion();
         await service.createCliente({
           ruc: rucCliente,
           nombres_completos: nombreCliente,
@@ -424,6 +435,7 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       setDireccionCliente('');
       setProvinciaCliente('');
       setCiudadCliente('');
+      setGeoCapturada(null);
       setClienteEncontrado(null);
       setVendedorId('');
       setFormaPago('');
@@ -602,11 +614,34 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
 
           {/* Ubicación — editable para cliente nuevo, read-only para existente */}
           <div className="md:col-span-2">
-            <div className="flex items-center gap-1.5 mb-2 text-sm font-medium text-gray-700">
-              <MapPin className="h-4 w-4 text-blue-500" />
-              Ubicación
-              {clienteEncontrado && (
-                <span className="text-xs text-gray-400 font-normal">(solo lectura)</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                <MapPin className="h-4 w-4 text-blue-500" />
+                Ubicación
+                {clienteEncontrado && (
+                  <span className="text-xs text-gray-400 font-normal">(solo lectura)</span>
+                )}
+              </div>
+              {/* Botón GPS solo para cliente nuevo */}
+              {!clienteEncontrado && rucCliente.length >= 10 && (
+                <button
+                  type="button"
+                  onClick={handleCapturarGeoManual}
+                  disabled={capturandoGeo}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                    geoCapturada
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                  } disabled:opacity-50`}
+                >
+                  {capturandoGeo ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Capturando…</>
+                  ) : geoCapturada ? (
+                    <><MapPin className="h-3.5 w-3.5" /> GPS capturado ✓</>
+                  ) : (
+                    <><MapPin className="h-3.5 w-3.5" /> Capturar mi ubicación</>
+                  )}
+                </button>
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -909,10 +944,10 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
             Capturando ubicación GPS…
           </span>
         )}
-        {!clienteEncontrado && !capturandoGeo && rucCliente.length >= 10 && (
+        {!clienteEncontrado && !capturandoGeo && rucCliente.length >= 10 && !geoCapturada && (
           <span className="flex items-center gap-1.5 text-xs text-gray-400">
             <MapPin className="h-3.5 w-3.5" />
-            Se grabará la ubicación GPS al guardar
+            Sin GPS — se intentará capturar al guardar
           </span>
         )}
         <button
