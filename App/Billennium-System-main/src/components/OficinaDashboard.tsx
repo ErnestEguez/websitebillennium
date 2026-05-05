@@ -6,13 +6,14 @@ import { supabase } from '../lib/supabase';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-
-// Fix default marker icon path broken by bundlers
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow });
+
+type Ubicacion = { lat: number; lng: number; at: string };
 
 export function OficinaDashboard() {
     const { vendedor: oficinaUser, signOut } = useAuth();
@@ -24,74 +25,78 @@ export function OficinaDashboard() {
     const [busqueda, setBusqueda] = useState('');
     const [showDeleteMenu, setShowDeleteMenu] = useState(false);
     const [showMap, setShowMap] = useState(false);
-    const [vendedorUbicacion, setVendedorUbicacion] = useState<{ lat: number; lng: number; at: string } | null>(null);
+    const [vendedorUbicacion, setVendedorUbicacion] = useState<Ubicacion | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        loadRooms();
-    }, [oficinaUser]);
+    useEffect(() => { loadRooms(); }, [oficinaUser]);
 
     useEffect(() => {
-        if (selectedRoom) {
-            console.log('🏢 Oficina: Cargando room', selectedRoom.id);
-            loadMessages(selectedRoom.id);
-            setShowMap(false);
-            setVendedorUbicacion(null);
+        if (!selectedRoom) return;
 
-            // Cargar ubicación del vendedor
-            if (selectedRoom.vendedor_id) {
-                supabase
-                    .from('vendedores')
-                    .select('ultima_latitud,ultima_longitud,ultima_ubicacion_at')
-                    .eq('id', selectedRoom.vendedor_id)
-                    .maybeSingle()
-                    .then(({ data }) => {
-                        if (data?.ultima_latitud && data?.ultima_longitud) {
-                            setVendedorUbicacion({
-                                lat: data.ultima_latitud,
-                                lng: data.ultima_longitud,
-                                at: data.ultima_ubicacion_at || '',
-                            });
-                        }
+        loadMessages(selectedRoom.id);
+        setShowMap(false);
+        setVendedorUbicacion(null);
+
+        // Carga inicial de ubicación
+        supabase
+            .from('vendedores')
+            .select('ultima_latitud,ultima_longitud,ultima_ubicacion_at')
+            .eq('id', selectedRoom.vendedor_id)
+            .maybeSingle()
+            .then(({ data }) => {
+                if (data?.ultima_latitud && data?.ultima_longitud) {
+                    setVendedorUbicacion({
+                        lat: data.ultima_latitud,
+                        lng: data.ultima_longitud,
+                        at: data.ultima_ubicacion_at || '',
                     });
-            }
-
-            const subscription = chatService.subscribeToMessages(selectedRoom.id, (msg) => {
-                console.log('🏢 Oficina: Nuevo mensaje recibido', msg);
-                setMessages(prev => [...prev, msg]);
+                }
             });
 
-            console.log('✅ Oficina: Suscripción activada para room', selectedRoom.id);
+        // Suscripción chat
+        const chatSub = chatService.subscribeToMessages(selectedRoom.id, (msg) => {
+            setMessages(prev => [...prev, msg]);
+        });
 
-            return () => {
-                console.log('🔴 Oficina: Limpiando suscripción');
-                subscription.unsubscribe();
-            };
-        }
+        // Suscripción en tiempo real a ubicación del vendedor
+        const geoSub = supabase
+            .channel(`vendedor-geo-${selectedRoom.vendedor_id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'pedidosbillennium',
+                    table: 'vendedores',
+                    filter: `id=eq.${selectedRoom.vendedor_id}`,
+                },
+                (payload) => {
+                    const d = payload.new as any;
+                    if (d.ultima_latitud && d.ultima_longitud) {
+                        setVendedorUbicacion({
+                            lat: d.ultima_latitud,
+                            lng: d.ultima_longitud,
+                            at: d.ultima_ubicacion_at || '',
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            chatSub.unsubscribe();
+            supabase.removeChannel(geoSub);
+        };
     }, [selectedRoom]);
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+    useEffect(() => { scrollToBottom(); }, [messages]);
 
     const loadRooms = async () => {
-        console.log('🏢 Oficina: Iniciando carga de rooms...');
-        console.log('🏢 Oficina: Usuario actual:', oficinaUser);
-        console.log('🏢 Oficina: Empresa ID:', oficinaUser?.empresa_id);
-        console.log('🏢 Oficina: is_office:', oficinaUser?.is_office);
-
-        if (!oficinaUser?.empresa_id) {
-            console.error('❌ Oficina: No hay empresa_id');
-            return;
-        }
-
+        if (!oficinaUser?.empresa_id) return;
         try {
             const activeRooms = await chatService.getActiveRooms(oficinaUser.empresa_id);
-            console.log('📋 Rooms cargados:', activeRooms.length);
-            console.log('📋 Detalles de rooms:', activeRooms);
             setRooms(activeRooms);
         } catch (err) {
-            console.error('❌ Error cargando rooms:', err);
+            console.error('Error cargando rooms:', err);
         } finally {
             setLoading(false);
         }
@@ -100,10 +105,9 @@ export function OficinaDashboard() {
     const loadMessages = async (roomId: string) => {
         try {
             const history = await chatService.getMessages(roomId);
-            console.log('📜 Oficina: Historial cargado:', history.length, 'mensajes');
             setMessages(history);
         } catch (err) {
-            console.error('❌ Error cargando mensajes:', err);
+            console.error('Error cargando mensajes:', err);
         }
     };
 
@@ -114,7 +118,6 @@ export function OficinaDashboard() {
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newMessage.trim() || !selectedRoom || !oficinaUser) return;
-
         try {
             await chatService.sendMessage(selectedRoom.id, oficinaUser.id, newMessage);
             setNewMessage('');
@@ -125,20 +128,16 @@ export function OficinaDashboard() {
 
     const handleDeleteMessages = async (daysBack?: number) => {
         if (!selectedRoom) return;
-
         const confirmMsg = daysBack
             ? `¿Eliminar mensajes de los últimos ${daysBack} días del chat con ${selectedRoom.vendedor?.nombre}?`
             : `¿Eliminar TODOS los mensajes del chat con ${selectedRoom.vendedor?.nombre}?`;
-
         if (!confirm(confirmMsg)) return;
-
         try {
             await chatService.deleteMessages(selectedRoom.id, daysBack);
             await loadMessages(selectedRoom.id);
             setShowDeleteMenu(false);
             alert('Mensajes eliminados correctamente');
         } catch (err) {
-            console.error('Error eliminando mensajes:', err);
             alert('Error al eliminar mensajes: ' + (err as Error).message);
         }
     };
@@ -149,7 +148,7 @@ export function OficinaDashboard() {
 
     return (
         <div className="flex h-[calc(100-2rem)] bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 min-h-[600px]">
-            {/* Sidebar - Lista de Vendedores */}
+            {/* Sidebar */}
             <div className="w-80 border-r border-gray-100 flex flex-col bg-gray-50/50">
                 <div className="p-4 border-b border-gray-100 bg-white">
                     <div className="flex items-center justify-between mb-4">
@@ -163,7 +162,7 @@ export function OficinaDashboard() {
                             placeholder="Buscar vendedor..."
                             value={busqueda}
                             onChange={(e) => setBusqueda(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-gray-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                            className="w-full pl-9 pr-4 py-2 bg-gray-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                     </div>
                 </div>
@@ -181,19 +180,14 @@ export function OficinaDashboard() {
                             <button
                                 key={room.id}
                                 onClick={() => setSelectedRoom(room)}
-                                className={`w-full p-4 flex items-center space-x-3 transition-all hover:bg-white border-b border-gray-50 ${selectedRoom?.id === room.id ? 'bg-white border-l-4 border-l-blue-600 shadow-sm' : ''
-                                    }`}
+                                className={`w-full p-4 flex items-center space-x-3 transition-all hover:bg-white border-b border-gray-50 ${selectedRoom?.id === room.id ? 'bg-white border-l-4 border-l-blue-600 shadow-sm' : ''}`}
                             >
                                 <div className="h-12 w-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600">
                                     <User className="h-6 w-6" />
                                 </div>
                                 <div className="text-left flex-1 min-w-0">
-                                    <p className="font-semibold text-gray-900 truncate">
-                                        {room.vendedor?.nombre}
-                                    </p>
-                                    <p className="text-xs text-gray-500 truncate">
-                                        {room.vendedor?.email}
-                                    </p>
+                                    <p className="font-semibold text-gray-900 truncate">{room.vendedor?.nombre}</p>
+                                    <p className="text-xs text-gray-500 truncate">{room.vendedor?.email}</p>
                                 </div>
                                 <div className="text-[10px] text-gray-400">
                                     {new Date(room.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -213,12 +207,12 @@ export function OficinaDashboard() {
                 </div>
             </div>
 
-            {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col bg-white">
+            {/* Main Area */}
+            <div className="flex-1 flex flex-col bg-white overflow-hidden">
                 {selectedRoom ? (
                     <>
-                        {/* Chat Header */}
-                        <div className="p-4 border-b border-gray-100 flex items-center justify-between shadow-sm">
+                        {/* Header */}
+                        <div className="p-4 border-b border-gray-100 flex items-center justify-between shadow-sm shrink-0">
                             <div className="flex items-center space-x-3">
                                 <div className="h-10 w-10 bg-blue-600 rounded-full flex items-center justify-center text-white">
                                     <User className="h-6 w-6" />
@@ -228,80 +222,76 @@ export function OficinaDashboard() {
                                     {vendedorUbicacion ? (
                                         <p className="text-xs text-blue-500 flex items-center gap-1">
                                             <MapPin className="h-3 w-3" />
-                                            {new Date(vendedorUbicacion.at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                            Última ubicación: {new Date(vendedorUbicacion.at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                         </p>
                                     ) : (
-                                        <p className="text-xs text-green-500 flex items-center">
-                                            <span className="h-1.5 w-1.5 bg-green-500 rounded-full mr-1.5" />
-                                            Chat de soporte activo
+                                        <p className="text-xs text-gray-400 flex items-center gap-1">
+                                            <MapPin className="h-3 w-3" />
+                                            Sin ubicación registrada aún
                                         </p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-2">
-                            {/* Map toggle button */}
-                            {vendedorUbicacion && (
+                                {/* Botón mapa — siempre visible */}
                                 <button
                                     type="button"
-                                    onClick={() => setShowMap(v => !v)}
-                                    className={`p-2 rounded-lg transition-colors ${showMap ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}
-                                    title={showMap ? 'Ocultar mapa' : 'Ver ubicación en mapa'}
+                                    onClick={() => vendedorUbicacion && setShowMap(v => !v)}
+                                    title={
+                                        vendedorUbicacion
+                                            ? (showMap ? 'Ocultar mapa' : 'Ver ubicación en mapa')
+                                            : 'El vendedor aún no ha enviado su ubicación'
+                                    }
+                                    className={`p-2 rounded-lg transition-colors ${
+                                        vendedorUbicacion
+                                            ? (showMap ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100')
+                                            : 'text-gray-300 cursor-default'
+                                    }`}
                                 >
                                     <Map className="h-5 w-5" />
                                 </button>
-                            )}
 
-                            {/* Delete Messages Button */}
-                            <div className="relative">
-                                <button
-                                    onClick={() => setShowDeleteMenu(!showDeleteMenu)}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Borrar mensajes"
-                                >
-                                    <Trash2 className="h-5 w-5" />
-                                </button>
-
-                                {showDeleteMenu && (
-                                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-10">
-                                        <div className="p-2">
-                                            <p className="text-xs text-gray-500 px-3 py-2 font-semibold">Borrar mensajes</p>
-                                            <button
-                                                onClick={() => handleDeleteMessages(7)}
-                                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                                            >
-                                                Últimos 7 días
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteMessages(30)}
-                                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                                            >
-                                                Últimos 30 días
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteMessages(90)}
-                                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                                            >
-                                                Últimos 90 días
-                                            </button>
-                                            <div className="border-t border-gray-200 my-1"></div>
-                                            <button
-                                                onClick={() => handleDeleteMessages()}
-                                                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors font-semibold"
-                                            >
-                                                Borrar TODO
-                                            </button>
+                                {/* Borrar mensajes */}
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setShowDeleteMenu(!showDeleteMenu)}
+                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Borrar mensajes"
+                                    >
+                                        <Trash2 className="h-5 w-5" />
+                                    </button>
+                                    {showDeleteMenu && (
+                                        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-10">
+                                            <div className="p-2">
+                                                <p className="text-xs text-gray-500 px-3 py-2 font-semibold">Borrar mensajes</p>
+                                                {[7, 30, 90].map(d => (
+                                                    <button key={d}
+                                                        onClick={() => handleDeleteMessages(d)}
+                                                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+                                                    >
+                                                        Últimos {d} días
+                                                    </button>
+                                                ))}
+                                                <div className="border-t border-gray-200 my-1" />
+                                                <button
+                                                    onClick={() => handleDeleteMessages()}
+                                                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md font-semibold"
+                                                >
+                                                    Borrar TODO
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
-                            </div>{/* end flex items-center gap-2 */}
                         </div>
 
-                        {/* Mapa de ubicación */}
+                        {/* Mapa en tiempo real */}
                         {showMap && vendedorUbicacion && (
-                            <div className="h-64 border-b border-gray-100">
+                            <div className="h-64 border-b border-gray-100 shrink-0">
                                 <MapContainer
+                                    key={`${vendedorUbicacion.lat}-${vendedorUbicacion.lng}`}
                                     center={[vendedorUbicacion.lat, vendedorUbicacion.lng]}
                                     zoom={15}
                                     style={{ height: '100%', width: '100%' }}
@@ -320,21 +310,13 @@ export function OficinaDashboard() {
                             </div>
                         )}
 
-                        {/* Messages */}
+                        {/* Mensajes */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50/30">
                             {messages.map((msg) => {
                                 const isMine = msg.sender_id === oficinaUser?.id;
                                 return (
-                                    <div
-                                        key={msg.id}
-                                        className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
-                                    >
-                                        <div
-                                            className={`max-w-[70%] p-4 rounded-3xl shadow-sm ${isMine
-                                                ? 'bg-blue-600 text-white rounded-tr-none'
-                                                : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
-                                                }`}
-                                        >
+                                    <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[70%] p-4 rounded-3xl shadow-sm ${isMine ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'}`}>
                                             <p className="text-sm leading-relaxed">{msg.content}</p>
                                             <div className={`text-[10px] mt-2 opacity-50 ${isMine ? 'text-blue-100' : 'text-gray-400'}`}>
                                                 {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -346,20 +328,20 @@ export function OficinaDashboard() {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Chat Input */}
-                        <form onSubmit={handleSend} className="p-4 bg-white border-t border-gray-100">
+                        {/* Input */}
+                        <form onSubmit={handleSend} className="p-4 bg-white border-t border-gray-100 shrink-0">
                             <div className="flex items-center space-x-3">
                                 <input
                                     type="text"
                                     placeholder="Escribe una respuesta para el vendedor..."
                                     value={newMessage}
                                     onChange={(e) => setNewMessage(e.target.value)}
-                                    className="flex-1 px-6 py-3 bg-gray-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 transition-all outline-none"
+                                    className="flex-1 px-6 py-3 bg-gray-100 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
                                 <button
                                     type="submit"
                                     disabled={!newMessage.trim()}
-                                    className="p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 transition-all shadow-lg shadow-blue-200"
+                                    className="p-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-200"
                                 >
                                     <Send className="h-5 w-5" />
                                 </button>
@@ -374,7 +356,7 @@ export function OficinaDashboard() {
                             </div>
                             <h3 className="text-2xl font-bold text-gray-900 mb-2">Panel de Soporte</h3>
                             <p className="text-gray-500">
-                                Selecciona un vendedor de la lista para comenzar a chatear o ver el historial de conversaciones.
+                                Selecciona un vendedor para chatear o ver su ubicación en tiempo real.
                             </p>
                         </div>
                     </div>

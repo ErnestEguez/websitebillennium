@@ -1,9 +1,18 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Edit2, Trash2, Search, MapPin } from 'lucide-react';
+import { UserPlus, Edit2, Trash2, Search, MapPin, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Cliente } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { PROVINCIAS, PROVINCIAS_CIUDADES } from '../lib/ecuador';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow });
 
 interface FormData {
   ruc: string;
@@ -31,8 +40,8 @@ export function ClienteManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<FormData>(FORM_VACIO);
   const [capturandoGeo, setCapturandoGeo] = useState(false);
+  const [geoEditando, setGeoEditando] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Ciudades disponibles según provincia seleccionada
   const ciudadesDisponibles = formData.provincia ? (PROVINCIAS_CIUDADES[formData.provincia] || []) : [];
 
   useEffect(() => { loadData(); }, []);
@@ -62,7 +71,6 @@ export function ClienteManager() {
     return n;
   };
 
-  // Captura la ubicación GPS actual del dispositivo (silenciosa)
   const capturarGeolocalizacion = (): Promise<{ lat: number; lng: number } | null> => {
     return new Promise(resolve => {
       if (!navigator.geolocation) { resolve(null); return; }
@@ -86,7 +94,6 @@ export function ClienteManager() {
       const telefonoNormalizado = normalizarTelefono(formData.telefono);
 
       if (editingId) {
-        // Actualización — sin cambiar coordenadas existentes
         const { error: updateError } = await supabase
           .from('clientes')
           .update({
@@ -101,7 +108,6 @@ export function ClienteManager() {
           .eq('ruc', editingId);
         if (updateError) throw updateError;
       } else {
-        // Creación — capturar geolocalización automáticamente
         const geo = await capturarGeolocalizacion();
 
         const { error: insertError } = await supabase
@@ -125,6 +131,7 @@ export function ClienteManager() {
       setFormData(FORM_VACIO);
       setShowForm(false);
       setEditingId(null);
+      setGeoEditando(null);
       await loadData();
     } catch (err: any) {
       setError(err.message);
@@ -145,7 +152,13 @@ export function ClienteManager() {
       ciudad:            cliente.ciudad || '',
     });
     setEditingId(cliente.ruc);
+    setGeoEditando(
+      cliente.latitud && cliente.longitud
+        ? { lat: cliente.latitud, lng: cliente.longitud }
+        : null
+    );
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (ruc: string) => {
@@ -166,11 +179,13 @@ export function ClienteManager() {
     setShowForm(false);
     setEditingId(null);
     setFormData(FORM_VACIO);
+    setGeoEditando(null);
   };
 
   const filteredClientes = clientes.filter(c =>
     c.nombres_completos.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.ruc.includes(searchTerm)
+    c.ruc.includes(searchTerm) ||
+    (c.nombre_negocio || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -178,7 +193,7 @@ export function ClienteManager() {
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Gestión de Clientes</h2>
         <button
-          onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData(FORM_VACIO); }}
+          onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData(FORM_VACIO); setGeoEditando(null); }}
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           <UserPlus className="h-5 w-5 mr-2" />
@@ -194,10 +209,9 @@ export function ClienteManager() {
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
           <h3 className="text-lg font-semibold">{editingId ? 'Editar Cliente' : 'Nuevo Cliente'}</h3>
 
-          {/* Datos básicos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">RUC/Cédula *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">RUC / Cédula *</label>
               <input type="text" value={formData.ruc}
                 onChange={e => setFormData({ ...formData, ruc: e.target.value })}
                 disabled={!!editingId}
@@ -259,7 +273,7 @@ export function ClienteManager() {
             </div>
           </div>
 
-          {/* Aviso geolocalización (solo en creación) */}
+          {/* Aviso / estado GPS — solo en creación */}
           {!editingId && (
             <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700">
               <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
@@ -268,6 +282,46 @@ export function ClienteManager() {
                   ? 'Capturando ubicación GPS…'
                   : 'Al guardar se registrará automáticamente la ubicación GPS del dispositivo.'}
               </span>
+            </div>
+          )}
+
+          {/* Mini-mapa — solo al editar si el cliente tiene coordenadas */}
+          {editingId && geoEditando && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                  <MapPin className="h-4 w-4 text-green-600" />
+                  Ubicación GPS registrada
+                </span>
+                <a
+                  href={`https://www.google.com/maps?q=${geoEditando.lat},${geoEditando.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Ver en Google Maps
+                </a>
+              </div>
+              <div className="rounded-lg overflow-hidden border border-gray-200" style={{ height: 220 }}>
+                <MapContainer
+                  center={[geoEditando.lat, geoEditando.lng]}
+                  zoom={16}
+                  style={{ height: '100%', width: '100%' }}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={[geoEditando.lat, geoEditando.lng]}>
+                    <Popup>{formData.nombres_completos}</Popup>
+                  </Marker>
+                </MapContainer>
+              </div>
+              <p className="text-xs text-gray-400">
+                Coords: {geoEditando.lat.toFixed(6)}, {geoEditando.lng.toFixed(6)}
+              </p>
             </div>
           )}
 
@@ -289,7 +343,7 @@ export function ClienteManager() {
         <div className="p-4 border-b border-gray-200">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input type="text" placeholder="Buscar por nombre o RUC..."
+            <input type="text" placeholder="Buscar por nombre, negocio o RUC..."
               value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
           </div>
@@ -300,11 +354,11 @@ export function ClienteManager() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">RUC</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Negocio</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre / Negocio</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provincia / Ciudad</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dirección</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teléfono</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Geo</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">GPS</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
               </tr>
             </thead>
@@ -316,17 +370,30 @@ export function ClienteManager() {
               ) : filteredClientes.map(c => (
                 <tr key={c.ruc} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">{c.ruc}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900">{c.nombres_completos}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{c.nombre_negocio || '-'}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="text-gray-900">{c.nombres_completos}</div>
+                    {c.nombre_negocio && <div className="text-xs text-gray-500">{c.nombre_negocio}</div>}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {c.provincia ? `${c.provincia}${c.ciudad ? ` / ${c.ciudad}` : ''}` : '-'}
                   </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 max-w-[160px] truncate" title={c.direccion || ''}>
+                    {c.direccion || '-'}
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{c.telefono || '-'}</td>
                   <td className="px-4 py-3 text-center">
-                    {c.latitud && c.longitud
-                      ? <span title={`${c.latitud?.toFixed(4)}, ${c.longitud?.toFixed(4)}`}><MapPin className="h-4 w-4 text-green-500 mx-auto" /></span>
-                      : <span className="text-gray-300 text-xs">—</span>
-                    }
+                    {c.latitud && c.longitud ? (
+                      <a
+                        href={`https://www.google.com/maps?q=${c.latitud},${c.longitud}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Ver en mapa: ${c.latitud.toFixed(5)}, ${c.longitud.toFixed(5)}`}
+                      >
+                        <MapPin className="h-4 w-4 text-green-500 mx-auto hover:text-green-700" />
+                      </a>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-center">
                     <div className="flex justify-center gap-2">
