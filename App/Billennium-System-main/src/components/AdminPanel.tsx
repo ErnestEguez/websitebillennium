@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Building2, Users, LogOut, Settings, UserCheck, FileText, Database, Package, ShoppingCart } from 'lucide-react';
+import { Building2, Users, LogOut, Settings, UserCheck, FileText, Database, Package, ShoppingCart, Search } from 'lucide-react';
 import { EmpresaConfig } from './EmpresaConfig';
 import { VendedorManager } from './VendedorManager';
 import { ClienteManager } from './ClienteManager';
+import { ConsultaClientes } from './ConsultaClientes';
 import { ProformaManager } from './ProformaManager';
 import { PedidoManager } from './PedidoManager';
 import { ArticulosManager } from './ArticulosManager';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
-type AdminView = 'empresas' | 'vendedores' | 'clientes' | 'proformas' | 'pedidos' | 'articulos' | 'respaldo';
+type AdminView = 'empresas' | 'vendedores' | 'clientes' | 'consulta-clientes' | 'proformas' | 'pedidos' | 'articulos' | 'respaldo';
 
 export function AdminPanel() {
   const { vendedor, signOut } = useAuth();
@@ -85,6 +86,16 @@ export function AdminPanel() {
               Clientes
             </button>
             <button
+              onClick={() => setCurrentView('consulta-clientes')}
+              className={`flex items-center px-6 py-4 font-medium transition-colors whitespace-nowrap ${currentView === 'consulta-clientes'
+                  ? 'text-teal-600 border-b-2 border-teal-600'
+                  : 'text-gray-600 hover:text-gray-900'
+                }`}
+            >
+              <Search className="h-5 w-5 mr-2" />
+              Consulta
+            </button>
+            <button
               onClick={() => setCurrentView('proformas')}
               className={`flex items-center px-6 py-4 font-medium transition-colors whitespace-nowrap ${currentView === 'proformas'
                   ? 'text-blue-600 border-b-2 border-blue-600'
@@ -130,6 +141,7 @@ export function AdminPanel() {
         {currentView === 'empresas' && <EmpresaConfig />}
         {currentView === 'vendedores' && <VendedorManager />}
         {currentView === 'clientes' && <ClienteManager />}
+        {currentView === 'consulta-clientes' && <ConsultaClientes />}
         {currentView === 'proformas' && <ProformaManager />}
         {currentView === 'pedidos' && <PedidoManager />}
         {currentView === 'articulos' && (

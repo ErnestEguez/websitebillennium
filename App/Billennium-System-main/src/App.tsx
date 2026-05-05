@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Plus, List, RefreshCw, Package, LogOut, User, BarChart3 } from 'lucide-react';
+import { FileText, Plus, List, RefreshCw, Package, LogOut, User, BarChart3, Users } from 'lucide-react';
 import { ProformaForm } from './components/ProformaForm';
 import { DocumentosList } from './components/DocumentosList';
 import { ArticulosManager } from './components/ArticulosManager';
@@ -8,11 +8,12 @@ import { Login } from './components/Login';
 import { AdminPanel } from './components/AdminPanel';
 import { OficinaDashboard } from './components/OficinaDashboard';
 import { ChatBubble } from './components/ChatBubble';
+import { ConsultaClientes } from './components/ConsultaClientes';
 import { useAuth } from './contexts/AuthContext';
 import { supabase } from './lib/supabase';
 import type { ProformaCompleta, PedidoCompleto, Empresa } from './lib/supabase';
 
-type Vista = 'nueva-proforma' | 'nueva-pedido' | 'documentos' | 'dashboard' | 'articulos';
+type Vista = 'nueva-proforma' | 'nueva-pedido' | 'documentos' | 'dashboard' | 'articulos' | 'clientes';
 
 function App() {
   const { user, vendedor, loading, signOut } = useAuth();
@@ -187,6 +188,16 @@ function App() {
                 <BarChart3 className="h-5 w-5" />
               </button>
               <button
+                onClick={() => setVistaActual('clientes')}
+                className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${vistaActual === 'clientes'
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                title="Clientes"
+              >
+                <Users className="h-5 w-5" />
+              </button>
+              <button
                 onClick={() => setVistaActual('articulos')}
                 className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${vistaActual === 'articulos'
                   ? 'bg-purple-600 text-white'
@@ -202,7 +213,9 @@ function App() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {vistaActual === 'articulos' ? (
+        {vistaActual === 'clientes' ? (
+          <ConsultaClientes />
+        ) : vistaActual === 'articulos' ? (
           <ArticulosManager />
         ) : vistaActual === 'dashboard' ? (
           <Dashboard />
