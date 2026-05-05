@@ -623,7 +623,7 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
                 )}
               </div>
               {/* Botón GPS solo para cliente nuevo */}
-              {!clienteEncontrado && rucCliente.length >= 10 && (
+              {!clienteEncontrado && (
                 <button
                   type="button"
                   onClick={handleCapturarGeoManual}
@@ -944,10 +944,10 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
             Capturando ubicación GPS…
           </span>
         )}
-        {!clienteEncontrado && !capturandoGeo && rucCliente.length >= 10 && !geoCapturada && (
+        {!clienteEncontrado && !capturandoGeo && !geoCapturada && (
           <span className="flex items-center gap-1.5 text-xs text-gray-400">
             <MapPin className="h-3.5 w-3.5" />
-            Sin GPS — se intentará capturar al guardar
+            Sin GPS — pulse "Capturar mi ubicación" o se intentará al guardar
           </span>
         )}
         <button
