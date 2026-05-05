@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { aiService, AiSuggestion } from '../lib/aiService';
 import { Sparkles, ShoppingBag } from 'lucide-react';
+import { PROVINCIAS, PROVINCIAS_CIUDADES } from '../lib/ecuador';
 
 interface DetalleItem {
   articulo_id: string;
@@ -332,14 +333,20 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
           nombres_completos: nombreCliente,
           nombre_negocio: nombreNegocio || null,
           correo: correoCliente || null,
-          telefono: telefonoNormalizado || null
+          telefono: telefonoNormalizado || null,
+          direccion: direccionCliente || null,
+          provincia: provinciaCliente || null,
+          ciudad: ciudadCliente || null,
         });
       } else {
         await service.updateCliente(rucCliente, {
           nombres_completos: nombreCliente,
           nombre_negocio: nombreNegocio || null,
           correo: correoCliente || null,
-          telefono: telefonoNormalizado || null
+          telefono: telefonoNormalizado || null,
+          direccion: direccionCliente || null,
+          provincia: provinciaCliente || null,
+          ciudad: ciudadCliente || null,
         });
       }
 
@@ -577,40 +584,69 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
             />
           </div>
 
-          {clienteEncontrado && (provinciaCliente || ciudadCliente || direccionCliente) && (
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-1.5 mb-2 text-sm font-medium text-gray-700">
-                <MapPin className="h-4 w-4 text-blue-500" />
-                Ubicación del cliente
+          {/* Ubicación — editable para cliente nuevo, read-only para existente */}
+          <div className="md:col-span-2">
+            <div className="flex items-center gap-1.5 mb-2 text-sm font-medium text-gray-700">
+              <MapPin className="h-4 w-4 text-blue-500" />
+              Ubicación
+              {clienteEncontrado && (
+                <span className="text-xs text-gray-400 font-normal">(solo lectura)</span>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Provincia</label>
+                {clienteEncontrado ? (
+                  <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 min-h-[38px]">
+                    {provinciaCliente || <span className="text-gray-400">—</span>}
+                  </div>
+                ) : (
+                  <select
+                    value={provinciaCliente}
+                    onChange={e => { setProvinciaCliente(e.target.value); setCiudadCliente(''); }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    <option value="">Seleccionar...</option>
+                    {PROVINCIAS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {provinciaCliente && (
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Provincia</label>
-                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
-                      {provinciaCliente}
-                    </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Ciudad / Cantón</label>
+                {clienteEncontrado ? (
+                  <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 min-h-[38px]">
+                    {ciudadCliente || <span className="text-gray-400">—</span>}
                   </div>
+                ) : (
+                  <select
+                    value={ciudadCliente}
+                    onChange={e => setCiudadCliente(e.target.value)}
+                    disabled={!provinciaCliente}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100"
+                  >
+                    <option value="">Seleccionar...</option>
+                    {(PROVINCIAS_CIUDADES[provinciaCliente] || []).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 )}
-                {ciudadCliente && (
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Ciudad</label>
-                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
-                      {ciudadCliente}
-                    </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Dirección</label>
+                {clienteEncontrado ? (
+                  <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 min-h-[38px]">
+                    {direccionCliente || <span className="text-gray-400">—</span>}
                   </div>
-                )}
-                {direccionCliente && (
-                  <div className={!provinciaCliente && !ciudadCliente ? 'md:col-span-3' : ''}>
-                    <label className="block text-xs text-gray-500 mb-1">Dirección</label>
-                    <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
-                      {direccionCliente}
-                    </div>
-                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={direccionCliente}
+                    onChange={e => setDireccionCliente(e.target.value)}
+                    placeholder="Calle y número"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
                 )}
               </div>
             </div>
-          )}
+          </div>
 
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -68,6 +68,9 @@ export const proformaService = {
         nombre_negocio: cliente.nombre_negocio || null,
         correo: cliente.correo,
         telefono: cliente.telefono,
+        direccion: cliente.direccion || null,
+        provincia: cliente.provincia || null,
+        ciudad: cliente.ciudad || null,
         activo: true
       })
       .select()
@@ -83,6 +86,9 @@ export const proformaService = {
     if (datos.nombre_negocio !== undefined) updateData.nombre_negocio = datos.nombre_negocio;
     if (datos.correo !== undefined) updateData.correo = datos.correo;
     if (datos.telefono !== undefined) updateData.telefono = datos.telefono;
+    if (datos.direccion !== undefined) updateData.direccion = datos.direccion;
+    if (datos.provincia !== undefined) updateData.provincia = datos.provincia;
+    if (datos.ciudad !== undefined) updateData.ciudad = datos.ciudad;
 
     const { error } = await supabase
       .from('clientes')
