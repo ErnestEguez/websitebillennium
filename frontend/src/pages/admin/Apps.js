@@ -32,7 +32,7 @@ const ADMIN_APPS = [
     description: 'Control de órdenes de compra internacionales, seguimiento de embarques y cálculo de costos.',
     icon: Ship,
     color: 'bg-cyan-50 text-cyan-600',
-    available: false,
+    available: true,
   },
   {
     id: 'conta',

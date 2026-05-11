@@ -530,6 +530,80 @@ def get_me(current_user: dict = Depends(get_current_user)):
         is_active=current_user.get("is_active", True)
     )
 
+@api_router.get("/admin/apps/{app_id}/enter")
+def admin_enter_app(app_id: str, admin: dict = Depends(get_admin_user)):
+    """Genera magic link SSO para que el admin entre al panel de una app."""
+    APP_URLS = {
+        "sentinel": os.environ.get("SENTINEL_URL", "https://pedidosbillennium.vercel.app/"),
+        "importaciones": os.environ.get("IMPORTACIONES_URL", "http://localhost:5173/"),
+    }
+    app_url = APP_URLS.get(app_id)
+    if not app_url:
+        raise HTTPException(status_code=404, detail=f"App '{app_id}' no encontrada o no disponible")
+
+    admin_endpoint = f"{SUPABASE_URL}/auth/v1/admin/generate_link"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "type": "magiclink",
+        "email": admin["email"],
+        "redirect_to": app_url,
+    }
+
+    try:
+        import httpx
+        resp = httpx.post(admin_endpoint, json=payload, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        action_link = data.get("action_link")
+        if not action_link:
+            raise HTTPException(status_code=500, detail="Supabase no devolvió el enlace de acceso")
+        return {"url": action_link}
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=500, detail=f"Error Supabase Admin: {e.response.text}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando acceso: {str(e)}")
+
+@api_router.get("/auth/app-token")
+def get_app_token(product_id: str, current_user: dict = Depends(get_current_user)):
+    """Genera un magic link de Supabase Auth para SSO hacia apps internas."""
+    APP_URLS = {
+        "sentinel": os.environ.get("SENTINEL_URL", "https://pedidosbillennium.vercel.app/"),
+        "importaciones": os.environ.get("IMPORTACIONES_URL", "https://importaciones-billennium.vercel.app/"),
+    }
+    app_url = APP_URLS.get(product_id)
+    if not app_url:
+        raise HTTPException(status_code=404, detail="App no encontrada")
+
+    admin_endpoint = f"{SUPABASE_URL}/auth/v1/admin/generate_link"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "type": "magiclink",
+        "email": current_user["email"],
+        "redirect_to": app_url,
+    }
+
+    try:
+        import httpx
+        resp = httpx.post(admin_endpoint, json=payload, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        action_link = data.get("action_link")
+        if not action_link:
+            raise HTTPException(status_code=500, detail="Supabase no devolvió el enlace de acceso")
+        return {"url": action_link}
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=500, detail=f"Error Supabase Admin: {e.response.text}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando acceso SSO: {str(e)}")
+
 # ============== PRODUCTS ROUTES ==============
 
 @api_router.get("/products", response_model=List[Product])

@@ -43,7 +43,7 @@ const productConfig = {
     name: 'Módulo de Importaciones',
     icon: Ship,
     color: 'bg-cyan-50 text-cyan-600',
-    url: 'https://import-cloud.vercel.app/',
+    url: 'https://import-cloud-34hpy6xjk-ernesteguezs-projects.vercel.app/',
     description: 'Control de importaciones'
   },
   lopdp: {
@@ -110,7 +110,7 @@ export const UserDashboard = () => {
   };
 
   // Productos que usan SSO (magic link) en vez de URL directa
-  const SSO_PRODUCTS = ['sentinel'];
+  const SSO_PRODUCTS = ['sentinel', 'importaciones'];
 
   const handleSsoAccess = async (productId) => {
     setSsoLoading(productId);
@@ -128,10 +128,12 @@ export const UserDashboard = () => {
     }
   };
 
-  // Get enabled products
-  const enabledProducts = subscriptions
-    .filter(sub => sub.is_enabled && sub.status === 'active')
-    .map(sub => sub.product_id);
+  // Los admins ven todos los productos disponibles sin necesitar suscripción
+  const enabledProducts = user?.role === 'admin'
+    ? Object.keys(productConfig)
+    : subscriptions
+        .filter(sub => sub.is_enabled && sub.status === 'active')
+        .map(sub => sub.product_id);
 
   if (loading) {
     return (
