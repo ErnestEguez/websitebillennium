@@ -764,6 +764,7 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
 # Mapa de product_id → URL de producción de la App
 APP_URLS = {
     "sentinel": os.environ.get("PEDIDOS_APP_URL", "http://localhost:5173"),
+    "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://import-cloud-34hpy6xjk-ernesteguezs-projects.vercel.app/"),
 }
 
 @api_router.get("/debug/env")
@@ -821,7 +822,20 @@ def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
     email = admin["email"]
     name = admin["name"]
 
-    # 1. Obtener o crear usuario en Supabase Auth
+    # Para importaciones solo se genera el magic link (el email de admin es superadmin por configuración)
+    if product_id == "importaciones":
+        try:
+            result = supabase.auth.admin.generate_link({
+                "type": "magiclink",
+                "email": email,
+                "options": {"redirect_to": APP_URLS[product_id]}
+            })
+            return {"url": result.properties.action_link, "app": product_id}
+        except Exception as e:
+            logger.error(f"Error generating admin magic link for {email}: {e}")
+            raise HTTPException(status_code=500, detail=f"Error al generar acceso: {str(e)}")
+
+    # Para sentinel y otras apps: obtener o crear usuario en Supabase Auth
     supabase_user_id = None
     try:
         id_result = supabase.rpc('get_user_id_by_email', {'p_email': email}).execute()
@@ -840,7 +854,7 @@ def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
         supabase_user_id = str(create_result.user.id)
         logger.info(f"Admin Supabase Auth user created: {email} → {supabase_user_id}")
 
-    # 2. Garantizar vendedor admin en pedidosbillennium
+    # Garantizar vendedor admin en pedidosbillennium
     existing = supabase.schema('pedidosbillennium').table('vendedores').select('id, is_admin').eq('id', supabase_user_id).execute()
 
     if existing.data:
@@ -861,7 +875,7 @@ def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
         }).execute()
         logger.info(f"Admin vendedor created in pedidosbillennium: {email}")
 
-    # 3. Generar magic link
+    # Generar magic link
     try:
         result = supabase.auth.admin.generate_link({
             "type": "magiclink",
