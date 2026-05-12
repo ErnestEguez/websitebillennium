@@ -30,6 +30,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [signedOut, setSignedOut] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
@@ -55,12 +56,28 @@ export default function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setSession(null);
+    setSignedOut(true);
+    setTimeout(() => window.close(), 1200);
   };
 
   const handleMockLogin = (mockUser: any) => {
     setSession({ user: mockUser });
   };
+
+  if (signedOut) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-slate-600 text-lg">Sesión cerrada.</p>
+          <p className="text-slate-500 text-sm mt-2">Puedes cerrar esta pestaña.</p>
+          <button onClick={() => window.close()} className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+            Cerrar pestaña
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Detectar si hay un magic link en la URL (token SSO del Portal)
   const hasMagicLinkToken =
