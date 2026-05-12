@@ -764,15 +764,17 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
 # Mapa de product_id → URL de producción de la App
 APP_URLS = {
     "sentinel": os.environ.get("PEDIDOS_APP_URL", "http://localhost:5173"),
-    "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://import-cloud-34hpy6xjk-ernesteguezs-projects.vercel.app/"),
+    "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://websitebillennium-5gsk-o5f9iu4gm-ernesteguezs-projects.vercel.app/"),
 }
 
 @api_router.get("/debug/env")
 def debug_env():
     """Endpoint temporal de diagnóstico — eliminar después de verificar."""
     return {
-        "PEDIDOS_APP_URL": os.environ.get("PEDIDOS_APP_URL", "NO CONFIGURADA - usando localhost"),
+        "PEDIDOS_APP_URL": os.environ.get("PEDIDOS_APP_URL", "NO CONFIGURADA"),
         "PEDIDOS_APP_URL_resolved": APP_URLS.get("sentinel"),
+        "IMPORTACIONES_APP_URL": os.environ.get("IMPORTACIONES_APP_URL", "NO CONFIGURADA - usando fallback"),
+        "IMPORTACIONES_APP_URL_resolved": APP_URLS.get("importaciones"),
         "SUPABASE_URL_set": bool(os.environ.get("SUPABASE_URL")),
         "SUPABASE_KEY_set": bool(os.environ.get("SUPABASE_KEY")),
         "JWT_SECRET_set": bool(os.environ.get("JWT_SECRET")),
