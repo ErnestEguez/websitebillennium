@@ -764,7 +764,7 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
 # Mapa de product_id → URL de producción de la App
 APP_URLS = {
     "sentinel": os.environ.get("PEDIDOS_APP_URL", "http://localhost:5173"),
-    "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://websitebillennium-5gsk-o5f9iu4gm-ernesteguezs-projects.vercel.app/"),
+    "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://websitebillennium-5gsk.vercel.app/"),
 }
 
 @api_router.get("/debug/env")

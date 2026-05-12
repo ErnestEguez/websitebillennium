@@ -43,7 +43,7 @@ const productConfig = {
     name: 'Módulo de Importaciones',
     icon: Ship,
     color: 'bg-cyan-50 text-cyan-600',
-    url: 'https://import-cloud-34hpy6xjk-ernesteguezs-projects.vercel.app/',
+    url: 'https://websitebillennium-5gsk.vercel.app/',
     description: 'Control de importaciones'
   },
   lopdp: {
