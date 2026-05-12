@@ -792,12 +792,14 @@ def get_app_token(
     if product_id not in APP_URLS:
         raise HTTPException(status_code=400, detail=f"Producto '{product_id}' no soporta SSO aún")
 
-    sub = supabase.table("subscriptions").select("id").eq(
-        "user_id", current_user["id"]
-    ).eq("product_id", product_id).eq("status", "active").eq("is_enabled", True).execute()
+    # Los admins del Portal tienen acceso a todas las apps sin necesitar suscripción
+    if current_user.get("role") != "admin":
+        sub = supabase.table("subscriptions").select("id").eq(
+            "user_id", current_user["id"]
+        ).eq("product_id", product_id).eq("status", "active").eq("is_enabled", True).execute()
 
-    if not sub.data:
-        raise HTTPException(status_code=403, detail="No tienes acceso activo a esta aplicación")
+        if not sub.data:
+            raise HTTPException(status_code=403, detail="No tienes acceso activo a esta aplicación")
 
     redirect_url = APP_URLS[product_id]
 
