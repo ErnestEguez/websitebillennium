@@ -352,7 +352,7 @@ export function InvoicingPage() {
                                                     onClick={async () => {
                                                         setLoading(true);
                                                         try {
-                                                            const { data, error } = await (supabase as any).functions.invoke('factura-electronica', {
+                                                            const { data, error } = await (supabase as any).functions.invoke('sri-signer', {
                                                                 body: { comprobante_id: doc.id }
                                                             });
                                                             if (error) throw error;

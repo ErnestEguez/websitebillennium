@@ -262,22 +262,22 @@ export const facturacionService = {
                 }
             }
 
-            // 5. Invocar Edge Function factura-electronica (firma XAdES-BES + SRI + correo Resend)
+            // 5. Invocar Edge Function sri-signer (firma XAdES-BES + SRI + correo Resend)
             try {
-                const { data: sriResult, error: sriErr } = await supabase.functions.invoke('factura-electronica', {
+                const { data: sriResult, error: sriErr } = await supabase.functions.invoke('sri-signer', {
                     body: { comprobante_id: factura.id }
                 })
 
                 if (sriErr) {
-                    console.error('[factura-electronica] Error invocando Edge Function:', sriErr)
+                    console.error('[sri-signer] Error invocando Edge Function:', sriErr)
                     // No tiramos error: el comprobante queda en PENDIENTE y se puede reintentar
                 } else if (sriResult?.success) {
-                    console.log('[factura-electronica] Resultado:', sriResult)
+                    console.log('[sri-signer] Resultado:', sriResult)
                 } else {
-                    console.warn('[factura-electronica] Respuesta inesperada:', sriResult)
+                    console.warn('[sri-signer] Respuesta inesperada:', sriResult)
                 }
             } catch (edgeFnErr) {
-                console.error('[factura-electronica] Excepción al invocar Edge Function:', edgeFnErr)
+                console.error('[sri-signer] Excepción al invocar Edge Function:', edgeFnErr)
                 // El comprobante sigue en PENDIENTE — no bloquea el flujo del cajero
             }
 

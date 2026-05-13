@@ -246,19 +246,19 @@ export const facturaDirectaService = {
             console.error('Error al registrar salida en Kardex:', kardexErr)
         }
 
-        // 9. Invocar Edge Function factura-electronica
+        // 9. Invocar Edge Function sri-signer
         try {
-            const { data: sriResult, error: sriErr } = await supabase.functions.invoke('factura-electronica', {
+            const { data: sriResult, error: sriErr } = await supabase.functions.invoke('sri-signer', {
                 body: { comprobante_id: factura.id }
             })
 
             if (sriErr) {
-                console.error('[factura-electronica] Error:', sriErr)
+                console.error('[sri-signer] Error:', sriErr)
             } else {
-                console.log('[factura-electronica] Resultado:', sriResult)
+                console.log('[sri-signer] Resultado:', sriResult)
             }
         } catch (edgeFnErr) {
-            console.error('[factura-electronica] Excepción:', edgeFnErr)
+            console.error('[sri-signer] Excepción:', edgeFnErr)
         }
 
         // 10. Retornar comprobante actualizado

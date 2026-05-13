@@ -119,7 +119,7 @@ export const sriService = {
     async consultarEstadoComprobante(id: string) {
         // Llamar a la Edge Function para consultar el estado real en el SRI
         try {
-            const { data, error } = await supabase.functions.invoke('factura-electronica', {
+            const { data, error } = await supabase.functions.invoke('sri-signer', {
                 body: { comprobante_id: id, solo_consulta: true }
             });
 
