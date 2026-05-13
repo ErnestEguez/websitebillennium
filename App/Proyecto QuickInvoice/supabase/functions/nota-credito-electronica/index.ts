@@ -386,7 +386,7 @@ async function firmarXmlXadesBes(
 ): Promise<string> {
   const p12Der   = atob(p12Base64);
   const p12Asn1  = forge.asn1.fromDer(p12Der);
-  const p12      = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, p12Password);
+  const p12      = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, p12Password || "");
 
   const keyBags  = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
   const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
@@ -475,7 +475,8 @@ serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { db: { schema: "facturacion" } }
     );
 
     // ── Obtener NC base (evitar joins complejos que fallan en schema cache)
