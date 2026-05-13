@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(npx supabase:*)",
+      "Bash(supabase functions:*)",
+      "Bash(git push *)"
+    ]
+  }
+}

@@ -1,0 +1,738 @@
+================================================================================
+          MANUAL DE USUARIO -- QUICKINVOICE
+          Sistema de Facturacion Electronica integrado con SRI Ecuador
+================================================================================
+
+  NOTA SOBRE IMAGENES
+  -------------------
+  Las capturas de pantalla deben guardarse en la carpeta:
+      Docs/imagenes/
+
+  Convención de nombres: ##_nombre-seccion.png
+  Ejemplo: 01_login.png, 02_dashboard.png, 03_factura-nueva.png
+
+================================================================================
+                           TABLA DE CONTENIDOS
+================================================================================
+
+  1.  Acceso al sistema
+  2.  Pantalla principal (Dashboard)
+  3.  Facturacion Electronica
+  4.  Comprobantes emitidos
+  5.  Clientes
+  6.  Productos
+  7.  Proveedores
+  8.  Ingreso de Compras / Inventario
+  9.  Kardex
+  10. Vendedores
+  11. Cartera por Cobrar (CxC)
+  12. Notas de Credito
+  13. Anulacion de Facturas
+  14. Cierres de Caja
+  15. Consultas e Informes
+  16. Configuracion
+  17. Preguntas frecuentes
+  A.  Glosario
+
+================================================================================
+  1. ACCESO AL SISTEMA
+================================================================================
+
+1.1 Ingresar al sistema
+-----------------------
+  1. Abra el navegador web (Chrome o Edge recomendado).
+  2. Ingrese la direccion de la aplicacion.
+  3. Escriba su CORREO ELECTRONICO y CONTRASENA.
+  4. Haga clic en "Iniciar Sesion".
+
+  [IMAGEN: 01_login.png -- pantalla de inicio de sesion]
+
+1.2 Roles de usuario
+--------------------
+  +---------------------+---------------------------------------------------+
+  | Rol                 | Acceso                                            |
+  +---------------------+---------------------------------------------------+
+  | Oficina             | Acceso completo a facturacion, cartera, reportes  |
+  |                     | y configuracion                                   |
+  +---------------------+---------------------------------------------------+
+  | Mesero / Caja       | Solo pedidos y caja (modulo restaurante)          |
+  +---------------------+---------------------------------------------------+
+
+1.3 Cerrar sesion
+-----------------
+  En el menu lateral inferior haga clic en "Cerrar Sesion".
+
+================================================================================
+  2. PANTALLA PRINCIPAL (DASHBOARD)
+================================================================================
+
+  Al ingresar vera el panel principal con:
+
+    - Empresa activa     -- nombre y logo en la barra superior
+    - Menu lateral       -- acceso a todos los modulos
+    - Resumen del dia    -- ventas, caja abierta/cerrada
+
+  [IMAGEN: 02_dashboard.png -- vista general del sistema]
+
+================================================================================
+  3. FACTURACION ELECTRONICA
+================================================================================
+
+  Menu: Nueva Factura
+
+  [IMAGEN: 03_facturacion-nueva.png -- formulario de factura]
+
+3.1 Emitir una nueva factura
+----------------------------
+  1. Haga clic en "Nueva Factura" (boton azul superior derecho).
+
+  2. Seleccionar cliente:
+       - Busque por nombre, RUC o cedula.
+       - Si el cliente no existe, haga clic en "Nuevo Cliente" para crearlo
+         en el momento.
+
+  3. Agregar productos:
+       - Busque el producto por nombre o codigo.
+       - Ingrese la cantidad.
+       - El precio y el IVA se cargan automaticamente.
+       - Repita para cada producto.
+
+  4. Forma de pago:
+       - Seleccione: Efectivo, Tarjeta, Transferencia, Cheque o Credito.
+       - Para credito, seleccione la fecha de vencimiento.
+       - Puede combinar varias formas de pago en una misma factura.
+
+  5. Haga clic en "Emitir Factura".
+
+  El sistema automaticamente:
+    - Genera la clave de acceso de 49 digitos.
+    - Firma el XML con su certificado digital (.p12).
+    - Envia al SRI (recepcion + autorizacion).
+    - Actualiza el inventario (Kardex).
+    - Si es a credito, registra en Cartera CxC.
+    - Envia el RIDE y XML al correo del cliente (si tiene correo registrado).
+
+3.2 Comprobantes que genera
+----------------------------
+  Despues de facturar aparecen dos opciones de impresion:
+
+    +-------------------+-----------------------------------------------+
+    | Boton             | Descripcion                                   |
+    +-------------------+-----------------------------------------------+
+    | Ticket 80mm       | Comprobante provisional para impresora termica|
+    | RIDE A4           | Comprobante oficial SRI en formato A4         |
+    +-------------------+-----------------------------------------------+
+
+  [IMAGEN: 03b_factura-impresion.png -- botones de impresion post-factura]
+
+3.3 Estados de una factura
+---------------------------
+    +-------------+--------------------------------------------------+
+    | Estado SRI  | Significado                                      |
+    +-------------+--------------------------------------------------+
+    | AUTORIZADO  | El SRI autorizo el comprobante -- es valido      |
+    | PENDIENTE   | Enviado, esperando respuesta del SRI             |
+    | RECHAZADO   | El SRI rechazo el comprobante -- revisar error   |
+    +-------------+--------------------------------------------------+
+
+3.4 Reintentar autorizacion
+----------------------------
+  Si una factura quedo en estado PENDIENTE o RECHAZADO:
+    1. Vaya a "Comprobantes".
+    2. Busque la factura.
+    3. Use el boton de reintento (icono de recarga).
+
+================================================================================
+  4. COMPROBANTES EMITIDOS
+================================================================================
+
+  Menu: Comprobantes
+
+  [IMAGEN: 04_comprobantes-lista.png -- listado de comprobantes]
+
+  Listado de todas las facturas emitidas con opciones de:
+
+    - Buscar          -- por numero, cliente o fecha
+    - Ver RIDE        -- abre el RIDE en formato A4
+    - Descargar XML   -- descarga el archivo XML firmado
+    - Reenviar correo -- reenvía al cliente
+
+================================================================================
+  5. CLIENTES
+================================================================================
+
+  Menu: Clientes
+
+  [IMAGEN: 05_clientes.png -- listado de clientes]
+
+5.1 Crear cliente
+-----------------
+  1. Haga clic en "Nuevo Cliente".
+  2. Ingrese:
+       - Identificacion   -- RUC (13 digitos), Cedula (10 digitos) o Pasaporte
+       - Nombre / Razon Social
+       - Direccion, telefono, correo
+         (el correo recibe los comprobantes automaticamente)
+  3. Haga clic en "Guardar".
+
+  CONSEJO: Al ingresar el RUC o cedula, el sistema puede consultar
+           automaticamente los datos en el SRI.
+
+5.2 Editar / Eliminar cliente
+------------------------------
+  - Haga clic en el icono de edicion (lapiz) en la fila del cliente.
+  - Para eliminar, use el icono de basura
+    (solo si el cliente no tiene facturas asociadas).
+
+================================================================================
+  6. PRODUCTOS
+================================================================================
+
+  Menu: Productos
+
+  [IMAGEN: 06_productos.png -- listado de productos]
+
+6.1 Crear producto
+------------------
+  1. Haga clic en "Nuevo Producto".
+  2. Ingrese:
+       - Codigo        -- codigo interno (aparece en la factura)
+       - Nombre        -- descripcion del producto
+       - Precio venta  -- sin IVA
+       - IVA           -- 0%, 5%, 12% o 15%
+       - Stock inicial
+       - Categoria
+  3. Haga clic en "Guardar".
+
+6.2 Control de stock
+---------------------
+  El stock se actualiza automaticamente con cada factura emitida.
+  Para ajustes manuales use el modulo de "Ingreso de Compras".
+
+================================================================================
+  7. PROVEEDORES
+================================================================================
+
+  Menu: Proveedores
+
+  Registro de los proveedores de la empresa. Datos:
+    - RUC / Cedula
+    - Nombre / Razon Social
+    - Direccion, telefono, correo
+
+================================================================================
+  8. INGRESO DE COMPRAS / INVENTARIO
+================================================================================
+
+  Menu: Ingreso de Compras
+
+  [IMAGEN: 08_ingreso-compras.png -- formulario de ingreso]
+
+  Permite registrar compras a proveedores y aumentar el stock de productos.
+
+  Pasos:
+    1. Seleccione el proveedor.
+    2. Ingrese la fecha y numero de factura del proveedor.
+    3. Agregue los productos comprados con cantidad y costo.
+    4. Haga clic en "Registrar Ingreso".
+
+  El sistema actualiza automaticamente el stock en Kardex.
+
+================================================================================
+  9. KARDEX
+================================================================================
+
+  Menu: Kardex
+
+  [IMAGEN: 09_kardex.png -- movimientos de inventario]
+
+  Registro de todos los movimientos de inventario:
+
+    +------------------+--------------------------------+
+    | Tipo             | Origen                         |
+    +------------------+--------------------------------+
+    | ENTRADA          | Compra a proveedor             |
+    | SALIDA           | Venta (factura)                |
+    | DEVOLUCION_NC    | Nota de credito (devolucion)   |
+    +------------------+--------------------------------+
+
+  Filtros disponibles: por producto, fecha, tipo de movimiento.
+
+================================================================================
+  10. VENDEDORES
+================================================================================
+
+  Menu: Vendedores
+
+  [IMAGEN: 10_vendedores.png -- listado de vendedores]
+
+  Registro del personal de ventas. Cada vendedor puede asociarse a las
+  facturas para analisis de comisiones y reportes.
+
+  Datos del vendedor:
+    - Nombre completo
+    - Iniciales (aparecen en reportes)
+    - Email y telefono
+    - Estado: Activo / Baja
+
+================================================================================
+  11. CARTERA POR COBRAR (CxC)
+================================================================================
+
+  Menu: Cartera CxC
+
+  [IMAGEN: 11_cartera-lista.png -- listado de cartera]
+
+  La cartera registra todas las facturas emitidas a CREDITO que tienen
+  saldo pendiente de cobro.
+
+11.1 Filtros de la cartera
+---------------------------
+    +---------------------------+--------------------------------------------+
+    | Filtro                    | Muestra                                    |
+    +---------------------------+--------------------------------------------+
+    | Activos (Pend+Parcial)    | Pendientes y con abonos parciales          |
+    |                           | (vista por defecto)                        |
+    | Pendiente                 | Solo facturas sin ningun pago              |
+    | Parcial                   | Facturas con abonos parciales              |
+    | Pagada                    | Facturas totalmente canceladas             |
+    | Todos                     | Historial completo                         |
+    +---------------------------+--------------------------------------------+
+
+11.2 Registrar un abono (factura individual)
+--------------------------------------------
+  1. Busque la factura en la lista.
+  2. Haga clic en "Abonar".
+  3. Ingrese el valor del abono, metodo de pago y referencia
+     (numero de cheque, transferencia, etc.).
+  4. Haga clic en "Registrar y Comprobante".
+
+  Inmediatamente se abre una ventana con el COMPROBANTE DE PAGO
+  para imprimir en A4 o 80mm.
+
+  [IMAGEN: 11b_cartera-abono.png -- modal de registro de abono]
+
+11.3 Cobro a Cliente (un pago para varias facturas)
+----------------------------------------------------
+  Cuando un cliente paga con un solo cheque o transferencia varias facturas:
+
+  1. Haga clic en "Cobro a Cliente" (boton superior derecho).
+  2. Busque y seleccione el cliente.
+  3. El sistema muestra todas sus facturas pendientes con el total de deuda.
+  4. Ingrese el VALOR DEL PAGO, metodo y referencia.
+  5. El sistema distribuye automaticamente el pago de la factura mas antigua
+     a la mas reciente (orden FIFO -- primero en entrar, primero en salir).
+  6. Vera en tiempo real como se aplica el pago en cada factura.
+  7. Haga clic en "Registrar y Comprobante".
+
+  [IMAGEN: 11c_cobro-cliente.png -- modal de cobro multi-factura]
+
+11.4 Comprobante de pago
+------------------------
+  El comprobante muestra:
+
+    +------------+---------------------------------------------------+
+    | Columna    | Descripcion                                       |
+    +------------+---------------------------------------------------+
+    | No. Factura| Numero de la factura afectada                     |
+    | Deuda      | Saldo que tenia antes del pago                    |
+    | Abono      | Valor aplicado en este pago                       |
+    | Saldo      | Saldo nuevo (muestra CANCELADA si quedo en cero)  |
+    +------------+---------------------------------------------------+
+
+  Al final: forma de pago, referencia, fecha/hora y total pagado.
+
+  Opciones de impresion:
+    - Imprimir A4   -- para archivo o cliente formal
+    - Imprimir 80mm -- para impresora termica de punto de venta
+
+11.5 Ver historial de pagos por factura
+----------------------------------------
+  Haga clic en cualquier fila de la cartera para expandirla y ver todos
+  los pagos registrados con fecha, metodo y referencia.
+
+11.6 Imprimir cartera
+----------------------
+  El boton "Imprimir Cartera" genera un reporte con el listado actual en
+  pantalla (aplica los filtros activos) con totales de deuda pendiente.
+
+================================================================================
+  12. NOTAS DE CREDITO
+================================================================================
+
+  Menu: Notas de Credito
+
+  [IMAGEN: 12_nc-lista.png -- listado de notas de credito]
+
+  Las Notas de Credito permiten registrar DEVOLUCIONES de productos de una
+  factura ya emitida. Son comprobantes electronicos autorizados por el SRI.
+
+12.1 Crear una Nota de Credito
+-------------------------------
+  1. Haga clic en "Nueva Nota de Credito".
+
+  2. Paso 1 -- Seleccionar factura:
+       - Busque la factura de origen por numero o cliente.
+       - Haga clic en "Seleccionar" en la factura que corresponde.
+
+  3. Paso 2 -- Seleccionar productos a devolver:
+       - Vea los productos de la factura.
+       - Ingrese la cantidad a devolver (puede ser parcial).
+       - El sistema muestra cuantas unidades ya fueron devueltas en notas
+         anteriores.
+
+  4. Paso 3 -- Motivo:
+       - Seleccione el tipo: Devolucion, Descuento, Correccion.
+       - Ingrese el motivo especifico.
+
+  5. Paso 4 -- Confirmar y emitir:
+       - Revise los totales.
+       - Haga clic en "Emitir Nota de Credito".
+
+12.2 Comprobantes de la NC
+---------------------------
+  Igual que en facturacion, tiene dos formatos:
+    - Ticket 80mm -- comprobante para el cliente al momento
+    - RIDE A4     -- documento oficial SRI (color naranja para diferenciar
+                     de facturas)
+
+12.3 Acciones disponibles en el listado
+----------------------------------------
+    +-----------+----------------------------------------+
+    | Icono     | Accion                                 |
+    +-----------+----------------------------------------+
+    | Recarga   | Reintentar autorizacion SRI            |
+    | Impresora | Imprimir ticket 80mm                   |
+    | Documento | Ver RIDE A4                            |
+    | Descarga  | Descargar XML firmado                  |
+    +-----------+----------------------------------------+
+
+12.4 Estados de una NC
+-----------------------
+    +-------------+----------------------------------------------------+
+    | Estado      | Significado                                        |
+    +-------------+----------------------------------------------------+
+    | AUTORIZADO  | NC valida y autorizada por el SRI                  |
+    | PENDIENTE   | En proceso                                         |
+    | RECHAZADO   | Error en el SRI -- ver observaciones en rojo       |
+    +-------------+----------------------------------------------------+
+
+  NOTA: Si una NC queda RECHAZADA, expanda la fila para ver el mensaje
+  de error del SRI, corrija si aplica y use el boton de reintento.
+
+================================================================================
+  13. ANULACION DE FACTURAS
+================================================================================
+
+  Menu: Anulacion de Facturas
+
+  [IMAGEN: 13_anulacion-lista.png -- listado de facturas para anular]
+
+  Este modulo permite anular facturas que ya no son validas
+  (errores, duplicados, cancelaciones totales).
+
+  IMPORTANTE: La anulacion en QuickInvoice marca la factura como ANULADA
+  en el sistema. La anulacion EN EL PORTAL DEL SRI debe hacerse por separado
+  usando los datos que este modulo le proporciona.
+
+13.1 Datos SRI para la anulacion en el portal
+----------------------------------------------
+  Al expandir cualquier factura (clic en la fila) vera el panel "Datos SRI":
+
+    +-----------------------------+----------------------------------------+
+    | Dato                        | Uso                                    |
+    +-----------------------------+----------------------------------------+
+    | No. Factura                 | Ingresarlo en el portal SRI            |
+    | Nro. Autorizacion SRI       | Numero de 49 digitos del comprobante   |
+    | RUC / Cedula Cliente        | Identificacion del receptor            |
+    | Clave de Acceso             | Clave completa del comprobante         |
+    +-----------------------------+----------------------------------------+
+
+  Cada campo tiene un boton [COPIAR] para copiar al portapapeles con un clic.
+
+  [IMAGEN: 13b_anulacion-datos-sri.png -- panel con datos SRI copiables]
+
+13.2 Anular una factura de contado
+-----------------------------------
+  1. Busque la factura (filtro: Vigentes).
+  2. Haga clic en "Anular" (boton rojo).
+  3. Ingrese el MOTIVO de anulacion (obligatorio).
+  4. Haga clic en "Confirmar Anulacion".
+
+13.3 Anular una factura a credito (con pagos)
+---------------------------------------------
+  Si la factura tiene pagos registrados en cartera, el sistema no permite
+  anularla directamente. Debe:
+
+  1. Expandir la fila de la factura.
+  2. En el panel "Cartera / Pagos", vera la lista de pagos.
+  3. Haga clic en "Revertir" para eliminar cada pago.
+  4. Una vez sin pagos, aparecera el boton "Anular".
+  5. Ingrese el motivo y confirme.
+
+  [IMAGEN: 13c_anulacion-revertir-pago.png -- panel con pagos a revertir]
+
+13.4 Facturas anuladas en reportes
+------------------------------------
+  En el reporte de "Ventas por Periodo", las facturas anuladas aparecen:
+    - Con el numero tachado
+    - Con insignia ANULADA
+    - Valores en CERO (no afectan los totales)
+
+================================================================================
+  14. CIERRES DE CAJA
+================================================================================
+
+  Menu: Cierres de Caja
+
+  [IMAGEN: 14_cierre-caja.png -- pantalla de cierre de caja]
+
+14.1 Abrir caja
+---------------
+  Al inicio del turno:
+  1. Haga clic en "Abrir Caja".
+  2. Ingrese el FONDO INICIAL (dinero en efectivo con que inicia).
+  3. Confirme la apertura.
+
+14.2 Movimientos de caja
+-------------------------
+  Durante el turno puede registrar:
+    - Ingresos adicionales -- ventas extras, otros ingresos
+    - Egresos              -- pagos a proveedores, gastos del dia
+
+14.3 Cerrar caja
+----------------
+  1. Haga clic en "Cerrar Caja".
+  2. El sistema muestra el resumen:
+       - Ventas del turno (por forma de pago)
+       - Ingresos y egresos adicionales
+       - Fondo inicial + entradas - salidas = TOTAL ESPERADO
+  3. Ingrese el DINERO CONTADO en fisico.
+  4. El sistema calcula la DIFERENCIA.
+  5. Confirme el cierre.
+
+================================================================================
+  15. CONSULTAS E INFORMES
+================================================================================
+
+15.1 Ventas por Periodo
+------------------------
+  Menu: Consultas -> Ventas por Periodo
+
+  [IMAGEN: 15a_ventas-periodo.png -- reporte de ventas]
+
+  Filtros:
+    - Fecha inicio y fecha fin
+    - Vendedor (opcional)
+
+  Columnas del reporte:
+    +-----------------------------+------------------------------------------+
+    | Columna                     | Descripcion                              |
+    +-----------------------------+------------------------------------------+
+    | Nro. Factura                | Numero del comprobante                   |
+    | Fecha                       | Fecha de emision                         |
+    | Cliente                     | Nombre del cliente                       |
+    | Identificacion              | RUC o cedula                             |
+    | Vendedor                    | Vendedor asignado                        |
+    | Base IVA                    | Subtotal con IVA                         |
+    | Base 0%                     | Subtotal sin IVA                         |
+    | Suma Bases                  | Total base imponible                     |
+    | IVA                         | Valor del impuesto                       |
+    | Total                       | Total de la factura                      |
+    | Efectivo / Tarjeta /        | Desglose por forma de pago               |
+    |   Transferencia / Cheque /  |                                          |
+    |   Credito                   |                                          |
+    | Estado                      | AUTORIZADO / PENDIENTE / ANULADA         |
+    +-----------------------------+------------------------------------------+
+
+  Opciones:
+    - Imprimir      -- genera reporte imprimible
+    - Exportar CSV  -- descarga en Excel
+
+  NOTA: Las facturas anuladas aparecen con sus valores en cero y no se
+        incluyen en los totales.
+
+15.2 Deudas Clientes (Cartera por Vendedor)
+--------------------------------------------
+  Menu: Consultas -> Deudas Clientes
+
+  [IMAGEN: 15b_deudas-clientes.png -- reporte de deudas]
+
+  Muestra la cartera pendiente agrupada por vendedor, con:
+    - Filtro por fecha de corte y vendedor
+    - Subtotales por vendedor
+    - Total general
+
+15.3 Estado de Cuenta por Cliente
+-----------------------------------
+  Menu: Consultas -> Estado de Cuenta
+
+  [IMAGEN: 15c_estado-cuenta.png -- estado de cuenta]
+
+  Muestra el historial completo de un cliente:
+  1. Busque y seleccione el cliente.
+  2. Vera todas sus facturas con el detalle de cada pago.
+  3. Haga clic en una factura para expandir y ver los pagos individuales.
+
+  Resumen superior:
+    - Total de facturas emitidas
+    - Total pagado
+    - Saldo pendiente actual
+
+  El boton "Imprimir Estado de Cuenta" genera un documento con toda la
+  informacion para entregarlo al cliente.
+
+================================================================================
+  16. CONFIGURACION
+================================================================================
+
+  Menu: Configuracion
+
+  [IMAGEN: 16_configuracion.png -- pantalla de configuracion]
+
+16.1 Datos de la empresa
+-------------------------
+    - Nombre / Razon Social
+    - RUC
+    - Direccion
+    - Telefono
+    - Logo  -- sube la imagen del logo (aparece en facturas y comprobantes)
+
+16.2 Configuracion SRI / Facturacion Electronica
+-------------------------------------------------
+    +----------------------------+------------------------------------------+
+    | Campo                      | Descripcion                              |
+    +----------------------------+------------------------------------------+
+    | Establecimiento            | Codigo 3 digitos del establecimiento     |
+    |                            | (ejemplo: 001)                           |
+    | Punto de Emision           | Codigo 3 digitos del punto de emision    |
+    |                            | (ejemplo: 001)                           |
+    | Ambiente                   | PRUEBAS o PRODUCCION                     |
+    | Secuencial Inicial         | Numero desde el cual inicia la secuencia |
+    | Firma Electronica (.p12)   | Archivo del certificado digital          |
+    | Contrasena de firma        | Clave del certificado .p12               |
+    +----------------------------+------------------------------------------+
+
+  IMPORTANTE: Para emitir facturas en PRODUCCION debe tener:
+    - Certificado digital (.p12) vigente
+    - RUC activo en el SRI
+    - Autorizacion de facturacion electronica en el SRI
+
+16.3 Secuencial inicial
+------------------------
+  El campo "Secuencial Inicial Facturas" define desde que numero inicia la
+  secuencia cuando no hay facturas previas en el sistema.
+
+  Ejemplo: Si migra desde otro sistema con 459 facturas, ponga 460 y la
+           primera factura de QuickInvoice sera: 001-001-000000460.
+
+  NOTA: Si ya existen facturas emitidas, el sistema continua automaticamente
+        desde el ultimo numero registrado, ignorando este campo.
+
+16.4 Cambiar entre PRUEBAS y PRODUCCION
+----------------------------------------
+  1. Vaya a "Configuracion".
+  2. Cambie el campo "Ambiente" de PRUEBAS a PRODUCCION.
+  3. Haga clic en "Guardar".
+  4. Verifique que el certificado .p12 sea el de produccion (no el de pruebas).
+
+================================================================================
+  17. PREGUNTAS FRECUENTES
+================================================================================
+
+  P: Por que mi factura quedo en estado PENDIENTE?
+  R: El SRI puede tardar unos segundos en procesar. Use el boton de reintento
+     en "Comprobantes". Si persiste, revise la conexion a internet y que su
+     certificado .p12 no este vencido.
+
+  --------------------------------------------------------------------------
+
+  P: Puedo emitir facturas si el internet se corta?
+  R: No. QuickInvoice requiere conexion a internet para enviar los
+     comprobantes al SRI en tiempo real.
+
+  --------------------------------------------------------------------------
+
+  P: Como anulo una factura en el SRI?
+  R: 1. Vaya a "Anulacion de Facturas".
+     2. Expanda la factura y copie los datos del panel "Datos SRI".
+     3. Ingrese al portal del SRI (sri.gob.ec) con su clave.
+     4. Use los datos copiados para completar la anulacion en el portal.
+     5. En QuickInvoice haga clic en "Anular" para marcarla como anulada.
+
+  --------------------------------------------------------------------------
+
+  P: Que hago si el SRI rechaza una Nota de Credito?
+  R: 1. Vaya a "Notas de Credito".
+     2. Expanda la NC rechazada para ver el mensaje de error del SRI
+        (aparece en rojo).
+     3. Corrija el problema (datos del cliente, RUC de la empresa, etc.).
+     4. Use el boton de reintento (icono de recarga).
+
+  --------------------------------------------------------------------------
+
+  P: Como registro un pago con cheque de una deuda de varias facturas?
+  R: Use "Cobro a Cliente" en la pantalla de "Cartera CxC":
+     1. Seleccione el cliente.
+     2. Ingrese el valor total del cheque.
+     3. El sistema distribuye automaticamente entre las facturas mas
+        antiguas primero.
+     4. Ingrese el numero de cheque en el campo "Referencia".
+
+  --------------------------------------------------------------------------
+
+  P: Puedo imprimir en impresora termica de 80mm?
+  R: Si. Todos los comprobantes tienen opcion de impresion en 80mm:
+       - Facturas:             boton "Ticket 80mm" despues de emitir
+       - Notas de Credito:     boton "Ticket 80mm" en el paso 4
+       - Comprobantes de pago: boton "Imprimir 80mm" en la ventana
+
+  --------------------------------------------------------------------------
+
+  P: Que pasa con el inventario al anular una factura?
+  R: Al anular una factura, el sistema marca el comprobante como ANULADA
+     pero NO revierte automaticamente el Kardex. Si necesita devolver el
+     stock, use el modulo de "Notas de Credito" antes de anular, o haga
+     un ajuste manual en Ingreso de Compras.
+
+  --------------------------------------------------------------------------
+
+  P: Como se cuanto debe un cliente?
+  R: Use "Consultas -> Estado de Cuenta", seleccione el cliente y vera
+     el resumen completo con el detalle de cada factura y sus pagos.
+
+================================================================================
+  APENDICE -- GLOSARIO
+================================================================================
+
+    +-------------------+------------------------------------------------------+
+    | Termino           | Significado                                          |
+    +-------------------+------------------------------------------------------+
+    | SRI               | Servicio de Rentas Internas                          |
+    |                   | (autoridad tributaria del Ecuador)                   |
+    +-------------------+------------------------------------------------------+
+    | RIDE              | Representacion Impresa del Documento Electronico     |
+    +-------------------+------------------------------------------------------+
+    | XML               | Archivo del comprobante electronico firmado          |
+    +-------------------+------------------------------------------------------+
+    | Clave de acceso   | Numero unico de 49 digitos que identifica cada       |
+    |                   | comprobante                                          |
+    +-------------------+------------------------------------------------------+
+    | XAdES-BES         | Estandar de firma electronica usado en Ecuador       |
+    +-------------------+------------------------------------------------------+
+    | RUC               | Registro Unico de Contribuyentes (13 digitos)        |
+    +-------------------+------------------------------------------------------+
+    | Cartera CxC       | Cuentas por cobrar -- facturas pendientes de pago    |
+    +-------------------+------------------------------------------------------+
+    | FIFO              | Primero en entrar, primero en salir                  |
+    |                   | (metodo de aplicacion de pagos)                      |
+    +-------------------+------------------------------------------------------+
+    | Kardex            | Registro de movimientos de inventario                |
+    +-------------------+------------------------------------------------------+
+    | NC                | Nota de Credito                                      |
+    +-------------------+------------------------------------------------------+
+
+================================================================================
+  Manual de Usuario -- QuickInvoice v1.0
+  Actualizado: Abril 2026
+================================================================================

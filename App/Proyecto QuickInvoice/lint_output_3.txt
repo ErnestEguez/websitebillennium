@@ -1,0 +1,202 @@
+
+> retrograde-zodiac@0.0.0 lint
+> eslint .
+
+
+C:\Proyecto Restaurantes\src\components\BillingModal.tsx
+   19:13  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+   20:26  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+   25:44  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+   27:58  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+   44:8   warning  React Hook useEffect has a missing dependency: 'loadInitialData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   91:71  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+  140:25  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+  167:25  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\components\CierreCajaModal.tsx
+   37:8   warning  React Hook useEffect has a missing dependency: 'calculateTotals'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   47:23  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+   77:23  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+  102:45  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+  217:56  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+  218:50  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\components\SplitCheckModal.tsx
+   12:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   45:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   51:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  118:64  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  257:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  275:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\components\mobile\WaiterOrderTakeMobile.tsx
+   36:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  270:87  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\components\mobile\WaiterTableListMobile.tsx
+  11:25  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\contexts\AuthContext.tsx
+   26:17   error    Unexpected any. Specify a different type                                                                                         @typescript-eslint/no-explicit-any
+   38:50   error    Unexpected any. Specify a different type                                                                                         @typescript-eslint/no-explicit-any
+   52:103  error    Unexpected any. Specify a different type                                                                                         @typescript-eslint/no-explicit-any
+  108:8    warning  React Hook useEffect has missing dependencies: 'fetchProfile' and 'loading'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  129:35   error    Unexpected any. Specify a different type                                                                                         @typescript-eslint/no-explicit-any
+  130:19   error    Unexpected any. Specify a different type                                                                                         @typescript-eslint/no-explicit-any
+  163:25   error    Unexpected any. Specify a different type                                                                                         @typescript-eslint/no-explicit-any
+  322:14   error    Unexpected any. Specify a different type                                                                                         @typescript-eslint/no-explicit-any
+  328:17   error    Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components   react-refresh/only-export-components
+
+C:\Proyecto Restaurantes\src\pages\CierresPage.tsx
+  14:46  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+  22:8   warning  React Hook useEffect has a missing dependency: 'loadSesiones'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  54:25  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\ClientsPage.tsx
+  27:8   warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  52:22  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+  57:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+  68:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\ConfigurationPage.tsx
+    36:52   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+    56:52   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+    58:58   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+    71:8    warning  React Hook useEffect has missing dependencies: 'loadData' and 'profile'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+    89:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   175:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   200:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   243:48   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   250:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   263:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   273:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   293:22   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   299:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   311:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   336:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   354:25   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   852:67   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+   997:59   error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+  1078:114  error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+  1091:117  error    Unexpected any. Specify a different type                                                                                     @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\Dashboard.tsx
+  18:68  error    Unexpected any. Specify a different type                                                                              @typescript-eslint/no-explicit-any
+  55:56  error    Unexpected any. Specify a different type                                                                              @typescript-eslint/no-explicit-any
+  61:8   warning  React Hook useEffect has a missing dependency: 'loadDashboardData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Proyecto Restaurantes\src\pages\InventarioPage.tsx
+   23:48  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+   24:46  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+   40:8   warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   50:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+   58:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+   66:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+   71:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+   88:70  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+  144:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\InvoicePrint.tsx
+   12:44   error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+   19:8    warning  React Hook useEffect has a missing dependency: 'loadFactura'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  160:75   error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  184:73   error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  220:77   error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  234:106  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\InvoicingPage.tsx
+  43:8   warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  71:39  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\KardexPage.tsx
+   8:48  error    Unexpected any. Specify a different type                                                                          @typescript-eslint/no-explicit-any
+  26:8   warning  React Hook useEffect has a missing dependency: 'loadProductos'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Proyecto Restaurantes\src\pages\KitchenOrderPrint.tsx
+   11:42  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+   16:8   warning  React Hook useEffect has a missing dependency: 'loadPedido'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   43:40  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+   44:38  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+   87:55  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+  109:53  error    Unexpected any. Specify a different type                                                                       @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\LoginPage.tsx
+  47:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\MesaGrid.tsx
+  131:8   warning  React Hook useEffect has a missing dependency: 'loadMesas'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  141:48  error    Unexpected any. Specify a different type                                                                      @typescript-eslint/no-explicit-any
+  169:25  error    Unexpected any. Specify a different type                                                                      @typescript-eslint/no-explicit-any
+  246:76  error    Unexpected any. Specify a different type                                                                      @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\OrderTake.tsx
+   37:38  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+   43:58  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+   52:8   warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  145:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+  186:25  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+  334:95  error    Unexpected any. Specify a different type                                                                     @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\OrdersPage.tsx
+   20:44  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+   24:58  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+   44:8   warning  React Hook useEffect has a missing dependency: 'loadPedidos'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   51:23  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+   62:23  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+   67:45  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  100:23  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  236:84  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\ProductsPage.tsx
+  18:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  54:63  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  62:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\ProveedoresPage.tsx
+  18:8   warning  React Hook useEffect has a missing dependency: 'loadProveedores'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  52:25  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+  66:25  error    Unexpected any. Specify a different type                                                                            @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\pages\TicketPrint.tsx
+   11:44   error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+   16:8    warning  React Hook useEffect has a missing dependency: 'loadFactura'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   77:71   error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+   90:73   error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  102:102  error    Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\services\cajaService.ts
+  103:13  error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+  104:52  error  Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\services\emailService.ts
+  2:57  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\services\facturacionService.ts
+  114:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  162:65  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\services\inventarioService.ts
+  32:60  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  43:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\services\inventoryService.ts
+  41:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  68:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\services\kardexService.ts
+  128:74  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\services\mesaService.ts
+  88:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  91:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\services\pedidoService.ts
+   23:83  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  272:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  349:62  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Proyecto Restaurantes\src\services\sriService.ts
+  47:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Ô£û 133 problems (116 errors, 17 warnings)
+

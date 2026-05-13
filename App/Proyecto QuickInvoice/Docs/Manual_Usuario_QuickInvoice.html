@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Manual de Usuario — QuickInvoice</title>
+<style>
+  /* ── Estilos compatibles con Word ── */
+  @page {
+    size: A4;
+    margin: 2.5cm 2.5cm 2.5cm 3cm;
+  }
+  body {
+    font-family: 'Calibri', Arial, sans-serif;
+    font-size: 11pt;
+    color: #1a1a1a;
+    line-height: 1.5;
+    max-width: 21cm;
+    margin: 0 auto;
+    padding: 2cm;
+    background: white;
+  }
+
+  /* Portada */
+  .portada {
+    text-align: center;
+    padding: 4cm 0 3cm 0;
+    border-bottom: 3px solid #1e3a5f;
+    margin-bottom: 2cm;
+    page-break-after: always;
+  }
+  .portada .logo-empresa {
+    font-size: 42pt;
+    font-weight: bold;
+    color: #1e3a5f;
+    letter-spacing: -1px;
+  }
+  .portada .logo-empresa span {
+    color: #2563eb;
+  }
+  .portada .subtitulo {
+    font-size: 14pt;
+    color: #475569;
+    margin-top: 8px;
+  }
+  .portada .titulo-manual {
+    font-size: 22pt;
+    font-weight: bold;
+    color: #1e3a5f;
+    margin-top: 3cm;
+    padding: 16px 32px;
+    background: #f1f5f9;
+    border-left: 6px solid #2563eb;
+    display: inline-block;
+    text-align: left;
+  }
+  .portada .version {
+    margin-top: 2cm;
+    font-size: 10pt;
+    color: #94a3b8;
+  }
+
+  /* TOC */
+  .toc { margin-bottom: 2cm; }
+  .toc h2 { color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 6px; }
+  .toc ol { padding-left: 1.2em; }
+  .toc li { padding: 3px 0; font-size: 11pt; }
+  .toc a { color: #2563eb; text-decoration: none; }
+
+  /* Títulos */
+  h1 {
+    font-size: 20pt;
+    color: #1e3a5f;
+    border-bottom: 3px solid #1e3a5f;
+    padding-bottom: 8px;
+    margin-top: 0;
+    page-break-before: always;
+  }
+  h1:first-of-type { page-break-before: avoid; }
+  h2 {
+    font-size: 14pt;
+    color: #1e3a5f;
+    border-left: 5px solid #2563eb;
+    padding-left: 10px;
+    margin-top: 24px;
+  }
+  h3 {
+    font-size: 12pt;
+    color: #334155;
+    margin-top: 16px;
+  }
+
+  /* Párrafos y listas */
+  p { margin: 8px 0; text-align: justify; }
+  ul, ol { margin: 8px 0; padding-left: 1.5em; }
+  li { margin: 4px 0; }
+
+  /* Tablas */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 10.5pt;
+  }
+  thead tr {
+    background-color: #1e3a5f;
+    color: white;
+  }
+  th {
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: bold;
+  }
+  td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background-color: #f8fafc; }
+
+  /* Recuadros especiales */
+  .nota {
+    background: #eff6ff;
+    border-left: 5px solid #2563eb;
+    padding: 10px 14px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 10.5pt;
+  }
+  .advertencia {
+    background: #fff7ed;
+    border-left: 5px solid #ea580c;
+    padding: 10px 14px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 10.5pt;
+  }
+  .importante {
+    background: #fef2f2;
+    border-left: 5px solid #dc2626;
+    padding: 10px 14px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 10.5pt;
+  }
+  .tip {
+    background: #f0fdf4;
+    border-left: 5px solid #16a34a;
+    padding: 10px 14px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 10.5pt;
+  }
+
+  /* Imagen placeholder */
+  .imagen-placeholder {
+    border: 2px dashed #cbd5e1;
+    background: #f8fafc;
+    padding: 20px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 10pt;
+    margin: 14px 0;
+    border-radius: 6px;
+  }
+  .imagen-placeholder strong { display: block; font-size: 11pt; color: #64748b; margin-bottom: 4px; }
+
+  /* Código / referencia */
+  code {
+    font-family: 'Courier New', monospace;
+    background: #f1f5f9;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10pt;
+    color: #1e3a5f;
+  }
+
+  /* Footer */
+  .pie-pagina {
+    margin-top: 3cm;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 8px;
+    text-align: center;
+    font-size: 9pt;
+    color: #94a3b8;
+  }
+
+  /* Pasos numerados destacados */
+  .pasos ol { counter-reset: paso; padding-left: 0; list-style: none; }
+  .pasos ol li {
+    counter-increment: paso;
+    padding: 6px 6px 6px 36px;
+    position: relative;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .pasos ol li::before {
+    content: counter(paso);
+    position: absolute;
+    left: 0;
+    top: 6px;
+    background: #1e3a5f;
+    color: white;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 22px;
+    font-size: 10pt;
+    font-weight: bold;
+  }
+
+  @media print {
+    body { padding: 0; }
+    h1 { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     PORTADA
+══════════════════════════════════════ -->
+<div class="portada">
+  <div class="logo-empresa">Quick<span>Invoice</span></div>
+  <div class="subtitulo">Sistema de Facturación Electrónica integrado con SRI Ecuador</div>
+  <br><br>
+  <div class="titulo-manual">MANUAL DE USUARIO</div>
+  <div class="version">
+    Versión 1.0 &nbsp;|&nbsp; Abril 2026<br>
+    Para uso interno — Confidencial
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     TABLA DE CONTENIDOS
+══════════════════════════════════════ -->
+<div class="toc">
+  <h2>Tabla de Contenidos</h2>
+  <ol>
+    <li><a href="#s1">Acceso al sistema</a></li>
+    <li><a href="#s2">Pantalla principal</a></li>
+    <li><a href="#s3">Facturación Electrónica</a></li>
+    <li><a href="#s4">Comprobantes emitidos</a></li>
+    <li><a href="#s5">Clientes</a></li>
+    <li><a href="#s6">Productos</a></li>
+    <li><a href="#s7">Proveedores</a></li>
+    <li><a href="#s8">Ingreso de Compras / Inventario</a></li>
+    <li><a href="#s9">Kardex</a></li>
+    <li><a href="#s10">Vendedores</a></li>
+    <li><a href="#s11">Cartera por Cobrar (CxC)</a></li>
+    <li><a href="#s12">Notas de Crédito</a></li>
+    <li><a href="#s13">Anulación de Facturas</a></li>
+    <li><a href="#s14">Cierres de Caja</a></li>
+    <li><a href="#s15">Consultas e Informes</a></li>
+    <li><a href="#s16">Configuración</a></li>
+    <li><a href="#s17">Preguntas frecuentes</a></li>
+    <li><a href="#s18">Glosario</a></li>
+  </ol>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     1. ACCESO
+══════════════════════════════════════ -->
+<h1 id="s1">1. Acceso al sistema</h1>
+
+<h2>1.1 Ingresar al sistema</h2>
+<div class="pasos"><ol>
+  <li>Abra el navegador web (Chrome o Edge recomendado).</li>
+  <li>Ingrese la dirección de la aplicación proporcionada por su administrador.</li>
+  <li>Escriba su <strong>correo electrónico</strong> y <strong>contraseña</strong>.</li>
+  <li>Haga clic en <strong>Iniciar Sesión</strong>.</li>
+</ol></div>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 01_login.png</strong>
+  Pantalla de inicio de sesión — formulario con correo y contraseña
+</div>
+
+<h2>1.2 Roles de usuario</h2>
+<table>
+  <thead><tr><th>Rol</th><th>Acceso</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Oficina</strong></td><td>Acceso completo: facturación, cartera, reportes y configuración</td></tr>
+    <tr><td><strong>Mesero / Caja</strong></td><td>Solo pedidos y operaciones de caja (módulo restaurante)</td></tr>
+  </tbody>
+</table>
+
+<h2>1.3 Cerrar sesión</h2>
+<p>En el menú lateral inferior haga clic en <strong>Cerrar Sesión</strong>.</p>
+
+
+<!-- ══════════════════════════════════════
+     2. DASHBOARD
+══════════════════════════════════════ -->
+<h1 id="s2">2. Pantalla principal</h1>
+
+<p>Al ingresar verá el panel principal con:</p>
+<ul>
+  <li><strong>Empresa activa</strong> — nombre y logo en la barra superior</li>
+  <li><strong>Menú lateral</strong> — acceso a todos los módulos</li>
+  <li><strong>Resumen del día</strong> — ventas y estado de caja</li>
+</ul>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 02_dashboard.png</strong>
+  Vista general del sistema con menú lateral y panel principal
+</div>
+
+
+<!-- ══════════════════════════════════════
+     3. FACTURACIÓN
+══════════════════════════════════════ -->
+<h1 id="s3">3. Facturación Electrónica</h1>
+<p><strong>Menú:</strong> Facturación</p>
+
+<h2>3.1 Emitir una nueva factura</h2>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 03_facturacion-nueva.png</strong>
+  Formulario de nueva factura con búsqueda de cliente y productos
+</div>
+
+<div class="pasos"><ol>
+  <li>Haga clic en <strong>Nueva Factura</strong> (botón azul superior derecho).</li>
+  <li><strong>Seleccionar cliente:</strong> busque por nombre, RUC o cédula. Si no existe, haga clic en <strong>Nuevo Cliente</strong> para crearlo en el momento.</li>
+  <li><strong>Agregar productos:</strong> busque por nombre o código, ingrese la cantidad. El precio y el IVA se cargan automáticamente.</li>
+  <li><strong>Forma de pago:</strong> seleccione Efectivo, Tarjeta, Transferencia, Cheque o Crédito. Para crédito, establezca la fecha de vencimiento. Puede combinar varias formas de pago.</li>
+  <li>Haga clic en <strong>Emitir Factura</strong>.</li>
+</ol></div>
+
+<div class="tip">
+  <strong>💡 El sistema automáticamente:</strong><br>
+  Genera la clave de acceso de 49 dígitos · Firma el XML con su certificado digital (.p12) · Envía al SRI (recepción + autorización) · Actualiza el inventario (Kardex) · Si es a crédito, registra en Cartera CxC · Envía el RIDE y XML al correo del cliente.
+</div>
+
+<h2>3.2 Comprobantes que genera</h2>
+<p>Después de facturar aparecen dos opciones de impresión:</p>
+<table>
+  <thead><tr><th>Botón</th><th>Descripción</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Ticket 80mm</strong></td><td>Comprobante provisional para impresora térmica de punto de venta</td></tr>
+    <tr><td><strong>RIDE A4</strong></td><td>Representación Impresa oficial del comprobante electrónico (formato SRI)</td></tr>
+  </tbody>
+</table>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 03b_factura-impresion.png</strong>
+  Pantalla post-factura con botones Ticket 80mm y RIDE A4
+</div>
+
+<h2>3.3 Estados de una factura</h2>
+<table>
+  <thead><tr><th>Estado SRI</th><th>Significado</th></tr></thead>
+  <tbody>
+    <tr><td><strong>AUTORIZADO</strong></td><td>El SRI autorizó el comprobante — documento válido</td></tr>
+    <tr><td><strong>PENDIENTE</strong></td><td>Enviado al SRI, esperando respuesta</td></tr>
+    <tr><td><strong>RECHAZADO</strong></td><td>El SRI rechazó el comprobante — revisar error y reintentar</td></tr>
+  </tbody>
+</table>
+
+<h2>3.4 Reintentar autorización</h2>
+<p>Si una factura quedó en PENDIENTE o RECHAZADO: vaya a <strong>Comprobantes</strong>, busque la factura y use el botón de reintento (ícono de recarga ↻).</p>
+
+
+<!-- ══════════════════════════════════════
+     4. COMPROBANTES
+══════════════════════════════════════ -->
+<h1 id="s4">4. Comprobantes emitidos</h1>
+<p><strong>Menú:</strong> Comprobantes</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 04_comprobantes-lista.png</strong>
+  Listado de comprobantes con opciones de búsqueda y acciones
+</div>
+
+<p>Listado de todas las facturas emitidas con las siguientes acciones por comprobante:</p>
+<ul>
+  <li><strong>Ver RIDE</strong> — abre el RIDE en formato A4 imprimible</li>
+  <li><strong>Descargar XML</strong> — descarga el archivo XML firmado y autorizado</li>
+  <li><strong>Reenviar correo</strong> — reenvía el RIDE y XML al cliente</li>
+  <li><strong>Reintentar</strong> — reintenta la autorización SRI si está pendiente</li>
+</ul>
+
+
+<!-- ══════════════════════════════════════
+     5. CLIENTES
+══════════════════════════════════════ -->
+<h1 id="s5">5. Clientes</h1>
+<p><strong>Menú:</strong> Clientes</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 05_clientes.png</strong>
+  Listado de clientes con buscador y botón Nuevo Cliente
+</div>
+
+<h2>5.1 Crear cliente</h2>
+<div class="pasos"><ol>
+  <li>Haga clic en <strong>Nuevo Cliente</strong>.</li>
+  <li>Ingrese la <strong>Identificación</strong>: RUC (13 dígitos), Cédula (10 dígitos) o Pasaporte.</li>
+  <li>Complete: nombre o razón social, dirección, teléfono y correo electrónico.</li>
+  <li>Haga clic en <strong>Guardar</strong>.</li>
+</ol></div>
+
+<div class="tip">
+  <strong>💡 Consulta SRI:</strong> Al ingresar el RUC o cédula, el sistema puede consultar automáticamente los datos registrados en el SRI.
+</div>
+
+<div class="nota">
+  <strong>📌 Correo electrónico:</strong> Si el cliente tiene correo registrado, recibirá automáticamente el RIDE (PDF) y el XML firmado cada vez que se le emita una factura.
+</div>
+
+<h2>5.2 Editar cliente</h2>
+<p>Haga clic en el ícono de edición (lápiz) en la fila del cliente, realice los cambios y guarde.</p>
+
+
+<!-- ══════════════════════════════════════
+     6. PRODUCTOS
+══════════════════════════════════════ -->
+<h1 id="s6">6. Productos</h1>
+<p><strong>Menú:</strong> Productos</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 06_productos.png</strong>
+  Listado de productos con stock actual y precio
+</div>
+
+<h2>6.1 Crear producto</h2>
+<div class="pasos"><ol>
+  <li>Haga clic en <strong>Nuevo Producto</strong>.</li>
+  <li>Ingrese el <strong>Código</strong> interno (aparece en la factura).</li>
+  <li>Ingrese el <strong>Nombre</strong> / descripción del producto.</li>
+  <li>Establezca el <strong>Precio de venta</strong> (sin IVA).</li>
+  <li>Seleccione el <strong>IVA</strong>: 0%, 5%, 12% o 15%.</li>
+  <li>Ingrese el <strong>Stock inicial</strong>.</li>
+  <li>Asigne una <strong>Categoría</strong>.</li>
+  <li>Haga clic en <strong>Guardar</strong>.</li>
+</ol></div>
+
+<div class="nota">
+  <strong>📌 Control de stock:</strong> El stock se actualiza automáticamente con cada factura emitida (resta) y con cada ingreso de compra (suma). Para ajustes manuales use el módulo de Ingreso de Compras.
+</div>
+
+
+<!-- ══════════════════════════════════════
+     7. PROVEEDORES
+══════════════════════════════════════ -->
+<h1 id="s7">7. Proveedores</h1>
+<p><strong>Menú:</strong> Proveedores</p>
+<p>Registro de los proveedores de la empresa. Datos requeridos: RUC / Cédula, Nombre / Razón Social, dirección, teléfono y correo.</p>
+
+
+<!-- ══════════════════════════════════════
+     8. INGRESO DE COMPRAS
+══════════════════════════════════════ -->
+<h1 id="s8">8. Ingreso de Compras / Inventario</h1>
+<p><strong>Menú:</strong> Ingreso de Compras</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 08_ingreso-compras.png</strong>
+  Formulario de ingreso de compra con proveedor y detalle de productos
+</div>
+
+<p>Permite registrar compras a proveedores y reponer el stock de productos.</p>
+
+<div class="pasos"><ol>
+  <li>Seleccione el <strong>proveedor</strong>.</li>
+  <li>Ingrese la <strong>fecha</strong> y <strong>número de factura del proveedor</strong>.</li>
+  <li>Agregue los productos comprados con cantidad y costo.</li>
+  <li>Haga clic en <strong>Registrar Ingreso</strong>.</li>
+</ol></div>
+
+<p>El sistema actualiza automáticamente el stock de cada producto en el Kardex.</p>
+
+
+<!-- ══════════════════════════════════════
+     9. KARDEX
+══════════════════════════════════════ -->
+<h1 id="s9">9. Kardex</h1>
+<p><strong>Menú:</strong> Kardex</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 09_kardex.png</strong>
+  Registro de movimientos de inventario con filtros
+</div>
+
+<p>Registro completo de todos los movimientos de inventario:</p>
+<table>
+  <thead><tr><th>Tipo de movimiento</th><th>Origen</th></tr></thead>
+  <tbody>
+    <tr><td><strong>ENTRADA</strong></td><td>Compra a proveedor (Ingreso de Compras)</td></tr>
+    <tr><td><strong>SALIDA</strong></td><td>Venta — cada factura emitida</td></tr>
+    <tr><td><strong>DEVOLUCION_NC</strong></td><td>Devolución por Nota de Crédito</td></tr>
+  </tbody>
+</table>
+<p><strong>Filtros disponibles:</strong> por producto, rango de fechas y tipo de movimiento.</p>
+
+
+<!-- ══════════════════════════════════════
+     10. VENDEDORES
+══════════════════════════════════════ -->
+<h1 id="s10">10. Vendedores</h1>
+<p><strong>Menú:</strong> Vendedores</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 10_vendedores.png</strong>
+  Listado de vendedores activos
+</div>
+
+<p>Registro del personal de ventas. Cada vendedor puede asociarse a las facturas para análisis de comisiones y reportes de ventas por vendedor.</p>
+<p><strong>Datos:</strong> nombre completo, iniciales (para reportes), email, teléfono y estado (Activo / Baja).</p>
+
+
+<!-- ══════════════════════════════════════
+     11. CARTERA CxC
+══════════════════════════════════════ -->
+<h1 id="s11">11. Cartera por Cobrar (CxC)</h1>
+<p><strong>Menú:</strong> Cartera CxC</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 11_cartera-lista.png</strong>
+  Listado de cartera con filtros, saldos y botones de acción
+</div>
+
+<p>La cartera registra todas las facturas emitidas a <strong>crédito</strong> con saldo pendiente de cobro.</p>
+
+<h2>11.1 Filtros de la cartera</h2>
+<table>
+  <thead><tr><th>Filtro</th><th>Qué muestra</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Activos (Pend+Parcial)</strong></td><td>Facturas pendientes y con abonos parciales — <em>vista por defecto</em></td></tr>
+    <tr><td>Pendiente</td><td>Solo facturas sin ningún pago</td></tr>
+    <tr><td>Parcial</td><td>Facturas con al menos un abono</td></tr>
+    <tr><td>Pagada</td><td>Facturas totalmente canceladas</td></tr>
+    <tr><td>Todos</td><td>Historial completo incluyendo anuladas</td></tr>
+  </tbody>
+</table>
+
+<h2>11.2 Registrar un abono (factura individual)</h2>
+<div class="pasos"><ol>
+  <li>Busque la factura en la lista.</li>
+  <li>Haga clic en <strong>Abonar</strong>.</li>
+  <li>Ingrese el valor del abono.</li>
+  <li>Seleccione el método de pago y la referencia (número de cheque, transferencia, etc.).</li>
+  <li>Haga clic en <strong>Registrar y Comprobante</strong>.</li>
+</ol></div>
+
+<p>Se abre automáticamente la ventana del <strong>Comprobante de Pago</strong>.</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 11b_cartera-abono.png</strong>
+  Modal de registro de abono con valor, método y referencia
+</div>
+
+<h2>11.3 Cobro a Cliente — un pago para varias facturas</h2>
+<p>Cuando un cliente cancela con un solo cheque o transferencia varias facturas al mismo tiempo:</p>
+
+<div class="pasos"><ol>
+  <li>Haga clic en <strong>Cobro a Cliente</strong> (botón superior derecho).</li>
+  <li>Busque y seleccione el cliente por nombre o identificación.</li>
+  <li>El sistema muestra todas sus facturas pendientes con el total de deuda.</li>
+  <li>Ingrese el <strong>valor del pago</strong>, método y referencia.</li>
+  <li>El sistema distribuye automáticamente: primero paga la factura más antigua y continúa con las siguientes (<strong>orden FIFO</strong>).</li>
+  <li>Verá en tiempo real cómo se aplica en cada factura.</li>
+  <li>Haga clic en <strong>Registrar y Comprobante</strong>.</li>
+</ol></div>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 11c_cobro-cliente.png</strong>
+  Modal de cobro multi-factura con distribución automática FIFO
+</div>
+
+<h2>11.4 Comprobante de pago</h2>
+<p>El comprobante detalla cada factura afectada:</p>
+<table>
+  <thead><tr><th>Columna</th><th>Descripción</th></tr></thead>
+  <tbody>
+    <tr><td><strong>No. Factura</strong></td><td>Número del comprobante afectado</td></tr>
+    <tr><td><strong>Deuda</strong></td><td>Saldo que tenía antes de este pago</td></tr>
+    <tr><td><strong>Abono</strong></td><td>Valor aplicado en este pago</td></tr>
+    <tr><td><strong>Saldo</strong></td><td>Saldo nuevo (muestra <em>✓ CANCELADA</em> si quedó en cero)</td></tr>
+  </tbody>
+</table>
+<p>Al pie: forma de pago, referencia, fecha/hora, total pagado y saldo pendiente restante.</p>
+<p><strong>Opciones de impresión:</strong> <em>Imprimir A4</em> (archivo formal) o <em>Imprimir 80mm</em> (impresora térmica).</p>
+
+<h2>11.5 Ver historial de pagos por factura</h2>
+<p>Haga clic en cualquier fila de la cartera para expandirla y ver el detalle de todos los pagos registrados (fecha, método, referencia y valor).</p>
+
+<h2>11.6 Imprimir cartera</h2>
+<p>El botón <strong>Imprimir Cartera</strong> genera un reporte con el listado actual en pantalla, aplicando los filtros activos, con totales de deuda pendiente.</p>
+
+
+<!-- ══════════════════════════════════════
+     12. NOTAS DE CRÉDITO
+══════════════════════════════════════ -->
+<h1 id="s12">12. Notas de Crédito</h1>
+<p><strong>Menú:</strong> Notas de Crédito</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 12_nc-lista.png</strong>
+  Listado de notas de crédito con estados y acciones
+</div>
+
+<p>Las Notas de Crédito permiten registrar <strong>devoluciones</strong> de productos de una factura ya emitida. Son comprobantes electrónicos que el SRI debe autorizar.</p>
+
+<h2>12.1 Crear una Nota de Crédito</h2>
+
+<p><strong>Paso 1 — Seleccionar factura de origen</strong></p>
+<p>Busque la factura por número o cliente y haga clic en <strong>Seleccionar</strong>.</p>
+
+<p><strong>Paso 2 — Seleccionar productos a devolver</strong></p>
+<p>Ingrese la cantidad a devolver por producto. El sistema muestra cuántas unidades ya fueron devueltas en notas anteriores y el máximo disponible. La devolución puede ser parcial (no es necesario devolver todas las unidades).</p>
+
+<p><strong>Paso 3 — Motivo</strong></p>
+<p>Seleccione el tipo (Devolución, Descuento, Corrección) e ingrese el motivo específico.</p>
+
+<p><strong>Paso 4 — Confirmar y emitir</strong></p>
+<p>Revise los totales y haga clic en <strong>Emitir Nota de Crédito</strong>.</p>
+
+<h2>12.2 Comprobantes de la NC</h2>
+<table>
+  <thead><tr><th>Botón</th><th>Descripción</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Ticket 80mm</strong></td><td>Comprobante para entregar al cliente al momento</td></tr>
+    <tr><td><strong>RIDE A4</strong></td><td>Documento oficial SRI en formato A4 (color naranja, diferente a facturas)</td></tr>
+    <tr><td><strong>Descargar XML</strong></td><td>Archivo XML firmado y autorizado</td></tr>
+  </tbody>
+</table>
+
+<h2>12.3 Acciones en el listado de NC</h2>
+<table>
+  <thead><tr><th>Ícono</th><th>Acción</th></tr></thead>
+  <tbody>
+    <tr><td>↻ Recarga</td><td>Reintentar autorización SRI</td></tr>
+    <tr><td>🖨 Impresora</td><td>Imprimir ticket 80mm</td></tr>
+    <tr><td>📄 Documento</td><td>Ver RIDE A4</td></tr>
+    <tr><td>⬇ Descarga</td><td>Descargar XML firmado</td></tr>
+  </tbody>
+</table>
+
+<h2>12.4 Estados de una NC</h2>
+<table>
+  <thead><tr><th>Estado</th><th>Significado</th></tr></thead>
+  <tbody>
+    <tr><td><strong>AUTORIZADO</strong></td><td>NC válida y autorizada por el SRI</td></tr>
+    <tr><td><strong>PENDIENTE</strong></td><td>En proceso de autorización</td></tr>
+    <tr><td><strong>RECHAZADO</strong></td><td>Error en el SRI — ver observaciones en rojo y reintentar</td></tr>
+  </tbody>
+</table>
+
+<div class="advertencia">
+  <strong>⚠️ NC rechazada:</strong> Si una NC queda RECHAZADA, expanda la fila para ver el mensaje de error del SRI (aparece en rojo). Corrija si aplica y use el botón de reintento (↻).
+</div>
+
+
+<!-- ══════════════════════════════════════
+     13. ANULACIÓN DE FACTURAS
+══════════════════════════════════════ -->
+<h1 id="s13">13. Anulación de Facturas</h1>
+<p><strong>Menú:</strong> Anulación de Facturas</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 13_anulacion-lista.png</strong>
+  Listado de facturas con filtros Vigentes / Anuladas y botón Anular
+</div>
+
+<div class="importante">
+  <strong>🔴 Importante:</strong> La anulación en QuickInvoice marca la factura como ANULADA en el sistema. La anulación en el <strong>portal del SRI</strong> (sri.gob.ec) debe hacerse por separado usando los datos que este módulo proporciona.
+</div>
+
+<h2>13.1 Datos SRI para la anulación en el portal</h2>
+<p>Al expandir cualquier factura (clic en la fila) aparece el panel <strong>Datos SRI</strong> con botón Copiar para cada campo:</p>
+
+<table>
+  <thead><tr><th>Dato</th><th>Uso en el portal SRI</th></tr></thead>
+  <tbody>
+    <tr><td><strong>No. Factura</strong></td><td>Número secuencial del comprobante (ej: 001-001-000000460)</td></tr>
+    <tr><td><strong>Nro. Autorización SRI</strong></td><td>Número de 49 dígitos — identifica el comprobante ante el SRI</td></tr>
+    <tr><td><strong>RUC / Cédula Cliente</strong></td><td>Identificación del receptor del comprobante</td></tr>
+    <tr><td><strong>Clave de Acceso</strong></td><td>Clave completa del comprobante electrónico</td></tr>
+  </tbody>
+</table>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 13b_anulacion-datos-sri.png</strong>
+  Panel expandido con datos SRI y botones Copiar (📋) por cada campo
+</div>
+
+<h2>13.2 Anular una factura de contado</h2>
+<div class="pasos"><ol>
+  <li>Busque la factura (filtro: <strong>Vigentes</strong>).</li>
+  <li>Haga clic en el botón rojo <strong>Anular</strong>.</li>
+  <li>Ingrese el <strong>motivo de anulación</strong> (obligatorio).</li>
+  <li>Haga clic en <strong>Confirmar Anulación</strong>.</li>
+</ol></div>
+
+<h2>13.3 Anular una factura a crédito (con pagos registrados)</h2>
+<p>Si la factura tiene pagos en cartera, el sistema exige revertirlos primero:</p>
+
+<div class="pasos"><ol>
+  <li>Expanda la fila de la factura (clic en la fila).</li>
+  <li>En el panel <strong>Cartera / Pagos</strong> verá la lista de pagos registrados.</li>
+  <li>Haga clic en <strong>Revertir</strong> en cada pago para eliminarlo. El saldo de la cartera se recalcula automáticamente.</li>
+  <li>Una vez sin pagos, aparecerá el botón <strong>Anular</strong>.</li>
+  <li>Ingrese el motivo y confirme.</li>
+</ol></div>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 13c_anulacion-revertir-pago.png</strong>
+  Panel de pagos con botón Revertir por cada pago registrado
+</div>
+
+<h2>13.4 Efecto de la anulación en reportes</h2>
+<p>En el reporte de <strong>Ventas por Período</strong>, las facturas anuladas aparecen:</p>
+<ul>
+  <li>Con el número de factura <s>tachado</s></li>
+  <li>Badge rojo <strong>ANULADA</strong></li>
+  <li>Todos sus valores en cero — <strong>no se incluyen en los totales</strong></li>
+</ul>
+
+
+<!-- ══════════════════════════════════════
+     14. CIERRES DE CAJA
+══════════════════════════════════════ -->
+<h1 id="s14">14. Cierres de Caja</h1>
+<p><strong>Menú:</strong> Cierres de Caja</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 14_cierre-caja.png</strong>
+  Pantalla de cierre de caja con resumen de ventas y diferencia
+</div>
+
+<h2>14.1 Abrir caja</h2>
+<div class="pasos"><ol>
+  <li>Al inicio del turno haga clic en <strong>Abrir Caja</strong>.</li>
+  <li>Ingrese el <strong>fondo inicial</strong> (dinero en efectivo con que inicia el turno).</li>
+  <li>Confirme la apertura.</li>
+</ol></div>
+
+<h2>14.2 Cerrar caja</h2>
+<div class="pasos"><ol>
+  <li>Haga clic en <strong>Cerrar Caja</strong>.</li>
+  <li>El sistema muestra el resumen del turno: ventas por forma de pago, ingresos/egresos adicionales, fondo inicial.</li>
+  <li>Ingrese el <strong>dinero contado</strong> en físico.</li>
+  <li>El sistema calcula la diferencia (sobrante o faltante).</li>
+  <li>Confirme el cierre.</li>
+</ol></div>
+
+
+<!-- ══════════════════════════════════════
+     15. CONSULTAS
+══════════════════════════════════════ -->
+<h1 id="s15">15. Consultas e Informes</h1>
+
+<h2>15.1 Ventas por Período</h2>
+<p><strong>Menú:</strong> Consultas → Ventas por Período</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 15a_ventas-periodo.png</strong>
+  Reporte de ventas con filtros de fecha y vendedor
+</div>
+
+<p><strong>Filtros:</strong> fecha inicio, fecha fin y vendedor (opcional).</p>
+
+<table>
+  <thead><tr><th>Columna</th><th>Descripción</th></tr></thead>
+  <tbody>
+    <tr><td>Nro. Factura</td><td>Número del comprobante</td></tr>
+    <tr><td>Fecha</td><td>Fecha de emisión</td></tr>
+    <tr><td>Cliente / Identificación</td><td>Datos del receptor</td></tr>
+    <tr><td>Vendedor</td><td>Vendedor asignado a la factura</td></tr>
+    <tr><td>Base IVA / Base 0%</td><td>Subtotales por tarifa de IVA</td></tr>
+    <tr><td>Suma Bases / IVA / Total</td><td>Totales del comprobante</td></tr>
+    <tr><td>Efectivo / Tarjeta / etc.</td><td>Desglose por forma de pago</td></tr>
+    <tr><td>Estado</td><td>AUTORIZADO, PENDIENTE o ANULADA</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Opciones:</strong> botón <em>Imprimir</em> y botón <em>Exportar CSV</em> (abre en Excel).</p>
+
+<div class="nota">
+  <strong>📌 Facturas anuladas:</strong> Aparecen con valores en cero y no afectan los totales del período.
+</div>
+
+<h2>15.2 Deudas Clientes (Cartera por Vendedor)</h2>
+<p><strong>Menú:</strong> Consultas → Deudas Clientes</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 15b_deudas-clientes.png</strong>
+  Reporte de deudas agrupado por vendedor con subtotales
+</div>
+
+<p>Muestra la cartera pendiente agrupada por vendedor con filtro de fecha de corte. Incluye subtotales por vendedor y total general. Tiene botón de impresión y exportación.</p>
+
+<h2>15.3 Estado de Cuenta por Cliente</h2>
+<p><strong>Menú:</strong> Consultas → Estado de Cuenta</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 15c_estado-cuenta.png</strong>
+  Estado de cuenta con historial de facturas y pagos por cliente
+</div>
+
+<div class="pasos"><ol>
+  <li>Busque y seleccione el cliente por nombre o identificación.</li>
+  <li>El sistema muestra todas sus facturas con el detalle de cada pago.</li>
+  <li>Haga clic en una factura para expandir y ver los pagos individuales.</li>
+  <li>Use el botón <strong>Imprimir Estado de Cuenta</strong> para generar el documento.</li>
+</ol></div>
+
+<p><strong>Resumen del estado de cuenta:</strong></p>
+<ul>
+  <li>Total de facturas emitidas al cliente</li>
+  <li>Total pagado hasta la fecha</li>
+  <li>Saldo pendiente actual</li>
+</ul>
+
+
+<!-- ══════════════════════════════════════
+     16. CONFIGURACIÓN
+══════════════════════════════════════ -->
+<h1 id="s16">16. Configuración</h1>
+<p><strong>Menú:</strong> Configuración</p>
+
+<div class="imagen-placeholder">
+  <strong>📷 Imagen: 16_configuracion.png</strong>
+  Pantalla de configuración con datos de empresa y parámetros SRI
+</div>
+
+<h2>16.1 Datos de la empresa</h2>
+<table>
+  <thead><tr><th>Campo</th><th>Descripción</th></tr></thead>
+  <tbody>
+    <tr><td>Nombre / Razón Social</td><td>Nombre legal de la empresa (aparece en facturas)</td></tr>
+    <tr><td>RUC</td><td>Registro Único de Contribuyentes</td></tr>
+    <tr><td>Dirección</td><td>Dirección de la matriz</td></tr>
+    <tr><td>Teléfono</td><td>Teléfono de contacto</td></tr>
+    <tr><td>Logo</td><td>Imagen del logo — aparece en facturas, RIDE y comprobantes</td></tr>
+  </tbody>
+</table>
+
+<h2>16.2 Configuración SRI / Facturación Electrónica</h2>
+<table>
+  <thead><tr><th>Campo</th><th>Descripción</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Establecimiento</strong></td><td>Código de 3 dígitos del establecimiento (ej: 001)</td></tr>
+    <tr><td><strong>Punto de Emisión</strong></td><td>Código de 3 dígitos del punto de emisión (ej: 001)</td></tr>
+    <tr><td><strong>Ambiente</strong></td><td>PRUEBAS (desarrollo) o PRODUCCION (comprobantes válidos)</td></tr>
+    <tr><td><strong>Secuencial Inicial</strong></td><td>Número desde el cual inicia la secuencia de facturas</td></tr>
+    <tr><td><strong>Firma Electrónica (.p12)</strong></td><td>Archivo del certificado digital para firmar comprobantes</td></tr>
+    <tr><td><strong>Contraseña de firma</strong></td><td>Clave de protección del certificado .p12</td></tr>
+  </tbody>
+</table>
+
+<h2>16.3 Secuencial inicial de facturas</h2>
+<p>El campo <strong>Secuencial Inicial</strong> define desde qué número inicia la secuencia cuando no hay facturas previas en el sistema.</p>
+<div class="nota">
+  <strong>📌 Migración desde otro sistema:</strong> Si migra con 459 facturas previas, ponga <code>460</code>. La primera factura de QuickInvoice será <code>001-001-000000460</code>. Si ya hay facturas emitidas, el sistema continúa automáticamente desde el último número registrado.
+</div>
+
+<h2>16.4 Cambiar de PRUEBAS a PRODUCCIÓN</h2>
+<div class="advertencia">
+  <strong>⚠️ Requisitos para PRODUCCION:</strong><br>
+  Certificado digital (.p12) vigente · RUC activo en el SRI · Autorización de facturación electrónica en el SRI
+</div>
+<div class="pasos"><ol>
+  <li>Vaya a <strong>Configuración</strong>.</li>
+  <li>Cambie el campo <strong>Ambiente</strong> de PRUEBAS a PRODUCCION.</li>
+  <li>Verifique que el certificado .p12 sea el de producción (no el de pruebas).</li>
+  <li>Haga clic en <strong>Guardar</strong>.</li>
+</ol></div>
+
+
+<!-- ══════════════════════════════════════
+     17. PREGUNTAS FRECUENTES
+══════════════════════════════════════ -->
+<h1 id="s17">17. Preguntas frecuentes</h1>
+
+<h2>¿Por qué mi factura quedó en estado PENDIENTE?</h2>
+<p>El SRI puede tardar unos segundos en procesar. Use el botón de reintento (↻) en <strong>Comprobantes</strong>. Si persiste, revise la conexión a internet y verifique que su certificado .p12 no esté vencido.</p>
+
+<h2>¿Puedo emitir facturas si el internet se corta?</h2>
+<p>No. QuickInvoice requiere conexión a internet para enviar los comprobantes al SRI en tiempo real.</p>
+
+<h2>¿Cómo anulo una factura en el SRI?</h2>
+<div class="pasos"><ol>
+  <li>Vaya a <strong>Anulación de Facturas</strong> y expanda la factura.</li>
+  <li>Copie los datos del panel <em>Datos SRI</em> (número, autorización, RUC).</li>
+  <li>Ingrese al portal <strong>sri.gob.ec</strong> con su clave y complete la anulación.</li>
+  <li>De regreso en QuickInvoice, haga clic en <strong>Anular</strong> para marcarla en el sistema.</li>
+</ol></div>
+
+<h2>¿Qué hago si el SRI rechaza una Nota de Crédito?</h2>
+<div class="pasos"><ol>
+  <li>Vaya a <strong>Notas de Crédito</strong>.</li>
+  <li>Expanda la NC rechazada para ver el mensaje de error del SRI (aparece en rojo).</li>
+  <li>Corrija el problema indicado.</li>
+  <li>Use el botón de reintento (↻).</li>
+</ol></div>
+
+<h2>¿Cómo registro un cheque que cancela varias facturas?</h2>
+<p>Use <strong>Cobro a Cliente</strong> en la pantalla de Cartera CxC: seleccione el cliente, ingrese el valor del cheque y el número de cheque en el campo Referencia. El sistema distribuye automáticamente entre facturas de la más antigua a la más reciente.</p>
+
+<h2>¿Puedo imprimir en impresora térmica de 80mm?</h2>
+<p>Sí. Todos los comprobantes tienen opción de impresión en 80mm:</p>
+<ul>
+  <li><strong>Facturas</strong> — botón <em>Ticket 80mm</em> después de emitir</li>
+  <li><strong>Notas de Crédito</strong> — botón <em>Ticket 80mm</em> en el paso 4</li>
+  <li><strong>Comprobantes de pago</strong> — botón <em>Imprimir 80mm</em> en la ventana del comprobante</li>
+</ul>
+
+<h2>¿Qué pasa con el inventario al anular una factura?</h2>
+<p>Al anular una factura el sistema la marca como ANULADA pero <strong>no revierte automáticamente el Kardex</strong>. Si necesita restaurar el stock, use el módulo de Ingreso de Compras para registrar una entrada manual, o cree una Nota de Crédito antes de anular.</p>
+
+<h2>¿Cómo veo cuánto debe un cliente específico?</h2>
+<p>Use <strong>Consultas → Estado de Cuenta</strong>, seleccione el cliente y verá el resumen completo con el detalle de cada factura y sus pagos. Puede imprimir el estado de cuenta para entregárselo al cliente.</p>
+
+
+<!-- ══════════════════════════════════════
+     18. GLOSARIO
+══════════════════════════════════════ -->
+<h1 id="s18">18. Glosario</h1>
+<table>
+  <thead><tr><th>Término</th><th>Significado</th></tr></thead>
+  <tbody>
+    <tr><td><strong>SRI</strong></td><td>Servicio de Rentas Internas — autoridad tributaria del Ecuador</td></tr>
+    <tr><td><strong>RIDE</strong></td><td>Representación Impresa del Documento Electrónico</td></tr>
+    <tr><td><strong>XML</strong></td><td>Archivo del comprobante electrónico firmado digitalmente</td></tr>
+    <tr><td><strong>Clave de acceso</strong></td><td>Número único de 49 dígitos que identifica cada comprobante</td></tr>
+    <tr><td><strong>XAdES-BES</strong></td><td>Estándar de firma electrónica utilizado en Ecuador</td></tr>
+    <tr><td><strong>RUC</strong></td><td>Registro Único de Contribuyentes (13 dígitos)</td></tr>
+    <tr><td><strong>Cédula</strong></td><td>Documento de identidad nacional (10 dígitos)</td></tr>
+    <tr><td><strong>Cartera CxC</strong></td><td>Cuentas por cobrar — facturas a crédito pendientes de pago</td></tr>
+    <tr><td><strong>FIFO</strong></td><td>First In First Out — primero en entrar, primero en salir. Método de aplicación de pagos a facturas más antiguas primero</td></tr>
+    <tr><td><strong>Kardex</strong></td><td>Registro histórico de entradas y salidas de inventario</td></tr>
+    <tr><td><strong>NC</strong></td><td>Nota de Crédito — comprobante que anula total o parcialmente una factura</td></tr>
+    <tr><td><strong>.p12</strong></td><td>Archivo de certificado digital para firma electrónica</td></tr>
+    <tr><td><strong>Ambiente PRUEBAS</strong></td><td>Entorno de pruebas del SRI — los comprobantes no son válidos legalmente</td></tr>
+    <tr><td><strong>Ambiente PRODUCCION</strong></td><td>Entorno real del SRI — comprobantes con validez legal y tributaria</td></tr>
+  </tbody>
+</table>
+
+<div class="pie-pagina">
+  Manual de Usuario — QuickInvoice v1.0 &nbsp;|&nbsp; Abril 2026 &nbsp;|&nbsp; Documento de uso interno
+</div>
+
+</body>
+</html>

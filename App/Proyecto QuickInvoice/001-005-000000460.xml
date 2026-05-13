@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<factura id="comprobante" version="1.1.0">
+  <infoTributaria>
+    <ambiente>1</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>EGUEZ RUIZ ERNESTO GUILLERMO</razonSocial>
+    <nombreComercial>ERNESTO EGUEZ RUIZ</nombreComercial>
+    <ruc>0907388268001</ruc>
+    <claveAcceso>1003202601090738826800110010050000004600000007215</claveAcceso>
+    <codDoc>01</codDoc>
+    <estab>001</estab>
+    <ptoEmi>005</ptoEmi>
+    <secuencial>000000460</secuencial>
+    <dirMatriz>QUITO, ECUADOR</dirMatriz>
+  </infoTributaria>
+  <infoFactura>
+    <fechaEmision>10/03/2026</fechaEmision>
+    <dirEstablecimiento>QUITO, ECUADOR</dirEstablecimiento>
+    <obligadoContabilidad>SI</obligadoContabilidad>
+    <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
+    <razonSocialComprador>CARLA DELGADO</razonSocialComprador>
+    <identificacionComprador>0508755648</identificacionComprador>
+    <direccionComprador>S/N</direccionComprador>
+    <totalSinImpuestos>13.48</totalSinImpuestos>
+    <totalDescuento>0.00</totalDescuento>
+    <totalConImpuestos>
+      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>4</codigoPorcentaje>
+        <baseImponible>13.48</baseImponible>
+        <valor>2.02</valor>
+      </totalImpuesto>
+    </totalConImpuestos>
+    <propina>0.00</propina>
+    <importeTotal>15.50</importeTotal>
+    <moneda>DOLAR</moneda>
+    <pagos>
+      <pago>
+        <formaPago>17</formaPago>
+        <total>15.50</total>
+      </pago>
+    </pagos>
+  </infoFactura>
+  <detalles>
+    <detalle>
+      <codigoPrincipal>72c4a8ad-d8c8-4d86-89af-d</codigoPrincipal>
+      <descripcion>JUGO NATURAL</descripcion>
+      <cantidad>1.000000</cantidad>
+      <precioUnitario>3.043478</precioUnitario>
+      <descuento>0.00</descuento>
+      <precioTotalSinImpuesto>3.04</precioTotalSinImpuesto>
+      <impuestos>
+        <impuesto>
+          <codigo>2</codigo>
+          <codigoPorcentaje>4</codigoPorcentaje>
+          <tarifa>15</tarifa>
+          <baseImponible>3.04</baseImponible>
+          <valor>0.46</valor>
+        </impuesto>
+      </impuestos>
+    </detalle>
+    <detalle>
+      <codigoPrincipal>b3ec73f3-0a43-49ba-b589-2</codigoPrincipal>
+      <descripcion>CEVICHE DE CAMARÓN</descripcion>
+      <cantidad>1.000000</cantidad>
+      <precioUnitario>6.956522</precioUnitario>
+      <descuento>0.00</descuento>
+      <precioTotalSinImpuesto>6.96</precioTotalSinImpuesto>
+      <impuestos>
+        <impuesto>
+          <codigo>2</codigo>
+          <codigoPorcentaje>4</codigoPorcentaje>
+          <tarifa>15</tarifa>
+          <baseImponible>6.96</baseImponible>
+          <valor>1.04</valor>
+        </impuesto>
+      </impuestos>
+    </detalle>
+    <detalle>
+      <codigoPrincipal>0a606e34-7d52-4307-b5cd-c</codigoPrincipal>
+      <descripcion>CERVEZA NACIONAL</descripcion>
+      <cantidad>1.000000</cantidad>
+      <precioUnitario>3.478261</precioUnitario>
+      <descuento>0.00</descuento>
+      <precioTotalSinImpuesto>3.48</precioTotalSinImpuesto>
+      <impuestos>
+        <impuesto>
+          <codigo>2</codigo>
+          <codigoPorcentaje>4</codigoPorcentaje>
+          <tarifa>15</tarifa>
+          <baseImponible>3.48</baseImponible>
+          <valor>0.52</valor>
+        </impuesto>
+      </impuestos>
+    </detalle>
+  </detalles>
+  <infoAdicional>
+    <campoAdicional nombre="Email">S/N</campoAdicional>
+    <campoAdicional nombre="Direccion">S/N</campoAdicional>
+  </infoAdicional>
+<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="Signature-1773168158957"><ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></ds:CanonicalizationMethod><ds:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></ds:SignatureMethod><ds:Reference Id="Reference-ID-1773168158957" URI="#comprobante"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></ds:Transform></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod><ds:DigestValue>l+Mni7Jaz9T0R55DJG6J6svtPYs=</ds:DigestValue></ds:Reference><ds:Reference Id="ReferenceKeyInfo" URI="#KeyInfoId-Signature-1773168158957"><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod><ds:DigestValue>LrCKJDzfA0jWCPvReuWygNrRZ00=</ds:DigestValue></ds:Reference><ds:Reference Type="http://uri.etsi.org/01903#SignedProperties" URI="#SignedProperties-Signature-1773168158957"><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod><ds:DigestValue>tj+jI1JKPuEDgd8FABJ8hitwF1c=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue Id="SignatureValue-1773168158957">e/hnzf8RMjyTX89q+VRpJ/Hq/KrfR3hHXacjzVxtV2HW3pmk/0iezrs3hyE5OXexfN2/Y4crZoBPXPttBz05/2JgcheFK5ssRDMsjd7an7o2cU2NsQaQHLvaSTXeehvMBjZ2HtdpDt7IkdRXcfAOjqx+r2lM200ip+xDld8tupU2sQrvybd09OyxaFjNb1DF0OC0CWp6fTEgrgVnMor3ArcD+VidhN4rQunVBTTulLJ2Ucl+wNEBBhW01T7/mOuXVfPXBBfD9zbr/qdcvUNMpU92E5XZaT2JK7QsWTwNNvAHumqT6KCEnC6+30bp5Mcr/X4lnFWvxWEl+UFMpbj90A==</ds:SignatureValue><ds:KeyInfo Id="KeyInfoId-Signature-1773168158957"><ds:X509Data><ds:X509Certificate>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</ds:X509Certificate></ds:X509Data><ds:KeyValue><ds:RSAKeyValue><ds:Modulus>mI9jy1t0+ypM1wRSpIW1Tw3yEu2ZkuMKS8haFyoq8NzKyV/tXvYDqsWjkAn6Yp1gS+Aabbzfd+JpflhEDqSFw66iLpp7bBVxBiqLCTIvktklFNBEJne5fLGQyAx7uo33nmvMtgGXOJX4/Bvrb9r29xVhmS4Ux6Ky+bfZMix2/7mkGe5KwUHcnE4ggHE4r9JWO6QASpnPC9ytV/mmUsb6Lp1J+nvOMTQU/czX1pdY6ZUhQ/1W6YyYM5VsdvXknZJcVydvErM4JrcgupJRMHu5oGMrK2tuWzl6W1ql/auVLIetpAC2FdfPzGP/VwVn2TBKcTik051YK4mNbR5OW3i6KQ==</ds:Modulus><ds:Exponent>AQAB</ds:Exponent></ds:RSAKeyValue></ds:KeyValue></ds:KeyInfo><ds:Object Id="XadesObjectId-1773168158957"><xades:QualifyingProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Id="QualifyingProperties-1773168158957" Target="#Signature-1773168158957"><xades:SignedProperties Id="SignedProperties-Signature-1773168158957"><xades:SignedSignatureProperties><xades:SigningTime>2026-03-10T13:42:38-05:00</xades:SigningTime><xades:SigningCertificate><xades:Cert><xades:CertDigest><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></ds:DigestMethod><ds:DigestValue>n6rwt2NlNdfJdz0TriGvYI4HBrM=</ds:DigestValue></xades:CertDigest><xades:IssuerSerial><ds:X509IssuerName>CN=Lazzate Emisor CA2,O=Lazzate Cia. Ltda.,C=EC</ds:X509IssuerName><ds:X509SerialNumber>3254880676</ds:X509SerialNumber></xades:IssuerSerial></xades:Cert></xades:SigningCertificate></xades:SignedSignatureProperties><xades:SignedDataObjectProperties><xades:DataObjectFormat ObjectReference="#Reference-ID-1773168158957"><xades:Description>contenido comprobante</xades:Description><xades:MimeType>text/xml</xades:MimeType><xades:Encoding>UTF-8</xades:Encoding></xades:DataObjectFormat></xades:SignedDataObjectProperties></xades:SignedProperties></xades:QualifyingProperties></ds:Object></ds:Signature></factura>

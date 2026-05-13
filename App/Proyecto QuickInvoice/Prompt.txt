@@ -1,0 +1,266 @@
+
+Contrasena Base de datos veriliz2025
+VITE_SUPABASE_URL=https://alttjjytmcrixghxavbt.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsdHRqanl0bWNyaXhnaHhhdmJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDAwMDIsImV4cCI6MjA4NTMxNjAwMn0.96Wyf_Horbk58UOW09LbDFMhL-UQD_FWBJSYbDBWT8Y
+
+luis@cafearoma.com		luis2026		mesero
+alicia@cafearoma.com		alicia2026		oficina
+oficina@cafearoma.com	 	Oficina@2026
+superadmin@restoflow.com	Super@2026
+oficina@azullimon.com		Azul@2026
+
+Para transferir archivos usar https://limewire.com/    e_eguez@hotmail.com   Passw0rd
+
+
+
+
+PROMPT DE DESARROLLO
+
+
+Diseña una aplicación web SaaS para restaurantes con control de mesas, pedidos, reservas, meseros, inventario con kardex, facturación electrónica del SRI (Ecuador), integración con POS y multiempresa.
+
+Tecnologías
+Frontend: React 18 + TypeScript + Vite.
+
+Estilos: Tailwind CSS (diseño responsive móvil/tablet/escritorio).
+
+Iconos: Lucide React.
+
+Backend/BD: Supabase (PostgreSQL) con Row Level Security (RLS) para multiempresa.
+
+Deploy: Vercel (frontend) + Supabase.
+
+Multiempresa, usuarios y RLS
+Tablas principales con columna empresa_id para aislar los datos por empresa (tenant).
+​
+
+Roles de usuario:
+
+Admin plataforma: crea empresas, asigna planes, crea usuario Oficina inicial.
+
+Oficina: pertenece a una empresa, puede configurar productos, mesas, facturar, ver reportes, cierres de caja.
+
+Mesero: puede ver solo sus mesas/pedidos, tomar pedidos, enviar a cocina, pasar a facturación.
+
+Implementar RLS en Supabase:
+
+Política general: cada usuario solo ve/modifica filas donde empresa_id coincide con la empresa del usuario.
+
+Incluir en el JWT un claim empresa_id y el rol interno (admin/oficina/mesero) para las políticas.
+​
+
+Tablas base sugeridas: empresas, usuarios, roles, mesas, reservas, clientes, productos, inventarios, kardex, pedidos, pedido_detalles, comprobantes, comprobante_detalles, formas_pago, pagos, parametros_sri, planes, empresa_planes.
+
+Inventario y kardex
+Tabla productos:
+
+Campos: nombre, categoría, precio_venta (con IVA incluido), controla_inventario (bool), stock_minimo, activo, indicador de IVA, etc.
+
+Tabla inventarios:
+
+producto_id, stock_actual, empresa_id.
+
+Tabla kardex:
+
+Movimiento de inventario: fecha, tipo_movimiento (compra, venta, ajuste, devolución), producto_id, cantidad, costo_unitario, costo_total, referencia (número de documento).
+
+Lógica:
+
+Al facturar un producto con controla_inventario = true, registrar movimiento de salida en kardex y actualizar stock_actual.
+
+Añadir alerta si stock_actual <= stock_minimo para mostrar en panel Oficina.
+
+Formas de pago e integración POS
+Tabla formas_pago:
+
+Ejemplos: efectivo, tarjeta crédito, tarjeta débito, transferencia, otros.
+
+Tabla pagos:
+
+Vinculada a comprobantes, permite múltiples formas de pago por comprobante (mix efectivo/tarjeta).
+
+Campos: forma_pago_id, monto, referencia (número de voucher, autorizador del POS, etc.).
+
+Flujo:
+
+En la pantalla de facturación, permitir seleccionar una o varias formas de pago, registrar montos y referencias.
+
+Dejar la integración con POS como capa adicional (por ejemplo, función que reciba confirmación de pago desde POS o pasarela y actualice el estado de pago).
+
+UI de productos (lista/tabla)
+Pantalla de administración de productos con:
+
+Tabla con columnas: código, nombre, categoría, precio, controla inventario, stock actual, stock mínimo, estado.
+
+Búsqueda por texto, filtros por categoría, paginación.
+
+Acciones por fila: editar, activar/desactivar.
+
+Mesas, pedidos, reservas (igual que antes pero sumando inventario)
+Mantener:
+
+Estado de mesa (libre, reservada, ocupada, pendiente de facturar).
+
+Reservas con fecha/hora, cliente, personas, teléfono.
+
+Pedidos por mesa, asignación de mesero, cálculo de propina como porcentaje manual.
+
+Impresión de órdenes de pedido a impresora térmica 80mm en red (Wi‑Fi/Ethernet).
+​
+
+Descuento de inventario solo al momento de facturar (no al tomar pedido, salvo que se requiera un modo “reserva de stock”).
+
+Facturación electrónica SRI (resumen)
+Parámetros por empresa (parametros_sri): certificados, ambiente (pruebas/producción), credenciales, numeración.
+
+Tabla comprobantes con estado:
+	
+
+estoy probando desde vercel como mesero
+
+Hago un pedido y lo envio a cocina,  la app se queda inhibida y muestra una pantalla en blanco,  
+
+Luego lo revise como oficina y ese error me hizo caer el usuario oficina, tuve que cerrqar todo y volver a abrir y note que no se habia cambiado el estado, aun continua para enviar a cocina
+
+Por favor revisa ese cliclo de trabajo
+
+
+
+pendiente_envio, enviado, autorizado, rechazado (guardar mensaje de error).
+​
+
+Generar XML, enviar a WS SRI, procesar respuesta y generar RIDE PDF.
+​
+
+Enviar automáticamente el PDF al email del cliente al ser autorizado.
+​
+
+Reportes y monetización
+Reportes:
+
+Ventas por día, por mesero, por mesa, por forma de pago.
+
+Cierre diario de caja por empresa, mostrando totales por forma de pago.
+
+Monetización:
+
+Tablas planes y empresa_planes con límite de documentos por mes y fecha de expiración.
+
+Si una empresa está vencida o supera el límite, bloquear nuevas facturas y mostrar aviso.
+
+RLS y seguridad
+Activar RLS en todas las tablas sensibles.
+
+Usar políticas tipo:
+
+USING (empresa_id = auth.jwt() ->> 'empresa_id') para SELECT/INSERT/UPDATE/DELETE.
+
+Excepciones para el rol Admin plataforma, que puede ver todas las empresas.
+
+Asegurar que los triggers de inventario y kardex respeten el empresa_id.
+
+PROMPT DE MEJORAS DE MESEROS
+
+Buenos dias
+
+Quiero que mejores la versión móvil de mi aplicación de restaurantes, enfocada únicamente en el flujo de los meseros.
+Contexto general:
+
+
+La app ya está desplegada en Vercel.
+
+
+Existen 3 tipos de usuario: administrador, oficina  y meseros.
+
+
+El objetivo principal del mesero es tomar pedidos desde el teléfono, de forma rápida y clara, sin ver opciones administrativas.
+
+
+Objetivo del cambio:
+
+
+Adaptar el diseño y la maquetación de la interfaz del mesero para que se vea y funcione muy bien en teléfonos (mobile‑first, responsive).
+
+
+No quiero cambios de lógica de negocio ni cambios en la parte de administración.
+
+
+Sólo quiero mejorar la UI/UX y el layout de las pantallas que usa el rol mesero.
+
+
+Requisitos específicos:
+
+
+Asegúrate de usar un diseño mobile‑first (por ejemplo con Tailwind CSS, CSS flexbox/grid o el framework que ya tenga el proyecto), dando prioridad a:
+
+
+Botones grandes y fáciles de tocar.
+
+
+Tipografía legible en pantallas pequeñas.
+
+
+Distribución en una sola columna donde sea posible.
+
+
+
+
+Optimiza estas pantallas (o componentes) específicas para el rol mesero:
+
+
+Listado de mesas con su estado (libre, ocupada, pendiente de pago).
+
+
+Detalle de mesa y toma de pedido (lista de productos/categorías, cantidades, notas).
+
+
+Resumen del pedido antes de enviarlo a la cocina / facturación.
+
+
+
+
+En el código, no modifiques nada relacionado con:
+
+
+Pantallas y componentes del rol administrador.
+
+
+Lógica de permisos / autenticación / roles.
+
+
+Integración con SRI, facturación o cierre de caja.
+
+
+
+
+Si necesitas crear componentes nuevos para la vista móvil del mesero, hazlo de forma separada y reutilizable (por ejemplo: WaiterTableListMobile, WaiterOrderFormMobile), y con nombres descriptivos.
+
+
+Documenta los cambios en un archivo README_MESEROS_MOBILE.md donde expliques:
+
+
+Qué archivos modificaste.
+
+
+Qué componentes nuevos creaste.
+
+
+Cómo se debe ver y probar el flujo del mesero en un teléfono.
+
+
+
+
+Forma de trabajo:
+
+
+Primero, analiza el código actual y explícame brevemente (en comentarios o en el README) cómo está armada hoy la interfaz del mesero y qué limitaciones viste en móvil.
+
+
+Luego, propone y aplica los cambios de estilo/maquetación necesarios limitando los cambios a los archivos de frontend del rol mesero.
+
+
+Evita refactors globales o cambios estructurales grandes en todo el proyecto.
+
+
+Repite en tu respuesta qué archivos vas a tocar y confirma que no tocarás nada del flujo de administrador ni de la lógica de negocio, sólo diseño y layout para el mesero en móvil. 
+

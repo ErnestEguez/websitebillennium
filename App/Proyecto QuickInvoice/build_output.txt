@@ -1,0 +1,11 @@
+
+> retrograde-zodiac@0.0.0 build
+> tsc -b && vite build
+
+src/pages/OrdersPage.tsx(15,5): error TS6133: 'Plus' is declared but its value is never read.
+src/pages/OrdersPage.tsx(16,5): error TS6133: 'Trash2' is declared but its value is never read.
+src/pages/OrdersPage.tsx(17,5): error TS6133: 'X' is declared but its value is never read.
+src/pages/OrdersPage.tsx(18,5): error TS6133: 'Save' is declared but its value is never read.
+src/pages/OrdersPage.tsx(19,5): error TS6133: 'User' is declared but its value is never read.
+src/pages/OrdersPage.tsx(26,11): error TS6133: 'navigate' is declared but its value is never read.
+src/pages/OrdersPage.tsx(29,12): error TS6133: 'error' is declared but its value is never read.
