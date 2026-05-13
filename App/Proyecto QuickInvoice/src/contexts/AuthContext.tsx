@@ -251,7 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             fecha_apertura: new Date().toISOString()
                         })
                         .select()
-                        .single();
+                        .maybeSingle();
 
                     if (errorInsert) {
                         console.error('Error abriendo caja:', errorInsert);
