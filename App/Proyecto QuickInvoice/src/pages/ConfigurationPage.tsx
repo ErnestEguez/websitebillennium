@@ -62,6 +62,9 @@ export function ConfigurationPage() {
     const [isEmpresaModalOpen, setIsEmpresaModalOpen] = useState(false)
     const [editingEmpresa, setEditingEmpresa] = useState<any>(null)
     const [oficinaUsers, setOficinaUsers] = useState<StaffMember[]>([])
+    const [isSSOModalOpen, setIsSSOModalOpen] = useState(false)
+    const [ssoForm, setSSOForm] = useState({ email: '', nombre: '', rol: 'oficina', empresa_id: '' })
+    const [ssoLoading, setSSOLoading] = useState(false)
 
     useEffect(() => {
         if (profile?.rol === 'admin_plataforma') {
@@ -324,6 +327,32 @@ export function ConfigurationPage() {
             alert(`Error al guardar staff: ${error.message}`)
         } finally {
             setSaving(false)
+        }
+    }
+
+    async function handleDarAccesoPortal() {
+        if (!ssoForm.email || !ssoForm.nombre || !ssoForm.empresa_id) {
+            alert('Email, nombre y empresa son obligatorios')
+            return
+        }
+        setSSOLoading(true)
+        try {
+            const { data, error } = await supabase.rpc('dar_acceso_portal', {
+                p_email:      ssoForm.email.trim().toLowerCase(),
+                p_empresa_id: ssoForm.empresa_id,
+                p_nombre:     ssoForm.nombre,
+                p_rol:        ssoForm.rol,
+            })
+            if (error) throw error
+            if (!data.ok) throw new Error(data.error)
+            alert(`Acceso concedido correctamente a ${ssoForm.email}`)
+            setIsSSOModalOpen(false)
+            setSSOForm({ email: '', nombre: '', rol: 'oficina', empresa_id: '' })
+            loadData()
+        } catch (err: any) {
+            alert(`Error: ${err.message}`)
+        } finally {
+            setSSOLoading(false)
         }
     }
 
@@ -1067,15 +1096,26 @@ export function ConfigurationPage() {
                                     <h2 className="text-lg font-bold text-slate-900">Personal de Oficina</h2>
                                     <p className="text-sm text-slate-500">Administra los usuarios con rol de Oficina para cada empresa</p>
                                 </div>
-                                <button
-                                    onClick={() => {
-                                        setEditingStaff({ rol: 'oficina' })
-                                        setIsStaffModalOpen(true)
-                                    }}
-                                    className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2"
-                                >
-                                    <Plus className="w-4 h-4" /> Nuevo Usuario Oficina
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setSSOForm({ email: '', nombre: '', rol: 'oficina', empresa_id: allEmpresas[0]?.id || '' })
+                                            setIsSSOModalOpen(true)
+                                        }}
+                                        className="btn btn-secondary py-2 px-4 text-sm flex items-center gap-2"
+                                    >
+                                        <Shield className="w-4 h-4" /> Dar Acceso via Portal
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setEditingStaff({ rol: 'oficina' })
+                                            setIsStaffModalOpen(true)
+                                        }}
+                                        className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2"
+                                    >
+                                        <Plus className="w-4 h-4" /> Nuevo Usuario Oficina
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="card overflow-hidden">
@@ -1145,8 +1185,80 @@ export function ConfigurationPage() {
                 </div>
             )}
 
-            {/* Modals */}
+            {/* Modal: Dar Acceso via Portal */}
+            {isSSOModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 space-y-5">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-900">Dar Acceso via Portal</h2>
+                                <p className="text-sm text-slate-500 mt-1">El usuario debe haber ingresado al Portal Billennium al menos una vez.</p>
+                            </div>
+                            <button onClick={() => setIsSSOModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Email (del Portal Billennium)</label>
+                                <input
+                                    type="email"
+                                    value={ssoForm.email}
+                                    onChange={e => setSSOForm({ ...ssoForm, email: e.target.value })}
+                                    placeholder="usuario@empresa.com"
+                                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Nombre completo</label>
+                                <input
+                                    type="text"
+                                    value={ssoForm.nombre}
+                                    onChange={e => setSSOForm({ ...ssoForm, nombre: e.target.value })}
+                                    placeholder="Nombre del usuario"
+                                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Empresa</label>
+                                <select
+                                    value={ssoForm.empresa_id}
+                                    onChange={e => setSSOForm({ ...ssoForm, empresa_id: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                >
+                                    <option value="">Seleccione empresa</option>
+                                    {allEmpresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Rol</label>
+                                <select
+                                    value={ssoForm.rol}
+                                    onChange={e => setSSOForm({ ...ssoForm, rol: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                >
+                                    <option value="oficina">Oficina</option>
+                                    <option value="mesero">Mesero</option>
+                                    <option value="cocina">Cocina</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button onClick={() => setIsSSOModalOpen(false)} className="flex-1 btn btn-secondary py-2.5">Cancelar</button>
+                            <button
+                                onClick={handleDarAccesoPortal}
+                                disabled={ssoLoading}
+                                className="flex-1 btn btn-primary py-2.5 flex items-center justify-center gap-2"
+                            >
+                                {ssoLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+                                {ssoLoading ? 'Procesando...' : 'Dar Acceso'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
+            {/* Modals */}
             {/* Modals */}
             {
                 isEmpresaModalOpen && (
