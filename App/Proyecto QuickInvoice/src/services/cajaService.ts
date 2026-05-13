@@ -34,6 +34,8 @@ export const cajaService = {
             .select('*')
             .eq('empresa_id', empresaId)
             .eq('estado', 'abierta')
+            .order('fecha_apertura', { ascending: false })
+            .limit(1)
             .maybeSingle();
 
         if (error) {
@@ -64,9 +66,10 @@ export const cajaService = {
                 fecha_apertura: new Date().toISOString()
             })
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
+        if (!data) throw new Error('No se pudo recuperar la caja creada. Verifica los permisos en Supabase.');
         return data;
     },
 
