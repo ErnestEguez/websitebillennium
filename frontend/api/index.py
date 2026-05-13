@@ -765,7 +765,7 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
 APP_URLS = {
     "sentinel":      os.environ.get("PEDIDOS_APP_URL",       "http://localhost:5173"),
     "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://websitebillennium-5gsk.vercel.app/"),
-    "facturacion":   os.environ.get("FACTURACION_APP_URL",   "https://quickinvoice-puce.vercel.app/"),
+    "facturacion":   os.environ.get("FACTURACION_APP_URL",   "https://websitebillennium-quickinvoice.vercel.app/"),
 }
 
 @api_router.get("/debug/env")
