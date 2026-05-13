@@ -24,7 +24,7 @@ const ADMIN_APPS = [
     description: 'Emisión de comprobantes electrónicos SRI. Facturas, notas de crédito, retenciones y guías de remisión.',
     icon: FileText,
     color: 'bg-purple-50 text-purple-600',
-    available: false,
+    available: true,
   },
   {
     id: 'importaciones',

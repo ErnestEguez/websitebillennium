@@ -763,8 +763,9 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
 
 # Mapa de product_id → URL de producción de la App
 APP_URLS = {
-    "sentinel": os.environ.get("PEDIDOS_APP_URL", "http://localhost:5173"),
+    "sentinel":      os.environ.get("PEDIDOS_APP_URL",       "http://localhost:5173"),
     "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://websitebillennium-5gsk.vercel.app/"),
+    "facturacion":   os.environ.get("FACTURACION_APP_URL",   "https://quickinvoice-puce.vercel.app/"),
 }
 
 @api_router.get("/debug/env")
@@ -826,8 +827,8 @@ def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
     email = admin["email"]
     name = admin["name"]
 
-    # Para importaciones solo se genera el magic link (el email de admin es superadmin por configuración)
-    if product_id == "importaciones":
+    # Para estas apps solo se genera el magic link — el perfil de admin se crea directamente en la BD de cada app
+    if product_id in ("importaciones", "facturacion"):
         try:
             result = supabase.auth.admin.generate_link({
                 "type": "magiclink",

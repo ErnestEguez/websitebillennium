@@ -110,7 +110,7 @@ export const UserDashboard = () => {
   };
 
   // Productos que usan SSO (magic link) en vez de URL directa
-  const SSO_PRODUCTS = ['sentinel', 'importaciones'];
+  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion'];
 
   const handleSsoAccess = async (productId) => {
     setSsoLoading(productId);
