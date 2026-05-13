@@ -1,27 +1,37 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://billenniumsystem.com'
+
 interface ProtectedRouteProps {
     allowedRoles: string[]
     children: React.ReactNode
 }
 
 export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
-    const { profile } = useAuth()
+    const { profile, loading } = useAuth()
+
+    // Esperar que el perfil cargue antes de redirigir
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+        )
+    }
 
     if (!profile) {
-        return <Navigate to="/login" replace />
+        // Sin perfil y sin carga: volver al Portal
+        window.location.replace(PORTAL_URL)
+        return null
     }
 
     if (!allowedRoles.includes(profile.rol)) {
-        // Redirigir a una ruta segura según el rol para evitar bucles
         if (profile.rol === 'mesero') return <Navigate to="/mesas" replace />
         if (profile.rol === 'cocina') return <Navigate to="/pedidos" replace />
-
-        // Si es admin_plataforma y está en una ruta no permitida, mandarlo a configuración
         if (profile.rol === 'admin_plataforma') return <Navigate to="/configuracion" replace />
-
-        return <Navigate to="/login" replace />
+        window.location.replace(PORTAL_URL)
+        return null
     }
 
     return <>{children}</>

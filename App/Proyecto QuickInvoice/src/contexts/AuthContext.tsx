@@ -217,6 +217,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .select('*')
                 .eq('empresa_id', empresaId)
                 .eq('estado', 'abierta')
+                .order('fecha_apertura', { ascending: false })
+                .limit(1)
                 .maybeSingle();
 
             if (error) throw error;
@@ -273,18 +275,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const signOut = async () => {
-        console.log('Emergency SignOut triggered');
+        console.log('SignOut triggered — redirecting to Portal');
         try {
-            // Intentar cerrar sesión en Supabase (puede fallar si no hay internet o sesion rota)
             await supabase.auth.signOut().catch(() => { });
         } finally {
-            // Limpieza TOTAL y FORZADA
-            console.log('Clearing local caches and redirecting...');
             localStorage.clear();
             sessionStorage.clear();
-
-            // Usar reload forzado para asegurar que todo rastro de memoria se limpie
-            window.location.replace('/login');
+            const portalUrl = import.meta.env.VITE_PORTAL_URL || 'https://billenniumsystem.com';
+            window.location.replace(portalUrl);
         }
     }
 

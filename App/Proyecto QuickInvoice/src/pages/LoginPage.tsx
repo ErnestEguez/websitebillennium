@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { LogIn, Loader2 } from 'lucide-react'
 
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://billenniumsystem.com'
+
 export function LoginPage() {
     const navigate = useNavigate()
     // Redirect if already logged in AND has profile
@@ -16,6 +18,10 @@ export function LoginPage() {
     useEffect(() => {
         if (user && profile && !authLoading) {
             navigate('/', { replace: true })
+        }
+        // Si hay sesión pero no perfil (y ya cargó), regresar al Portal
+        if (user && !profile && !authLoading) {
+            window.location.replace(PORTAL_URL)
         }
     }, [user, profile, authLoading, navigate])
 

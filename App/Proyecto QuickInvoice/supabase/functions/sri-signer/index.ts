@@ -215,7 +215,7 @@ async function firmarXmlXadesBes(
 ): Promise<string> {
     const p12Der = atob(p12Base64);
     const p12Asn1 = forge.asn1.fromDer(p12Der);
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, p12Password);
+    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, p12Password || "");
 
     const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
     const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
@@ -290,7 +290,11 @@ serve(async (req) => {
 
     try {
         const { comprobante_id, solo_consulta } = await req.json();
-        const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        const supabase = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+            { db: { schema: "facturacion" } }
+        );
 
         const { data: comprobante } = await supabase
             .from("comprobantes")
