@@ -215,14 +215,6 @@ export function AnulacionFacturasPage() {
                 <p className="text-slate-600 mt-1">Gestión de facturas anuladas. Las facturas anuladas se excluyen de los totales de ventas.</p>
             </div>
 
-            {/* Aviso SQL */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex gap-3 items-start">
-                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                <div className="text-sm text-amber-800">
-                    <strong>Requisito previo:</strong> Ejecutar <code className="bg-amber-100 px-1 rounded">SQL_Revertir_Pagos_Anulacion.sql</code> en Supabase si aún no se ha hecho.
-                </div>
-            </div>
-
             {/* Filtros + búsqueda */}
             <div className="flex flex-wrap gap-3 items-center">
                 <div className="relative">
