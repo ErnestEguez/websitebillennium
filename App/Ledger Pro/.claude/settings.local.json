@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"c:/Billenniumweb2026/Ledger Pro/supabase/migrations\")",
+      "Bash(mkdir -p \"c:/Billenniumweb2026/Ledger Pro/src/components\")",
+      "Bash(mkdir -p \"c:/Billenniumweb2026/Ledger Pro/src/contexts\")",
+      "Bash(mkdir -p \"c:/Billenniumweb2026/Ledger Pro/src/hooks\")",
+      "Bash(mkdir -p \"c:/Billenniumweb2026/Ledger Pro/src/lib\")",
+      "Read(//tmp/**)"
+    ]
+  }
+}
