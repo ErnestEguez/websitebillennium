@@ -28,6 +28,7 @@ const PRODUCTS = [
   { id: 'importaciones', name: 'Módulo de Importaciones' },
   { id: 'lopdp', name: 'LOPDP' },
   { id: 'facturacion', name: 'Facturación Electrónica' },
+  { id: 'contabilidad', name: 'Ledger Pro Contabilidad' },
   { id: 'dashboard', name: 'Dashboard Empresarial' },
   { id: 'plataforma-ferias', name: 'Plataforma Móvil para Ferias' },
 ];
