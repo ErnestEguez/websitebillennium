@@ -766,7 +766,7 @@ APP_URLS = {
     "sentinel":      os.environ.get("PEDIDOS_APP_URL",       "http://localhost:5173"),
     "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://websitebillennium-5gsk.vercel.app/"),
     "facturacion":   os.environ.get("FACTURACION_APP_URL",   "https://websitebillennium-quickinvoice.vercel.app/"),
-    "contabilidad":  os.environ.get("CONTABILIDAD_APP_URL",  "https://websitebillennium-ledgerpro.vercel.app/"),
+    "contabilidad":  os.environ.get("CONTABILIDAD_APP_URL",  "https://websitebillennium-ledgerpro-ernesteguezs-projects.vercel.app/"),
 }
 
 @api_router.get("/debug/env")

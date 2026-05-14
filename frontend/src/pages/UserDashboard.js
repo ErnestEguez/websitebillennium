@@ -64,7 +64,7 @@ const productConfig = {
     name: 'Ledger Pro',
     icon: BarChart3,
     color: 'bg-emerald-50 text-emerald-600',
-    url: null,
+    url: 'https://websitebillennium-ledgerpro-ernesteguezs-projects.vercel.app/',
     description: 'Contabilidad NIIF para PYMES'
   },
   dashboard: {
