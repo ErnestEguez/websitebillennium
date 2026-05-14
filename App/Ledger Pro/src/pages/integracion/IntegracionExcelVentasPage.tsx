@@ -443,7 +443,6 @@ export function IntegracionExcelVentasPage() {
 
             // Generar asientos contables
             let asientosCreados = 0
-            const cuentaMap = new Map(cuentas.map(c => [c.id, c]))
 
             for (const asiento of asientosCuadrados) {
                 if (!asiento.cuadra) continue
@@ -517,7 +516,6 @@ export function IntegracionExcelVentasPage() {
     const ventasValidas   = ventas.filter(v => !v._excluida && !v._error)
     const ventasConError  = ventas.filter(v => v._error && !v._excluida)
     const sumaTotal       = r2(ventasValidas.reduce((s, v) => s + v.importe_total, 0))
-    const sumaBases       = r2(ventasValidas.reduce((s, v) => s + v.total_bases, 0))
     const sumaIva         = r2(ventasValidas.reduce((s, v) => s + v.valor_iva, 0))
 
     const mapeoCompleto = mapeo.cuenta_cobro_id && mapeo.cuenta_ventas_grav_id && mapeo.cuenta_iva_debito_id
