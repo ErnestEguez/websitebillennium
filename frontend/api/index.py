@@ -416,6 +416,45 @@ PRODUCTS = [
         ],
         "external_link": "https://proyecto-ferias2026.vercel.app/",
         "plans": []
+    },
+    {
+        "id": "contabilidad",
+        "name": "Ledger Pro Contabilidad",
+        "slug": "contabilidad",
+        "description": "Sistema contable completo con plan de cuentas NIIF PYMES, asientos, balances e integración SRI.",
+        "icon": "BookOpen",
+        "features": [
+            "Plan de cuentas NIIF para PYMES",
+            "Comprobantes contables",
+            "Balance general y estado de resultados",
+            "Integración con QuickInvoice",
+            "Importación de comprobantes SRI",
+            "Presupuesto vs Real"
+        ],
+        "plans": [
+            {
+                "name": "Básico",
+                "price_before": 40,
+                "price_now": 25,
+                "billing": "mensual",
+                "features": ["1 empresa", "2 usuarios", "Plan de cuentas NIIF", "Comprobantes y balances", "Soporte básico"]
+            },
+            {
+                "name": "Profesional",
+                "price_before": 80,
+                "price_now": 50,
+                "billing": "mensual",
+                "popular": True,
+                "features": ["Hasta 3 empresas", "5 usuarios", "Todo lo del Plan Básico", "Integración QuickInvoice", "Importación SRI", "Presupuesto", "Soporte prioritario"]
+            },
+            {
+                "name": "Empresarial",
+                "price_before": 150,
+                "price_now": 90,
+                "billing": "mensual",
+                "features": ["Multiempresa ilimitada", "Usuarios ilimitados", "Todo lo del Plan Profesional", "Cierre contable anual", "Reportes avanzados", "Acompañamiento en implementación"]
+            }
+        ]
     }
 ]
 
