@@ -16,33 +16,35 @@ import { cn, formatMoneda } from '../../lib/utils'
 import type { LpCuenta, LpPeriodo } from '../../types/conta'
 
 // ── Columnas fijas de la plantilla (validadas por posición + nombre) ───────
+// 27 columnas: A–AA  (tarjetas y otros son columnas separadas)
 const COLS_ESPERADAS = [
-    { idx: 0,  col: 'A', nombre: 'fechaEmision',          campo: 'fecha_emision' },
-    { idx: 1,  col: 'B', nombre: 'Estab',                 campo: 'estab' },
-    { idx: 2,  col: 'C', nombre: 'ptoEmi',                campo: 'pto_emi' },
-    { idx: 3,  col: 'D', nombre: 'secuencial',            campo: 'secuencial' },
-    { idx: 4,  col: 'E', nombre: 'razonSocialComprador',  campo: 'razon_social' },
-    { idx: 5,  col: 'F', nombre: 'Cedula/Ruc',            campo: 'cedula_ruc' },
-    { idx: 6,  col: 'G', nombre: 'Base Iva 0%',           campo: 'base_iva_0' },
-    { idx: 7,  col: 'H', nombre: 'Base Iva 5%',           campo: 'base_iva_5' },
-    { idx: 8,  col: 'I', nombre: 'Base Iva 15%',          campo: 'base_iva_15' },
-    { idx: 9,  col: 'J', nombre: 'Total Bases',           campo: 'total_bases' },
-    { idx: 10, col: 'K', nombre: 'valor IVA',             campo: 'valor_iva' },
-    { idx: 11, col: 'L', nombre: 'importe Total',         campo: 'importe_total' },
-    { idx: 12, col: 'M', nombre: 'efectivo',              campo: 'efectivo' },
-    { idx: 13, col: 'N', nombre: 'crédito',               campo: 'credito' },
-    { idx: 14, col: 'O', nombre: 'cheques',               campo: 'cheques' },
-    { idx: 15, col: 'P', nombre: 'transferencias',        campo: 'transferencias' },
-    { idx: 16, col: 'Q', nombre: 'tarjeta otros',         campo: 'tarjeta_otros' },
-    { idx: 17, col: 'R', nombre: 'base',                  campo: 'ret_fuente_base' },
-    { idx: 18, col: 'S', nombre: 'Tasa',                  campo: 'ret_fuente_tasa' },
-    { idx: 19, col: 'T', nombre: 'Valor',                 campo: 'ret_fuente_valor' },
-    { idx: 20, col: 'U', nombre: 'base',                  campo: 'ret_transporte_base' },
-    { idx: 21, col: 'V', nombre: 'Tasa',                  campo: 'ret_transporte_tasa' },
-    { idx: 22, col: 'W', nombre: 'Valor',                 campo: 'ret_transporte_valor' },
-    { idx: 23, col: 'X', nombre: 'base',                  campo: 'ret_iva_base' },
-    { idx: 24, col: 'Y', nombre: 'Tasa',                  campo: 'ret_iva_tasa' },
-    { idx: 25, col: 'Z', nombre: 'Valor',                 campo: 'ret_iva_valor' },
+    { idx: 0,  col: 'A',  nombre: 'fechaEmision',          campo: 'fecha_emision' },
+    { idx: 1,  col: 'B',  nombre: 'Estab',                 campo: 'estab' },
+    { idx: 2,  col: 'C',  nombre: 'ptoEmi',                campo: 'pto_emi' },
+    { idx: 3,  col: 'D',  nombre: 'secuencial',            campo: 'secuencial' },
+    { idx: 4,  col: 'E',  nombre: 'razonSocialComprador',  campo: 'razon_social' },
+    { idx: 5,  col: 'F',  nombre: 'Cedula/Ruc',            campo: 'cedula_ruc' },
+    { idx: 6,  col: 'G',  nombre: 'Base Iva 0%',           campo: 'base_iva_0' },
+    { idx: 7,  col: 'H',  nombre: 'Base Iva 5%',           campo: 'base_iva_5' },
+    { idx: 8,  col: 'I',  nombre: 'Base Iva 15%',          campo: 'base_iva_15' },
+    { idx: 9,  col: 'J',  nombre: 'Total Bases',           campo: 'total_bases' },
+    { idx: 10, col: 'K',  nombre: 'valor IVA',             campo: 'valor_iva' },
+    { idx: 11, col: 'L',  nombre: 'importe Total',         campo: 'importe_total' },
+    { idx: 12, col: 'M',  nombre: 'efectivo',              campo: 'efectivo' },
+    { idx: 13, col: 'N',  nombre: 'crédito',               campo: 'credito' },
+    { idx: 14, col: 'O',  nombre: 'cheques',               campo: 'cheques' },
+    { idx: 15, col: 'P',  nombre: 'transferencias',        campo: 'transferencias' },
+    { idx: 16, col: 'Q',  nombre: 'tarjetas',              campo: 'tarjetas' },
+    { idx: 17, col: 'R',  nombre: 'otros',                 campo: 'otros' },
+    { idx: 18, col: 'S',  nombre: 'base',                  campo: 'ret_fuente_base' },
+    { idx: 19, col: 'T',  nombre: 'Tasa',                  campo: 'ret_fuente_tasa' },
+    { idx: 20, col: 'U',  nombre: 'Valor',                 campo: 'ret_fuente_valor' },
+    { idx: 21, col: 'V',  nombre: 'base',                  campo: 'ret_transporte_base' },
+    { idx: 22, col: 'W',  nombre: 'Tasa',                  campo: 'ret_transporte_tasa' },
+    { idx: 23, col: 'X',  nombre: 'Valor',                 campo: 'ret_transporte_valor' },
+    { idx: 24, col: 'Y',  nombre: 'base',                  campo: 'ret_iva_base' },
+    { idx: 25, col: 'Z',  nombre: 'Tasa',                  campo: 'ret_iva_tasa' },
+    { idx: 26, col: 'AA', nombre: 'Valor',                 campo: 'ret_iva_valor' },
 ]
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -67,7 +69,8 @@ interface VentaExcel {
     credito: number
     cheques: number
     transferencias: number
-    tarjeta_otros: number
+    tarjetas: number
+    otros: number
     ret_fuente_base: number; ret_fuente_tasa: number; ret_fuente_valor: number
     ret_transporte_base: number; ret_transporte_tasa: number; ret_transporte_valor: number
     ret_iva_base: number; ret_iva_tasa: number; ret_iva_valor: number
@@ -360,10 +363,11 @@ export function IntegracionExcelVentasPage() {
                     credito: parseNum(row[13]),
                     cheques: parseNum(row[14]),
                     transferencias: parseNum(row[15]),
-                    tarjeta_otros: parseNum(row[16]),
-                    ret_fuente_base: parseNum(row[17]), ret_fuente_tasa: parseNum(row[18]), ret_fuente_valor: parseNum(row[19]),
-                    ret_transporte_base: parseNum(row[20]), ret_transporte_tasa: parseNum(row[21]), ret_transporte_valor: parseNum(row[22]),
-                    ret_iva_base: parseNum(row[23]), ret_iva_tasa: parseNum(row[24]), ret_iva_valor: parseNum(row[25]),
+                    tarjetas: parseNum(row[16]),
+                    otros: parseNum(row[17]),
+                    ret_fuente_base: parseNum(row[18]), ret_fuente_tasa: parseNum(row[19]), ret_fuente_valor: parseNum(row[20]),
+                    ret_transporte_base: parseNum(row[21]), ret_transporte_tasa: parseNum(row[22]), ret_transporte_valor: parseNum(row[23]),
+                    ret_iva_base: parseNum(row[24]), ret_iva_tasa: parseNum(row[25]), ret_iva_valor: parseNum(row[26]),
                 }
                 ventasParsed.push(venta)
             }
@@ -421,7 +425,7 @@ export function IntegracionExcelVentasPage() {
                 base_iva_0: v.base_iva_0, base_iva_5: v.base_iva_5, base_iva_15: v.base_iva_15,
                 total_bases: v.total_bases, valor_iva: v.valor_iva, importe_total: v.importe_total,
                 efectivo: v.efectivo, credito: v.credito, cheques: v.cheques,
-                transferencias: v.transferencias, tarjeta_otros: v.tarjeta_otros,
+                transferencias: v.transferencias, tarjetas: v.tarjetas, otros: v.otros,
                 ret_fuente_base: v.ret_fuente_base, ret_fuente_tasa: v.ret_fuente_tasa, ret_fuente_valor: v.ret_fuente_valor,
                 ret_transporte_base: v.ret_transporte_base, ret_transporte_tasa: v.ret_transporte_tasa, ret_transporte_valor: v.ret_transporte_valor,
                 ret_iva_base: v.ret_iva_base, ret_iva_tasa: v.ret_iva_tasa, ret_iva_valor: v.ret_iva_valor,
@@ -585,7 +589,7 @@ export function IntegracionExcelVentasPage() {
                         <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
                         <div className="text-sm text-blue-700">
                             <p className="font-semibold mb-1">Plantilla requerida — 26 columnas fijas (A→Z)</p>
-                            <p className="text-xs">fechaEmision · Estab · ptoEmi · secuencial · razonSocialComprador · Cedula/Ruc · Base Iva 0% · Base Iva 5% · Base Iva 15% · Total Bases · valor IVA · importe Total · efectivo · crédito · cheques · transferencias · tarjeta otros · [Ret. Fuente: base/Tasa/Valor] · [Ret. Transporte: base/Tasa/Valor] · [Ret. IVA: base/Tasa/Valor]</p>
+                            <p className="text-xs">fechaEmision · Estab · ptoEmi · secuencial · razonSocialComprador · Cedula/Ruc · Base Iva 0% · Base Iva 5% · Base Iva 15% · Total Bases · valor IVA · importe Total · efectivo · crédito · cheques · transferencias · <strong>tarjetas · otros</strong> · [Ret. Fuente: base/Tasa/Valor] · [Ret. Transporte: base/Tasa/Valor] · [Ret. IVA: base/Tasa/Valor]</p>
                         </div>
                     </div>
                 </div>
