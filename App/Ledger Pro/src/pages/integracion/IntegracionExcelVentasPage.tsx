@@ -101,17 +101,26 @@ interface AsientoPreview {
 // ── Helpers ────────────────────────────────────────────────────────────────
 const r2 = (n: number) => Math.round(n * 100) / 100
 
+// Normaliza strings para comparaciones tolerantes a acentos, case y espacios
+function norm(s: string): string {
+    return s.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ')
+}
+
 function parseFecha(val: unknown): Date | null {
     if (!val) return null
-    if (typeof val === 'number') {
-        const d = XLSX.SSF.parse_date_code(val)
-        if (d) return new Date(d.y, d.m - 1, d.d)
+    // cellDates:true → viene como Date directamente
+    if (val instanceof Date) return isNaN(val.getTime()) ? null : val
+    // Serial numérico de Excel (días desde 1900-01-01, con offset de 25569 días a Unix epoch)
+    if (typeof val === 'number' && val > 1) {
+        const d = new Date(Math.round((val - 25569) * 86400 * 1000))
+        return isNaN(d.getTime()) ? null : d
     }
-    if (typeof val === 'string') {
-        const d = new Date(val)
-        if (!isNaN(d.getTime())) return d
-        // dd/MM/yyyy
-        const m = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+    if (typeof val === 'string' && val.trim()) {
+        // ISO o formato americano
+        const d1 = new Date(val)
+        if (!isNaN(d1.getTime())) return d1
+        // dd/MM/yyyy o dd-MM-yyyy
+        const m = val.trim().match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/)
         if (m) return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]))
     }
     return null
@@ -322,31 +331,32 @@ export function IntegracionExcelVentasPage() {
             const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
             if (!rows.length) { setErroresCols(['El archivo está vacío']); setPaso(0); return }
 
-            // Buscar la fila de cabecera: la primera donde la col A contenga "fechaEmision"
+            // Buscar la fila de cabecera: la primera donde col A tenga "fechaEmision" (tolerante a case/acentos)
             let headerRowIdx = -1
-            for (let r = 0; r < Math.min(rows.length, 5); r++) {
+            for (let r = 0; r < Math.min(rows.length, 10); r++) {
                 const val = String(rows[r][0] ?? '').trim()
-                if (val === 'fechaEmision') { headerRowIdx = r; break }
+                if (norm(val) === norm('fechaEmision')) { headerRowIdx = r; break }
             }
 
             if (headerRowIdx === -1) {
                 // No se encontró la cabecera — mostrar las primeras celdas de la columna A para diagnóstico
-                const primeras = rows.slice(0, 5).map((r, i) => `Fila ${i + 1}: "${String(r[0] ?? '').trim()}"`)
+                const primeras = rows.slice(0, 8).map((r, i) => `Fila ${i + 1}: "${String(r[0] ?? '').trim()}"`)
                 setErroresCols([
-                    'No se encontró la columna "fechaEmision" en las primeras 5 filas.',
+                    'No se encontró la columna "fechaEmision" en las primeras 10 filas.',
                     'Columna A encontrada:',
                     ...primeras,
-                    'Asegúrate de que la primera fila con datos sea la cabecera de la plantilla.',
+                    'Asegúrate de que la plantilla tenga "fechaEmision" como cabecera de la primera columna.',
                 ])
                 setPaso(0)
                 return
             }
 
             const cabecera: string[] = (rows[headerRowIdx] as any[]).map(c => String(c ?? '').trim())
+            // Validación tolerante: normaliza acentos y case antes de comparar
             const errores: string[] = []
             COLS_ESPERADAS.forEach(col => {
                 const real = cabecera[col.idx] ?? ''
-                if (real !== col.nombre) {
+                if (norm(real) !== norm(col.nombre)) {
                     errores.push(`Col ${col.col}: esperado "${col.nombre}" → encontrado "${real || 'vacío'}"`)
                 }
             })
@@ -355,6 +365,7 @@ export function IntegracionExcelVentasPage() {
                 setErroresCols([
                     `Cabecera encontrada en fila ${headerRowIdx + 1} pero con ${errores.length} columna(s) incorrecta(s):`,
                     ...errores,
+                    'Tip: verifica espacios, tildes y mayúsculas en tu plantilla.',
                 ])
                 setPaso(0)
                 return
@@ -613,7 +624,7 @@ export function IntegracionExcelVentasPage() {
                     <div className="card p-4 bg-blue-50 border-blue-200 flex gap-3 items-start">
                         <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
                         <div className="text-sm text-blue-700">
-                            <p className="font-semibold mb-1">Plantilla requerida — 26 columnas fijas (A→Z)</p>
+                            <p className="font-semibold mb-1">Plantilla requerida — 27 columnas fijas (A→AA)</p>
                             <p className="text-xs">fechaEmision · Estab · ptoEmi · secuencial · razonSocialComprador · Cedula/Ruc · Base Iva 0% · Base Iva 5% · Base Iva 15% · Total Bases · valor IVA · importe Total · efectivo · crédito · cheques · transferencias · <strong>tarjetas · otros</strong> · [Ret. Fuente: base/Tasa/Valor] · [Ret. Transporte: base/Tasa/Valor] · [Ret. IVA: base/Tasa/Valor]</p>
                         </div>
                     </div>
