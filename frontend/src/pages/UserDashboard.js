@@ -60,6 +60,13 @@ const productConfig = {
     url: 'https://websitebillennium-quickinvoice.vercel.app/',
     description: 'Comprobantes electrónicos SRI'
   },
+  contabilidad: {
+    name: 'Ledger Pro',
+    icon: BarChart3,
+    color: 'bg-emerald-50 text-emerald-600',
+    url: null,
+    description: 'Contabilidad NIIF para PYMES'
+  },
   dashboard: {
     name: 'Dashboard Empresarial',
     icon: BarChart3,
@@ -110,7 +117,7 @@ export const UserDashboard = () => {
   };
 
   // Productos que usan SSO (magic link) en vez de URL directa
-  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion'];
+  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion', 'contabilidad'];
 
   const handleSsoAccess = async (productId) => {
     setSsoLoading(productId);

@@ -35,12 +35,12 @@ const ADMIN_APPS = [
     available: true,
   },
   {
-    id: 'conta',
+    id: 'contabilidad',
     name: 'LedgerPro Contabilidad',
     description: 'Sistema contable completo con plan de cuentas, asientos, balances y reportes financieros.',
     icon: BookOpen,
     color: 'bg-green-50 text-green-600',
-    available: false,
+    available: true,
   },
 ];
 
