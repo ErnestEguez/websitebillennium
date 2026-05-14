@@ -9,7 +9,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
 
-const ADMIN_EMAIL = 'admin@billenniumsystem.com'
+const ADMIN_EMAILS = ['admin@billenniumsystem.com', 'billenniumsystem@gmail.com', 'admin@billennium.com']
 
 interface SidebarItemProps {
     to: string
@@ -79,7 +79,7 @@ const navigation: NavItem[] = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
     const { empresaActiva, empresas, setEmpresaActiva, signOut, user } = useAuth()
-    const isAdmin = user?.email === ADMIN_EMAIL
+    const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false
     const location = useLocation()
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true)
     const [openGroups, setOpenGroups] = React.useState<string[]>(['Reportes'])

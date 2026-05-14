@@ -22,8 +22,9 @@ const ROLES = [
 export function AdminPage() {
     const { user } = useAuth()
 
+    const ADMIN_EMAILS = ['admin@billenniumsystem.com', 'billenniumsystem@gmail.com', 'admin@billennium.com']
     // Guard: solo admin
-    if (user?.email !== 'admin@billenniumsystem.com') {
+    if (!user?.email || !ADMIN_EMAILS.includes(user.email)) {
         return (
             <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
                 <Shield className="w-12 h-12 text-red-300" />

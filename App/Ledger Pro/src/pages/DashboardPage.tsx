@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { formatMoneda, mesNombre } from '../lib/utils'
 
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://websitebillennium-k4qc-ernesteguezs-projects.vercel.app'
+
 function SinEmpresa() {
     const { user } = useAuth()
     const [reintentando, setReintentando] = useState(false)
@@ -13,7 +15,7 @@ function SinEmpresa() {
         Object.keys(localStorage).forEach(k => {
             if (k.startsWith('sb-') || k.startsWith('lp_')) localStorage.removeItem(k)
         })
-        window.location.replace('/login')
+        window.location.replace(PORTAL_URL)
     }
 
     async function reintentar() {
@@ -38,14 +40,15 @@ function SinEmpresa() {
                     className="btn btn-primary gap-2 text-sm">
                     <RefreshCw className="w-4 h-4" /> Reintentar
                 </button>
+                <Link to="/admin"
+                    className="btn text-sm gap-2 border border-primary-300 text-primary-700 hover:bg-primary-50">
+                    Ir a Administración
+                </Link>
                 <button onClick={limpiarYSalir}
                     className="btn text-sm gap-2 border border-slate-200 text-slate-600 hover:bg-slate-50">
                     <LogOut className="w-4 h-4" /> Cerrar sesión
                 </button>
             </div>
-            <p className="text-xs text-slate-400 max-w-xs">
-                Si la cuenta mostrada no es la correcta, cierra sesión e ingresa con las credenciales de Ledger Pro.
-            </p>
         </div>
     )
 }
