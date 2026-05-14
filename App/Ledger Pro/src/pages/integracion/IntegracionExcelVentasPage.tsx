@@ -322,28 +322,55 @@ export function IntegracionExcelVentasPage() {
             const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
             if (!rows.length) { setErroresCols(['El archivo está vacío']); setPaso(0); return }
 
-            const cabecera: string[] = (rows[0] as any[]).map(c => String(c ?? '').trim())
+            // Buscar la fila de cabecera: la primera donde la col A contenga "fechaEmision"
+            let headerRowIdx = -1
+            for (let r = 0; r < Math.min(rows.length, 5); r++) {
+                const val = String(rows[r][0] ?? '').trim()
+                if (val === 'fechaEmision') { headerRowIdx = r; break }
+            }
+
+            if (headerRowIdx === -1) {
+                // No se encontró la cabecera — mostrar las primeras celdas de la columna A para diagnóstico
+                const primeras = rows.slice(0, 5).map((r, i) => `Fila ${i + 1}: "${String(r[0] ?? '').trim()}"`)
+                setErroresCols([
+                    'No se encontró la columna "fechaEmision" en las primeras 5 filas.',
+                    'Columna A encontrada:',
+                    ...primeras,
+                    'Asegúrate de que la primera fila con datos sea la cabecera de la plantilla.',
+                ])
+                setPaso(0)
+                return
+            }
+
+            const cabecera: string[] = (rows[headerRowIdx] as any[]).map(c => String(c ?? '').trim())
             const errores: string[] = []
             COLS_ESPERADAS.forEach(col => {
                 const real = cabecera[col.idx] ?? ''
                 if (real !== col.nombre) {
-                    errores.push(`Col ${col.col} (pos ${col.idx + 1}): esperado "${col.nombre}", encontrado "${real || 'vacío'}"`)
+                    errores.push(`Col ${col.col}: esperado "${col.nombre}" → encontrado "${real || 'vacío'}"`)
                 }
             })
 
-            if (errores.length > 0) { setErroresCols(errores); setPaso(0); return }
+            if (errores.length > 0) {
+                setErroresCols([
+                    `Cabecera encontrada en fila ${headerRowIdx + 1} pero con ${errores.length} columna(s) incorrecta(s):`,
+                    ...errores,
+                ])
+                setPaso(0)
+                return
+            }
             setErroresCols([])
 
             // Parsear filas
             const ventasParsed: VentaExcel[] = []
-            for (let i = 1; i < rows.length; i++) {
+            for (let i = headerRowIdx + 1; i < rows.length; i++) {
                 const row = rows[i] as any[]
                 if (row.every(c => c === '' || c === null || c === undefined)) continue
                 const errors: string[] = []
                 const fecha = parseFecha(row[0])
                 if (!fecha) errors.push('Fecha inválida')
                 const venta: VentaExcel = {
-                    _linea: i + 1,
+                    _linea: i + 1, // número de fila real en Excel
                     _error: errors.length ? errors.join('; ') : null,
                     _excluida: false,
                     fecha_emision: fecha,
