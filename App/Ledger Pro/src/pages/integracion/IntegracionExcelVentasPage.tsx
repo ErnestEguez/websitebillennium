@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx'
 import {
     Upload, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft,
     Loader2, Settings, Eye, FileSpreadsheet, X, RefreshCw,
-    ChevronDown, ChevronUp, Info,
+    ChevronDown, ChevronUp, Info, Download,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -558,6 +558,16 @@ export function IntegracionExcelVentasPage() {
 
     const mapeoCompleto = mapeo.cuenta_cobro_id && mapeo.cuenta_ventas_grav_id && mapeo.cuenta_iva_debito_id
 
+    function descargarPlantilla() {
+        const header = COLS_ESPERADAS.map(c => c.nombre)
+        const ws = XLSX.utils.aoa_to_sheet([header])
+        // Ancho de columnas
+        ws['!cols'] = header.map(() => ({ wch: 18 }))
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Facturas')
+        XLSX.writeFile(wb, 'Plantilla_Ventas_LedgerPro.xlsx')
+    }
+
     // ── PASOS UI ─────────────────────────────────────────────
     const PASOS = ['Subir archivo', 'Vista previa', 'Mapeo contable', 'Pre-asientos', 'Resultado']
 
@@ -623,9 +633,13 @@ export function IntegracionExcelVentasPage() {
 
                     <div className="card p-4 bg-blue-50 border-blue-200 flex gap-3 items-start">
                         <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                        <div className="text-sm text-blue-700">
+                        <div className="flex-1 text-sm text-blue-700">
                             <p className="font-semibold mb-1">Plantilla requerida — 27 columnas fijas (A→AA)</p>
-                            <p className="text-xs">fechaEmision · Estab · ptoEmi · secuencial · razonSocialComprador · Cedula/Ruc · Base Iva 0% · Base Iva 5% · Base Iva 15% · Total Bases · valor IVA · importe Total · efectivo · crédito · cheques · transferencias · <strong>tarjetas · otros</strong> · [Ret. Fuente: base/Tasa/Valor] · [Ret. Transporte: base/Tasa/Valor] · [Ret. IVA: base/Tasa/Valor]</p>
+                            <p className="text-xs mb-2">fechaEmision · Estab · ptoEmi · secuencial · razonSocialComprador · Cedula/Ruc · Base Iva 0% · Base Iva 5% · Base Iva 15% · Total Bases · valor IVA · importe Total · efectivo · crédito · cheques · transferencias · <strong>tarjetas · otros</strong> · [Ret. Fuente: base/Tasa/Valor] · [Ret. Transporte: base/Tasa/Valor] · [Ret. IVA: base/Tasa/Valor]</p>
+                            <button onClick={descargarPlantilla}
+                                className="inline-flex items-center gap-2 text-xs bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-lg font-medium transition-colors">
+                                <Download className="w-3.5 h-3.5" /> Descargar plantilla vacía (.xlsx)
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -634,6 +648,23 @@ export function IntegracionExcelVentasPage() {
             {/* ══ PASO 1: Vista previa de ventas ══ */}
             {paso === 1 && (
                 <div className="space-y-4">
+                    {/* Aviso si el archivo no tiene filas de datos */}
+                    {ventas.length === 0 && (
+                        <div className="card p-5 border-amber-200 bg-amber-50 flex gap-3 items-start">
+                            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                            <div className="text-sm text-amber-800 space-y-1">
+                                <p className="font-semibold">El archivo fue leído correctamente pero no tiene filas de datos.</p>
+                                <p>La cabecera de la plantilla es válida. Sin embargo, no hay ninguna fila debajo de ella.</p>
+                                <p className="text-xs text-amber-700">
+                                    Pasos a seguir:<br/>
+                                    1. Abre el archivo Excel que usas para registrar tus ventas.<br/>
+                                    2. Copia las filas de datos (sin la cabecera) y pégalas en la plantilla, a partir de la fila 2.<br/>
+                                    3. Guarda y vuelve a subir el archivo.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Totales control */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {[
