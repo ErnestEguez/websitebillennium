@@ -111,34 +111,39 @@ export function AdminPage() {
     async function crearEmpresa() {
         if (!fNombre || !fRuc || !fMonedaId) return
         setGuardandoEmp(true)
-        const qiEmp   = qiEmpresas.find(e => e.id === qiSelId)
-        const nuevaId = crypto.randomUUID()   // UUID pre-generado para evitar SELECT post-insert
+        setError('')
+        try {
+            const qiEmp   = qiEmpresas.find(e => e.id === qiSelId)
+            const nuevaId = crypto.randomUUID()
 
-        const { error: e } = await supabase.from('lp_empresas').insert({
-            id:            nuevaId,
-            nombre:        fNombre,
-            razon_social:  fRazonSocial || fNombre,
-            ruc:           fRuc,
-            moneda_id:     fMonedaId,
-            qi_empresa_id: qiEmp?.id ?? null,
-            activa:        true,
-        })
-        if (e) { setError(e.message); setGuardandoEmp(false); return }
+            const { error: e } = await supabase.from('lp_empresas').insert({
+                id:            nuevaId,
+                nombre:        fNombre,
+                razon_social:  fRazonSocial || fNombre,
+                ruc:           fRuc,
+                moneda_id:     fMonedaId,
+                qi_empresa_id: qiEmp?.id ?? null,
+                activa:        true,
+            })
+            if (e) throw new Error('Error al crear empresa: ' + e.message)
 
-        // Asignar admin para que RLS SELECT devuelva la empresa
-        const { error: e2 } = await supabase.from('lp_usuarios_empresa').insert({
-            user_id:    user!.id,
-            empresa_id: nuevaId,
-            rol:        'admin_conta',
-            activo:     true,
-        })
-        if (e2) { setError(e2.message); setGuardandoEmp(false); return }
+            const { error: e2 } = await supabase.from('lp_usuarios_empresa').insert({
+                user_id:    user!.id,
+                empresa_id: nuevaId,
+                rol:        'admin_conta',
+                activo:     true,
+            })
+            if (e2) throw new Error('Error al asignar admin: ' + e2.message)
 
-        setShowModalEmp(false)
-        setFNombre(''); setFRazonSocial(''); setFRuc(''); setQiSelId('')
-        flash('Empresa creada correctamente')
-        await cargarTodo()
-        setGuardandoEmp(false)
+            setShowModalEmp(false)
+            setFNombre(''); setFRazonSocial(''); setFRuc(''); setQiSelId('')
+            flash('Empresa creada correctamente')
+            await cargarTodo()
+        } catch (err: any) {
+            setError(err.message || 'Error desconocido al crear empresa')
+        } finally {
+            setGuardandoEmp(false)
+        }
     }
 
     // ── Asignar usuario a empresa LP ──────────────────────────────────────
