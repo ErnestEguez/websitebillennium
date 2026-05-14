@@ -72,8 +72,9 @@ const navigation: NavItem[] = [
     },
     { to: '/presupuesto',      icon: Target,  label: 'Presupuesto' },
     { to: '/cierre-contable',  icon: Lock,    label: 'Cierre Contable' },
-    { to: '/integracion-qi',   icon: Zap,     label: 'Integración QI' },
-    { to: '/integracion-sri',  icon: FileText, label: 'Integración SRI' },
+    { to: '/integracion-qi',           icon: Zap,          label: 'Integración QI' },
+    { to: '/integracion-sri',          icon: FileText,     label: 'Integración SRI' },
+    { to: '/integracion-excel-ventas', icon: BookMarked,   label: 'Excel Ventas' },
     { to: '/configuracion',    icon: Settings, label: 'Configuración' },
 ]
 

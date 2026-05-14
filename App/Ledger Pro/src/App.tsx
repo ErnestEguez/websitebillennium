@@ -18,8 +18,9 @@ const EstadoCuentaPage       = lazy(() => import('./pages/reportes/EstadoCuentaP
 const RealVsPresupuestoPage  = lazy(() => import('./pages/reportes/RealVsPresupuestoPage').then(m => ({ default: m.RealVsPresupuestoPage })))
 const PresupuestoPage        = lazy(() => import('./pages/presupuesto/PresupuestoPage').then(m => ({ default: m.PresupuestoPage })))
 const CierreContablePage     = lazy(() => import('./pages/cierre/CierreContablePage').then(m => ({ default: m.CierreContablePage })))
-const IntegracionQIPage      = lazy(() => import('./pages/integracion/IntegracionQIPage').then(m => ({ default: m.IntegracionQIPage })))
-const IntegracionSRIPage     = lazy(() => import('./pages/integracion/IntegracionSRIPage').then(m => ({ default: m.IntegracionSRIPage })))
+const IntegracionQIPage           = lazy(() => import('./pages/integracion/IntegracionQIPage').then(m => ({ default: m.IntegracionQIPage })))
+const IntegracionSRIPage          = lazy(() => import('./pages/integracion/IntegracionSRIPage').then(m => ({ default: m.IntegracionSRIPage })))
+const IntegracionExcelVentasPage  = lazy(() => import('./pages/integracion/IntegracionExcelVentasPage').then(m => ({ default: m.IntegracionExcelVentasPage })))
 const ConfiguracionPage      = lazy(() => import('./pages/ConfiguracionPage').then(m => ({ default: m.ConfiguracionPage })))
 const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })))
 
@@ -124,6 +125,12 @@ function AppRoutes() {
                 <Route path="/integracion-sri" element={
                     <ProtectedRoute>
                         <Layout><IntegracionSRIPage /></Layout>
+                    </ProtectedRoute>
+                } />
+
+                <Route path="/integracion-excel-ventas" element={
+                    <ProtectedRoute>
+                        <Layout><IntegracionExcelVentasPage /></Layout>
                     </ProtectedRoute>
                 } />
 
