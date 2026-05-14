@@ -19,7 +19,7 @@ function SelectorCuenta({
     const filtradas = cuentas
         .filter(c => c.acepta_movimientos)
         .filter(c => !q || c.codigo.includes(q) || c.nombre.toLowerCase().includes(q.toLowerCase()))
-        .slice(0, 30)
+        .slice(0, q ? 50 : 15)
 
     return (
         <div className="relative">
@@ -37,7 +37,7 @@ function SelectorCuenta({
                         <input
                             autoFocus
                             className="flex-1 text-sm outline-none"
-                            placeholder="Buscar código o nombre..."
+                            placeholder="Ej: 1.01, 2, ventas, banco..."
                             value={q}
                             onChange={e => setQ(e.target.value)}
                         />
