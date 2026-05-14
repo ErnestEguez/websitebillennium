@@ -39,6 +39,7 @@ const PLANS = {
   importaciones: ['Estándar', 'Profesional'],
   lopdp: ['PYME', 'Profesional'],
   facturacion: ['Básico', 'Profesional', 'Empresarial'],
+  contabilidad: ['Básico', 'Profesional', 'Empresarial'],
   dashboard: ['Básico', 'Profesional'],
   'plataforma-ferias': ['Estándar'],
 };
