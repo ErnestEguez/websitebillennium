@@ -1,13 +1,13 @@
 -- ============================================================
 -- VENDOR MANAGEMENT — Migración completa
--- Extiende tablas existentes + crea tablas nuevas
+-- Esquema: facturacion
 -- Seguro para ejecutar sobre datos existentes (ADD COLUMN IF NOT EXISTS)
 -- ============================================================
 
 -- ────────────────────────────────────────────────────────────
 -- 1. EXTENDER proveedores
 -- ────────────────────────────────────────────────────────────
-ALTER TABLE public.proveedores
+ALTER TABLE facturacion.proveedores
     ADD COLUMN IF NOT EXISTS tipo_identificacion  TEXT DEFAULT 'RUC'
         CHECK (tipo_identificacion IN ('RUC','CEDULA','PASAPORTE','EXTERIOR')),
     ADD COLUMN IF NOT EXISTS tipo_proveedor       TEXT DEFAULT 'SOCIEDAD'
@@ -28,7 +28,7 @@ ALTER TABLE public.proveedores
 -- ────────────────────────────────────────────────────────────
 -- 2. EXTENDER ingresos_stock → cabecera única de compras
 -- ────────────────────────────────────────────────────────────
-ALTER TABLE public.ingresos_stock
+ALTER TABLE facturacion.ingresos_stock
     -- Tipo y estado
     ADD COLUMN IF NOT EXISTS tipo_compra    TEXT DEFAULT 'INVENTARIO'
         CHECK (tipo_compra IN ('INVENTARIO','SERVICIO')),
@@ -71,17 +71,17 @@ ALTER TABLE public.ingresos_stock
     ADD COLUMN IF NOT EXISTS aplica_convenio_ddi BOOLEAN DEFAULT false;
 
 -- Registros existentes → tipo_compra INVENTARIO, estado ACTIVO
-UPDATE public.ingresos_stock
+UPDATE facturacion.ingresos_stock
     SET tipo_compra = 'INVENTARIO', estado = 'ACTIVO', origen = 'MANUAL'
     WHERE tipo_compra IS NULL;
 
 -- ────────────────────────────────────────────────────────────
--- 3. NUEVA: ordenes_compra (antes de ingresos_stock FK)
+-- 3. NUEVA: ordenes_compra (antes de la FK desde ingresos_stock)
 -- ────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.ordenes_compra (
+CREATE TABLE IF NOT EXISTS facturacion.ordenes_compra (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    empresa_id              UUID NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
-    proveedor_id            UUID REFERENCES public.proveedores(id) ON DELETE SET NULL,
+    empresa_id              UUID NOT NULL REFERENCES facturacion.empresas(id) ON DELETE CASCADE,
+    proveedor_id            UUID REFERENCES facturacion.proveedores(id) ON DELETE SET NULL,
     numero_oc               TEXT NOT NULL,
     fecha_emision           DATE NOT NULL DEFAULT CURRENT_DATE,
     fecha_entrega_esperada  DATE,
@@ -95,10 +95,10 @@ CREATE TABLE IF NOT EXISTS public.ordenes_compra (
     updated_at              TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now())
 );
 
-CREATE TABLE IF NOT EXISTS public.detalle_ordenes_compra (
+CREATE TABLE IF NOT EXISTS facturacion.detalle_ordenes_compra (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    oc_id               UUID NOT NULL REFERENCES public.ordenes_compra(id) ON DELETE CASCADE,
-    producto_id         UUID REFERENCES public.productos(id) ON DELETE SET NULL,
+    oc_id               UUID NOT NULL REFERENCES facturacion.ordenes_compra(id) ON DELETE CASCADE,
+    producto_id         UUID REFERENCES facturacion.productos(id) ON DELETE SET NULL,
     descripcion         TEXT,
     cantidad_solicitada DECIMAL(12,2) NOT NULL,
     cantidad_recibida   DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -107,16 +107,16 @@ CREATE TABLE IF NOT EXISTS public.detalle_ordenes_compra (
 );
 
 -- FK de ingresos_stock a ordenes_compra
-ALTER TABLE public.ingresos_stock
-    ADD COLUMN IF NOT EXISTS orden_compra_id UUID REFERENCES public.ordenes_compra(id) ON DELETE SET NULL;
+ALTER TABLE facturacion.ingresos_stock
+    ADD COLUMN IF NOT EXISTS orden_compra_id UUID REFERENCES facturacion.ordenes_compra(id) ON DELETE SET NULL;
 
 -- ────────────────────────────────────────────────────────────
 -- 4. NUEVA: detalle_servicios
 -- ────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.detalle_servicios (
+CREATE TABLE IF NOT EXISTS facturacion.detalle_servicios (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    empresa_id      UUID NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
-    compra_id       UUID NOT NULL REFERENCES public.ingresos_stock(id) ON DELETE CASCADE,
+    empresa_id      UUID NOT NULL REFERENCES facturacion.empresas(id) ON DELETE CASCADE,
+    compra_id       UUID NOT NULL REFERENCES facturacion.ingresos_stock(id) ON DELETE CASCADE,
     descripcion     TEXT NOT NULL,
     cantidad        DECIMAL(12,2) NOT NULL DEFAULT 1,
     precio_unitario DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -134,11 +134,11 @@ CREATE TABLE IF NOT EXISTS public.detalle_servicios (
 -- ────────────────────────────────────────────────────────────
 -- 5. NUEVA: retenciones_compras
 -- ────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.retenciones_compras (
+CREATE TABLE IF NOT EXISTS facturacion.retenciones_compras (
     id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    empresa_id              UUID NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
-    compra_id               UUID NOT NULL REFERENCES public.ingresos_stock(id) ON DELETE CASCADE,
-    proveedor_id            UUID REFERENCES public.proveedores(id) ON DELETE SET NULL,
+    empresa_id              UUID NOT NULL REFERENCES facturacion.empresas(id) ON DELETE CASCADE,
+    compra_id               UUID NOT NULL REFERENCES facturacion.ingresos_stock(id) ON DELETE CASCADE,
+    proveedor_id            UUID REFERENCES facturacion.proveedores(id) ON DELETE SET NULL,
     numero_retencion        TEXT,
     fecha_emision           DATE NOT NULL DEFAULT CURRENT_DATE,
     tipo                    TEXT NOT NULL CHECK (tipo IN ('FUENTE','IVA')),
@@ -160,11 +160,11 @@ CREATE TABLE IF NOT EXISTS public.retenciones_compras (
 -- ────────────────────────────────────────────────────────────
 -- 6. NUEVA: cuentas_por_pagar
 -- ────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.cuentas_por_pagar (
+CREATE TABLE IF NOT EXISTS facturacion.cuentas_por_pagar (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    empresa_id          UUID NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
-    proveedor_id        UUID NOT NULL REFERENCES public.proveedores(id) ON DELETE RESTRICT,
-    compra_id           UUID NOT NULL REFERENCES public.ingresos_stock(id) ON DELETE RESTRICT,
+    empresa_id          UUID NOT NULL REFERENCES facturacion.empresas(id) ON DELETE CASCADE,
+    proveedor_id        UUID NOT NULL REFERENCES facturacion.proveedores(id) ON DELETE RESTRICT,
+    compra_id           UUID NOT NULL REFERENCES facturacion.ingresos_stock(id) ON DELETE RESTRICT,
     fecha_emision       DATE NOT NULL,
     fecha_vencimiento   DATE NOT NULL,
     monto_original      DECIMAL(12,2) NOT NULL,
@@ -179,11 +179,11 @@ CREATE TABLE IF NOT EXISTS public.cuentas_por_pagar (
 -- ────────────────────────────────────────────────────────────
 -- 7. NUEVA: pagos_proveedores
 -- ────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.pagos_proveedores (
+CREATE TABLE IF NOT EXISTS facturacion.pagos_proveedores (
     id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    empresa_id          UUID NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
-    cxp_id              UUID NOT NULL REFERENCES public.cuentas_por_pagar(id) ON DELETE RESTRICT,
-    proveedor_id        UUID NOT NULL REFERENCES public.proveedores(id) ON DELETE RESTRICT,
+    empresa_id          UUID NOT NULL REFERENCES facturacion.empresas(id) ON DELETE CASCADE,
+    cxp_id              UUID NOT NULL REFERENCES facturacion.cuentas_por_pagar(id) ON DELETE RESTRICT,
+    proveedor_id        UUID NOT NULL REFERENCES facturacion.proveedores(id) ON DELETE RESTRICT,
     fecha_pago          DATE NOT NULL DEFAULT CURRENT_DATE,
     monto               DECIMAL(12,2) NOT NULL,
     forma_pago          TEXT NOT NULL DEFAULT 'TRANSFERENCIA'
@@ -197,79 +197,78 @@ CREATE TABLE IF NOT EXISTS public.pagos_proveedores (
 -- ────────────────────────────────────────────────────────────
 -- 8. ÍNDICES para rendimiento
 -- ────────────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_ingresos_stock_tipo_compra   ON public.ingresos_stock(empresa_id, tipo_compra);
-CREATE INDEX IF NOT EXISTS idx_ingresos_stock_estado        ON public.ingresos_stock(empresa_id, estado);
-CREATE INDEX IF NOT EXISTS idx_ingresos_stock_proveedor     ON public.ingresos_stock(proveedor_id);
-CREATE INDEX IF NOT EXISTS idx_ingresos_stock_clave_acceso  ON public.ingresos_stock(clave_acceso) WHERE clave_acceso IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_detalle_servicios_compra     ON public.detalle_servicios(compra_id);
-CREATE INDEX IF NOT EXISTS idx_retenciones_compra           ON public.retenciones_compras(compra_id);
-CREATE INDEX IF NOT EXISTS idx_retenciones_empresa          ON public.retenciones_compras(empresa_id);
-CREATE INDEX IF NOT EXISTS idx_cxp_empresa_estado           ON public.cuentas_por_pagar(empresa_id, estado);
-CREATE INDEX IF NOT EXISTS idx_cxp_proveedor                ON public.cuentas_por_pagar(proveedor_id);
-CREATE INDEX IF NOT EXISTS idx_cxp_vencimiento              ON public.cuentas_por_pagar(fecha_vencimiento);
-CREATE INDEX IF NOT EXISTS idx_pagos_cxp                    ON public.pagos_proveedores(cxp_id);
-CREATE INDEX IF NOT EXISTS idx_oc_empresa_estado            ON public.ordenes_compra(empresa_id, estado);
+CREATE INDEX IF NOT EXISTS idx_ingresos_stock_tipo_compra   ON facturacion.ingresos_stock(empresa_id, tipo_compra);
+CREATE INDEX IF NOT EXISTS idx_ingresos_stock_estado        ON facturacion.ingresos_stock(empresa_id, estado);
+CREATE INDEX IF NOT EXISTS idx_ingresos_stock_proveedor     ON facturacion.ingresos_stock(proveedor_id);
+CREATE INDEX IF NOT EXISTS idx_ingresos_stock_clave_acceso  ON facturacion.ingresos_stock(clave_acceso) WHERE clave_acceso IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_detalle_servicios_compra     ON facturacion.detalle_servicios(compra_id);
+CREATE INDEX IF NOT EXISTS idx_retenciones_compra           ON facturacion.retenciones_compras(compra_id);
+CREATE INDEX IF NOT EXISTS idx_retenciones_empresa          ON facturacion.retenciones_compras(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_cxp_empresa_estado           ON facturacion.cuentas_por_pagar(empresa_id, estado);
+CREATE INDEX IF NOT EXISTS idx_cxp_proveedor                ON facturacion.cuentas_por_pagar(proveedor_id);
+CREATE INDEX IF NOT EXISTS idx_cxp_vencimiento              ON facturacion.cuentas_por_pagar(fecha_vencimiento);
+CREATE INDEX IF NOT EXISTS idx_pagos_cxp                    ON facturacion.pagos_proveedores(cxp_id);
+CREATE INDEX IF NOT EXISTS idx_oc_empresa_estado            ON facturacion.ordenes_compra(empresa_id, estado);
 
 -- ────────────────────────────────────────────────────────────
 -- 9. RLS — Row Level Security
 -- ────────────────────────────────────────────────────────────
-ALTER TABLE public.ordenes_compra        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.detalle_ordenes_compra ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.detalle_servicios     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.retenciones_compras   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cuentas_por_pagar     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pagos_proveedores     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturacion.ordenes_compra         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturacion.detalle_ordenes_compra ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturacion.detalle_servicios      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturacion.retenciones_compras    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturacion.cuentas_por_pagar      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE facturacion.pagos_proveedores      ENABLE ROW LEVEL SECURITY;
 
 -- Políticas: usuario autenticado ve solo los registros de su empresa
-CREATE POLICY "ordenes_compra_empresa" ON public.ordenes_compra
+CREATE POLICY "ordenes_compra_empresa" ON facturacion.ordenes_compra
     FOR ALL USING (empresa_id IN (
-        SELECT empresa_id FROM public.profiles WHERE id = auth.uid()
+        SELECT empresa_id FROM facturacion.profiles WHERE id = auth.uid()
     ));
 
-CREATE POLICY "detalle_oc_empresa" ON public.detalle_ordenes_compra
+CREATE POLICY "detalle_oc_empresa" ON facturacion.detalle_ordenes_compra
     FOR ALL USING (oc_id IN (
-        SELECT id FROM public.ordenes_compra WHERE empresa_id IN (
-            SELECT empresa_id FROM public.profiles WHERE id = auth.uid()
+        SELECT id FROM facturacion.ordenes_compra WHERE empresa_id IN (
+            SELECT empresa_id FROM facturacion.profiles WHERE id = auth.uid()
         )
     ));
 
-CREATE POLICY "detalle_servicios_empresa" ON public.detalle_servicios
+CREATE POLICY "detalle_servicios_empresa" ON facturacion.detalle_servicios
     FOR ALL USING (empresa_id IN (
-        SELECT empresa_id FROM public.profiles WHERE id = auth.uid()
+        SELECT empresa_id FROM facturacion.profiles WHERE id = auth.uid()
     ));
 
-CREATE POLICY "retenciones_compras_empresa" ON public.retenciones_compras
+CREATE POLICY "retenciones_compras_empresa" ON facturacion.retenciones_compras
     FOR ALL USING (empresa_id IN (
-        SELECT empresa_id FROM public.profiles WHERE id = auth.uid()
+        SELECT empresa_id FROM facturacion.profiles WHERE id = auth.uid()
     ));
 
-CREATE POLICY "cxp_empresa" ON public.cuentas_por_pagar
+CREATE POLICY "cxp_empresa" ON facturacion.cuentas_por_pagar
     FOR ALL USING (empresa_id IN (
-        SELECT empresa_id FROM public.profiles WHERE id = auth.uid()
+        SELECT empresa_id FROM facturacion.profiles WHERE id = auth.uid()
     ));
 
-CREATE POLICY "pagos_proveedores_empresa" ON public.pagos_proveedores
+CREATE POLICY "pagos_proveedores_empresa" ON facturacion.pagos_proveedores
     FOR ALL USING (empresa_id IN (
-        SELECT empresa_id FROM public.profiles WHERE id = auth.uid()
+        SELECT empresa_id FROM facturacion.profiles WHERE id = auth.uid()
     ));
 
 -- ────────────────────────────────────────────────────────────
 -- 10. FUNCIÓN: actualizar saldo CxP al registrar un pago
 -- ────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.fn_actualizar_saldo_cxp()
+CREATE OR REPLACE FUNCTION facturacion.fn_actualizar_saldo_cxp()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
     v_saldo_nuevo DECIMAL(12,2);
 BEGIN
-    -- Recalcular saldo restando todos los pagos
     SELECT c.monto_original - COALESCE(SUM(p.monto), 0)
       INTO v_saldo_nuevo
-      FROM public.cuentas_por_pagar c
-      LEFT JOIN public.pagos_proveedores p ON p.cxp_id = c.id
+      FROM facturacion.cuentas_por_pagar c
+      LEFT JOIN facturacion.pagos_proveedores p ON p.cxp_id = c.id
      WHERE c.id = NEW.cxp_id
      GROUP BY c.monto_original;
 
-    UPDATE public.cuentas_por_pagar
+    UPDATE facturacion.cuentas_por_pagar
        SET saldo_pendiente = GREATEST(v_saldo_nuevo, 0),
            estado = CASE
                WHEN v_saldo_nuevo <= 0 THEN 'PAGADO'
@@ -283,15 +282,15 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_actualizar_saldo_cxp ON public.pagos_proveedores;
+DROP TRIGGER IF EXISTS trg_actualizar_saldo_cxp ON facturacion.pagos_proveedores;
 CREATE TRIGGER trg_actualizar_saldo_cxp
-    AFTER INSERT ON public.pagos_proveedores
-    FOR EACH ROW EXECUTE FUNCTION public.fn_actualizar_saldo_cxp();
+    AFTER INSERT ON facturacion.pagos_proveedores
+    FOR EACH ROW EXECUTE FUNCTION facturacion.fn_actualizar_saldo_cxp();
 
 -- ────────────────────────────────────────────────────────────
 -- 11. FUNCIÓN: secuencial de OC por empresa
 -- ────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.fn_siguiente_numero_oc(p_empresa_id UUID)
+CREATE OR REPLACE FUNCTION facturacion.fn_siguiente_numero_oc(p_empresa_id UUID)
 RETURNS TEXT LANGUAGE plpgsql AS $$
 DECLARE
     v_siguiente INTEGER;
@@ -300,7 +299,7 @@ BEGIN
         CAST(SPLIT_PART(numero_oc, '-', 3) AS INTEGER)
     ), 0) + 1
       INTO v_siguiente
-      FROM public.ordenes_compra
+      FROM facturacion.ordenes_compra
      WHERE empresa_id = p_empresa_id
        AND numero_oc ~ '^\d{4}-OC-\d+$';
 
