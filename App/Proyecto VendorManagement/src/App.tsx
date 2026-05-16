@@ -11,6 +11,7 @@ import { CxPPage }                    from './pages/CxPPage'
 import { ConsultaComprasPage }        from './pages/reportes/ConsultaComprasPage'
 import { ConsultaCxPPage }            from './pages/reportes/ConsultaCxPPage'
 import { EstadoCuentaProveedorPage }  from './pages/reportes/EstadoCuentaProveedorPage'
+import { ComprobantesRetencionPage }  from './pages/ComprobantesRetencionPage'
 
 function App() {
     return (
@@ -34,6 +35,9 @@ function App() {
                     } />
                     <Route path="/cxp" element={
                         <ProtectedRoute><Layout><CxPPage /></Layout></ProtectedRoute>
+                    } />
+                    <Route path="/comprobantes-retencion" element={
+                        <ProtectedRoute><Layout><ComprobantesRetencionPage /></Layout></ProtectedRoute>
                     } />
                     <Route path="/reportes/compras" element={
                         <ProtectedRoute><Layout><ConsultaComprasPage /></Layout></ProtectedRoute>

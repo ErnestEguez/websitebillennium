@@ -70,6 +70,7 @@ import { CierreCajaModal } from './CierreCajaModal'
 
 export function Layout({ children }: { children: React.ReactNode }) {
     const { profile, empresa, signOut } = useAuth()
+    const usaVendor = !!empresa?.usar_vendor_management
     const location = useLocation()
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true)
     const [isCierreCajaOpen, setIsCierreCajaOpen] = React.useState(false)
@@ -87,8 +88,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         { to: '/facturacion', icon: FileText, label: 'Comprobantes', roles: ['oficina'] },
         { to: '/clientes', icon: Users, label: 'Clientes', roles: ['oficina'] },
         { to: '/productos', icon: Package, label: 'Productos', roles: ['oficina'] },
-        { to: '/proveedores', icon: Truck, label: 'Proveedores', roles: ['oficina'] },
-        { to: '/inventario', icon: ShoppingCart, label: 'Ingreso de Compras', roles: ['oficina'] },
+        ...(!usaVendor ? [
+            { to: '/proveedores', icon: Truck,        label: 'Proveedores',       roles: ['oficina'] } as NavLink,
+            { to: '/inventario',  icon: ShoppingCart, label: 'Ingreso de Compras', roles: ['oficina'] } as NavLink,
+        ] : []),
         { to: '/kardex', icon: BarChart3, label: 'Kardex', roles: ['oficina'] },
         { to: '/vendedores', icon: UserCheck, label: 'Vendedores', roles: ['oficina'] },
         { to: '/cartera-cxc', icon: Wallet, label: 'Cartera CxC', roles: ['oficina'] },

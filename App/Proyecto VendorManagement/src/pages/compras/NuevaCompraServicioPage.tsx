@@ -46,8 +46,9 @@ export function NuevaCompraServicioPage() {
     const [valorIvaManual, setValorIvaManual] = useState(0)
     const [modoIvaManual, setModoIvaManual]   = useState(false)
 
-    const [retenciones, setRetenciones] = useState<RetLine[]>([])
-    const [retSeccion, setRetSeccion]   = useState(false)
+    const [numeroRetencion, setNumeroRetencion] = useState('')
+    const [retenciones, setRetenciones]         = useState<RetLine[]>([])
+    const [retSeccion, setRetSeccion]            = useState(false)
 
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
 
@@ -105,7 +106,7 @@ export function NuevaCompraServicioPage() {
             }
             const retsParaGuardar = retenciones.filter(r => r.codigo && r.valor > 0).map(r => ({
                 empresa_id: empresa!.id, proveedor_id: proveedorId,
-                numero_retencion: r.numero || undefined,
+                numero_retencion: numeroRetencion || undefined,
                 fecha_emision: HOY, tipo: r.tipo,
                 codigo_retencion: r.codigo, descripcion: r.descripcion,
                 base_imponible: r.base, porcentaje: r.pct, valor: r.valor,
@@ -337,7 +338,13 @@ export function NuevaCompraServicioPage() {
                 </button>
                 {retSeccion && (
                     <div className="p-5 pt-0 border-t border-slate-100">
-                        <RetencionesEditor retenciones={retenciones} onChange={setRetenciones} baseDefault={subtotalLineas} />
+                        <RetencionesEditor
+                            numeroRetencion={numeroRetencion}
+                            onChangeNumero={setNumeroRetencion}
+                            retenciones={retenciones}
+                            onChange={setRetenciones}
+                            baseDefault={subtotalLineas}
+                        />
                     </div>
                 )}
             </div>

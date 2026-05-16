@@ -4,6 +4,7 @@ import { compraService, proveedorService } from '../../services/vendorService'
 import type { Compra, Proveedor } from '../../types/vendors'
 import { Search, RefreshCw, Loader2, FileText, Package, Wrench } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { PrintExportBar } from '../../components/PrintExportBar'
 
 const HOY = new Date().toISOString().split('T')[0]
 const PRIMER_DIA_MES = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
@@ -99,6 +100,22 @@ export function ConsultaComprasPage() {
                     </button>
                 </div>
             </div>
+
+            <PrintExportBar
+                datos={visibles.map(c => ({
+                    Fecha:      c.fecha_emision ?? c.fecha_ingreso,
+                    Tipo:       c.tipo_compra,
+                    Proveedor:  (c.proveedor as any)?.nombre_empresa ?? '',
+                    RUC:        (c.proveedor as any)?.ruc ?? '',
+                    Factura:    c.numero_factura ?? '',
+                    Subtotal:   c.subtotal ?? 0,
+                    IVA:        c.valor_iva ?? 0,
+                    Total:      c.total,
+                    FormaPago:  c.forma_pago,
+                    Estado:     c.estado,
+                }))}
+                nombreArchivo={`compras_${desde}_${hasta}`}
+            />
 
             {/* Resumen */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

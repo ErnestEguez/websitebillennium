@@ -4,6 +4,7 @@ import { cxpService, proveedorService } from '../../services/vendorService'
 import type { CuentaPorPagar, Proveedor } from '../../types/vendors'
 import { Wallet, AlertCircle, Clock, Loader2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { PrintExportBar } from '../../components/PrintExportBar'
 
 const HOY = new Date().toISOString().split('T')[0]
 const fmt = (n: number) => `$${n.toFixed(2)}`
@@ -104,6 +105,20 @@ export function ConsultaCxPPage() {
                     ))}
                 </div>
             </div>
+
+            <PrintExportBar
+                datos={lista.map(c => ({
+                    Proveedor:        (c.proveedor as any)?.nombre_empresa ?? '',
+                    RUC:              (c.proveedor as any)?.ruc ?? '',
+                    Factura:          (c.compra as any)?.numero_factura ?? '',
+                    FechaEmision:     c.fecha_emision,
+                    FechaVencimiento: c.fecha_vencimiento,
+                    MontoOriginal:    c.monto_original,
+                    SaldoPendiente:   c.saldo_pendiente,
+                    Estado:           c.estado,
+                }))}
+                nombreArchivo="cxp_proveedores"
+            />
 
             {/* Filtros */}
             <div className="flex gap-3 flex-wrap">

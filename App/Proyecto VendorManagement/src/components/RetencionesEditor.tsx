@@ -10,37 +10,39 @@ export interface RetLine {
     base:        number
     pct:         number
     valor:       number
-    numero:      string  // nº comprobante de retención
 }
 
 const EMPTY_RET: RetLine = {
-    tipo: 'FUENTE', codigo: '', descripcion: '', base: 0, pct: 0, valor: 0, numero: '',
+    tipo: 'FUENTE', codigo: '', descripcion: '', base: 0, pct: 0, valor: 0,
 }
 
 interface Props {
-    retenciones: RetLine[]
-    onChange:    (list: RetLine[]) => void
-    baseDefault: number   // subtotal — para precargar la base
+    // Número único de comprobante de retención (aplica a todas las líneas)
+    numeroRetencion:   string
+    onChangeNumero:    (n: string) => void
+    retenciones:       RetLine[]
+    onChange:          (list: RetLine[]) => void
+    baseDefault:       number
 }
 
-export function RetencionesEditor({ retenciones, onChange, baseDefault }: Props) {
+export function RetencionesEditor({
+    numeroRetencion, onChangeNumero,
+    retenciones, onChange, baseDefault,
+}: Props) {
 
     function add() {
         if (retenciones.length >= 4) return
         onChange([...retenciones, { ...EMPTY_RET, base: baseDefault }])
     }
 
-    function remove(i: number) {
-        onChange(retenciones.filter((_, j) => j !== i))
-    }
+    function remove(i: number) { onChange(retenciones.filter((_, j) => j !== i)) }
 
     function upd(i: number, campo: keyof RetLine, val: unknown) {
         const next = retenciones.map((r, j) => {
             if (j !== i) return r
             const updated = { ...r, [campo]: val }
-            // auto-calcular valor si cambia base o pct
             if (campo === 'base' || campo === 'pct') {
-                updated.valor = Math.round((updated.base * updated.pct / 100) * 100) / 100
+                updated.valor = Math.round(updated.base * updated.pct / 100 * 100) / 100
             }
             return updated
         })
@@ -54,34 +56,39 @@ export function RetencionesEditor({ retenciones, onChange, baseDefault }: Props)
             if (j !== i) return r
             const pct  = item?.porcentaje ?? r.pct
             const base = r.base || baseDefault
-            return {
-                ...r, codigo,
-                descripcion: item?.descripcion ?? '',
-                pct,
-                base,
-                valor: Math.round(base * pct / 100 * 100) / 100,
-            }
+            return { ...r, codigo, descripcion: item?.descripcion ?? '', pct, base,
+                valor: Math.round(base * pct / 100 * 100) / 100 }
         })
         onChange(next)
     }
 
     function changeTipo(i: number, tipo: TipoRetencion) {
-        const next = retenciones.map((r, j) =>
+        onChange(retenciones.map((r, j) =>
             j !== i ? r : { ...EMPTY_RET, tipo, base: r.base || baseDefault }
-        )
-        onChange(next)
+        ))
     }
 
     const totalRet = retenciones.reduce((s, r) => s + r.valor, 0)
 
     return (
-        <div className="space-y-3">
+        <div className="space-y-4 pt-2">
+            {/* Número único del comprobante — aplica a todas las líneas */}
+            <div>
+                <label className="label text-xs">
+                    Nº Comprobante de retención
+                    <span className="ml-1 text-slate-400 font-normal">(único para todas las retenciones de esta factura)</span>
+                </label>
+                <input className="input text-sm font-mono max-w-xs"
+                    value={numeroRetencion}
+                    onChange={e => onChangeNumero(e.target.value)}
+                    placeholder="001-001-000000001" />
+            </div>
+
+            {/* Líneas de retención */}
             {retenciones.map((r, i) => (
-                <div key={i} className="border border-slate-200 rounded-xl p-4 space-y-3 bg-amber-50/30">
+                <div key={i} className="border border-amber-200 rounded-xl p-4 space-y-3 bg-amber-50/30">
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
-                            Retención {i + 1}
-                        </span>
+                        <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Línea {i + 1}</span>
                         <button type="button" onClick={() => remove(i)}
                             className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500">
                             <Trash2 className="w-3.5 h-3.5" />
@@ -98,7 +105,7 @@ export function RetencionesEditor({ retenciones, onChange, baseDefault }: Props)
                             </select>
                         </div>
                         <div>
-                            <label className="label text-xs">Código</label>
+                            <label className="label text-xs">Código SRI</label>
                             <select className="input text-sm" value={r.codigo}
                                 onChange={e => selCodigo(i, r.tipo, e.target.value)}>
                                 <option value="">Seleccionar...</option>
@@ -125,19 +132,12 @@ export function RetencionesEditor({ retenciones, onChange, baseDefault }: Props)
                                 onChange={e => upd(i, 'pct', parseFloat(e.target.value) || 0)} />
                         </div>
                         <div>
-                            <label className="label text-xs">Valor</label>
+                            <label className="label text-xs">Valor retenido</label>
                             <div className={cn('input text-right font-mono font-bold text-sm',
                                 r.valor > 0 ? 'bg-amber-50 text-amber-800' : 'bg-slate-50')}>
                                 ${r.valor.toFixed(2)}
                             </div>
                         </div>
-                    </div>
-
-                    <div>
-                        <label className="label text-xs">Nº Comprobante retención (opcional)</label>
-                        <input className="input text-sm font-mono" value={r.numero}
-                            onChange={e => upd(i, 'numero', e.target.value)}
-                            placeholder="001-001-000000001" />
                     </div>
                 </div>
             ))}
@@ -150,13 +150,12 @@ export function RetencionesEditor({ retenciones, onChange, baseDefault }: Props)
                             ? 'text-amber-700 hover:bg-amber-50 border border-amber-200'
                             : 'text-slate-300 cursor-not-allowed border border-slate-200')}>
                     <Plus className="w-4 h-4" />
-                    Agregar retención {retenciones.length < 4 ? `(${retenciones.length}/4)` : '(máx 4)'}
+                    Otra retención {retenciones.length < 4 ? `(${retenciones.length}/4)` : '(máx 4)'}
                 </button>
-
                 {retenciones.length > 0 && (
-                    <div className="text-sm text-amber-800 font-semibold">
+                    <p className="text-sm font-semibold text-amber-800">
                         Total retenciones: <span className="font-mono">${totalRet.toFixed(2)}</span>
-                    </div>
+                    </p>
                 )}
             </div>
         </div>

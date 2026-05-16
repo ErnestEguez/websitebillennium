@@ -53,9 +53,10 @@ export function NuevaCompraInventarioPage() {
     const [baseIva15, setBaseIva15] = useState(0)
     const [usarIvaManual, setUsarIvaManual] = useState(false)
 
-    // Retenciones (hasta 4)
-    const [retenciones, setRetenciones] = useState<RetLine[]>([])
-    const [retSeccion, setRetSeccion]   = useState(false)
+    // Retenciones (hasta 4, con número único de comprobante)
+    const [numeroRetencion, setNumeroRetencion] = useState('')
+    const [retenciones, setRetenciones]         = useState<RetLine[]>([])
+    const [retSeccion, setRetSeccion]            = useState(false)
 
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
 
@@ -118,7 +119,7 @@ export function NuevaCompraInventarioPage() {
                 .map(r => ({
                     empresa_id:       empresa!.id,
                     proveedor_id:     proveedorId,
-                    numero_retencion: r.numero || undefined,
+                    numero_retencion: numeroRetencion || undefined,
                     fecha_emision:    HOY,
                     tipo:             r.tipo,
                     codigo_retencion: r.codigo,
@@ -404,6 +405,8 @@ export function NuevaCompraInventarioPage() {
                 {retSeccion && (
                     <div className="p-5 pt-0 border-t border-slate-100">
                         <RetencionesEditor
+                            numeroRetencion={numeroRetencion}
+                            onChangeNumero={setNumeroRetencion}
                             retenciones={retenciones}
                             onChange={setRetenciones}
                             baseDefault={subtotalLineas}

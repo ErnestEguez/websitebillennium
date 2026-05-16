@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import {
     ShoppingCart, Truck, LayoutDashboard, LogOut,
     ChevronRight, ChevronDown, Menu, X,
-    Building2, Package, Wrench, FileText, Wallet, BarChart2,
+    Building2, Package, Wrench, FileText, Wallet, BarChart2, Receipt,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
@@ -26,7 +26,8 @@ const navigation: NavItem[] = [
             { to: '/compras/nueva-servicio',   label: 'Nueva — Servicio',    icon: Wrench    },
         ],
     },
-    { to: '/cxp', icon: Wallet, label: 'Cuentas por Pagar' },
+    { to: '/cxp',                   icon: Wallet,   label: 'Cuentas por Pagar'     },
+    { to: '/comprobantes-retencion', icon: Receipt,  label: 'Comprobantes Retención' },
     {
         type: 'group', icon: BarChart2, label: 'Reportes',
         children: [

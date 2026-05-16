@@ -16,6 +16,7 @@ interface Empresa {
     ruc: string
     logo_url?: string | null
     habilitar_division_cuenta?: boolean
+    usar_vendor_management?: boolean
 }
 
 interface AuthContextType {

@@ -18,6 +18,14 @@
   body { @apply bg-slate-50 text-slate-900; }
 }
 
+@media print {
+  aside, header, .no-print { display: none !important; }
+  main { margin-left: 0 !important; padding: 0 !important; }
+  .card { border: 1px solid #e2e8f0 !important; box-shadow: none !important; }
+  @page { margin: 1.5cm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors duration-200;

@@ -5,6 +5,7 @@ import { proveedorService } from '../../services/vendorService'
 import type { Proveedor } from '../../types/vendors'
 import { FileText, Loader2, Building2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { PrintExportBar } from '../../components/PrintExportBar'
 
 const HOY = new Date().toISOString().split('T')[0]
 const PRIMER_DIA_AÑO = `${new Date().getFullYear()}-01-01`
@@ -165,6 +166,21 @@ export function EstadoCuentaProveedorPage() {
                         </p>
                     </div>
                 </div>
+            )}
+
+            {movimientos.length > 0 && (
+                <PrintExportBar
+                    datos={movimientos.map(m => ({
+                        Fecha:       m.fecha,
+                        Tipo:        m.tipo,
+                        Descripcion: m.descripcion,
+                        Cargo:       m.cargo,
+                        Abono:       m.abono,
+                        Saldo:       m.saldo,
+                    }))}
+                    nombreArchivo={`estado_cuenta_${proveedor?.nombre_empresa ?? 'proveedor'}`}
+                    titulo={proveedor ? `${proveedor.nombre_empresa} | ${fmtF(desde)} - ${fmtF(hasta)}` : ''}
+                />
             )}
 
             {/* Tabla movimientos */}
