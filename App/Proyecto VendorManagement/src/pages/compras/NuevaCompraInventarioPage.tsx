@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { compraService, proveedorService } from '../../services/vendorService'
 import { supabase } from '../../lib/supabase'
-import type { Proveedor, RetencionCompra } from '../../types/vendors'
-import { CODIGOS_RETENCION_FUENTE, CODIGOS_RETENCION_IVA, TIPO_SUSTENTO_LABELS } from '../../types/vendors'
+import type { Proveedor } from '../../types/vendors'
+import { TIPO_SUSTENTO_LABELS } from '../../types/vendors'
+import { RetencionesEditor } from '../../components/RetencionesEditor'
+import type { RetLine } from '../../components/RetencionesEditor'
 import {
-    ArrowLeft, Plus, Trash2, Save, Package,
-    ChevronDown, ChevronUp, Info,
+    ArrowLeft, Plus, Trash2, Save, Package, ChevronDown, ChevronUp,
 } from 'lucide-react'
+
 import { cn } from '../../lib/utils'
 
 const HOY = new Date().toISOString().split('T')[0]
@@ -25,162 +27,126 @@ export function NuevaCompraInventarioPage() {
     const navigate = useNavigate()
 
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
-    const [productos, setProductos] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
-    const [saving, setSaving] = useState(false)
+    const [productos, setProductos]     = useState<{ id: string; nombre: string }[]>([])
+    const [loading, setLoading]         = useState(true)
+    const [saving, setSaving]           = useState(false)
 
     // Cabecera
-    const [proveedorId, setProveedorId] = useState('')
-    const [fechaEmision, setFechaEmision] = useState(HOY)
-    const [estab, setEstab]               = useState('')
-    const [ptoEmi, setPtoEmi]             = useState('')
-    const [secuencial, setSecuencial]     = useState('')
+    const [proveedorId, setProveedorId]     = useState('')
+    const [fechaEmision, setFechaEmision]   = useState(HOY)
+    const [estab, setEstab]                 = useState('')
+    const [ptoEmi, setPtoEmi]               = useState('')
+    const [secuencial, setSecuencial]       = useState('')
     const [numeroFactura, setNumeroFactura] = useState('')
-    const [claveAcceso, setClaveAcceso]   = useState('')
-    const [tipoSustento, setTipoSustento] = useState<'01'|'02'|'03'|'04'|'05'>('04')
-    const [formaPago, setFormaPago]       = useState<'CONTADO'|'CREDITO'>('CONTADO')
-    const [fechaVenc, setFechaVenc]       = useState('')
+    const [claveAcceso, setClaveAcceso]     = useState('')
+    const [tipoSustento, setTipoSustento]   = useState<'01'|'02'|'03'|'04'|'05'>('04')
+    const [formaPago, setFormaPago]         = useState<'CONTADO'|'CREDITO'>('CONTADO')
+    const [fechaVenc, setFechaVenc]         = useState('')
     const [observaciones, setObservaciones] = useState('')
 
     // Detalle
     const [detalle, setDetalle] = useState<LineaDetalle[]>([])
 
-    // Impuestos (calculados)
-    const [baseIva0, setBaseIva0]   = useState(0)
+    // Bases IVA (ingresadas manualmente desde la factura)
+    const [baseIva0,  setBaseIva0]  = useState(0)
+    const [baseIva5,  setBaseIva5]  = useState(0)
     const [baseIva15, setBaseIva15] = useState(0)
-    const [porcIva, setPorcIva]     = useState<0|15>(15)
+    const [usarIvaManual, setUsarIvaManual] = useState(false)
 
-    // Retención
-    const [tieneRet, setTieneRet]   = useState(false)
-    const [retTipo, setRetTipo]     = useState<'FUENTE'|'IVA'>('FUENTE')
-    const [retCodigo, setRetCodigo] = useState('')
-    const [retDesc, setRetDesc]     = useState('')
-    const [retBase, setRetBase]     = useState(0)
-    const [retPct, setRetPct]       = useState(0)
-    const [retNumero, setRetNumero] = useState('')
-    const [retSeccion, setRetSeccion] = useState(false)
+    // Retenciones (hasta 4)
+    const [retenciones, setRetenciones] = useState<RetLine[]>([])
+    const [retSeccion, setRetSeccion]   = useState(false)
 
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
 
     async function load() {
         try {
             const { data: prodsData } = await supabase
-                .from('productos').select('id, nombre, codigo').eq('empresa_id', empresa!.id).eq('activo', true).order('nombre')
-        const [provs] = await Promise.all([proveedorService.listar(empresa!.id)])
-        const prods = prodsData ?? []
+                .from('productos').select('id, nombre').eq('empresa_id', empresa!.id).eq('activo', true).order('nombre')
+            const [provs] = await Promise.all([proveedorService.listar(empresa!.id)])
             setProveedores(provs.filter(p => p.estado === 'ACTIVO'))
-            setProductos(prods)
-        } catch (e: any) {
-            alert('Error al cargar datos: ' + e.message)
-        } finally {
-            setLoading(false)
-        }
+            setProductos(prodsData ?? [])
+        } catch (e: any) { alert('Error al cargar datos: ' + e.message) }
+        finally { setLoading(false) }
     }
 
-    // Autocompletar número de factura al cambiar estab/pto_emi/secuencial
     useEffect(() => {
         if (estab && ptoEmi && secuencial)
             setNumeroFactura(`${estab.padStart(3,'0')}-${ptoEmi.padStart(3,'0')}-${secuencial.padStart(9,'0')}`)
     }, [estab, ptoEmi, secuencial])
 
-    // Calcular totales
     const subtotalLineas = detalle.reduce((s, d) => s + d.cantidad * d.costo_unitario, 0)
-    const baseGrav = baseIva15
-    const baseNoGrav = baseIva0 || subtotalLineas - baseGrav
-    const ivaCalc = Math.round(baseGrav * porcIva) / 100
-    const total = subtotalLineas + ivaCalc
-    const retValor = Math.round(retBase * retPct) / 100
+    const b0  = usarIvaManual ? baseIva0  : 0
+    const b5  = usarIvaManual ? baseIva5  : 0
+    const b15 = usarIvaManual ? baseIva15 : subtotalLineas
+    const ivaCalc = Math.round((b5 * 0.05 + b15 * 0.15) * 100) / 100
+    const total   = subtotalLineas + ivaCalc
+    const totalRet = retenciones.reduce((s, r) => s + r.valor, 0)
 
     function addLinea() {
         setDetalle(prev => [...prev, { producto_id: '', nombre: '', cantidad: 1, costo_unitario: 0 }])
     }
-    function updLinea(i: number, campo: keyof LineaDetalle, val: any) {
-        setDetalle(prev => {
-            const next = [...prev]
+    function updLinea(i: number, campo: keyof LineaDetalle, val: unknown) {
+        setDetalle(prev => prev.map((d, j) => {
+            if (j !== i) return d
             if (campo === 'producto_id') {
                 const prod = productos.find(p => p.id === val)
-                next[i] = { ...next[i], producto_id: val, nombre: prod?.nombre ?? '' }
-            } else {
-                next[i] = { ...next[i], [campo]: val }
+                return { ...d, producto_id: val as string, nombre: prod?.nombre ?? '' }
             }
-            return next
-        })
+            return { ...d, [campo]: val }
+        }))
     }
-    function removeLinea(i: number) {
-        setDetalle(prev => prev.filter((_, j) => j !== i))
-    }
-
-    function seleccionarCodRet(codigo: string, tipo: 'FUENTE'|'IVA') {
-        const lista = tipo === 'FUENTE' ? CODIGOS_RETENCION_FUENTE : CODIGOS_RETENCION_IVA
-        const item = lista.find(c => c.codigo === codigo)
-        if (item) {
-            setRetCodigo(codigo)
-            setRetDesc(item.descripcion)
-            setRetPct(item.porcentaje)
-        }
-    }
+    function removeLinea(i: number) { setDetalle(prev => prev.filter((_, j) => j !== i)) }
 
     async function handleGuardar() {
-        if (!proveedorId) { alert('Selecciona un proveedor'); return }
+        if (!proveedorId)              { alert('Selecciona un proveedor'); return }
         const validas = detalle.filter(d => d.producto_id && d.cantidad > 0 && d.costo_unitario > 0)
-        if (validas.length === 0) { alert('Agrega al menos un producto válido'); return }
+        if (!validas.length)           { alert('Agrega al menos un producto válido'); return }
         if (formaPago === 'CREDITO' && !fechaVenc) { alert('Ingresa la fecha de vencimiento'); return }
 
         try {
             setSaving(true)
-            const proveedor = proveedores.find(p => p.id === proveedorId)
-            const diasCredito = proveedor?.dias_credito
-
+            const prov = proveedores.find(p => p.id === proveedorId)
             let fechaVencFinal = fechaVenc
-            if (formaPago === 'CREDITO' && !fechaVenc && diasCredito) {
-                const d = new Date(fechaEmision)
-                d.setDate(d.getDate() + diasCredito)
+            if (formaPago === 'CREDITO' && !fechaVenc && prov?.dias_credito) {
+                const d = new Date(); d.setDate(d.getDate() + prov.dias_credito)
                 fechaVencFinal = d.toISOString().split('T')[0]
             }
 
-            const retencion: Omit<RetencionCompra, 'id' | 'compra_id' | 'created_at'> | undefined =
-                tieneRet && retCodigo ? {
-                    empresa_id: empresa!.id,
-                    proveedor_id: proveedorId,
-                    numero_retencion: retNumero || undefined,
-                    fecha_emision: HOY,
-                    tipo: retTipo,
-                    codigo_retencion: retCodigo,
-                    descripcion: retDesc,
-                    base_imponible: retBase || subtotalLineas,
-                    porcentaje: retPct,
-                    valor: retValor,
-                    estado: 'ACTIVO',
-                    origen: 'MANUAL',
-                    created_by: profile?.id,
-                } : undefined
+            const retsParaGuardar = retenciones
+                .filter(r => r.codigo && r.valor > 0)
+                .map(r => ({
+                    empresa_id:       empresa!.id,
+                    proveedor_id:     proveedorId,
+                    numero_retencion: r.numero || undefined,
+                    fecha_emision:    HOY,
+                    tipo:             r.tipo,
+                    codigo_retencion: r.codigo,
+                    descripcion:      r.descripcion,
+                    base_imponible:   r.base,
+                    porcentaje:       r.pct,
+                    valor:            r.valor,
+                    estado:           'ACTIVO' as const,
+                    origen:           'MANUAL' as const,
+                    created_by:       profile?.id,
+                }))
 
             await compraService.crearInventario(
                 {
-                    empresa_id: empresa!.id,
-                    proveedor_id: proveedorId,
+                    empresa_id: empresa!.id, proveedor_id: proveedorId,
                     numero_factura: numeroFactura || undefined,
-                    fecha_ingreso: HOY,
-                    fecha_emision: fechaEmision,
-                    estab: estab || undefined,
-                    pto_emi: ptoEmi || undefined,
+                    fecha_ingreso: HOY, fecha_emision: fechaEmision,
+                    estab: estab || undefined, pto_emi: ptoEmi || undefined,
                     secuencial: secuencial || undefined,
                     clave_acceso: claveAcceso || undefined,
                     observaciones: observaciones || undefined,
-                    base_iva_0: baseNoGrav,
-                    base_iva_5: 0,
-                    base_iva_15: baseGrav,
-                    subtotal: subtotalLineas,
-                    valor_iva: ivaCalc,
-                    total,
+                    base_iva_0: b0, base_iva_5: b5, base_iva_15: b15,
+                    subtotal: subtotalLineas, valor_iva: ivaCalc, total,
                     forma_pago: formaPago,
                     fecha_vencimiento: formaPago === 'CREDITO' ? fechaVencFinal : undefined,
-                    tipo_sustento: tipoSustento,
-                    tipo_regimen_pago: '01',
+                    tipo_sustento: tipoSustento, tipo_regimen_pago: '01',
                     aplica_convenio_ddi: false,
-                    estado: 'ACTIVO',
-                    origen: 'MANUAL',
-                    tipo_compra: 'INVENTARIO',
+                    estado: 'ACTIVO', origen: 'MANUAL', tipo_compra: 'INVENTARIO',
                     created_by: profile?.id,
                 },
                 validas.map(d => ({
@@ -189,7 +155,7 @@ export function NuevaCompraInventarioPage() {
                     costo_unitario: d.costo_unitario,
                     subtotal: Math.round(d.cantidad * d.costo_unitario * 100) / 100,
                 })),
-                retencion,
+                retsParaGuardar,
             )
             navigate('/compras')
         } catch (e: any) {
@@ -215,7 +181,7 @@ export function NuevaCompraInventarioPage() {
                 </div>
             </div>
 
-            {/* ── Sección 1: Proveedor y factura ── */}
+            {/* Datos del comprobante */}
             <div className="card p-5 space-y-4">
                 <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Datos del comprobante</h2>
 
@@ -228,8 +194,7 @@ export function NuevaCompraInventarioPage() {
                             if (prov?.condicion_pago === 'CREDITO') {
                                 setFormaPago('CREDITO')
                                 if (prov.dias_credito) {
-                                    const d = new Date()
-                                    d.setDate(d.getDate() + prov.dias_credito)
+                                    const d = new Date(); d.setDate(d.getDate() + prov.dias_credito)
                                     setFechaVenc(d.toISOString().split('T')[0])
                                 }
                             }
@@ -247,42 +212,32 @@ export function NuevaCompraInventarioPage() {
                     </div>
                 </div>
 
-                {/* Número de factura */}
                 <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-                    <div>
-                        <label className="label text-xs">Estab.</label>
+                    <div><label className="label text-xs">Estab.</label>
                         <input className="input font-mono" maxLength={3} placeholder="001"
-                            value={estab} onChange={e => setEstab(e.target.value)} />
-                    </div>
-                    <div>
-                        <label className="label text-xs">Pto. Emi.</label>
+                            value={estab} onChange={e => setEstab(e.target.value)} /></div>
+                    <div><label className="label text-xs">Pto. Emi.</label>
                         <input className="input font-mono" maxLength={3} placeholder="001"
-                            value={ptoEmi} onChange={e => setPtoEmi(e.target.value)} />
-                    </div>
-                    <div className="col-span-2">
-                        <label className="label text-xs">Secuencial</label>
+                            value={ptoEmi} onChange={e => setPtoEmi(e.target.value)} /></div>
+                    <div className="col-span-2"><label className="label text-xs">Secuencial</label>
                         <input className="input font-mono" maxLength={9} placeholder="000000001"
-                            value={secuencial} onChange={e => setSecuencial(e.target.value)} />
-                    </div>
-                    <div className="col-span-2">
-                        <label className="label text-xs">Nº Factura</label>
+                            value={secuencial} onChange={e => setSecuencial(e.target.value)} /></div>
+                    <div className="col-span-2"><label className="label text-xs">Nº Factura</label>
                         <input className="input font-mono text-xs" readOnly value={numeroFactura}
-                            placeholder="001-001-000000001" />
-                    </div>
+                            placeholder="001-001-000000001" /></div>
                 </div>
 
                 <div>
-                    <label className="label text-xs">Clave de acceso (49 dígitos) — opcional</label>
+                    <label className="label text-xs">Clave de acceso (opcional)</label>
                     <input className="input font-mono text-xs" maxLength={49} value={claveAcceso}
-                        onChange={e => setClaveAcceso(e.target.value)}
-                        placeholder="Clave de acceso SRI (opcional)" />
+                        onChange={e => setClaveAcceso(e.target.value)} placeholder="49 dígitos SRI" />
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                         <label className="label text-xs">Tipo sustento (ATS)</label>
                         <select className="input text-sm" value={tipoSustento}
-                            onChange={e => setTipoSustento(e.target.value as any)}>
+                            onChange={e => setTipoSustento(e.target.value as '01'|'02'|'03'|'04'|'05')}>
                             {Object.entries(TIPO_SUSTENTO_LABELS).map(([k, v]) => (
                                 <option key={k} value={k}>{k} — {v}</option>
                             ))}
@@ -291,7 +246,7 @@ export function NuevaCompraInventarioPage() {
                     <div>
                         <label className="label text-xs">Forma de pago</label>
                         <select className="input text-sm" value={formaPago}
-                            onChange={e => setFormaPago(e.target.value as any)}>
+                            onChange={e => setFormaPago(e.target.value as 'CONTADO'|'CREDITO')}>
                             <option value="CONTADO">Contado</option>
                             <option value="CREDITO">Crédito</option>
                         </select>
@@ -308,12 +263,11 @@ export function NuevaCompraInventarioPage() {
                 <div>
                     <label className="label text-xs">Observaciones</label>
                     <input className="input text-sm" value={observaciones}
-                        onChange={e => setObservaciones(e.target.value)}
-                        placeholder="Notas internas..." />
+                        onChange={e => setObservaciones(e.target.value)} placeholder="Notas internas..." />
                 </div>
             </div>
 
-            {/* ── Sección 2: Detalle de productos ── */}
+            {/* Productos */}
             <div className="card p-5 space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Productos</h2>
@@ -334,7 +288,7 @@ export function NuevaCompraInventarioPage() {
                                 <thead>
                                     <tr className="text-xs text-slate-500 border-b">
                                         <th className="text-left py-2 pr-3 font-semibold">Producto</th>
-                                        <th className="text-right py-2 px-3 w-24 font-semibold">Cantidad</th>
+                                        <th className="text-right py-2 px-3 w-24 font-semibold">Cant.</th>
                                         <th className="text-right py-2 px-3 w-28 font-semibold">Costo unit.</th>
                                         <th className="text-right py-2 px-3 w-28 font-semibold">Subtotal</th>
                                         <th className="w-8" />
@@ -342,15 +296,12 @@ export function NuevaCompraInventarioPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {detalle.map((d, i) => (
-                                        <tr key={i} className="group">
+                                        <tr key={i}>
                                             <td className="py-2 pr-3">
-                                                <select className="input text-sm w-full"
-                                                    value={d.producto_id}
+                                                <select className="input text-sm w-full" value={d.producto_id}
                                                     onChange={e => updLinea(i, 'producto_id', e.target.value)}>
                                                     <option value="">Seleccionar...</option>
-                                                    {productos.map(p => (
-                                                        <option key={p.id} value={p.id}>{p.nombre}</option>
-                                                    ))}
+                                                    {productos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                                                 </select>
                                             </td>
                                             <td className="py-2 px-3">
@@ -382,40 +333,49 @@ export function NuevaCompraInventarioPage() {
 
                         {/* IVA */}
                         <div className="border-t pt-4 space-y-3">
-                            <p className="text-xs font-bold text-slate-500 uppercase">Impuestos</p>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-                                <div>
-                                    <label className="label text-xs">% IVA gravado</label>
-                                    <select className="input text-sm" value={porcIva}
-                                        onChange={e => setPorcIva(parseInt(e.target.value) as any)}>
-                                        <option value={0}>0% (exento)</option>
-                                        <option value={15}>15%</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="label text-xs">Base gravada (IVA {porcIva}%)</label>
-                                    <input type="number" step={0.01} className="input text-sm text-right"
-                                        value={baseIva15 || subtotalLineas}
-                                        onChange={e => setBaseIva15(parseFloat(e.target.value) || 0)} />
-                                </div>
-                                <div>
-                                    <label className="label text-xs">Base IVA 0%</label>
-                                    <input type="number" step={0.01} className="input text-sm text-right"
-                                        value={baseIva0}
-                                        onChange={e => setBaseIva0(parseFloat(e.target.value) || 0)} />
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-xs text-slate-500 mb-1">IVA calculado</p>
-                                    <p className="text-lg font-bold text-slate-800">${ivaCalc.toFixed(2)}</p>
-                                </div>
+                            <div className="flex items-center gap-3">
+                                <p className="text-xs font-bold text-slate-500 uppercase">Impuestos</p>
+                                <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                                    <input type="checkbox" checked={usarIvaManual}
+                                        onChange={e => setUsarIvaManual(e.target.checked)} />
+                                    Ingresar bases manualmente (desde la factura)
+                                </label>
                             </div>
+
+                            {usarIvaManual ? (
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="label text-xs">Base IVA 0%</label>
+                                        <input type="number" step={0.01} className="input text-sm text-right"
+                                            value={baseIva0 || ''} onChange={e => setBaseIva0(parseFloat(e.target.value) || 0)} />
+                                    </div>
+                                    <div>
+                                        <label className="label text-xs">Base IVA 5%</label>
+                                        <input type="number" step={0.01} className="input text-sm text-right"
+                                            value={baseIva5 || ''} onChange={e => setBaseIva5(parseFloat(e.target.value) || 0)} />
+                                    </div>
+                                    <div>
+                                        <label className="label text-xs">Base IVA 15%</label>
+                                        <input type="number" step={0.01} className="input text-sm text-right"
+                                            value={baseIva15 || ''} onChange={e => setBaseIva15(parseFloat(e.target.value) || 0)} />
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500">
+                                    IVA calculado al 15% sobre el subtotal de productos: <strong>${ivaCalc.toFixed(2)}</strong>
+                                </p>
+                            )}
                         </div>
 
-                        {/* Total */}
+                        {/* Totales */}
                         <div className="flex justify-between items-center border-t pt-3">
                             <div className="space-y-0.5 text-sm text-slate-500">
                                 <p>Subtotal: <span className="font-mono text-slate-700">${subtotalLineas.toFixed(2)}</span></p>
                                 <p>IVA: <span className="font-mono text-slate-700">${ivaCalc.toFixed(2)}</span></p>
+                                {totalRet > 0 && <p>Total retenciones: <span className="font-mono text-amber-700">-${totalRet.toFixed(2)}</span></p>}
+                                {formaPago === 'CREDITO' && totalRet > 0 && (
+                                    <p className="font-semibold text-slate-600">CxP a crédito: <span className="font-mono">${Math.max(total - totalRet, 0).toFixed(2)}</span></p>
+                                )}
                             </div>
                             <div className="text-right">
                                 <p className="text-xs text-slate-400">TOTAL FACTURA</p>
@@ -426,17 +386,15 @@ export function NuevaCompraInventarioPage() {
                 )}
             </div>
 
-            {/* ── Sección 3: Retención (colapsable) ── */}
+            {/* Retenciones */}
             <div className="card overflow-hidden">
-                <button
-                    onClick={() => setRetSeccion(v => !v)}
-                    className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors"
-                >
+                <button onClick={() => setRetSeccion(v => !v)}
+                    className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Retención en la fuente / IVA</span>
-                        {tieneRet && retCodigo && (
+                        <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Retenciones</span>
+                        {retenciones.filter(r => r.valor > 0).length > 0 && (
                             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                                {retCodigo} — {retPct}% — ${retValor.toFixed(2)}
+                                {retenciones.filter(r => r.valor > 0).length} ret. — ${totalRet.toFixed(2)}
                             </span>
                         )}
                     </div>
@@ -444,84 +402,20 @@ export function NuevaCompraInventarioPage() {
                 </button>
 
                 {retSeccion && (
-                    <div className="p-5 pt-0 space-y-4 border-t border-slate-100">
-                        <label className="flex items-center gap-2 cursor-pointer mt-4">
-                            <input type="checkbox" className="w-4 h-4 rounded"
-                                checked={tieneRet} onChange={e => setTieneRet(e.target.checked)} />
-                            <span className="text-sm font-medium text-slate-700">Esta compra tiene retención</span>
-                        </label>
-
-                        {tieneRet && (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="label text-xs">Tipo de retención</label>
-                                        <select className="input text-sm" value={retTipo}
-                                            onChange={e => { setRetTipo(e.target.value as any); setRetCodigo('') }}>
-                                            <option value="FUENTE">Retención en la fuente</option>
-                                            <option value="IVA">Retención de IVA</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="label text-xs">Código de retención</label>
-                                        <select className="input text-sm" value={retCodigo}
-                                            onChange={e => seleccionarCodRet(e.target.value, retTipo)}>
-                                            <option value="">Seleccionar...</option>
-                                            {(retTipo === 'FUENTE' ? CODIGOS_RETENCION_FUENTE : CODIGOS_RETENCION_IVA).map(c => (
-                                                <option key={c.codigo} value={c.codigo}>
-                                                    {c.codigo} — {c.descripcion.slice(0, 50)} ({c.porcentaje}%)
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="label text-xs">Base imponible</label>
-                                        <input type="number" step={0.01} className="input text-sm text-right"
-                                            value={retBase || subtotalLineas}
-                                            onChange={e => setRetBase(parseFloat(e.target.value) || 0)} />
-                                    </div>
-                                    <div>
-                                        <label className="label text-xs">% Retención</label>
-                                        <input type="number" step={0.01} className="input text-sm text-right"
-                                            value={retPct}
-                                            onChange={e => setRetPct(parseFloat(e.target.value) || 0)} />
-                                    </div>
-                                    <div>
-                                        <label className="label text-xs">Valor retención</label>
-                                        <div className="input bg-slate-50 text-right font-mono font-bold text-slate-800">
-                                            ${retValor.toFixed(2)}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="label text-xs">Nº Comprobante de retención (opcional)</label>
-                                    <input className="input text-sm font-mono" value={retNumero}
-                                        onChange={e => setRetNumero(e.target.value)}
-                                        placeholder="001-001-000000001" />
-                                </div>
-
-                                <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-xl">
-                                    <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                                    <p className="text-xs text-blue-700">
-                                        Si la compra es a crédito, el saldo en CxP se calculará como: <strong>Total factura - Valor retención = ${(total - retValor).toFixed(2)}</strong>
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+                    <div className="p-5 pt-0 border-t border-slate-100">
+                        <RetencionesEditor
+                            retenciones={retenciones}
+                            onChange={setRetenciones}
+                            baseDefault={subtotalLineas}
+                        />
                     </div>
                 )}
             </div>
 
-            {/* Botones */}
             <div className="flex justify-end gap-3">
-                <button onClick={() => navigate('/compras')} className="btn btn-secondary">
-                    Cancelar
-                </button>
-                <button onClick={handleGuardar} disabled={saving || detalle.length === 0}
+                <button onClick={() => navigate('/compras')} className="btn btn-secondary">Cancelar</button>
+                <button onClick={handleGuardar}
+                    disabled={saving || detalle.length === 0}
                     className={cn('btn btn-primary flex items-center gap-2',
                         (saving || detalle.length === 0) && 'opacity-50 cursor-not-allowed')}>
                     {saving
@@ -533,3 +427,4 @@ export function NuevaCompraInventarioPage() {
         </div>
     )
 }
+

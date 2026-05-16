@@ -8,6 +8,9 @@ import { ComprasPage }                from './pages/compras/ComprasPage'
 import { NuevaCompraInventarioPage }  from './pages/compras/NuevaCompraInventarioPage'
 import { NuevaCompraServicioPage }    from './pages/compras/NuevaCompraServicioPage'
 import { CxPPage }                    from './pages/CxPPage'
+import { ConsultaComprasPage }        from './pages/reportes/ConsultaComprasPage'
+import { ConsultaCxPPage }            from './pages/reportes/ConsultaCxPPage'
+import { EstadoCuentaProveedorPage }  from './pages/reportes/EstadoCuentaProveedorPage'
 
 function App() {
     return (
@@ -31,6 +34,15 @@ function App() {
                     } />
                     <Route path="/cxp" element={
                         <ProtectedRoute><Layout><CxPPage /></Layout></ProtectedRoute>
+                    } />
+                    <Route path="/reportes/compras" element={
+                        <ProtectedRoute><Layout><ConsultaComprasPage /></Layout></ProtectedRoute>
+                    } />
+                    <Route path="/reportes/cxp" element={
+                        <ProtectedRoute><Layout><ConsultaCxPPage /></Layout></ProtectedRoute>
+                    } />
+                    <Route path="/reportes/estado-cuenta" element={
+                        <ProtectedRoute><Layout><EstadoCuentaProveedorPage /></Layout></ProtectedRoute>
                     } />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

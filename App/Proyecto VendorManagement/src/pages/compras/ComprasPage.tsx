@@ -27,7 +27,7 @@ const ESTADO_BADGE: Record<string, string> = {
 const TIPO_ICON = { INVENTARIO: Package, SERVICIO: Wrench }
 
 export function ComprasPage() {
-    const { empresa } = useAuth()
+    const { empresa, user } = useAuth()
     const navigate = useNavigate()
 
     const [compras, setCompras] = useState<Compra[]>([])
@@ -74,7 +74,7 @@ export function ComprasPage() {
         if (!motivo?.trim()) return
         try {
             setAnulando(c.id)
-            await compraService.anular(c.id, motivo, empresa!.id)
+            await compraService.anular(c.id, motivo, user!.id)
             await loadAll()
         } catch (e: any) {
             alert('Error al anular: ' + e.message)
