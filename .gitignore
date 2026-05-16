@@ -13,8 +13,13 @@ build/
 # Environment variables — NEVER commit these
 .env
 *.env
+**/.env
 .env.local
 .env.production
+frontend/api/.env
+
+# Admin scripts that run with elevated credentials
+create_admin_user.py
 
 # Build outputs
 frontend/build/
