@@ -18,8 +18,8 @@
 .env.test.local
 .env.production.local
 
-# Except API env
-!api/.env
+# API env must NEVER be committed — contains service_role key
+api/.env
 
 npm-debug.log*
 yarn-debug.log*
