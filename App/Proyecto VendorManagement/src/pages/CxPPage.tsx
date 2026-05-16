@@ -71,7 +71,7 @@ export function CxPPage() {
 
             // Asiento contable de egreso (no-fatal)
             if (empresa!.usar_contabilidad_compras && empresa!.config_cuentas_compras) {
-                const ctas = empresa!.config_cuentas_compras as CuentasCompras
+                const ctas = empresa!.config_cuentas_compras as unknown as CuentasCompras
                 if (ctas.cuentas_por_pagar && ctas.efectivo) {
                     contabilidadService.crearAsientoPago({
                         empresaId:  empresa!.id,

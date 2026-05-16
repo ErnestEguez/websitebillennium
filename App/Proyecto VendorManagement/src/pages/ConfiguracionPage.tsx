@@ -34,21 +34,21 @@ export function ConfiguracionPage() {
 
     useEffect(() => {
         if (!empresa?.id) return
-        supabase
-            .from('empresas')
-            .select('usar_contabilidad_compras, usar_vendor_management, config_cuentas_compras')
-            .eq('id', empresa.id)
-            .single()
-            .then(({ data, error }) => {
-                if (error) {
-                    if (error.code === '42703') setMigNecesaria(true)
-                } else if (data) {
-                    setUsarContabilidad(!!data.usar_contabilidad_compras)
-                    setUsarVendor(!!data.usar_vendor_management)
-                    if (data.config_cuentas_compras) setCuentas({ ...EMPTY_CUENTAS, ...data.config_cuentas_compras })
-                }
-            })
-            .finally(() => setLoading(false))
+        Promise.resolve(
+            supabase
+                .from('empresas')
+                .select('usar_contabilidad_compras, usar_vendor_management, config_cuentas_compras')
+                .eq('id', empresa.id)
+                .single()
+        ).then(({ data, error }) => {
+            if (error) {
+                if (error.code === '42703') setMigNecesaria(true)
+            } else if (data) {
+                setUsarContabilidad(!!data.usar_contabilidad_compras)
+                setUsarVendor(!!data.usar_vendor_management)
+                if (data.config_cuentas_compras) setCuentas({ ...EMPTY_CUENTAS, ...(data.config_cuentas_compras as Record<string,string>) })
+            }
+        }).finally(() => setLoading(false))
     }, [empresa?.id])
 
     useEffect(() => {

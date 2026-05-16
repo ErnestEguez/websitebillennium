@@ -170,7 +170,7 @@ export function NuevaCompraInventarioPage() {
 
             // Asiento contable (no-fatal si falla)
             if (empresa!.usar_contabilidad_compras && empresa!.config_cuentas_compras) {
-                const ctas = empresa!.config_cuentas_compras as CuentasCompras
+                const ctas = empresa!.config_cuentas_compras as unknown as CuentasCompras
                 if (ctas.inventarios && ctas.cuentas_por_pagar && ctas.efectivo) {
                     const retF = retsParaGuardar.filter(r => r.tipo === 'FUENTE').reduce((s, r) => s + r.valor, 0)
                     const retI = retsParaGuardar.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
