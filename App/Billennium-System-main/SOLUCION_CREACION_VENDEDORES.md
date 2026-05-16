@@ -1,4 +1,4 @@
-# Solución: Problema con Creación de Vendedores
+ñ# Solución: Problema con Creación de Vendedores
 
 ## Fecha: 2025-12-19
 

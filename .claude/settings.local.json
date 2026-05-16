@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git rm *)",
+      "Bash(git commit *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Billenniumweb2026\\\\websitebillennium-main\" -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(supabase functions *)",
+      "Bash(cat vercel.json)",
+      "Bash(cat frontend/vercel.json)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Billenniumweb2026\\\\websitebillennium-main\\\\App\\\\Ledger Pro\\\\\" -Recurse -Include *.env*, *.sql, *supabase*, *schema*, *migration* | Select-Object FullName | head -50)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Billenniumweb2026\\\\websitebillennium-main\\\\App\\\\Ledger Pro\\\\\" -Force)",
+      "Bash(npx tsc *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Billenniumweb2026\\\\websitebillennium-main\\\\App\\\\Proyecto QuickInvoice\\\\\" -Recurse -Directory | Select-Object -ExpandProperty FullName | head -30)",
+      "Bash(Get-Content \"c:\\\\Billenniumweb2026\\\\websitebillennium-main\\\\App\\\\Proyecto VendorManagement\\\\src\\\\pages\\\\CxPPage.tsx\")",
+      "Bash(Select-Object -First 5)",
+      "Bash(git checkout *)",
+      "Bash(wmic logicaldisk *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Billenniumweb2026\\websitebillennium-main\\App\\Billennium-System-main\\.git"
+    ]
+  }
+}

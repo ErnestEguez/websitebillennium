@@ -15,6 +15,8 @@ export interface Empresa {
     nombre: string
     ruc: string
     logo_url?: string | null
+    usar_contabilidad_compras?: boolean
+    config_cuentas_compras?:   Record<string, string> | null
 }
 
 interface AuthContextType {

@@ -403,3 +403,26 @@ export const ocService = {
         if (error) throw error
     },
 }
+
+// ── Retenciones ──────────────────────────────────────────────
+
+export const retencionService = {
+    async siguienteNumero(empresaId: string): Promise<string> {
+        const { data } = await supabase
+            .from('retenciones_compras')
+            .select('numero_retencion')
+            .eq('empresa_id', empresaId)
+            .not('numero_retencion', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(200)
+        let maxSeq = 0
+        ;(data ?? []).forEach(r => {
+            const match = r.numero_retencion?.match(/^\d{3}-\d{3}-(\d+)$/)
+            if (match) {
+                const seq = parseInt(match[1], 10)
+                if (seq > maxSeq) maxSeq = seq
+            }
+        })
+        return `001-001-${String(maxSeq + 1).padStart(9, '0')}`
+    },
+}

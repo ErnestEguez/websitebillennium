@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { cxpService } from '../services/vendorService'
+import { contabilidadService } from '../services/contabilidadService'
+import type { CuentasCompras } from '../services/contabilidadService'
 import type { CuentaPorPagar, FormasPago } from '../types/vendors'
 import { Wallet, AlertCircle, CheckCircle2, Clock, Loader2, X } from 'lucide-react'
 import { cn } from '../lib/utils'
@@ -19,7 +21,7 @@ const ESTADO_BADGE: Record<string, string> = {
 }
 
 export function CxPPage() {
-    const { empresa } = useAuth()
+    const { empresa, profile } = useAuth()
     const [lista, setLista]           = useState<CuentaPorPagar[]>([])
     const [loading, setLoading]       = useState(true)
     const [filtro, setFiltro]         = useState<'pendientes'|'vencidas'|'todos'>('pendientes')
@@ -66,6 +68,23 @@ export function CxPPage() {
                 forma_pago:       formaPago,
                 numero_referencia: referencia || undefined,
             })
+
+            // Asiento contable de egreso (no-fatal)
+            if (empresa!.usar_contabilidad_compras && empresa!.config_cuentas_compras) {
+                const ctas = empresa!.config_cuentas_compras as CuentasCompras
+                if (ctas.cuentas_por_pagar && ctas.efectivo) {
+                    contabilidadService.crearAsientoPago({
+                        empresaId:  empresa!.id,
+                        fecha:      HOY,
+                        glosa:      `Pago proveedor ${formaPago}${referencia ? ' ' + referencia : ''}`,
+                        monto,
+                        cuentas:    ctas,
+                        referencia: referencia || undefined,
+                        creadoPor:  profile?.id,
+                    }).catch(err => console.warn('Asiento pago no creado:', err.message))
+                }
+            }
+
             setModalCxp(null)
             setMontoPago(''); setReferencia('')
             await load()

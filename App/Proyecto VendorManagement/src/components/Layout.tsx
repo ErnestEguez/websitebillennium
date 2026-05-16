@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import {
     ShoppingCart, Truck, LayoutDashboard, LogOut,
     ChevronRight, ChevronDown, Menu, X,
-    Building2, Package, Wrench, FileText, Wallet, BarChart2, Receipt,
+    Building2, Package, Wrench, FileText, Wallet, BarChart2, Receipt, Settings,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
@@ -36,6 +36,7 @@ const navigation: NavItem[] = [
             { to: '/reportes/estado-cuenta',    label: 'Estado de cuenta prov.',  icon: BarChart2 },
         ],
     },
+    { to: '/configuracion', icon: Settings, label: 'Configuración' },
 ]
 
 function SidebarItem({ to, icon: Icon, label, active, sub }: {

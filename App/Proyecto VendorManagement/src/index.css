@@ -18,10 +18,13 @@
   body { @apply bg-slate-50 text-slate-900; }
 }
 
+.print-only { display: none; }
+
 @media print {
   aside, header, .no-print { display: none !important; }
-  main { margin-left: 0 !important; padding: 0 !important; }
-  .card { border: 1px solid #e2e8f0 !important; box-shadow: none !important; }
+  main { margin-left: 0 !important; padding: 0.5cm !important; }
+  .card { border: 1px solid #cbd5e1 !important; box-shadow: none !important; }
+  .print-only { display: block !important; }
   @page { margin: 1.5cm; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

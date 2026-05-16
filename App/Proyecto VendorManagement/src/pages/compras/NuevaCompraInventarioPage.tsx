@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { compraService, proveedorService } from '../../services/vendorService'
+import { compraService, proveedorService, retencionService } from '../../services/vendorService'
+import { contabilidadService } from '../../services/contabilidadService'
+import type { CuentasCompras } from '../../services/contabilidadService'
 import { supabase } from '../../lib/supabase'
 import type { Proveedor } from '../../types/vendors'
 import { TIPO_SUSTENTO_LABELS } from '../../types/vendors'
@@ -75,6 +77,13 @@ export function NuevaCompraInventarioPage() {
         if (estab && ptoEmi && secuencial)
             setNumeroFactura(`${estab.padStart(3,'0')}-${ptoEmi.padStart(3,'0')}-${secuencial.padStart(9,'0')}`)
     }, [estab, ptoEmi, secuencial])
+
+    // Auto-generate retention number when the section opens for the first time
+    useEffect(() => {
+        if (retSeccion && !numeroRetencion && empresa?.id) {
+            retencionService.siguienteNumero(empresa.id).then(setNumeroRetencion).catch(() => {})
+        }
+    }, [retSeccion, empresa?.id])
 
     const subtotalLineas = detalle.reduce((s, d) => s + d.cantidad * d.costo_unitario, 0)
     const b0  = usarIvaManual ? baseIva0  : 0
@@ -158,6 +167,30 @@ export function NuevaCompraInventarioPage() {
                 })),
                 retsParaGuardar,
             )
+
+            // Asiento contable (no-fatal si falla)
+            if (empresa!.usar_contabilidad_compras && empresa!.config_cuentas_compras) {
+                const ctas = empresa!.config_cuentas_compras as CuentasCompras
+                if (ctas.inventarios && ctas.cuentas_por_pagar && ctas.efectivo) {
+                    const retF = retsParaGuardar.filter(r => r.tipo === 'FUENTE').reduce((s, r) => s + r.valor, 0)
+                    const retI = retsParaGuardar.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
+                    contabilidadService.crearAsientoCompra({
+                        empresaId: empresa!.id,
+                        fecha: HOY,
+                        glosa: `Compra inventario ${numeroFactura || proveedorId.slice(0, 8)}`,
+                        subtotal: subtotalLineas,
+                        valorIva: ivaCalc,
+                        retFuente: retF,
+                        retIva: retI,
+                        formaPago,
+                        tipoCompra: 'INVENTARIO',
+                        cuentas: ctas,
+                        referencia: numeroFactura || undefined,
+                        creadoPor: profile?.id,
+                    }).catch(err => console.warn('Asiento contable no creado:', err.message))
+                }
+            }
+
             navigate('/compras')
         } catch (e: any) {
             alert('Error al guardar: ' + e.message)
@@ -410,6 +443,7 @@ export function NuevaCompraInventarioPage() {
                             retenciones={retenciones}
                             onChange={setRetenciones}
                             baseDefault={subtotalLineas}
+                            baseIva={ivaCalc}
                         />
                     </div>
                 )}

@@ -47,3 +47,29 @@ htmlcov/
 
 .vercel
 .env*.local
+
+# Debug / diagnostic scripts — NEVER commit (may contain hardcoded credentials)
+diagnostic.ts
+diagnostic.js
+check_*.ts
+check_*.js
+check_*.mjs
+migrate_*.mjs
+migrate_*.js
+register_users.js
+register_*.js
+
+# Prompt / notes files that may contain credentials or passwords
+Prompt.txt
+Restaurantes\ Prompt\ y\ Desarrollo.txt
+*Prompt*.txt
+build_output*.txt
+lint_output*.txt
+
+# App/Proyecto Restaurantes has its own git repo — keep it separate
+App/Proyecto Restaurantes/
+
+# Virtual environments
+backend/.venv/
+.venv/
+venv/

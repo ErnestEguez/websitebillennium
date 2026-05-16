@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { compraService, proveedorService } from '../../services/vendorService'
 import type { Compra, Proveedor } from '../../types/vendors'
 import { Search, RefreshCw, Loader2, FileText, Package, Wrench } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { PrintExportBar } from '../../components/PrintExportBar'
+import { ReportPrintHeader } from '../../components/ReportPrintHeader'
 
 const HOY = new Date().toISOString().split('T')[0]
 const PRIMER_DIA_MES = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
 const fmt = (n: number) => `$${n.toFixed(2)}`
-const fmtF = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })
+const fmtF = (s?: string | null) => s ? new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 
 export function ConsultaComprasPage() {
     const { empresa } = useAuth()
@@ -24,8 +25,23 @@ export function ConsultaComprasPage() {
     const [provId, setProvId]       = useState('')
     const [busqueda, setBusqueda]   = useState('')
 
-    useEffect(() => { if (empresa?.id) { proveedorService.listar(empresa.id).then(setProveedores) } }, [empresa?.id])
-    useEffect(() => { if (empresa?.id) buscar() }, [empresa?.id])
+    // Keep latest filter values accessible from effects without stale closure
+    const filtersRef = useRef({ desde, hasta, tipo, estado, provId })
+    filtersRef.current = { desde, hasta, tipo, estado, provId }
+
+    useEffect(() => { if (empresa?.id) proveedorService.listar(empresa.id).then(setProveedores) }, [empresa?.id])
+    useEffect(() => {
+        if (!empresa?.id) return
+        const eid = empresa.id
+        const { desde: d, hasta: h, tipo: t, estado: e, provId: p } = filtersRef.current
+        let cancelled = false
+        setLoading(true)
+        compraService.listar(eid, { tipo: t || undefined, estado: e || undefined, proveedorId: p || undefined, desde: d, hasta: h })
+            .then(data => { if (!cancelled) setCompras(data) })
+            .catch(err => { if (!cancelled) alert('Error: ' + err.message) })
+            .finally(() => { if (!cancelled) setLoading(false) })
+        return () => { cancelled = true }
+    }, [empresa?.id])
 
     async function buscar() {
         if (!empresa?.id) return
@@ -59,13 +75,24 @@ export function ConsultaComprasPage() {
 
     return (
         <div className="space-y-5">
-            <div>
+            <ReportPrintHeader
+                titulo="Consulta de Compras por Período"
+                filtros={[
+                    { label: 'Desde',     valor: fmtF(desde) },
+                    { label: 'Hasta',     valor: fmtF(hasta) },
+                    ...(tipo   ? [{ label: 'Tipo',     valor: tipo === 'INVENTARIO' ? 'Inventario' : 'Servicio' }] : []),
+                    ...(estado ? [{ label: 'Estado',   valor: estado }] : []),
+                    ...(provId ? [{ label: 'Proveedor', valor: proveedores.find(p => p.id === provId)?.nombre_empresa ?? provId }] : []),
+                ]}
+            />
+
+            <div className="no-print">
                 <h1 className="text-2xl font-bold text-slate-900">Consulta de Compras por Período</h1>
                 <p className="text-slate-500 text-sm">Inventario y servicios con filtros por fecha, tipo y proveedor</p>
             </div>
 
             {/* Filtros */}
-            <div className="card p-4 space-y-3">
+            <div className="card p-4 space-y-3 no-print">
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div><label className="label text-xs">Desde</label>
                         <input type="date" className="input text-sm" value={desde} onChange={e => setDesde(e.target.value)} /></div>
@@ -101,7 +128,7 @@ export function ConsultaComprasPage() {
                 </div>
             </div>
 
-            <PrintExportBar
+            <div className="no-print"><PrintExportBar
                 datos={visibles.map(c => ({
                     Fecha:      c.fecha_emision ?? c.fecha_ingreso,
                     Tipo:       c.tipo_compra,
@@ -115,7 +142,7 @@ export function ConsultaComprasPage() {
                     Estado:     c.estado,
                 }))}
                 nombreArchivo={`compras_${desde}_${hasta}`}
-            />
+            /></div>
 
             {/* Resumen */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -217,6 +217,7 @@ export function ConfigurationPage() {
                 direccion: editingEmpresa.direccion || '',
                 telefono: editingEmpresa.telefono || null,
                 logo_url: editingEmpresa.logo_url || null,
+                usar_vendor_management: !!editingEmpresa.usar_vendor_management,
                 config_sri: {
                     ambiente: editingEmpresa.config_sri?.ambiente || 'PRUEBAS',
                     establecimiento: editingEmpresa.config_sri?.establecimiento || '001',
@@ -1462,6 +1463,25 @@ export function ConfigurationPage() {
                                         />
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* ── Módulos Integrados ──────────────────────────── */}
+                            <div className="border-t border-slate-100 pt-6 space-y-3">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Módulos Integrados</h3>
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Usar Gestión de Compras (VendorManagement)</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            ON → oculta "Proveedores" e "Ingreso de Compras" del menú de QuickInvoice (la gestión se hace desde la app de Compras).
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingEmpresa?.usar_vendor_management}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, usar_vendor_management: e.target.checked })}
+                                    />
+                                </label>
                             </div>
 
                             <div className="flex gap-4 pt-4">

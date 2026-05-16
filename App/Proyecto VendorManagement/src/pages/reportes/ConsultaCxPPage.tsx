@@ -5,10 +5,11 @@ import type { CuentaPorPagar, Proveedor } from '../../types/vendors'
 import { Wallet, AlertCircle, Clock, Loader2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { PrintExportBar } from '../../components/PrintExportBar'
+import { ReportPrintHeader } from '../../components/ReportPrintHeader'
 
 const HOY = new Date().toISOString().split('T')[0]
 const fmt = (n: number) => `$${n.toFixed(2)}`
-const fmtF = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })
+const fmtF = (s?: string | null) => s ? new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 
 function diasVenc(fecha: string) {
     const diff = Math.floor((new Date(fecha).getTime() - new Date(HOY).getTime()) / 86400000)
@@ -64,7 +65,16 @@ export function ConsultaCxPPage() {
 
     return (
         <div className="space-y-5">
-            <div>
+            <ReportPrintHeader
+                titulo="Cuentas por Pagar — Aging de Saldos"
+                filtros={[
+                    { label: 'Corte', valor: fmtF(HOY) },
+                    ...(estado ? [{ label: 'Estado', valor: estado }] : []),
+                    ...(provId ? [{ label: 'Proveedor', valor: proveedores.find(p => p.id === provId)?.nombre_empresa ?? provId }] : []),
+                ]}
+            />
+
+            <div className="no-print">
                 <h1 className="text-2xl font-bold text-slate-900">Consulta General CxP</h1>
                 <p className="text-slate-500 text-sm">Análisis de antigüedad de saldos y vencimientos</p>
             </div>
@@ -106,7 +116,7 @@ export function ConsultaCxPPage() {
                 </div>
             </div>
 
-            <PrintExportBar
+            <div className="no-print"><PrintExportBar
                 datos={lista.map(c => ({
                     Proveedor:        (c.proveedor as any)?.nombre_empresa ?? '',
                     RUC:              (c.proveedor as any)?.ruc ?? '',
@@ -118,10 +128,10 @@ export function ConsultaCxPPage() {
                     Estado:           c.estado,
                 }))}
                 nombreArchivo="cxp_proveedores"
-            />
+            /></div>
 
             {/* Filtros */}
-            <div className="flex gap-3 flex-wrap">
+            <div className="flex gap-3 flex-wrap no-print">
                 <select className="input text-sm max-w-xs" value={provId} onChange={e => setProvId(e.target.value)}>
                     <option value="">Todos los proveedores</option>
                     {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre_empresa}</option>)}

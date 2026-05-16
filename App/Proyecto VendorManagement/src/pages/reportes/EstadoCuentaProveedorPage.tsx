@@ -6,11 +6,12 @@ import type { Proveedor } from '../../types/vendors'
 import { FileText, Loader2, Building2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { PrintExportBar } from '../../components/PrintExportBar'
+import { ReportPrintHeader } from '../../components/ReportPrintHeader'
 
 const HOY = new Date().toISOString().split('T')[0]
 const PRIMER_DIA_AÑO = `${new Date().getFullYear()}-01-01`
 const fmt  = (n: number) => `$${n.toFixed(2)}`
-const fmtF = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })
+const fmtF = (s?: string | null) => s ? new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 
 interface MovProveedor {
     fecha: string
@@ -120,13 +121,22 @@ export function EstadoCuentaProveedorPage() {
 
     return (
         <div className="space-y-5">
-            <div>
+            <ReportPrintHeader
+                titulo="Estado de Cuenta por Proveedor"
+                subtitulo={proveedor?.nombre_empresa ?? undefined}
+                filtros={proveedor ? [
+                    { label: 'RUC',     valor: proveedor.ruc },
+                    { label: 'Período', valor: `${fmtF(desde)} — ${fmtF(hasta)}` },
+                ] : []}
+            />
+
+            <div className="no-print">
                 <h1 className="text-2xl font-bold text-slate-900">Estado de Cuenta por Proveedor</h1>
                 <p className="text-slate-500 text-sm">Historial de facturas, pagos y retenciones</p>
             </div>
 
             {/* Selector */}
-            <div className="card p-4 space-y-3">
+            <div className="card p-4 space-y-3 no-print">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div className="md:col-span-2">
                         <label className="label text-xs">Proveedor <span className="text-red-500">*</span></label>
@@ -169,7 +179,7 @@ export function EstadoCuentaProveedorPage() {
             )}
 
             {movimientos.length > 0 && (
-                <PrintExportBar
+                <div className="no-print"><PrintExportBar
                     datos={movimientos.map(m => ({
                         Fecha:       m.fecha,
                         Tipo:        m.tipo,
@@ -180,7 +190,7 @@ export function EstadoCuentaProveedorPage() {
                     }))}
                     nombreArchivo={`estado_cuenta_${proveedor?.nombre_empresa ?? 'proveedor'}`}
                     titulo={proveedor ? `${proveedor.nombre_empresa} | ${fmtF(desde)} - ${fmtF(hasta)}` : ''}
-                />
+                /></div>
             )}
 
             {/* Tabla movimientos */}

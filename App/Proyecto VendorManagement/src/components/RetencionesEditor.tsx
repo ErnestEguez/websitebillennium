@@ -22,13 +22,18 @@ interface Props {
     onChangeNumero:    (n: string) => void
     retenciones:       RetLine[]
     onChange:          (list: RetLine[]) => void
-    baseDefault:       number
+    baseDefault:       number   // base para líneas FUENTE (subtotal de la factura)
+    baseIva?:          number   // base para líneas de IVA (valor_iva de la factura)
 }
 
 export function RetencionesEditor({
     numeroRetencion, onChangeNumero,
-    retenciones, onChange, baseDefault,
+    retenciones, onChange, baseDefault, baseIva = 0,
 }: Props) {
+
+    function baseParaTipo(tipo: TipoRetencion) {
+        return tipo === 'IVA' ? baseIva : baseDefault
+    }
 
     function add() {
         if (retenciones.length >= 4) return
@@ -55,7 +60,7 @@ export function RetencionesEditor({
         const next  = retenciones.map((r, j) => {
             if (j !== i) return r
             const pct  = item?.porcentaje ?? r.pct
-            const base = r.base || baseDefault
+            const base = r.base || baseParaTipo(tipo)
             return { ...r, codigo, descripcion: item?.descripcion ?? '', pct, base,
                 valor: Math.round(base * pct / 100 * 100) / 100 }
         })
@@ -63,8 +68,9 @@ export function RetencionesEditor({
     }
 
     function changeTipo(i: number, tipo: TipoRetencion) {
+        const base = baseParaTipo(tipo)
         onChange(retenciones.map((r, j) =>
-            j !== i ? r : { ...EMPTY_RET, tipo, base: r.base || baseDefault }
+            j !== i ? r : { ...EMPTY_RET, tipo, base }
         ))
     }
 
