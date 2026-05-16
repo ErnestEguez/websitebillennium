@@ -5,7 +5,7 @@ import type { Proveedor } from '../types/vendors'
 import { REGIMEN_LABELS } from '../types/vendors'
 import {
     Building2, Plus, Edit2, Save, X, Search,
-    Phone, Mail, MapPin, ChevronDown, AlertCircle,
+    Phone, Mail, MapPin, AlertCircle,
 } from 'lucide-react'
 
 const PROVINCIAS_EC = [

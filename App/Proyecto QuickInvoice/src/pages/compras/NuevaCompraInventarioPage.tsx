@@ -7,7 +7,7 @@ import type { Proveedor, RetencionCompra } from '../../types/vendors'
 import { CODIGOS_RETENCION_FUENTE, CODIGOS_RETENCION_IVA, TIPO_SUSTENTO_LABELS } from '../../types/vendors'
 import {
     ArrowLeft, Plus, Trash2, Save, Package,
-    AlertCircle, ChevronDown, ChevronUp, Info,
+    ChevronDown, ChevronUp, Info,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 

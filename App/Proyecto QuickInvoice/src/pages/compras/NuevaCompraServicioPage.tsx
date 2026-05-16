@@ -8,7 +8,7 @@ import {
     TIPO_SUSTENTO_LABELS, TIPO_GASTO_LABELS,
 } from '../../types/vendors'
 import {
-    ArrowLeft, Plus, Trash2, Save, Wrench,
+    ArrowLeft, Plus, Trash2, Save,
     ChevronDown, ChevronUp, Info,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
