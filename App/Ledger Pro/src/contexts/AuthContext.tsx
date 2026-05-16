@@ -151,15 +151,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem(EMPRESA_KEY)
     }
 
-    async function signOut() {
+    function signOut() {
         cargadoParaUser.current = null
+        // Only clear lp_ keys — sb- keys belong to the shared Portal session
         Object.keys(localStorage).forEach(k => {
-            if (k.startsWith('sb-') || k.startsWith('lp_')) localStorage.removeItem(k)
+            if (k.startsWith('lp_')) localStorage.removeItem(k)
         })
-        await supabase.auth.signOut().catch(() => {})
-        resetState()
+        // Fire and forget — never await to avoid spinner hang
+        supabase.auth.signOut().catch(() => {})
         const portalUrl = import.meta.env.VITE_PORTAL_URL || 'https://websitebillennium-k4qc-ernesteguezs-projects.vercel.app'
         window.location.replace(portalUrl)
+        return Promise.resolve()
     }
 
     if (loading) {

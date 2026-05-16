@@ -4,7 +4,7 @@ import {
     LayoutDashboard, BookOpen, FileText, BarChart2,
     Settings, LogOut, ChevronRight, ChevronDown,
     Menu, X, Building2, PiggyBank, TrendingUp, BookMarked, Target,
-    Lock, Zap, Shield,
+    Lock, Zap, Shield, ArrowLeft,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
@@ -198,13 +198,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             active={location.pathname === '/admin'}
                         />
                     )}
-                    <button
-                        onClick={signOut}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors group"
-                    >
-                        <LogOut className="w-5 h-5 text-slate-400 group-hover:text-red-500" />
-                        <span>Cerrar Sesión</span>
-                    </button>
+                    {isAdmin ? (
+                        <a
+                            href={import.meta.env.VITE_PORTAL_URL || 'https://websitebillennium-k4qc-ernesteguezs-projects.vercel.app'}
+                            className="flex items-center gap-3 w-full px-4 py-3 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors text-sm font-medium"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                            <span>Volver al Portal</span>
+                        </a>
+                    ) : (
+                        <button
+                            onClick={signOut}
+                            className="flex items-center gap-3 w-full px-4 py-3 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors group"
+                        >
+                            <LogOut className="w-5 h-5 text-slate-400 group-hover:text-red-500" />
+                            <span>Cerrar Sesión</span>
+                        </button>
+                    )}
                 </div>
             </aside>
 

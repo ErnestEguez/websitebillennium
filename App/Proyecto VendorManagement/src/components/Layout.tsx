@@ -1,7 +1,7 @@
 import React from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
-    ShoppingCart, Truck, LayoutDashboard, LogOut,
+    ShoppingCart, Truck, LayoutDashboard, LogOut, ArrowLeft,
     ChevronRight, ChevronDown, Menu, X,
     Building2, Package, Wrench, FileText, Wallet, BarChart2, Receipt, Settings,
 } from 'lucide-react'
@@ -15,7 +15,7 @@ interface NavGroup {
 }
 type NavItem = NavLink | NavGroup
 
-const navigation: NavItem[] = [
+const NAV_USER: NavItem[] = [
     { to: '/',          icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/proveedores', icon: Truck,          label: 'Proveedores' },
     {
@@ -26,16 +26,19 @@ const navigation: NavItem[] = [
             { to: '/compras/nueva-servicio',   label: 'Nueva — Servicio',    icon: Wrench    },
         ],
     },
-    { to: '/cxp',                   icon: Wallet,   label: 'Cuentas por Pagar'     },
-    { to: '/comprobantes-retencion', icon: Receipt,  label: 'Comprobantes Retención' },
+    { to: '/cxp',                    icon: Wallet,   label: 'Cuentas por Pagar'      },
+    { to: '/comprobantes-retencion', icon: Receipt,  label: 'Comprobantes Retención'  },
     {
         type: 'group', icon: BarChart2, label: 'Reportes',
         children: [
-            { to: '/reportes/compras',          label: 'Compras por período',     icon: FileText  },
-            { to: '/reportes/cxp',              label: 'Consulta CxP',            icon: Wallet    },
-            { to: '/reportes/estado-cuenta',    label: 'Estado de cuenta prov.',  icon: BarChart2 },
+            { to: '/reportes/compras',       label: 'Compras por período',    icon: FileText  },
+            { to: '/reportes/cxp',           label: 'Consulta CxP',           icon: Wallet    },
+            { to: '/reportes/estado-cuenta', label: 'Estado de cuenta prov.', icon: BarChart2 },
         ],
     },
+]
+
+const NAV_ADMIN: NavItem[] = [
     { to: '/configuracion', icon: Settings, label: 'Configuración' },
 ]
 
@@ -60,12 +63,29 @@ function SidebarItem({ to, icon: Icon, label, active, sub }: {
 
 export function Layout({ children }: { children: React.ReactNode }) {
     const { empresa, profile, signOut } = useAuth()
-    const location = useLocation()
+    const location  = useLocation()
+    const navigate  = useNavigate()
     const [sidebarOpen, setSidebarOpen] = React.useState(true)
     const [openGroups, setOpenGroups]   = React.useState<string[]>(['Compras'])
 
+    const isAdmin = profile?.rol === 'admin_plataforma'
+    const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://websitebillennium-k4qc-ernesteguezs-projects.vercel.app'
+
+    // Admin: redirect to /configuracion if not already there
+    React.useEffect(() => {
+        if (isAdmin && location.pathname !== '/configuracion') {
+            navigate('/configuracion', { replace: true })
+        }
+    }, [isAdmin, location.pathname])
+
+    const navigation = isAdmin ? NAV_ADMIN : NAV_USER
+
     const toggleGroup = (label: string) =>
         setOpenGroups(prev => prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label])
+
+    // Display name: nombre → email → first part of user id
+    const displayName = profile?.nombre || profile?.email?.split('@')[0] || 'Usuario'
+    const displayInitial = displayName[0]?.toUpperCase() ?? 'U'
 
     return (
         <div className="min-h-screen bg-slate-50 flex">
@@ -79,9 +99,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
                         GC
                     </div>
-                    <span className="text-lg font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent whitespace-nowrap">
-                        Gestión Compras
-                    </span>
+                    <div>
+                        <span className="text-lg font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent whitespace-nowrap">
+                            Gestión Compras
+                        </span>
+                        {isAdmin && (
+                            <span className="block text-[10px] font-black text-primary-500 uppercase tracking-widest">Admin</span>
+                        )}
+                    </div>
                 </div>
 
                 {/* Nav */}
@@ -120,12 +145,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </nav>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-slate-100 shrink-0">
-                    <button onClick={signOut}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors group">
-                        <LogOut className="w-5 h-5 text-slate-400 group-hover:text-red-500" />
-                        <span>Cerrar Sesión</span>
-                    </button>
+                <div className="p-4 border-t border-slate-100 space-y-1 shrink-0">
+                    {/* User info */}
+                    <div className="flex items-center gap-2 px-3 py-2 mb-1">
+                        <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-xs shrink-0">
+                            {displayInitial}
+                        </div>
+                        <div className="overflow-hidden">
+                            <p className="text-xs font-semibold text-slate-700 truncate">{displayName}</p>
+                            <p className="text-[10px] text-slate-400 uppercase font-bold">{profile?.rol?.replace('_', ' ')}</p>
+                        </div>
+                    </div>
+
+                    {isAdmin ? (
+                        /* Admin: navigate back to Portal without signing out */
+                        <a href={PORTAL_URL}
+                            className="flex items-center gap-3 w-full px-4 py-2.5 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors group text-sm font-medium">
+                            <ArrowLeft className="w-4 h-4" />
+                            <span>Volver al Portal</span>
+                        </a>
+                    ) : (
+                        <button onClick={signOut}
+                            className="flex items-center gap-3 w-full px-4 py-2.5 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors group">
+                            <LogOut className="w-5 h-5 text-slate-400 group-hover:text-red-500" />
+                            <span className="text-sm">Cerrar Sesión</span>
+                        </button>
+                    )}
                 </div>
             </aside>
 
@@ -145,12 +190,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <span className="text-xs text-slate-400 font-medium uppercase tracking-widest">Powered by Billennium</span>
-                        {profile?.nombre && (
-                            <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm">
-                                {profile.nombre[0]}
-                            </div>
+                        {isAdmin && (
+                            <span className="text-xs font-black text-primary-600 bg-primary-50 px-3 py-1 rounded-full uppercase tracking-widest">
+                                Admin
+                            </span>
                         )}
+                        <span className="text-xs text-slate-400 font-medium uppercase tracking-widest hidden md:block">
+                            Powered by Billennium
+                        </span>
+                        <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm">
+                            {displayInitial}
+                        </div>
+                        <span className="text-sm font-medium text-slate-700 hidden md:block">{displayName}</span>
                     </div>
                 </header>
 

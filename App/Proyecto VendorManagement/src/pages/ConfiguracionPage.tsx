@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { contabilidadService, CAMPOS_CUENTAS } from '../services/contabilidadService'
 import type { CuentasCompras } from '../services/contabilidadService'
@@ -12,9 +13,17 @@ const EMPTY_CUENTAS: CuentasCompras = {
 }
 
 export function ConfiguracionPage() {
-    const { empresa } = useAuth()
+    const { empresa, profile } = useAuth()
+    const navigate = useNavigate()
     const [saving, setSaving]         = useState(false)
     const [loading, setLoading]       = useState(true)
+
+    // Only admin_plataforma can access this page
+    useEffect(() => {
+        if (profile && profile.rol !== 'admin_plataforma') {
+            navigate('/', { replace: true })
+        }
+    }, [profile])
     const [loadingCuentas, setLoadingCuentas] = useState(false)
 
     const [usarContabilidad, setUsarContabilidad] = useState(false)

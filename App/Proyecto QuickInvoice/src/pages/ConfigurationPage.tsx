@@ -726,29 +726,6 @@ export function ConfigurationPage() {
                                 </div>
                             </div>
 
-                            {/* Módulos integrados */}
-                            <div className="border-t border-slate-100 pt-6 space-y-3">
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
-                                    Módulos Integrados
-                                </h3>
-                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-800">Usar Gestión de Compras (VendorManagement)</p>
-                                        <p className="text-xs text-slate-500 mt-0.5">
-                                            Al activar: oculta "Proveedores" e "Ingreso de Compras" de este menú — la gestión se hace desde la app de Compras.
-                                        </p>
-                                    </div>
-                                    <div className="ml-4 shrink-0">
-                                        <input
-                                            type="checkbox"
-                                            className="w-5 h-5 rounded border-slate-300 text-primary-600"
-                                            checked={!!companyData.usar_vendor_management}
-                                            onChange={e => setCompanyData({ ...companyData, usar_vendor_management: e.target.checked })}
-                                        />
-                                    </div>
-                                </label>
-                            </div>
-
                             <div className="pt-2">
                                 <button
                                     type="submit"

@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (prof.empresa_id) {
                 const { data: emp } = await supabase
                     .from('empresas')
-                    .select('id, nombre, ruc, logo_url')
+                    .select('id, nombre, ruc, logo_url, usar_contabilidad_compras, config_cuentas_compras')
                     .eq('id', prof.empresa_id)
                     .maybeSingle()
                 if (emp && isMounted.current) setEmpresa(emp as Empresa)
@@ -95,10 +95,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }
 
-    async function signOut() {
-        await supabase.auth.signOut().catch(() => {})
-        setUser(null); setProfile(null); setEmpresa(null)
+    function signOut() {
+        // Fire-and-forget — never await to avoid spinner hang
+        supabase.auth.signOut().catch(() => {})
         window.location.replace(PORTAL_URL)
+        return Promise.resolve()
     }
 
     if (loading) {
