@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { compraService, proveedorService } from '../../services/vendorService'
@@ -43,28 +43,42 @@ export function ComprasPage() {
     const [desde, setDesde]           = useState(PRIMER_DIA_MES)
     const [hasta, setHasta]           = useState(HOY)
     const [filtrosOpen, setFiltrosOpen] = useState(false)
+    const [error, setError]             = useState('')
 
-    useEffect(() => { if (empresa?.id) loadAll() }, [empresa?.id])
+    // Ref to always read latest filter values without stale closure
+    const filtrosRef = useRef({ filtroTipo, filtroEst, filtroProv, desde, hasta })
+    filtrosRef.current = { filtroTipo, filtroEst, filtroProv, desde, hasta }
+
+    useEffect(() => {
+        if (!empresa?.id) { setLoading(false); return }
+        const eid = empresa.id
+        let cancelled = false
+        setLoading(true)
+        setError('')
+        const { filtroTipo: t, filtroEst: e, filtroProv: p, desde: d, hasta: h } = filtrosRef.current
+        Promise.all([
+            compraService.listar(eid, { tipo: t||undefined, estado: e||undefined, proveedorId: p||undefined, desde: d, hasta: h }),
+            proveedorService.listar(eid),
+        ]).then(([c, pv]) => { if (!cancelled) { setCompras(c); setProveedores(pv) } })
+          .catch(err  => { if (!cancelled) setError(err.message) })
+          .finally(()  => { if (!cancelled) setLoading(false) })
+        return () => { cancelled = true }
+    }, [empresa?.id])
 
     async function loadAll() {
+        if (!empresa?.id) return
         try {
-            setLoading(true)
+            setLoading(true); setError('')
             const [c, p] = await Promise.all([
-                compraService.listar(empresa!.id, {
-                    tipo: filtroTipo || undefined,
-                    estado: filtroEst || undefined,
-                    proveedorId: filtroProv || undefined,
-                    desde, hasta,
+                compraService.listar(empresa.id, {
+                    tipo: filtroTipo || undefined, estado: filtroEst || undefined,
+                    proveedorId: filtroProv || undefined, desde, hasta,
                 }),
-                proveedorService.listar(empresa!.id),
+                proveedorService.listar(empresa.id),
             ])
-            setCompras(c)
-            setProveedores(p)
-        } catch (e: any) {
-            alert('Error al cargar: ' + e.message)
-        } finally {
-            setLoading(false)
-        }
+            setCompras(c); setProveedores(p)
+        } catch (e: any) { setError(e.message) }
+        finally { setLoading(false) }
     }
 
     async function aplicarFiltros() { await loadAll() }
@@ -204,7 +218,11 @@ export function ComprasPage() {
 
             {/* Tabla */}
             <div className="card overflow-hidden">
-                {loading ? (
+                {error ? (
+                    <div className="flex items-center justify-center py-16 gap-2 text-red-500 text-sm">
+                        <AlertCircle className="w-5 h-5 shrink-0" /> Error al cargar: {error}
+                    </div>
+                ) : loading ? (
                     <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
                         <Loader2 className="w-5 h-5 animate-spin" /> Cargando...
                     </div>

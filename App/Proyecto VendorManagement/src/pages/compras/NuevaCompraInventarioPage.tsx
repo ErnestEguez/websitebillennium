@@ -168,29 +168,38 @@ export function NuevaCompraInventarioPage() {
                 retsParaGuardar,
             )
 
-            // Asiento contable (no-fatal si falla)
-            if (empresa!.usar_contabilidad_compras && empresa!.config_cuentas_compras) {
-                const ctas = empresa!.config_cuentas_compras as unknown as CuentasCompras
-                if (ctas.inventarios && ctas.cuentas_por_pagar && ctas.efectivo) {
-                    const retF = retsParaGuardar.filter(r => r.tipo === 'FUENTE').reduce((s, r) => s + r.valor, 0)
-                    const retI = retsParaGuardar.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
-                    contabilidadService.crearAsientoCompra({
-                        empresaId: empresa!.id,
-                        fecha: HOY,
-                        glosa: `Compra inventario ${numeroFactura || proveedorId.slice(0, 8)}`,
-                        subtotal: subtotalLineas,
-                        valorIva: ivaCalc,
-                        retFuente: retF,
-                        retIva: retI,
-                        formaPago,
-                        tipoCompra: 'INVENTARIO',
-                        cuentas: ctas,
-                        referencia: numeroFactura || undefined,
-                        creadoPor: profile?.id,
-                    }).catch(err => console.warn('Asiento contable no creado:', err.message))
+            // Asiento contable — fresh config fetch (no stale session)
+            let asientoInfo = ''
+            try {
+                const { data: cfg } = await supabase
+                    .from('empresas')
+                    .select('usar_contabilidad_compras, config_cuentas_compras')
+                    .eq('id', empresa!.id)
+                    .maybeSingle()
+
+                if (cfg?.usar_contabilidad_compras && cfg?.config_cuentas_compras) {
+                    const ctas = cfg.config_cuentas_compras as unknown as CuentasCompras
+                    if (ctas.inventarios && ctas.cuentas_por_pagar && ctas.efectivo) {
+                        const retF = retsParaGuardar.filter(r => r.tipo === 'FUENTE').reduce((s, r) => s + r.valor, 0)
+                        const retI = retsParaGuardar.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
+                        await contabilidadService.crearAsientoCompra({
+                            empresaId: empresa!.id, fecha: HOY,
+                            glosa: `Compra inventario ${numeroFactura || proveedorId.slice(0, 8)}`,
+                            subtotal: subtotalLineas, valorIva: ivaCalc,
+                            retFuente: retF, retIva: retI, formaPago,
+                            tipoCompra: 'INVENTARIO', cuentas: ctas,
+                            referencia: numeroFactura || undefined, creadoPor: profile?.id,
+                        })
+                        asientoInfo = '✓ Asiento contable registrado en LedgerPro.'
+                    } else {
+                        asientoInfo = '⚠ Contabilidad activa pero faltan cuentas configuradas.'
+                    }
                 }
+            } catch (contabErr: any) {
+                asientoInfo = `⚠ Sin asiento contable: ${contabErr.message}`
             }
 
+            if (asientoInfo) alert(asientoInfo)
             navigate('/compras')
         } catch (e: any) {
             alert('Error al guardar: ' + e.message)

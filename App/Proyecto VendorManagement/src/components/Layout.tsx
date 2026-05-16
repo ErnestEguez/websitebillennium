@@ -61,8 +61,12 @@ function SidebarItem({ to, icon: Icon, label, active, sub }: {
     )
 }
 
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://websitebillennium-k4qc-ernesteguezs-projects.vercel.app'
+
 function closeApp() {
     window.close()
+    // Fallback: if window.close() is blocked by browser (direct URL access), go to portal
+    setTimeout(() => { window.location.replace(PORTAL_URL) }, 300)
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
