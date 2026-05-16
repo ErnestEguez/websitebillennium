@@ -30,12 +30,10 @@ export function ConfiguracionPage() {
     // Load all empresas only when admin has no empresa in context
     useEffect(() => {
         if (empresaCtx?.id) { setEmpresaId(empresaCtx.id); return }
-        supabase
-            .from('empresas')
-            .select('id, nombre, ruc')
-            .order('nombre')
-            .then(({ data }) => setTodasEmpresas(data ?? []))
-            .finally(() => setLoadingEmpresas(false))
+        Promise.resolve(
+            supabase.from('empresas').select('id, nombre, ruc').order('nombre')
+        ).then(({ data }) => setTodasEmpresas(data ?? []))
+         .finally(() => setLoadingEmpresas(false))
     }, [empresaCtx?.id])
 
     // ── Settings for selected empresa ─────────────────────────
