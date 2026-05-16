@@ -3,7 +3,7 @@ import { Link, useLocation, Navigate } from 'react-router-dom'
 import {
     ShoppingCart, Truck, LayoutDashboard,
     ChevronRight, ChevronDown, Menu, X,
-    Building2, Package, Wrench, FileText, Wallet, BarChart2, Receipt, Settings,
+    Package, Wrench, FileText, Wallet, BarChart2, Receipt, Settings,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
@@ -66,7 +66,7 @@ function closeApp() {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-    const { empresa, profile, signOut } = useAuth()
+    const { empresa, profile } = useAuth()
     const location  = useLocation()
     const [sidebarOpen, setSidebarOpen] = React.useState(true)
     const [openGroups, setOpenGroups]   = React.useState<string[]>(['Compras'])
