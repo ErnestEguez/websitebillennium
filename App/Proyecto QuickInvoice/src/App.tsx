@@ -19,9 +19,6 @@ import { KitchenOrderPrint } from './pages/KitchenOrderPrint'
 import { ConfigurationPage } from './pages/ConfigurationPage'
 import { ProveedoresPage } from './pages/ProveedoresPage'
 import { InventarioPage } from './pages/InventarioPage'
-import { ComprasPage } from './pages/compras/ComprasPage'
-import { NuevaCompraInventarioPage } from './pages/compras/NuevaCompraInventarioPage'
-import { NuevaCompraServicioPage } from './pages/compras/NuevaCompraServicioPage'
 import { KardexPage } from './pages/KardexPage'
 import { CierresPage } from './pages/CierresPage'
 import { FacturaDirectaPage } from './pages/FacturaDirectaPage'
@@ -218,28 +215,6 @@ function App() {
               </ProtectedRoute>
             } />
 
-            {/* ── VendorManagement ── */}
-            <Route path="/compras" element={
-              <ProtectedRoute>
-                <RoleProtectedRoute allowedRoles={['oficina']}>
-                  <Layout><ComprasPage /></Layout>
-                </RoleProtectedRoute>
-              </ProtectedRoute>
-            } />
-            <Route path="/compras/nueva-inventario" element={
-              <ProtectedRoute>
-                <RoleProtectedRoute allowedRoles={['oficina']}>
-                  <Layout><NuevaCompraInventarioPage /></Layout>
-                </RoleProtectedRoute>
-              </ProtectedRoute>
-            } />
-            <Route path="/compras/nueva-servicio" element={
-              <ProtectedRoute>
-                <RoleProtectedRoute allowedRoles={['oficina']}>
-                  <Layout><NuevaCompraServicioPage /></Layout>
-                </RoleProtectedRoute>
-              </ProtectedRoute>
-            } />
 
             <Route path="/kardex" element={
               <ProtectedRoute>

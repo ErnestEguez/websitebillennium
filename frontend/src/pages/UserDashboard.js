@@ -67,6 +67,13 @@ const productConfig = {
     url: 'https://websitebillennium-ledgerpro.vercel.app/',
     description: 'Contabilidad NIIF para PYMES'
   },
+  vendormanagement: {
+    name: 'Gestión de Compras',
+    icon: FileText,
+    color: 'bg-orange-50 text-orange-600',
+    url: 'https://websitebillennium-vendor.vercel.app/',
+    description: 'Proveedores, compras y cuentas por pagar'
+  },
   dashboard: {
     name: 'Dashboard Empresarial',
     icon: BarChart3,
@@ -117,7 +124,7 @@ export const UserDashboard = () => {
   };
 
   // Productos que usan SSO (magic link) en vez de URL directa
-  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion', 'contabilidad'];
+  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion', 'contabilidad', 'vendormanagement'];
 
   const handleSsoAccess = async (productId) => {
     setSsoLoading(productId);

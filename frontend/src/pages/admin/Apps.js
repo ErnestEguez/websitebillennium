@@ -42,6 +42,14 @@ const ADMIN_APPS = [
     color: 'bg-green-50 text-green-600',
     available: true,
   },
+  {
+    id: 'vendormanagement',
+    name: 'Gestión de Compras',
+    description: 'Proveedores, compras de inventario y servicios, cuentas por pagar y órdenes de compra.',
+    icon: FileText,
+    color: 'bg-orange-50 text-orange-600',
+    available: true,
+  },
 ];
 
 export const AdminApps = () => {

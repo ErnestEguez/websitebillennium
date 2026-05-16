@@ -21,7 +21,6 @@ import {
     Search,
     FileMinus,
     Ban,
-    Wrench,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
@@ -74,7 +73,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const location = useLocation()
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true)
     const [isCierreCajaOpen, setIsCierreCajaOpen] = React.useState(false)
-    const [openGroups, setOpenGroups] = React.useState<string[]>(['Consultas', 'Compras'])
+    const [openGroups, setOpenGroups] = React.useState<string[]>(['Consultas'])
 
     const toggleGroup = (label: string) => {
         setOpenGroups(prev => prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label])
@@ -89,17 +88,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         { to: '/clientes', icon: Users, label: 'Clientes', roles: ['oficina'] },
         { to: '/productos', icon: Package, label: 'Productos', roles: ['oficina'] },
         { to: '/proveedores', icon: Truck, label: 'Proveedores', roles: ['oficina'] },
-        {
-            type: 'group',
-            icon: ShoppingCart,
-            label: 'Compras',
-            roles: ['oficina'],
-            children: [
-                { to: '/compras', label: 'Lista de Compras', icon: FileText },
-                { to: '/compras/nueva-inventario', label: 'Nueva — Inventario', icon: Package },
-                { to: '/compras/nueva-servicio', label: 'Nueva — Servicio', icon: Wrench },
-            ]
-        },
+        { to: '/inventario', icon: ShoppingCart, label: 'Ingreso de Compras', roles: ['oficina'] },
         { to: '/kardex', icon: BarChart3, label: 'Kardex', roles: ['oficina'] },
         { to: '/vendedores', icon: UserCheck, label: 'Vendedores', roles: ['oficina'] },
         { to: '/cartera-cxc', icon: Wallet, label: 'Cartera CxC', roles: ['oficina'] },

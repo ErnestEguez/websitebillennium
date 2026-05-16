@@ -29,6 +29,7 @@ const PRODUCTS = [
   { id: 'lopdp', name: 'LOPDP' },
   { id: 'facturacion', name: 'Facturación Electrónica' },
   { id: 'contabilidad', name: 'Ledger Pro Contabilidad' },
+  { id: 'vendormanagement', name: 'Gestión de Compras' },
   { id: 'dashboard', name: 'Dashboard Empresarial' },
   { id: 'plataforma-ferias', name: 'Plataforma Móvil para Ferias' },
 ];
@@ -40,6 +41,7 @@ const PLANS = {
   lopdp: ['PYME', 'Profesional'],
   facturacion: ['Básico', 'Profesional', 'Empresarial'],
   contabilidad: ['Básico', 'Profesional', 'Empresarial'],
+  vendormanagement: ['Básico', 'Profesional', 'Empresarial'],
   dashboard: ['Básico', 'Profesional'],
   'plataforma-ferias': ['Estándar'],
 };

@@ -455,6 +455,45 @@ PRODUCTS = [
                 "features": ["Multiempresa ilimitada", "Usuarios ilimitados", "Todo lo del Plan Profesional", "Cierre contable anual", "Reportes avanzados", "Acompañamiento en implementación"]
             }
         ]
+    },
+    {
+        "id": "vendormanagement",
+        "name": "Gestión de Compras",
+        "slug": "vendormanagement",
+        "description": "Módulo completo de proveedores, compras de inventario y servicios, cuentas por pagar y órdenes de compra.",
+        "icon": "ShoppingCart",
+        "features": [
+            "Maestro de proveedores con datos SRI",
+            "Compras de inventario con kardex",
+            "Compras de servicios",
+            "Retenciones en la fuente e IVA",
+            "Cuentas por pagar (CxP)",
+            "Órdenes de compra"
+        ],
+        "plans": [
+            {
+                "name": "Básico",
+                "price_before": 35,
+                "price_now": 20,
+                "billing": "mensual",
+                "features": ["1 empresa", "2 usuarios", "Proveedores y compras", "CxP básico", "Soporte básico"]
+            },
+            {
+                "name": "Profesional",
+                "price_before": 70,
+                "price_now": 45,
+                "billing": "mensual",
+                "popular": True,
+                "features": ["Hasta 3 empresas", "5 usuarios", "Todo lo del Plan Básico", "Retenciones electrónicas", "Órdenes de compra", "Soporte prioritario"]
+            },
+            {
+                "name": "Empresarial",
+                "price_before": 130,
+                "price_now": 80,
+                "billing": "mensual",
+                "features": ["Multiempresa", "Usuarios ilimitados", "Todo lo del Plan Profesional", "Integración SRI", "Reportes avanzados"]
+            }
+        ]
     }
 ]
 
@@ -805,7 +844,8 @@ APP_URLS = {
     "sentinel":      os.environ.get("PEDIDOS_APP_URL",       "http://localhost:5173"),
     "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://websitebillennium-5gsk.vercel.app/"),
     "facturacion":   os.environ.get("FACTURACION_APP_URL",   "https://websitebillennium-quickinvoice.vercel.app/"),
-    "contabilidad":  os.environ.get("CONTABILIDAD_APP_URL",  "https://websitebillennium-ledgerpro.vercel.app/"),
+    "contabilidad":     os.environ.get("CONTABILIDAD_APP_URL",    "https://websitebillennium-ledgerpro.vercel.app/"),
+    "vendormanagement": os.environ.get("VENDOR_APP_URL",           "https://websitebillennium-vendor.vercel.app/"),
 }
 
 @api_router.get("/debug/env")
@@ -868,7 +908,7 @@ def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
     name = admin["name"]
 
     # Para estas apps solo se genera el magic link — el perfil de admin se crea directamente en la BD de cada app
-    if product_id in ("importaciones", "facturacion"):
+    if product_id in ("importaciones", "facturacion", "vendormanagement"):
         try:
             result = supabase.auth.admin.generate_link({
                 "type": "magiclink",
