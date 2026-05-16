@@ -198,18 +198,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             active={location.pathname === '/admin'}
                         />
                     )}
-                    {isAdmin ? (
-                        <a
-                            href={import.meta.env.VITE_PORTAL_URL || 'https://websitebillennium-k4qc-ernesteguezs-projects.vercel.app'}
-                            className="flex items-center gap-3 w-full px-4 py-3 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors text-sm font-medium"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                            <span>Volver al Portal</span>
-                        </a>
-                    ) : (
+                    <button
+                        onClick={() => window.close()}
+                        className="flex items-center gap-3 w-full px-4 py-3 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors group text-sm"
+                    >
+                        <X className="w-4 h-4" />
+                        <span>Cerrar</span>
+                    </button>
+                    {!isAdmin && (
                         <button
                             onClick={signOut}
-                            className="flex items-center gap-3 w-full px-4 py-3 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors group"
+                            className="flex items-center gap-3 w-full px-4 py-3 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors group text-sm"
                         >
                             <LogOut className="w-5 h-5 text-slate-400 group-hover:text-red-500" />
                             <span>Cerrar Sesión</span>

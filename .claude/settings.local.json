@@ -17,7 +17,8 @@
       "Bash(Get-Content \"c:\\\\Billenniumweb2026\\\\websitebillennium-main\\\\App\\\\Proyecto VendorManagement\\\\src\\\\pages\\\\CxPPage.tsx\")",
       "Bash(Select-Object -First 5)",
       "Bash(git checkout *)",
-      "Bash(wmic logicaldisk *)"
+      "Bash(wmic logicaldisk *)",
+      "Bash(git check-ignore *)"
     ],
     "additionalDirectories": [
       "c:\\Billenniumweb2026\\websitebillennium-main\\App\\Billennium-System-main\\.git"

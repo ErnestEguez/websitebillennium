@@ -1,7 +1,7 @@
 import React from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, Navigate } from 'react-router-dom'
 import {
-    ShoppingCart, Truck, LayoutDashboard, LogOut, ArrowLeft,
+    ShoppingCart, Truck, LayoutDashboard,
     ChevronRight, ChevronDown, Menu, X,
     Building2, Package, Wrench, FileText, Wallet, BarChart2, Receipt, Settings,
 } from 'lucide-react'
@@ -16,14 +16,14 @@ interface NavGroup {
 type NavItem = NavLink | NavGroup
 
 const NAV_USER: NavItem[] = [
-    { to: '/',          icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/proveedores', icon: Truck,          label: 'Proveedores' },
+    { to: '/',                       icon: LayoutDashboard, label: 'Dashboard'             },
+    { to: '/proveedores',            icon: Truck,           label: 'Proveedores'            },
     {
         type: 'group', icon: ShoppingCart, label: 'Compras',
         children: [
-            { to: '/compras',                  label: 'Lista de Compras',    icon: FileText  },
-            { to: '/compras/nueva-inventario', label: 'Nueva — Inventario',  icon: Package   },
-            { to: '/compras/nueva-servicio',   label: 'Nueva — Servicio',    icon: Wrench    },
+            { to: '/compras',                  label: 'Lista de Compras',   icon: FileText },
+            { to: '/compras/nueva-inventario', label: 'Nueva — Inventario', icon: Package  },
+            { to: '/compras/nueva-servicio',   label: 'Nueva — Servicio',   icon: Wrench   },
         ],
     },
     { to: '/cxp',                    icon: Wallet,   label: 'Cuentas por Pagar'      },
@@ -61,31 +61,32 @@ function SidebarItem({ to, icon: Icon, label, active, sub }: {
     )
 }
 
+function closeApp() {
+    window.close()
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
     const { empresa, profile, signOut } = useAuth()
     const location  = useLocation()
-    const navigate  = useNavigate()
     const [sidebarOpen, setSidebarOpen] = React.useState(true)
     const [openGroups, setOpenGroups]   = React.useState<string[]>(['Compras'])
 
-    const isAdmin = profile?.rol === 'admin_plataforma'
-    const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://websitebillennium-k4qc-ernesteguezs-projects.vercel.app'
+    // Detect admin — synchronous in render, no timing issues
+    const isAdmin = profile !== null && profile.rol === 'admin_plataforma'
 
-    // Admin: redirect to /configuracion if not already there
-    React.useEffect(() => {
-        if (isAdmin && location.pathname !== '/configuracion') {
-            navigate('/configuracion', { replace: true })
-        }
-    }, [isAdmin, location.pathname])
+    // Admin must be on /configuracion — redirect in render, not in effect
+    if (isAdmin && location.pathname !== '/configuracion') {
+        return <Navigate to="/configuracion" replace />
+    }
 
     const navigation = isAdmin ? NAV_ADMIN : NAV_USER
 
     const toggleGroup = (label: string) =>
         setOpenGroups(prev => prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label])
 
-    // Display name: nombre → email → first part of user id
-    const displayName = profile?.nombre || profile?.email?.split('@')[0] || 'Usuario'
-    const displayInitial = displayName[0]?.toUpperCase() ?? 'U'
+    const displayName    = profile?.nombre || profile?.email?.split('@')[0] || '—'
+    const displayInitial = (profile?.nombre || profile?.email || 'U')[0].toUpperCase()
+    const rolLabel       = profile?.rol?.replace('_', ' ') ?? ''
 
     return (
         <div className="min-h-screen bg-slate-50 flex">
@@ -95,16 +96,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
             )}>
                 {/* Logo */}
-                <div className="p-6 flex items-center gap-3 border-b border-slate-100 shrink-0">
-                    <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                <div className="p-5 flex items-center gap-3 border-b border-slate-100 shrink-0">
+                    <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0">
                         GC
                     </div>
                     <div>
-                        <span className="text-lg font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent whitespace-nowrap">
-                            Gestión Compras
-                        </span>
+                        <span className="text-base font-bold text-primary-700 whitespace-nowrap">Gestión Compras</span>
                         {isAdmin && (
-                            <span className="block text-[10px] font-black text-primary-500 uppercase tracking-widest">Admin</span>
+                            <span className="block text-[10px] font-black text-primary-500 uppercase tracking-widest">
+                                — Admin —
+                            </span>
                         )}
                     </div>
                 </div>
@@ -144,33 +145,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     })}
                 </nav>
 
-                {/* Footer */}
-                <div className="p-4 border-t border-slate-100 space-y-1 shrink-0">
-                    {/* User info */}
-                    <div className="flex items-center gap-2 px-3 py-2 mb-1">
+                {/* Footer — user info + close */}
+                <div className="p-4 border-t border-slate-100 space-y-2 shrink-0">
+                    <div className="flex items-center gap-2 px-2 py-1">
                         <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-xs shrink-0">
                             {displayInitial}
                         </div>
-                        <div className="overflow-hidden">
-                            <p className="text-xs font-semibold text-slate-700 truncate">{displayName}</p>
-                            <p className="text-[10px] text-slate-400 uppercase font-bold">{profile?.rol?.replace('_', ' ')}</p>
+                        <div className="overflow-hidden min-w-0">
+                            <p className="text-xs font-semibold text-slate-800 truncate">{displayName}</p>
+                            <p className="text-[10px] text-slate-400 uppercase font-bold truncate">{rolLabel}</p>
                         </div>
                     </div>
-
-                    {isAdmin ? (
-                        /* Admin: navigate back to Portal without signing out */
-                        <a href={PORTAL_URL}
-                            className="flex items-center gap-3 w-full px-4 py-2.5 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors group text-sm font-medium">
-                            <ArrowLeft className="w-4 h-4" />
-                            <span>Volver al Portal</span>
-                        </a>
-                    ) : (
-                        <button onClick={signOut}
-                            className="flex items-center gap-3 w-full px-4 py-2.5 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors group">
-                            <LogOut className="w-5 h-5 text-slate-400 group-hover:text-red-500" />
-                            <span className="text-sm">Cerrar Sesión</span>
-                        </button>
-                    )}
+                    <button
+                        onClick={closeApp}
+                        className="flex items-center gap-2 w-full px-3 py-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors text-sm"
+                    >
+                        <X className="w-4 h-4" />
+                        Cerrar
+                    </button>
                 </div>
             </aside>
 
@@ -184,10 +176,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                         </button>
                         <div className="h-6 w-px bg-slate-200" />
-                        <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-slate-400" />
-                            <span className="text-sm font-bold text-slate-700">{empresa?.nombre ?? '—'}</span>
-                        </div>
+                        <span className="text-sm font-bold text-slate-700">{empresa?.nombre ?? '—'}</span>
                     </div>
                     <div className="flex items-center gap-3">
                         {isAdmin && (
@@ -195,13 +184,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 Admin
                             </span>
                         )}
-                        <span className="text-xs text-slate-400 font-medium uppercase tracking-widest hidden md:block">
-                            Powered by Billennium
-                        </span>
                         <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm">
                             {displayInitial}
                         </div>
-                        <span className="text-sm font-medium text-slate-700 hidden md:block">{displayName}</span>
+                        <span className="text-sm font-semibold text-slate-700">{displayName}</span>
                     </div>
                 </header>
 
