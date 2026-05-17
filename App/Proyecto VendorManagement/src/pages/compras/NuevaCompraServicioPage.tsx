@@ -190,8 +190,7 @@ export function NuevaCompraServicioPage() {
                 asientoInfo = `⚠ Sin asiento contable: ${contabErr.message}`
             }
 
-            if (asientoInfo) alert(asientoInfo)
-            navigate('/compras')
+            navigate('/compras', asientoInfo ? { state: { acctMsg: asientoInfo } } : {})
         } catch (e: any) {
             alert('Error al guardar: ' + e.message)
         } finally {

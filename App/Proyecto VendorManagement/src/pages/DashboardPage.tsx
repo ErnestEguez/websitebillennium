@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -13,10 +13,18 @@ export function DashboardPage() {
         comprasInventario: 0, comprasServicio: 0, proveedoresActivos: 0,
     })
     const [loading, setLoading] = useState(true)
+    const mountedRef = useRef(true)
+    useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
-    useEffect(() => { if (empresa?.id) loadStats() }, [empresa?.id])
+    useEffect(() => {
+        if (!empresa?.id) { setLoading(false); return }
+        const eid = empresa.id
+        let cancelled = false
+        loadStats(eid).finally(() => { if (!cancelled && mountedRef.current) setLoading(false) })
+        return () => { cancelled = true }
+    }, [empresa?.id])
 
-    async function loadStats() {
+    async function loadStats(eid: string) {
         try {
             const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
                 .toISOString().split('T')[0]
@@ -25,17 +33,17 @@ export function DashboardPage() {
             const [comprasRes, cxpRes, provRes] = await Promise.all([
                 supabase.from('ingresos_stock')
                     .select('total, tipo_compra')
-                    .eq('empresa_id', empresa!.id)
+                    .eq('empresa_id', eid)
                     .eq('estado', 'ACTIVO')
                     .gte('fecha_ingreso', primerDiaMes)
                     .lte('fecha_ingreso', hoy),
                 supabase.from('cuentas_por_pagar')
                     .select('saldo_pendiente, fecha_vencimiento, estado')
-                    .eq('empresa_id', empresa!.id)
+                    .eq('empresa_id', eid)
                     .in('estado', ['PENDIENTE', 'PARCIALMENTE_PAGADO']),
                 supabase.from('proveedores')
                     .select('id', { count: 'exact', head: true })
-                    .eq('empresa_id', empresa!.id)
+                    .eq('empresa_id', eid)
                     .eq('estado', 'ACTIVO'),
             ])
 
@@ -52,8 +60,6 @@ export function DashboardPage() {
             })
         } catch (e) {
             console.error('Dashboard stats error:', e)
-        } finally {
-            setLoading(false)
         }
     }
 

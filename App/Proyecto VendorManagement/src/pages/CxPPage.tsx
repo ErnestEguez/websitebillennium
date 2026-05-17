@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { cxpService } from '../services/vendorService'
 import { contabilidadService } from '../services/contabilidadService'
@@ -30,28 +30,29 @@ export function CxPPage() {
     const [formaPago, setFormaPago]   = useState<FormasPago>('TRANSFERENCIA')
     const [referencia, setReferencia] = useState('')
     const [guardando, setGuardando]   = useState(false)
+    const [refreshKey, setRefreshKey] = useState(0)
+    const mountedRef = useRef(true)
+    useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
-    useEffect(() => { if (empresa?.id) load() }, [empresa?.id, filtro])
-
-    async function load() {
-        try {
-            setLoading(true)
-            const data = await cxpService.listar(empresa!.id, {
-                estado: filtro === 'todos' ? undefined : undefined,
-                vencidas: filtro === 'vencidas',
+    useEffect(() => {
+        if (!empresa?.id) { setLoading(false); return }
+        const eid = empresa.id
+        let cancelled = false
+        setLoading(true)
+        cxpService.listar(eid, { vencidas: filtro === 'vencidas' })
+            .then(data => {
+                if (cancelled || !mountedRef.current) return
+                const filtradas = filtro === 'pendientes'
+                    ? data.filter(c => c.estado !== 'PAGADO' && c.estado !== 'ANULADO')
+                    : filtro === 'vencidas'
+                        ? data.filter(c => c.fecha_vencimiento < HOY && c.estado !== 'PAGADO' && c.estado !== 'ANULADO')
+                        : data
+                setLista(filtradas)
             })
-            const filtradas = filtro === 'pendientes'
-                ? data.filter(c => c.estado !== 'PAGADO' && c.estado !== 'ANULADO')
-                : filtro === 'vencidas'
-                    ? data.filter(c => c.fecha_vencimiento < HOY && c.estado !== 'PAGADO' && c.estado !== 'ANULADO')
-                    : data
-            setLista(filtradas)
-        } catch (e: any) {
-            alert('Error: ' + e.message)
-        } finally {
-            setLoading(false)
-        }
-    }
+            .catch(() => {})
+            .finally(() => { if (!cancelled && mountedRef.current) setLoading(false) })
+        return () => { cancelled = true }
+    }, [empresa?.id, filtro, refreshKey])
 
     async function handlePago() {
         if (!modalCxp || !montoPago) return
@@ -87,7 +88,7 @@ export function CxPPage() {
 
             setModalCxp(null)
             setMontoPago(''); setReferencia('')
-            await load()
+            setRefreshKey(k => k + 1)  // Trigger useEffect to reload list
         } catch (e: any) {
             alert('Error al registrar pago: ' + e.message)
         } finally {

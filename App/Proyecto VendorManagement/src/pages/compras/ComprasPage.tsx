@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { compraService, proveedorService } from '../../services/vendorService'
 import type { Compra, Proveedor } from '../../types/vendors'
@@ -29,6 +29,14 @@ const TIPO_ICON = { INVENTARIO: Package, SERVICIO: Wrench }
 export function ComprasPage() {
     const { empresa, user } = useAuth()
     const navigate = useNavigate()
+    const location  = useLocation()
+
+    // Non-blocking message passed via navigate state (replaces alert())
+    const [msgBanner, setMsgBanner] = useState<string>('')
+    useEffect(() => {
+        const st = location.state as { acctMsg?: string } | null
+        if (st?.acctMsg) { setMsgBanner(st.acctMsg); window.history.replaceState({}, '') }
+    }, [])
 
     const [compras, setCompras] = useState<Compra[]>([])
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
@@ -115,6 +123,16 @@ export function ComprasPage() {
 
     return (
         <div className="space-y-5">
+            {/* Accounting result banner (non-blocking, replaces alert) */}
+            {msgBanner && (
+                <div className={cn('flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium',
+                    msgBanner.startsWith('✓') ? 'bg-green-50 text-green-800 border border-green-200'
+                                              : 'bg-amber-50 text-amber-800 border border-amber-200')}>
+                    <span>{msgBanner}</span>
+                    <button onClick={() => setMsgBanner('')} className="shrink-0 text-slate-400 hover:text-slate-600">✕</button>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>

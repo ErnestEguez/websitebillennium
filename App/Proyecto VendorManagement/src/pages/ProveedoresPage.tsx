@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { proveedorService } from '../services/vendorService'
 import type { Proveedor } from '../types/vendors'
@@ -49,19 +49,20 @@ export function ProveedoresPage() {
     const [tabForm, setTabForm] = useState<'basico' | 'tributario' | 'pago'>('basico')
     const [saving, setSaving] = useState(false)
 
-    useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
+    const mountedRef = useRef(true)
+    useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
-    async function load() {
-        try {
-            setLoading(true)
-            const data = await proveedorService.listar(empresa!.id)
-            setProveedores(data)
-        } catch (e: any) {
-            alert('Error al cargar proveedores: ' + e.message)
-        } finally {
-            setLoading(false)
-        }
-    }
+    useEffect(() => {
+        if (!empresa?.id) { setLoading(false); return }
+        const eid = empresa.id
+        let cancelled = false
+        setLoading(true)
+        proveedorService.listar(eid)
+            .then(data => { if (!cancelled && mountedRef.current) setProveedores(data) })
+            .catch(() => {})
+            .finally(() => { if (!cancelled && mountedRef.current) setLoading(false) })
+        return () => { cancelled = true }
+    }, [empresa?.id])
 
     function abrirNuevo() {
         setEditando({ ...PROVEEDOR_VACIO, empresa_id: empresa!.id })
