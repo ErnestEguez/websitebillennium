@@ -53,7 +53,19 @@ export function NuevaCompraServicioPage() {
     const [retenciones, setRetenciones]         = useState<RetLine[]>([])
     const [retSeccion, setRetSeccion]            = useState(false)
 
+    // Accounts for "Cuenta de gasto" per line (only if contabilidad enabled)
+    const [cuentasGasto, setCuentasGasto] = useState<{ id: string; codigo: string; nombre: string }[]>([])
+    const usaContabilidad = !!empresa?.usar_contabilidad_compras
+
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
+
+    useEffect(() => {
+        if (!usaContabilidad || !empresa?.id || cuentasGasto.length > 0) return
+        import('../../services/contabilidadService')
+            .then(m => m.contabilidadService.listarCuentas(empresa!.id))
+            .then(data => setCuentasGasto(data.filter(c => c.tipo === 'gasto')))
+            .catch(() => {})
+    }, [usaContabilidad, empresa?.id])
 
     async function load() {
         try {
@@ -163,6 +175,11 @@ export function NuevaCompraServicioPage() {
                             retFuente: retF, retIva: retI, formaPago,
                             tipoCompra: 'SERVICIO', cuentas: ctas,
                             referencia: numeroFactura || undefined, creadoPor: profile?.id,
+                            lineasServicio: validas.map(d => ({
+                                descripcion: d.descripcion,
+                                subtotal: d.cantidad * d.precio_unitario,
+                                cuenta_contable_id: d.cuenta_contable_id,
+                            })),
                         })
                         asientoInfo = '✓ Asiento contable registrado en LedgerPro.'
                     } else {
@@ -296,7 +313,20 @@ export function NuevaCompraServicioPage() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="col-span-4 md:col-span-2">
+                            {/* Cuenta de gasto por línea — solo si contabilidad activa */}
+                            {usaContabilidad && cuentasGasto.length > 0 && (
+                                <div className="col-span-12 md:col-span-4">
+                                    <label className="label text-xs">Cuenta de gasto (contable)</label>
+                                    <select className="input text-xs" value={d.cuenta_contable_id || ''}
+                                        onChange={e => updLinea(i, 'cuenta_contable_id', e.target.value || null)}>
+                                        <option value="">— usar cuenta base de Ajustes —</option>
+                                        {cuentasGasto.map(c => (
+                                            <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                            <div className="col-span-4 md:col-span-1">
                                 <label className="label text-xs">Cant.</label>
                                 <input type="number" min={0} step={0.01} className="input text-sm text-right"
                                     value={d.cantidad || ''} onChange={e => updLinea(i, 'cantidad', parseFloat(e.target.value) || 0)} />
@@ -306,13 +336,13 @@ export function NuevaCompraServicioPage() {
                                 <input type="number" min={0} step={0.01} className="input text-sm text-right"
                                     value={d.precio_unitario || ''} onChange={e => updLinea(i, 'precio_unitario', parseFloat(e.target.value) || 0)} />
                             </div>
-                            <div className="col-span-10 md:col-span-1 flex flex-col">
+                            <div className="col-span-3 md:col-span-1 flex flex-col">
                                 <label className="label text-xs">Subtotal</label>
                                 <div className="input bg-white text-right font-mono text-sm font-bold">
                                     ${(d.cantidad * d.precio_unitario).toFixed(2)}
                                 </div>
                             </div>
-                            <div className="col-span-2 md:col-span-1 flex items-end pb-0.5">
+                            <div className="col-span-1 flex items-end pb-0.5">
                                 <button onClick={() => removeLinea(i)}
                                     className="p-2 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 w-full flex justify-center">
                                     <Trash2 className="w-4 h-4" />

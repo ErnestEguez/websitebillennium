@@ -13,6 +13,7 @@ import { ConsultaCxPPage }            from './pages/reportes/ConsultaCxPPage'
 import { EstadoCuentaProveedorPage }  from './pages/reportes/EstadoCuentaProveedorPage'
 import { ComprobantesRetencionPage }  from './pages/ComprobantesRetencionPage'
 import { ConfiguracionPage }          from './pages/ConfiguracionPage'
+import { AjustesPage }               from './pages/AjustesPage'
 
 function App() {
     return (
@@ -51,6 +52,9 @@ function App() {
                     } />
                     <Route path="/configuracion" element={
                         <ProtectedRoute><Layout><ConfiguracionPage /></Layout></ProtectedRoute>
+                    } />
+                    <Route path="/ajustes" element={
+                        <ProtectedRoute><Layout><AjustesPage /></Layout></ProtectedRoute>
                     } />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

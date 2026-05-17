@@ -3,7 +3,7 @@ import { Link, useLocation, Navigate } from 'react-router-dom'
 import {
     ShoppingCart, Truck, LayoutDashboard,
     ChevronRight, ChevronDown, Menu, X,
-    Package, Wrench, FileText, Wallet, BarChart2, Receipt, Settings,
+    Package, Wrench, FileText, Wallet, BarChart2, Receipt, Settings, SlidersHorizontal,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
@@ -36,6 +36,7 @@ const NAV_USER: NavItem[] = [
             { to: '/reportes/estado-cuenta', label: 'Estado de cuenta prov.', icon: BarChart2 },
         ],
     },
+    { to: '/ajustes', icon: SlidersHorizontal, label: 'Ajustes Contables' },
 ]
 
 const NAV_ADMIN: NavItem[] = [

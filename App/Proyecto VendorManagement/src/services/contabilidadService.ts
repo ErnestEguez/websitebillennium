@@ -128,13 +128,15 @@ export const contabilidadService = {
         glosa:          string
         subtotal:       number
         valorIva:       number
-        retFuente:      number    // total retenciones en la fuente
-        retIva:         number    // total retenciones de IVA
+        retFuente:      number
+        retIva:         number
         formaPago:      'CONTADO' | 'CREDITO'
         tipoCompra:     'INVENTARIO' | 'SERVICIO'
         cuentas:        CuentasCompras
         referencia?:    string
         creadoPor?:     string
+        // Per-line accounts for service purchases
+        lineasServicio?: { descripcion: string; subtotal: number; cuenta_contable_id?: string | null }[]
     }): Promise<void> {
         const [año, mes] = p.fecha.split('-').map(Number)
         const periodoId  = await getPeriodo(p.empresaId, p.fecha)
@@ -144,8 +146,6 @@ export const contabilidadService = {
         const neto   = Math.round((p.subtotal + p.valorIva - p.retFuente - p.retIva) * 100) / 100
         const tdebe  = Math.round((p.subtotal + p.valorIva) * 100) / 100
         const thaber = Math.round((neto + p.retFuente + p.retIva) * 100) / 100
-
-        const cuentaDebe  = p.tipoCompra === 'INVENTARIO' ? p.cuentas.inventarios : p.cuentas.gastos_servicios
         const cuentaHaber = p.formaPago === 'CREDITO' ? p.cuentas.cuentas_por_pagar : p.cuentas.efectivo
 
         const id = await insertarComprobante(p.empresaId, {
@@ -157,15 +157,34 @@ export const contabilidadService = {
 
         const lineas: Linea[] = []
         let ord = 0
-        lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: cuentaDebe,            descripcion: null, debe: p.subtotal, haber: 0,          orden: ord++ })
+
+        if (p.tipoCompra === 'SERVICIO' && p.lineasServicio?.length) {
+            // One DR per service line using its specific account (fallback to base)
+            for (const ls of p.lineasServicio) {
+                const cta = ls.cuenta_contable_id || p.cuentas.gastos_servicios
+                if (cta && ls.subtotal > 0)
+                    lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: cta,
+                        descripcion: ls.descripcion || null, debe: Math.round(ls.subtotal * 100) / 100, haber: 0, orden: ord++ })
+            }
+        } else {
+            // Inventory: single DR for all
+            const cuentaDebe = p.tipoCompra === 'INVENTARIO' ? p.cuentas.inventarios : p.cuentas.gastos_servicios
+            lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: cuentaDebe,
+                descripcion: null, debe: p.subtotal, haber: 0, orden: ord++ })
+        }
+
         if (p.valorIva > 0 && p.cuentas.iva_compras)
-            lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: p.cuentas.iva_compras, descripcion: null, debe: p.valorIva, haber: 0,       orden: ord++ })
+            lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: p.cuentas.iva_compras,
+                descripcion: null, debe: p.valorIva, haber: 0, orden: ord++ })
         if (neto > 0)
-            lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: cuentaHaber,          descripcion: null, debe: 0,         haber: neto,       orden: ord++ })
+            lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: cuentaHaber,
+                descripcion: null, debe: 0, haber: neto, orden: ord++ })
         if (p.retFuente > 0 && p.cuentas.ret_fuente)
-            lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: p.cuentas.ret_fuente, descripcion: null, debe: 0,         haber: p.retFuente, orden: ord++ })
+            lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: p.cuentas.ret_fuente,
+                descripcion: null, debe: 0, haber: p.retFuente, orden: ord++ })
         if (p.retIva > 0 && p.cuentas.ret_iva)
-            lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: p.cuentas.ret_iva,    descripcion: null, debe: 0,         haber: p.retIva,    orden: ord++ })
+            lineas.push({ comprobante_id: id, empresa_id: p.empresaId, cuenta_id: p.cuentas.ret_iva,
+                descripcion: null, debe: 0, haber: p.retIva, orden: ord++ })
 
         await insertarLineas(lineas)
         await actualizarSaldos(id)
