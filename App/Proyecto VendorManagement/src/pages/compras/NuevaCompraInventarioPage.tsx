@@ -183,7 +183,7 @@ export function NuevaCompraInventarioPage() {
                         const retF = retsParaGuardar.filter(r => r.tipo === 'FUENTE').reduce((s, r) => s + r.valor, 0)
                         const retI = retsParaGuardar.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
                         await contabilidadService.crearAsientoCompra({
-                            empresaId: empresa!.id, fecha: HOY,
+                            empresaId: empresa!.id, portalRuc: empresa?.ruc, fecha: HOY,
                             glosa: `Compra inventario ${numeroFactura || proveedorId.slice(0, 8)}`,
                             subtotal: subtotalLineas, valorIva: ivaCalc,
                             retFuente: retF, retIva: retI, formaPago,

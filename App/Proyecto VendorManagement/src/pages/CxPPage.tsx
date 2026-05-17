@@ -74,7 +74,7 @@ export function CxPPage() {
                 const ctas = empresa!.config_cuentas_compras as unknown as CuentasCompras
                 if (ctas.cuentas_por_pagar && ctas.efectivo) {
                     contabilidadService.crearAsientoPago({
-                        empresaId:  empresa!.id,
+                        empresaId: empresa!.id, portalRuc: empresa?.ruc,
                         fecha:      HOY,
                         glosa:      `Pago proveedor ${formaPago}${referencia ? ' ' + referencia : ''}`,
                         monto,

@@ -45,7 +45,7 @@ export function AjustesPage() {
     useEffect(() => {
         if (!habilitado || !empresa?.id || lista.length > 0) return
         setLoadingLista(true)
-        contabilidadService.listarCuentas(empresa.id)
+        contabilidadService.listarCuentas(empresa.ruc ?? undefined)
             .then(d => setLista(d))
             .catch(() => {})
             .finally(() => setLoadingLista(false))

@@ -62,7 +62,7 @@ export function NuevaCompraServicioPage() {
     useEffect(() => {
         if (!usaContabilidad || !empresa?.id || cuentasGasto.length > 0) return
         import('../../services/contabilidadService')
-            .then(m => m.contabilidadService.listarCuentas(empresa!.id))
+            .then(m => m.contabilidadService.listarCuentas(empresa?.ruc ?? undefined))
             .then(data => setCuentasGasto(data.filter(c => c.tipo === 'gasto')))
             .catch(() => {})
     }, [usaContabilidad, empresa?.id])
@@ -165,11 +165,11 @@ export function NuevaCompraServicioPage() {
 
                 if (cfg?.usar_contabilidad_compras && cfg?.config_cuentas_compras) {
                     const ctas = cfg.config_cuentas_compras as unknown as CuentasCompras
-                    if (ctas.gastos_servicios && ctas.cuentas_por_pagar && ctas.efectivo) {
+                    if ((ctas.gastos_servicios || validas.some(d => d.cuenta_contable_id)) && ctas.cuentas_por_pagar && ctas.efectivo) {
                         const retF = retsParaGuardar.filter(r => r.tipo === 'FUENTE').reduce((s, r) => s + r.valor, 0)
                         const retI = retsParaGuardar.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
                         await contabilidadService.crearAsientoCompra({
-                            empresaId: empresa!.id, fecha: HOY,
+                            empresaId: empresa!.id, portalRuc: empresa?.ruc, fecha: HOY,
                             glosa: `Compra servicio ${numeroFactura || proveedorId.slice(0, 8)}`,
                             subtotal: subtotalLineas, valorIva: ivaCalc,
                             retFuente: retF, retIva: retI, formaPago,

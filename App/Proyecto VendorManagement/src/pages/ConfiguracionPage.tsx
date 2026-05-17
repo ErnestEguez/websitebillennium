@@ -73,7 +73,8 @@ export function ConfiguracionPage() {
     useEffect(() => {
         if (!usarContabilidad || !empresaId || listaCuentas.length > 0) return
         setLoadingCuentas(true)
-        contabilidadService.listarCuentas(empresaId)
+        const ruc = empresaCtx?.ruc ?? todasEmpresas.find(e => e.id === empresaId)?.ruc
+        contabilidadService.listarCuentas(ruc)
             .then(data => setListaCuentas(data))
             .catch(() => {})
             .finally(() => setLoadingCuentas(false))
