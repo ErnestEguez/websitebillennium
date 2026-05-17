@@ -49,6 +49,7 @@ export function ProveedoresPage() {
     const [tabForm, setTabForm] = useState<'basico' | 'tributario' | 'pago'>('basico')
     const [saving, setSaving] = useState(false)
 
+    const [refreshKey, setRefreshKey] = useState(0)
     const mountedRef = useRef(true)
     useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
@@ -62,7 +63,7 @@ export function ProveedoresPage() {
             .catch(() => {})
             .finally(() => { if (!cancelled && mountedRef.current) setLoading(false) })
         return () => { cancelled = true }
-    }, [empresa?.id])
+    }, [empresa?.id, refreshKey])
 
     function abrirNuevo() {
         setEditando({ ...PROVEEDOR_VACIO, empresa_id: empresa!.id })
@@ -91,7 +92,7 @@ export function ProveedoresPage() {
                     empresa_id: empresa!.id,
                 } as Omit<Proveedor, 'id' | 'created_at' | 'updated_at'>)
             }
-            await load()
+            setRefreshKey(k => k + 1)
             setIsModalOpen(false)
         } catch (e: any) {
             alert('Error al guardar: ' + e.message)
@@ -107,7 +108,7 @@ export function ProveedoresPage() {
             await proveedorService.actualizar(p.id, {
                 estado: p.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO'
             })
-            await load()
+            setRefreshKey(k => k + 1)
         } catch (e: any) {
             alert('Error: ' + e.message)
         }
