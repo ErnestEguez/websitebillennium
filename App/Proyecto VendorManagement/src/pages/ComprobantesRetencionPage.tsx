@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { proveedorService } from '../services/vendorService'
 import type { Proveedor } from '../types/vendors'
 import {
     FileText, Search, ChevronDown, ChevronUp,
-    Loader2, CheckCircle2, AlertCircle, Clock,
+    Loader2, CheckCircle2, AlertCircle, Clock, Download, Send, X,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { PrintExportBar } from '../components/PrintExportBar'
@@ -15,14 +15,16 @@ const PRIMER_DIA_MES = new Date(new Date().getFullYear(), new Date().getMonth(),
 const fmt  = (n: number) => `$${n.toFixed(2)}`
 const fmtF = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })
 
+type EstadoSri = 'NO_FIRMADA' | 'ENVIADO' | 'AUTORIZADO' | 'RECHAZADO' | null
+
 interface RetencionDocumento {
-    compra_id:           string
-    numero_retencion:    string | null
-    proveedor_id:        string
-    proveedor_nombre:    string
-    proveedor_ruc:       string
-    factura_numero:      string | null
-    fecha_emision:       string
+    compra_id:            string
+    numero_retencion:     string | null
+    proveedor_id:         string
+    proveedor_nombre:     string
+    proveedor_ruc:        string
+    factura_numero:       string | null
+    fecha_emision:        string
     lineas: {
         tipo:             string
         codigo_retencion: string
@@ -31,28 +33,45 @@ interface RetencionDocumento {
         porcentaje:       number
         valor:            number
     }[]
-    total:               number
-    estado:              string
-    origen:              string
-    numero_autorizacion: string | null
+    total:                number
+    estado:               string
+    origen:               string
+    numero_autorizacion:  string | null
+    fecha_autorizacion:   string | null
+    estado_sri:           EstadoSri
+    clave_acceso:         string | null
+    xml_firmado:          string | null
+    observaciones_sri:    string | null
+}
+
+const SRI_BADGE: Record<NonNullable<EstadoSri>, { cls: string; label: string }> = {
+    NO_FIRMADA: { cls: 'bg-amber-100 text-amber-700',  label: 'Pendiente SRI'  },
+    ENVIADO:    { cls: 'bg-blue-100 text-blue-700',    label: 'Enviada SRI'    },
+    AUTORIZADO: { cls: 'bg-green-100 text-green-700',  label: 'Autorizada SRI' },
+    RECHAZADO:  { cls: 'bg-red-100 text-red-600',      label: 'Rechazada SRI'  },
 }
 
 export function ComprobantesRetencionPage() {
-    const { empresa }           = useAuth()
-    const [docs, setDocs]       = useState<RetencionDocumento[]>([])
+    const { empresa }                 = useAuth()
+    const [docs, setDocs]             = useState<RetencionDocumento[]>([])
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
-    const [loading, setLoading] = useState(true)
-    const [expandido, setExpandido] = useState<string | null>(null)
-    const [busqueda, setBusqueda]   = useState('')
-    const [desde, setDesde]         = useState(PRIMER_DIA_MES)
-    const [hasta, setHasta]         = useState(HOY)
-    const [provId, setProvId]       = useState('')
+    const [loading, setLoading]       = useState(true)
+    const [expandido, setExpandido]   = useState<string | null>(null)
+    const [busqueda, setBusqueda]     = useState('')
+    const [desde, setDesde]           = useState(PRIMER_DIA_MES)
+    const [hasta, setHasta]           = useState(HOY)
+    const [provId, setProvId]         = useState('')
+    const [sriLoading, setSriLoading] = useState<string | null>(null)
+    const [sriMsg, setSriMsg]         = useState<{ tipo: 'ok' | 'err'; texto: string } | null>(null)
+    const mountedRef = useRef(true)
+    useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
     useEffect(() => {
         if (empresa?.id) {
-            proveedorService.listar(empresa.id).then(setProveedores)
+            proveedorService.listar(empresa.id).then(setProveedores).catch(() => {})
             load()
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [empresa?.id])
 
     async function load() {
@@ -75,6 +94,11 @@ export function ComprobantesRetencionPage() {
                     estado,
                     origen,
                     numero_autorizacion,
+                    fecha_autorizacion,
+                    estado_sri,
+                    clave_acceso,
+                    xml_firmado,
+                    observaciones_sri,
                     compra:ingresos_stock(numero_factura),
                     proveedor:proveedores(nombre_empresa, ruc)
                 `)
@@ -88,24 +112,28 @@ export function ComprobantesRetencionPage() {
             const { data, error } = await q
             if (error) throw error
 
-            // Agrupar por (compra_id + numero_retencion)
             const mapa = new Map<string, RetencionDocumento>()
             ;(data ?? []).forEach((r: any) => {
                 const clave = `${r.compra_id}|${r.numero_retencion ?? 'sin_numero'}`
                 if (!mapa.has(clave)) {
                     mapa.set(clave, {
-                        compra_id:          r.compra_id,
-                        numero_retencion:   r.numero_retencion,
-                        proveedor_id:       r.proveedor_id,
-                        proveedor_nombre:   r.proveedor?.nombre_empresa ?? '—',
-                        proveedor_ruc:      r.proveedor?.ruc ?? '',
-                        factura_numero:     r.compra?.numero_factura ?? null,
-                        fecha_emision:      r.fecha_emision,
-                        lineas:             [],
-                        total:              0,
-                        estado:             r.estado,
-                        origen:             r.origen,
+                        compra_id:           r.compra_id,
+                        numero_retencion:    r.numero_retencion,
+                        proveedor_id:        r.proveedor_id,
+                        proveedor_nombre:    r.proveedor?.nombre_empresa ?? '—',
+                        proveedor_ruc:       r.proveedor?.ruc ?? '',
+                        factura_numero:      r.compra?.numero_factura ?? null,
+                        fecha_emision:       r.fecha_emision,
+                        lineas:              [],
+                        total:               0,
+                        estado:              r.estado,
+                        origen:              r.origen,
                         numero_autorizacion: r.numero_autorizacion,
+                        fecha_autorizacion:  r.fecha_autorizacion,
+                        estado_sri:          r.estado_sri as EstadoSri,
+                        clave_acceso:        r.clave_acceso,
+                        xml_firmado:         r.xml_firmado,
+                        observaciones_sri:   r.observaciones_sri,
                     })
                 }
                 const doc = mapa.get(clave)!
@@ -119,9 +147,50 @@ export function ComprobantesRetencionPage() {
                 })
                 doc.total += r.valor
             })
-            setDocs(Array.from(mapa.values()))
-        } catch (e: any) { alert('Error: ' + e.message) }
-        finally { setLoading(false) }
+            if (mountedRef.current) setDocs(Array.from(mapa.values()))
+        } catch (e: any) {
+            if (mountedRef.current)
+                setSriMsg({ tipo: 'err', texto: 'Error al cargar: ' + e.message })
+        } finally {
+            if (mountedRef.current) setLoading(false)
+        }
+    }
+
+    async function autorizarSRI(doc: RetencionDocumento) {
+        if (!empresa?.id) return
+        setSriLoading(doc.compra_id)
+        setSriMsg(null)
+        try {
+            const { data, error } = await supabase.functions.invoke('sri-retencion', {
+                body: { compra_id: doc.compra_id, empresa_id: empresa.id },
+            })
+            if (error) throw new Error(error.message || 'Error al invocar función')
+            if (!data?.success) throw new Error(data?.error || 'Error en función SRI')
+
+            if (mountedRef.current) {
+                const msg = data.authorized
+                    ? `✓ Autorizada por SRI — Nº ${data.numero_autorizacion ?? ''}`
+                    : `SRI respondió: ${data.message || data.estado_sri}`
+                setSriMsg({ tipo: data.authorized ? 'ok' : 'err', texto: msg })
+                await load()
+            }
+        } catch (e: any) {
+            if (mountedRef.current)
+                setSriMsg({ tipo: 'err', texto: 'Error: ' + e.message })
+        } finally {
+            if (mountedRef.current) setSriLoading(null)
+        }
+    }
+
+    function descargarXml(doc: RetencionDocumento) {
+        if (!doc.xml_firmado) return
+        const blob = new Blob([doc.xml_firmado], { type: 'application/xml' })
+        const url  = URL.createObjectURL(blob)
+        const a    = document.createElement('a')
+        a.href     = url
+        a.download = `RET-${doc.numero_retencion ?? doc.compra_id}.xml`
+        a.click()
+        URL.revokeObjectURL(url)
     }
 
     const visibles = docs.filter(d => {
@@ -135,9 +204,9 @@ export function ComprobantesRetencionPage() {
         )
     })
 
-    const totalRetenido  = visibles.filter(d => d.estado === 'ACTIVO').reduce((s, d) => s + d.total, 0)
-    const ctdElectronica = visibles.filter(d => d.origen === 'SRI').length
-    const ctdManual      = visibles.filter(d => d.origen === 'MANUAL').length
+    const totalRetenido   = visibles.filter(d => d.estado === 'ACTIVO').reduce((s, d) => s + d.total, 0)
+    const ctdAutorizadas  = visibles.filter(d => d.estado_sri === 'AUTORIZADO').length
+    const ctdPendientes   = visibles.filter(d => d.estado !== 'ANULADO' && d.estado_sri !== 'AUTORIZADO').length
 
     return (
         <div className="space-y-5">
@@ -146,13 +215,32 @@ export function ComprobantesRetencionPage() {
                 <p className="text-slate-500 text-sm">Retenciones emitidas a proveedores</p>
             </div>
 
+            {/* Banner SRI */}
+            {sriMsg && (
+                <div className={cn(
+                    'flex items-start gap-3 p-4 rounded-xl text-sm',
+                    sriMsg.tipo === 'ok'
+                        ? 'bg-green-50 border border-green-200 text-green-800'
+                        : 'bg-red-50 border border-red-200 text-red-800'
+                )}>
+                    {sriMsg.tipo === 'ok'
+                        ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                        : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    }
+                    <p className="flex-1">{sriMsg.texto}</p>
+                    <button onClick={() => setSriMsg(null)} className="p-0.5 hover:opacity-60">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                    { label: 'Total retenido',    val: fmt(totalRetenido), color: 'text-amber-700' },
-                    { label: 'Documentos',        val: visibles.length,    color: 'text-slate-700' },
-                    { label: 'Manuales',          val: ctdManual,          color: 'text-slate-600' },
-                    { label: 'Electrónicas (SRI)',val: ctdElectronica,     color: 'text-green-700' },
+                    { label: 'Total retenido',      val: fmt(totalRetenido), color: 'text-amber-700' },
+                    { label: 'Documentos',           val: visibles.length,    color: 'text-slate-700' },
+                    { label: 'Autorizadas SRI',      val: ctdAutorizadas,     color: 'text-green-700' },
+                    { label: 'Pendientes de firma',  val: ctdPendientes,      color: 'text-amber-600' },
                 ].map(k => (
                     <div key={k.label} className="card p-4 text-center">
                         <p className="text-xs text-slate-400 mb-1">{k.label}</p>
@@ -191,8 +279,8 @@ export function ComprobantesRetencionPage() {
                             RUC:             d.proveedor_ruc,
                             FacturaRelacion: d.factura_numero ?? '',
                             TotalRetenido:   d.total,
-                            Origen:          d.origen,
-                            Estado:          d.estado,
+                            EstadoSRI:       d.estado_sri ?? 'NO_FIRMADA',
+                            Autorizacion:    d.numero_autorizacion ?? '',
                         }))}
                         nombreArchivo="comprobantes_retencion"
                     />
@@ -212,27 +300,27 @@ export function ComprobantesRetencionPage() {
             ) : (
                 <div className="space-y-3">
                     {visibles.map((doc, idx) => {
-                        const clave    = `${doc.compra_id}|${doc.numero_retencion}`
-                        const abierto  = expandido === clave
-                        const esElect  = doc.origen === 'SRI'
+                        const clave     = `${doc.compra_id}|${doc.numero_retencion}`
+                        const abierto   = expandido === clave
+                        const sriBadge  = SRI_BADGE[doc.estado_sri ?? 'NO_FIRMADA']
+                        const autorizado = doc.estado_sri === 'AUTORIZADO'
+                        const procesando = sriLoading === doc.compra_id
 
                         return (
                             <div key={idx} className="card overflow-hidden">
-                                {/* Cabecera del documento */}
+                                {/* Cabecera */}
                                 <button
                                     onClick={() => setExpandido(abierto ? null : clave)}
                                     className="w-full flex items-center gap-4 p-4 hover:bg-slate-50 transition-colors text-left"
                                 >
-                                    {/* Ícono estado */}
                                     <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                                        esElect ? 'bg-green-100' : 'bg-amber-100')}>
-                                        {esElect
+                                        autorizado ? 'bg-green-100' : 'bg-amber-100')}>
+                                        {autorizado
                                             ? <CheckCircle2 className="w-5 h-5 text-green-600" />
                                             : <Clock className="w-5 h-5 text-amber-600" />
                                         }
                                     </div>
 
-                                    {/* Info principal */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="font-bold text-slate-900">
@@ -241,9 +329,8 @@ export function ComprobantesRetencionPage() {
                                                     : <span className="text-slate-400 italic">Sin número</span>
                                                 }
                                             </span>
-                                            <span className={cn('text-xs px-2 py-0.5 rounded-full font-semibold',
-                                                esElect ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}>
-                                                {esElect ? 'Electrónica SRI' : 'Manual'}
+                                            <span className={cn('text-xs px-2 py-0.5 rounded-full font-semibold', sriBadge.cls)}>
+                                                {sriBadge.label}
                                             </span>
                                             {doc.estado === 'ANULADO' && (
                                                 <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-600">
@@ -277,20 +364,44 @@ export function ComprobantesRetencionPage() {
                                 {/* Detalle expandido */}
                                 {abierto && (
                                     <div className="border-t border-slate-100 p-4 space-y-3 bg-slate-50/50">
-                                        {/* Info SRI si es electrónica */}
-                                        {esElect && doc.numero_autorizacion && (
-                                            <div className="flex items-center gap-2 p-3 bg-green-50 rounded-xl text-xs">
-                                                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
-                                                <div>
+
+                                        {/* Estado SRI */}
+                                        {autorizado ? (
+                                            <div className="flex items-start gap-2 p-3 bg-green-50 rounded-xl text-xs">
+                                                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                                                <div className="flex-1 min-w-0">
                                                     <p className="font-semibold text-green-800">Autorizada por SRI</p>
-                                                    <p className="font-mono text-green-700 break-all">{doc.numero_autorizacion}</p>
+                                                    {doc.numero_autorizacion && (
+                                                        <p className="font-mono text-green-700 break-all mt-0.5">
+                                                            Nº {doc.numero_autorizacion}
+                                                        </p>
+                                                    )}
+                                                    {doc.fecha_autorizacion && (
+                                                        <p className="text-green-600 mt-0.5">
+                                                            {new Date(doc.fecha_autorizacion).toLocaleString('es-EC')}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
-                                        )}
-                                        {!esElect && (
+                                        ) : doc.estado_sri === 'RECHAZADO' ? (
+                                            <div className="flex items-start gap-2 p-3 bg-red-50 rounded-xl text-xs text-red-700">
+                                                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="font-semibold">Rechazada por SRI</p>
+                                                    {doc.observaciones_sri && (
+                                                        <p className="mt-0.5 break-words">{doc.observaciones_sri}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
                                             <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl text-xs text-amber-700">
                                                 <AlertCircle className="w-4 h-4 shrink-0" />
-                                                <p>Retención manual — pendiente de autorización electrónica SRI</p>
+                                                <p className="flex-1">
+                                                    {doc.estado_sri === 'ENVIADO'
+                                                        ? 'Enviada al SRI — pendiente de autorización'
+                                                        : 'Pendiente de firma electrónica SRI'
+                                                    }
+                                                </p>
                                             </div>
                                         )}
 
@@ -332,6 +443,44 @@ export function ComprobantesRetencionPage() {
                                                 </tr>
                                             </tfoot>
                                         </table>
+
+                                        {/* Acciones SRI */}
+                                        {doc.estado !== 'ANULADO' && (
+                                            <div className="flex gap-2 pt-1">
+                                                {!autorizado && (
+                                                    <button
+                                                        onClick={() => autorizarSRI(doc)}
+                                                        disabled={procesando}
+                                                        className="btn btn-primary text-xs flex items-center gap-1.5"
+                                                    >
+                                                        {procesando
+                                                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Procesando...</>
+                                                            : <><Send className="w-3.5 h-3.5" /> Autorizar SRI</>
+                                                        }
+                                                    </button>
+                                                )}
+                                                {doc.xml_firmado && (
+                                                    <button
+                                                        onClick={() => descargarXml(doc)}
+                                                        className="btn btn-secondary text-xs flex items-center gap-1.5"
+                                                    >
+                                                        <Download className="w-3.5 h-3.5" /> Descargar XML
+                                                    </button>
+                                                )}
+                                                {doc.estado_sri === 'RECHAZADO' && (
+                                                    <button
+                                                        onClick={() => autorizarSRI(doc)}
+                                                        disabled={procesando}
+                                                        className="btn btn-secondary text-xs flex items-center gap-1.5"
+                                                    >
+                                                        {procesando
+                                                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reintentando...</>
+                                                            : <><Send className="w-3.5 h-3.5" /> Reintentar SRI</>
+                                                        }
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
