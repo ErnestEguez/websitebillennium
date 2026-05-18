@@ -818,7 +818,7 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
                 >
                   <ShoppingBag className="h-4 w-4 opacity-70 group-hover:scale-110 transition-transform" />
                   <span className="text-sm font-medium">{sug.descripcion}</span>
-                  <span className="text-xs opacity-80">${sug.precio.toFixed(2)}</span>
+                  <span className="text-xs opacity-80">${sug.precio.toFixed(4)}</span>
                 </button>
               ))}
             </div>
@@ -830,14 +830,14 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Artículo</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Cant.</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Precio</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Costo</th>
-                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-700">IVA</th>
-                  {showUtilidad && <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Utilidad</th>}
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Subtotal</th>
-                  <th className="px-3 py-2"></th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-700 w-auto">Artículo</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 w-24">Cant.</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 w-32">Precio</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 w-28">Costo</th>
+                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-700 w-16">IVA</th>
+                  {showUtilidad && <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 w-24">Utilidad</th>}
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-700 w-28">Subtotal</th>
+                  <th className="px-3 py-2 w-8"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -848,7 +848,7 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
                   return (
                     <tr key={detalle.articulo_id} className="hover:bg-gray-50">
                       <td className="px-3 py-2 text-sm text-gray-900">{detalle.descripcion}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 text-right">
                         <input
                           type="number"
                           min="0.01"
@@ -858,21 +858,21 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
                           className="w-20 px-2 py-1 text-right border border-gray-300 rounded text-sm"
                         />
                       </td>
-                      <td className="px-3 py-2">
-                        <div className="relative">
+                      <td className="px-3 py-2 text-right">
+                        <div className="relative inline-block">
                           <DollarSign className="absolute left-1 top-1 h-4 w-4 text-gray-400" />
                           <input
                             type="number"
                             min="0"
-                            step="0.01"
+                            step="0.0001"
                             value={detalle.precio}
                             onChange={(e) => actualizarDetalle(index, 'precio', parseFloat(e.target.value) || 0)}
-                            className="w-24 pl-6 pr-2 py-1 text-right border border-gray-300 rounded text-sm"
+                            className="w-28 pl-6 pr-2 py-1 text-right border border-gray-300 rounded text-sm"
                           />
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-right text-sm text-gray-600">
-                        ${detalle.costo.toFixed(2)}
+                      <td className="px-3 py-2 text-right text-sm text-gray-600 font-mono">
+                        ${detalle.costo.toFixed(4)}
                       </td>
                       <td className="px-3 py-2 text-center text-sm text-gray-600">
                         {detalle.tasa_iva}%
@@ -885,10 +885,10 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
                           </span>
                         </td>
                       )}
-                      <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                      <td className="px-3 py-2 text-right text-sm font-medium text-gray-900 font-mono">
                         ${subtotal.toFixed(2)}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 text-center">
                         <button
                           type="button"
                           onClick={() => eliminarDetalle(index)}
