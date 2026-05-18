@@ -158,7 +158,7 @@ export const proformaService = {
       costo: detalle.costo,
       subtotal: detalle.cantidad * detalle.precio,
       tasa_iva: detalle.tasa_iva ?? 15,
-      utilidad_porcentaje: detalle.costo > 0 ? ((detalle.precio - detalle.costo) / detalle.costo) * 100 : 0
+      utilidad_porcentaje: detalle.precio > 0 ? ((detalle.precio - detalle.costo) / detalle.precio) * 100 : 0
     }));
 
     const { error: detallesError } = await supabase
@@ -217,7 +217,7 @@ export const proformaService = {
       costo: detalle.costo,
       subtotal: detalle.cantidad * detalle.precio,
       tasa_iva: detalle.tasa_iva ?? 15,
-      utilidad_porcentaje: detalle.costo > 0 ? ((detalle.precio - detalle.costo) / detalle.costo) * 100 : 0
+      utilidad_porcentaje: detalle.precio > 0 ? ((detalle.precio - detalle.costo) / detalle.precio) * 100 : 0
     }));
 
     const { error: detallesError } = await supabase
@@ -370,6 +370,6 @@ export const proformaService = {
 };
 
 export function calcularUtilidad(precio: number, costo: number): number {
-  if (costo <= 0) return 0;
-  return ((precio - costo) / costo) * 100;
+  if (precio <= 0) return 0;
+  return ((precio - costo) / precio) * 100;
 }

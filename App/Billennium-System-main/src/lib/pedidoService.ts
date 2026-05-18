@@ -243,7 +243,7 @@ export const pedidoService = {
       costo: detalle.costo,
       subtotal: detalle.cantidad * detalle.precio,
       tasa_iva: detalle.tasa_iva ?? 15,
-      utilidad_porcentaje: detalle.costo > 0 ? ((detalle.precio - detalle.costo) / detalle.costo) * 100 : 0
+      utilidad_porcentaje: detalle.precio > 0 ? ((detalle.precio - detalle.costo) / detalle.precio) * 100 : 0
     }));
 
     const { error: detallesError } = await supabase
