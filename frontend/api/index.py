@@ -841,11 +841,12 @@ def get_admin_stats(admin: dict = Depends(get_admin_user)):
 
 # Mapa de product_id → URL de producción de la App
 APP_URLS = {
-    "sentinel":      os.environ.get("PEDIDOS_APP_URL",       "http://localhost:5173"),
-    "importaciones": os.environ.get("IMPORTACIONES_APP_URL", "https://websitebillennium-5gsk.vercel.app/"),
-    "facturacion":   os.environ.get("FACTURACION_APP_URL",   "https://websitebillennium-quickinvoice.vercel.app/"),
-    "contabilidad":     os.environ.get("CONTABILIDAD_APP_URL",    "https://websitebillennium-ledgerpro.vercel.app/"),
-    "vendormanagement": os.environ.get("VENDOR_APP_URL",           "https://websitebillennium-vendor.vercel.app/"),
+    "sentinel":         os.environ.get("PEDIDOS_APP_URL",       "http://localhost:5173"),
+    "importaciones":    os.environ.get("IMPORTACIONES_APP_URL", "https://websitebillennium-5gsk.vercel.app/"),
+    "facturacion":      os.environ.get("FACTURACION_APP_URL",   "https://websitebillennium-quickinvoice.vercel.app/"),
+    "contabilidad":     os.environ.get("CONTABILIDAD_APP_URL",  "https://websitebillennium-ledgerpro.vercel.app/"),
+    "vendormanagement": os.environ.get("VENDOR_APP_URL",        "https://websitebillennium-vendor.vercel.app/"),
+    "restoflow":        os.environ.get("RESTOFLOW_APP_URL",     "https://websitebillennium-restaurantes-6i4943gb3-ernesteguezs-projects.vercel.app/"),
 }
 
 @api_router.get("/debug/env")
@@ -908,7 +909,7 @@ def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
     name = admin["name"]
 
     # Para estas apps solo se genera el magic link — el perfil de admin se crea directamente en la BD de cada app
-    if product_id in ("importaciones", "facturacion", "vendormanagement"):
+    if product_id in ("importaciones", "facturacion", "vendormanagement", "restoflow", "contabilidad"):
         try:
             result = supabase.auth.admin.generate_link({
                 "type": "magiclink",
