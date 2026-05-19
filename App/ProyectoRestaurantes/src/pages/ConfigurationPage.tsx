@@ -88,10 +88,9 @@ export function ConfigurationPage() {
 
             if (profile?.rol === 'admin_plataforma') {
                 // Cargar empresas del portal + config RestoFlow por separado y mergear
-                const [{ data: portalEmps }, { data: configs }, users] = await Promise.all([
+                const [{ data: portalEmps }, { data: configs }] = await Promise.all([
                     supabasePortal.from('empresas').select('*').order('nombre'),
                     supabase.from('config_empresa').select('*'),
-                    staffService.getPortalUsers(),
                 ])
                 const merged = (portalEmps || []).map((e: any) => {
                     const cfg = (configs || []).find((c: any) => c.empresa_id === e.id)
@@ -105,6 +104,9 @@ export function ConfigurationPage() {
                     }
                 })
                 setAllEmpresas(merged)
+
+                // Usuarios del portal: carga independiente para no bloquear empresas si falla
+                const users = await staffService.getPortalUsers()
                 setPortalUsers(users)
             }
 
