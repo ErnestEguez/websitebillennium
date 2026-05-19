@@ -234,11 +234,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     async function signOut() {
-        // Fire-and-forget — no await para evitar spinner colgado
         supabase.auth.signOut().catch(() => {})
-        // Cerrar ventana (app abierta desde portal) o redirigir al portal
         window.close()
-        setTimeout(() => window.location.replace(PORTAL_URL), 300)
         return Promise.resolve()
     }
 
