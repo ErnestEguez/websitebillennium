@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { supabasePortal } from '../lib/supabasePortal'
+import { supabasePublic } from '../lib/supabasePublic'
 
 export interface StaffMember {
     id: string
@@ -94,29 +95,49 @@ export const staffService = {
         return true
     },
 
-    // ── Usuarios del Portal (para el formulario de asignación) ───
-    // Lee de facturacion.profiles (supabasePortal)
+    // ── Usuarios del Portal para dropdown ────────────────────
+    // Lee de public.users (tabla del portal — todos los usuarios registrados)
 
     async getPortalUsers(): Promise<StaffMember[]> {
-        const { data, error } = await supabasePortal
-            .from('profiles')
-            .select('id, nombre, email, rol, empresa_id')
-            .neq('rol', 'admin_plataforma')
-            .order('nombre')
+        const { data, error } = await supabasePublic
+            .from('users')
+            .select('id, name, email, role, company_name')
+            .eq('is_active', true)
+            .neq('role', 'admin')
+            .order('name')
         if (error) throw error
-        return (data || []) as StaffMember[]
+        return (data || []).map((u: any) => ({
+            id:         u.id,
+            nombre:     u.name || u.email,
+            email:      u.email,
+            rol:        'oficina' as const,
+            empresa_id: '',
+        }))
     },
 
-    // Asigna un usuario del portal a una empresa (actualiza facturacion.profiles)
+    // Asigna usuario del portal a empresa usando RPC dar_acceso_portal
+    // Crea/actualiza el registro en facturacion.profiles
     async asignarUsuarioEmpresa(userId: string, empresaId: string): Promise<void> {
-        const { error } = await supabasePortal
-            .from('profiles')
-            .update({ empresa_id: empresaId })
+        // Obtener email y nombre desde public.users
+        const { data: userData, error: userErr } = await supabasePublic
+            .from('users')
+            .select('email, name')
             .eq('id', userId)
-        if (error) throw error
+            .single()
+        if (userErr || !userData) throw new Error('Usuario no encontrado en el portal')
+
+        // Llamar RPC dar_acceso_portal (igual que QuickInvoice)
+        const { data: result, error: rpcErr } = await supabasePortal.rpc('dar_acceso_portal', {
+            p_email:      userData.email.trim().toLowerCase(),
+            p_empresa_id: empresaId,
+            p_nombre:     userData.name || userData.email,
+            p_rol:        'oficina',
+        })
+        if (rpcErr) throw rpcErr
+        if (result && !result.ok) throw new Error(result.error || 'Error al asignar usuario')
     },
 
-    // Obtiene usuarios del portal con rol oficina
+    // Usuarios ya asignados: lee de facturacion.profiles (oficina)
     async getOficinaUsers(): Promise<StaffMember[]> {
         const { data, error } = await supabasePortal
             .from('profiles')

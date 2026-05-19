@@ -48,10 +48,11 @@ export function ConfigurationPage() {
     const [editingEmpresa, setEditingEmpresa] = useState<any>(null)
 
     // ── Admin: usuarios del portal ────────────────────────
-    const [portalUsers, setPortalUsers]   = useState<StaffMember[]>([])
-    const [asignacion, setAsignacion]     = useState({ usuario_id: '', empresa_id: '' })
-    const [asignandoId, setAsignandoId]   = useState<string | null>(null)
-    const [msgAsig, setMsgAsig]           = useState<{ tipo: 'ok' | 'err'; texto: string } | null>(null)
+    const [portalUsers, setPortalUsers]       = useState<StaffMember[]>([])   // public.users → dropdown
+    const [assignedProfiles, setAssignedProfiles] = useState<StaffMember[]>([]) // facturacion.profiles → tabla
+    const [asignacion, setAsignacion]         = useState({ usuario_id: '', empresa_id: '' })
+    const [asignandoId, setAsignandoId]       = useState<string | null>(null)
+    const [msgAsig, setMsgAsig]               = useState<{ tipo: 'ok' | 'err'; texto: string } | null>(null)
 
     // ─────────────────────────────────────────────────────
     useEffect(() => {
@@ -105,13 +106,20 @@ export function ConfigurationPage() {
                 })
                 setAllEmpresas(merged)
 
-                // Usuarios del portal: aislado para que su fallo no afecte empresas
+                // Dropdown: todos los usuarios del portal (public.users)
                 try {
                     const users = await staffService.getPortalUsers()
                     setPortalUsers(users)
-                } catch (usersErr: any) {
-                    console.error('[RestoFlow] getPortalUsers error:', usersErr?.message)
-                    setPortalUsers([])
+                } catch (e: any) {
+                    console.error('[RestoFlow] getPortalUsers error:', e?.message)
+                }
+
+                // Tabla: usuarios ya asignados (facturacion.profiles oficina)
+                try {
+                    const assigned = await staffService.getOficinaUsers()
+                    setAssignedProfiles(assigned)
+                } catch (e: any) {
+                    console.error('[RestoFlow] getOficinaUsers error:', e?.message)
                 }
             }
 
@@ -259,8 +267,11 @@ export function ConfigurationPage() {
             return
         }
         // Validar que el usuario no esté ya asignado a esa empresa
-        const user = portalUsers.find(u => u.id === asignacion.usuario_id)
-        if (user?.empresa_id === asignacion.empresa_id) {
+        const alreadyAssigned = assignedProfiles.find(
+            u => u.empresa_id === asignacion.empresa_id &&
+                 portalUsers.find(p => p.id === asignacion.usuario_id)?.email === u.email
+        )
+        if (alreadyAssigned) {
             setMsgAsig({ tipo: 'err', texto: 'Este usuario ya está asignado a esa empresa' })
             return
         }
@@ -758,12 +769,15 @@ export function ConfigurationPage() {
                                             value={asignacion.usuario_id}
                                             onChange={e => setAsignacion({ ...asignacion, usuario_id: e.target.value })}>
                                             <option value="">Seleccionar usuario...</option>
-                                            {portalUsers.map(u => (
-                                                <option key={u.id} value={u.id}>
-                                                    {u.nombre || u.email} — {u.rol}
-                                                    {u.empresa_id ? ` (ya asignado)` : ''}
-                                                </option>
-                                            ))}
+                                            {portalUsers.map(u => {
+                                                const yaAsignado = assignedProfiles.find(a => a.email === u.email)
+                                                return (
+                                                    <option key={u.id} value={u.id}>
+                                                        {u.nombre || u.email}
+                                                        {yaAsignado ? ` — ya asignado a ${allEmpresas.find(e => e.id === yaAsignado.empresa_id)?.nombre || 'una empresa'}` : ''}
+                                                    </option>
+                                                )
+                                            })}
                                         </select>
                                     </div>
                                     <div>
@@ -800,7 +814,7 @@ export function ConfigurationPage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
-                                                {portalUsers.map(user => {
+                                                {assignedProfiles.map(user => {
                                                     const empAsig = allEmpresas.find(e => e.id === user.empresa_id)
                                                     return (
                                                         <tr key={user.id} className="hover:bg-slate-50 transition-colors">
@@ -825,8 +839,8 @@ export function ConfigurationPage() {
                                                         </tr>
                                                     )
                                                 })}
-                                                {portalUsers.length === 0 && (
-                                                    <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400">No hay usuarios del portal.</td></tr>
+                                                {assignedProfiles.length === 0 && (
+                                                    <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400">No hay usuarios asignados aún.</td></tr>
                                                 )}
                                             </tbody>
                                         </table>
