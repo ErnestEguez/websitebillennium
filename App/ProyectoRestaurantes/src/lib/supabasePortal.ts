@@ -10,6 +10,7 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 export const supabasePortal = createClient(url, key, {
     db: { schema: 'facturacion' },
     auth: {
+        storageKey:        'rf-portal',
         autoRefreshToken:  false,
         detectSessionInUrl: false,
         persistSession:    false,

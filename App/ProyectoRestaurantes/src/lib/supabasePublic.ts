@@ -7,7 +7,7 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 // Cliente para leer public.users (tabla de usuarios del portal)
 export const supabasePublic = createClient(url, key, {
     db: { schema: 'public' },
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    auth: { storageKey: 'rf-public', autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
     global: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
             const { data: { session } } = await supabase.auth.getSession()
