@@ -14,15 +14,6 @@ import {
 import { categoriaService, type Categoria } from '../services/categoriaService'
 import { cn } from '../lib/utils'
 
-// ─── Tipos ──────────────────────────────────────────────
-interface EmpresaConfig {
-    empresa_id:               string
-    config_sri?:              any
-    config_general?:          any
-    habilitar_division_cuenta?: boolean
-    usar_restoflow?:          boolean
-}
-
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
     const [activeTab, setActiveTab]         = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'plataforma'>('empresa')
