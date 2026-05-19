@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { supabasePortal } from '../lib/supabasePortal'
 import { supabasePublic } from '../lib/supabasePublic'
@@ -32,9 +33,14 @@ export const staffService = {
     async createStaffMember(member: Partial<StaffMember>): Promise<StaffMember> {
         let userId = member.id
 
-        // Crear usuario en Auth reutilizando supabasePortal (evita múltiples GoTrueClient)
+        // Cliente sin custom fetch ni sesión persistente — evita inyectar el token del admin en el signup
         if (member.email && (member as any).password) {
-            const { data: authData, error: authError } = await supabasePortal.auth.signUp({
+            const signupClient = createClient(
+                import.meta.env.VITE_SUPABASE_URL,
+                import.meta.env.VITE_SUPABASE_ANON_KEY,
+                { auth: { persistSession: false, storageKey: 'restoflow-staff-signup', autoRefreshToken: false } }
+            )
+            const { data: authData, error: authError } = await signupClient.auth.signUp({
                 email: member.email,
                 password: (member as any).password,
                 options: { data: { full_name: member.nombre } }
