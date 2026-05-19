@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
-import { Smartphone, FileText, Ship, BookOpen, ExternalLink, Loader2, Lock } from 'lucide-react';
+import { Smartphone, FileText, Ship, BookOpen, ExternalLink, Loader2, Lock, UtensilsCrossed } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -47,6 +47,14 @@ const ADMIN_APPS = [
     name: 'Gestión de Compras',
     description: 'Proveedores, compras de inventario y servicios, cuentas por pagar y órdenes de compra.',
     icon: FileText,
+    color: 'bg-orange-50 text-orange-600',
+    available: true,
+  },
+  {
+    id: 'restoflow',
+    name: 'RestoFlow',
+    description: 'Gestión integral de restaurantes. Mesas, pedidos, facturación electrónica, inventario y caja.',
+    icon: UtensilsCrossed,
     color: 'bg-orange-50 text-orange-600',
     available: true,
   },

@@ -29,7 +29,7 @@ const productConfig = {
     name: 'RestoFlow',
     icon: UtensilsCrossed,
     color: 'bg-orange-50 text-orange-600',
-    url: 'https://mi-restaurante-2026.vercel.app/',
+    url: 'https://websitebillennium-restaurantes-6i4943gb3-ernesteguezs-projects.vercel.app/',
     description: 'Gestión integral de restaurantes'
   },
   sentinel: {
@@ -124,7 +124,7 @@ export const UserDashboard = () => {
   };
 
   // Productos que usan SSO (magic link) en vez de URL directa
-  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion', 'contabilidad', 'vendormanagement'];
+  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion', 'contabilidad', 'vendormanagement', 'restoflow'];
 
   const handleSsoAccess = async (productId) => {
     setSsoLoading(productId);
