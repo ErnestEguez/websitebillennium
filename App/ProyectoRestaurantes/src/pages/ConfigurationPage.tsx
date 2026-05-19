@@ -87,12 +87,24 @@ export function ConfigurationPage() {
             setLoading(true)
 
             if (profile?.rol === 'admin_plataforma') {
-                // Empresas: lee desde la vista restaurantes.empresas (VIEW sobre facturacion.empresas)
-                const { data: emps } = await supabase.from('empresas').select('*').order('nombre')
-                setAllEmpresas(emps || [])
-
-                // Usuarios del portal: lee desde facturacion.profiles
-                const users = await staffService.getPortalUsers()
+                // Cargar empresas del portal + config RestoFlow por separado y mergear
+                const [{ data: portalEmps }, { data: configs }, users] = await Promise.all([
+                    supabasePortal.from('empresas').select('*').order('nombre'),
+                    supabase.from('config_empresa').select('*'),
+                    staffService.getPortalUsers(),
+                ])
+                const merged = (portalEmps || []).map((e: any) => {
+                    const cfg = (configs || []).find((c: any) => c.empresa_id === e.id)
+                    return {
+                        ...e,
+                        direccion_matriz:          e.direccion,
+                        config_iva:                cfg?.config_general?.config_iva     ?? 15,
+                        config_propina:            cfg?.config_general?.config_propina  ?? 10,
+                        usar_restoflow:            cfg?.usar_restoflow                  ?? false,
+                        habilitar_division_cuenta: cfg?.habilitar_division_cuenta       ?? false,
+                    }
+                })
+                setAllEmpresas(merged)
                 setPortalUsers(users)
             }
 
@@ -181,17 +193,19 @@ export function ConfigurationPage() {
                     alert('Nombre y RUC son obligatorios')
                     return
                 }
-                const { data: newEmp, error: empErr } = await supabasePortal.from('empresas').insert({
+                const newId = crypto.randomUUID()
+                const { error: empErr } = await supabasePortal.from('empresas').insert({
+                    id:           newId,
                     nombre:       editingEmpresa.nombre.trim(),
                     ruc:          editingEmpresa.ruc.trim(),
                     razon_social: editingEmpresa.razon_social?.trim() || editingEmpresa.nombre.trim(),
                     direccion:    editingEmpresa.direccion_matriz?.trim() || null,
                     telefono:     editingEmpresa.telefono?.trim() || null,
-                }).select().single()
+                })
                 if (empErr) throw empErr
 
                 const { error: cfgErr } = await supabase.from('config_empresa').upsert({
-                    empresa_id:               newEmp.id,
+                    empresa_id:               newId,
                     usar_restoflow:           true,
                     habilitar_division_cuenta: editingEmpresa.habilitar_division_cuenta ?? false,
                     config_general: {
@@ -213,19 +227,19 @@ export function ConfigurationPage() {
         }
     }
 
-    // ── Admin: desactivar empresa de RestoFlow ────────────
+    // ── Admin: eliminar empresa ───────────────────────────
     async function handleDeleteEmpresa(id: string) {
-        if (!confirm('¿Desactivar RestoFlow para esta empresa?')) return
+        if (!confirm('¿Eliminar esta empresa? Se eliminará del portal y de RestoFlow. Esta acción no se puede deshacer.')) return
         try {
             setSaving(true)
-            await supabase.from('config_empresa').upsert({
-                empresa_id:     id,
-                usar_restoflow: false,
-            }, { onConflict: 'empresa_id' })
+            // Primero eliminar config RestoFlow (FK)
+            await supabase.from('config_empresa').delete().eq('empresa_id', id)
+            // Luego eliminar de facturacion.empresas
+            const { error } = await supabasePortal.from('empresas').delete().eq('id', id)
+            if (error) throw error
             loadData()
-            alert('Empresa desactivada de RestoFlow')
         } catch (error: any) {
-            alert(`Error: ${error.message}`)
+            alert(`Error al eliminar: ${error.message}`)
         } finally {
             setSaving(false)
         }
