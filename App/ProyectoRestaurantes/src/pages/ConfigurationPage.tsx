@@ -87,13 +87,32 @@ export function ConfigurationPage() {
             setLoading(true)
 
             if (profile?.rol === 'admin_plataforma') {
-                // Empresas vía VIEW restaurantes.empresas (ya incluye config RestoFlow)
-                const { data: emps } = await supabase.from('empresas').select('*').order('nombre')
-                setAllEmpresas(emps || [])
+                // Empresas: consulta directa a facturacion.empresas + merge config
+                const { data: portalEmps } = await supabasePortal
+                    .from('empresas').select('*').order('nombre')
+                const { data: configs } = await supabase
+                    .from('config_empresa').select('*')
+                const merged = (portalEmps || []).map((e: any) => {
+                    const cfg = (configs || []).find((c: any) => c.empresa_id === e.id)
+                    return {
+                        ...e,
+                        direccion_matriz:          e.direccion,
+                        config_iva:                cfg?.config_general?.config_iva     ?? 15,
+                        config_propina:            cfg?.config_general?.config_propina  ?? 10,
+                        usar_restoflow:            cfg?.usar_restoflow                  ?? false,
+                        habilitar_division_cuenta: cfg?.habilitar_division_cuenta       ?? false,
+                    }
+                })
+                setAllEmpresas(merged)
 
-                // Usuarios del portal: independiente para no bloquear si falla
-                const users = await staffService.getPortalUsers()
-                setPortalUsers(users)
+                // Usuarios del portal: aislado para que su fallo no afecte empresas
+                try {
+                    const users = await staffService.getPortalUsers()
+                    setPortalUsers(users)
+                } catch (usersErr: any) {
+                    console.error('[RestoFlow] getPortalUsers error:', usersErr?.message)
+                    setPortalUsers([])
+                }
             }
 
             if (empresa?.id) {
