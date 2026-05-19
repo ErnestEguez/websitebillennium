@@ -176,13 +176,22 @@ export function ConfigurationPage() {
                 }, { onConflict: 'empresa_id' })
                 if (cfgErr) throw cfgErr
             } else {
-                // Nueva configuración: empresa ya debe existir en el portal
-                if (!editingEmpresa?.portal_empresa_id) {
-                    alert('Seleccione la empresa del portal')
+                // Nueva empresa: crear en facturacion.empresas y luego activar en RestoFlow
+                if (!editingEmpresa?.nombre?.trim() || !editingEmpresa?.ruc?.trim()) {
+                    alert('Nombre y RUC son obligatorios')
                     return
                 }
+                const { data: newEmp, error: empErr } = await supabasePortal.from('empresas').insert({
+                    nombre:       editingEmpresa.nombre.trim(),
+                    ruc:          editingEmpresa.ruc.trim(),
+                    razon_social: editingEmpresa.razon_social?.trim() || editingEmpresa.nombre.trim(),
+                    direccion:    editingEmpresa.direccion_matriz?.trim() || null,
+                    telefono:     editingEmpresa.telefono?.trim() || null,
+                }).select().single()
+                if (empErr) throw empErr
+
                 const { error: cfgErr } = await supabase.from('config_empresa').upsert({
-                    empresa_id:               editingEmpresa.portal_empresa_id,
+                    empresa_id:               newEmp.id,
                     usar_restoflow:           true,
                     habilitar_division_cuenta: editingEmpresa.habilitar_division_cuenta ?? false,
                     config_general: {
@@ -643,7 +652,7 @@ export function ConfigurationPage() {
                                 <button
                                     onClick={() => { setEditingEmpresa({ config_iva: 15, config_propina: 10, habilitar_division_cuenta: false }); setIsEmpresaModalOpen(true) }}
                                     className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2">
-                                    <Plus className="w-4 h-4" /> Activar Empresa
+                                    <Plus className="w-4 h-4" /> Nueva Empresa
                                 </button>
                             </div>
                             <div className="card overflow-hidden">
@@ -815,22 +824,47 @@ export function ConfigurationPage() {
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-8 space-y-6 my-8">
                         <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-bold">{editingEmpresa?.id ? 'Editar Configuración' : 'Activar Empresa para RestoFlow'}</h2>
+                            <h2 className="text-2xl font-bold">{editingEmpresa?.id ? 'Editar Empresa' : 'Nueva Empresa'}</h2>
                             <button onClick={() => setIsEmpresaModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400"><X className="w-6 h-6" /></button>
                         </div>
 
-                        {/* Si es nuevo: selector de empresa portal */}
+                        {/* Si es nuevo: campos para crear empresa */}
                         {!editingEmpresa?.id && (
-                            <div>
-                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Empresa del Portal</label>
-                                <select className="w-full px-4 py-3 rounded-xl border mt-1 bg-white"
-                                    value={editingEmpresa?.portal_empresa_id || ''}
-                                    onChange={e => setEditingEmpresa({ ...editingEmpresa, portal_empresa_id: e.target.value })}>
-                                    <option value="">Seleccionar empresa...</option>
-                                    {allEmpresas.map(emp => (
-                                        <option key={emp.id} value={emp.id}>{emp.nombre} — {emp.ruc}</option>
-                                    ))}
-                                </select>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Nombre *</label>
+                                        <input type="text" placeholder="Nombre comercial" className="w-full px-4 py-3 rounded-xl border mt-1"
+                                            value={editingEmpresa?.nombre || ''}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, nombre: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">RUC *</label>
+                                        <input type="text" maxLength={13} placeholder="0000000000001" className="w-full px-4 py-3 rounded-xl border mt-1 font-mono"
+                                            value={editingEmpresa?.ruc || ''}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, ruc: e.target.value })} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Razón Social</label>
+                                    <input type="text" placeholder="Razón social (opcional)" className="w-full px-4 py-3 rounded-xl border mt-1"
+                                        value={editingEmpresa?.razon_social || ''}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, razon_social: e.target.value })} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Dirección</label>
+                                        <input type="text" placeholder="Dirección principal" className="w-full px-4 py-3 rounded-xl border mt-1"
+                                            value={editingEmpresa?.direccion_matriz || ''}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, direccion_matriz: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Teléfono</label>
+                                        <input type="text" placeholder="0999999999" className="w-full px-4 py-3 rounded-xl border mt-1"
+                                            value={editingEmpresa?.telefono || ''}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, telefono: e.target.value })} />
+                                    </div>
+                                </div>
                             </div>
                         )}
 
