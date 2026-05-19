@@ -71,8 +71,7 @@ Restaurantes\ Prompt\ y\ Desarrollo.txt
 build_output*.txt
 lint_output*.txt
 
-# App/Proyecto Restaurantes has its own git repo — keep it separate
-App/Proyecto Restaurantes/
+# RestoFlow — integrado al repo principal (antes carpeta separada)
 
 # Virtual environments
 backend/.venv/
