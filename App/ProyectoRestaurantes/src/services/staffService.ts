@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { supabasePortal } from '../lib/supabasePortal'
 import { supabasePublic } from '../lib/supabasePublic'
@@ -33,14 +32,9 @@ export const staffService = {
     async createStaffMember(member: Partial<StaffMember>): Promise<StaffMember> {
         let userId = member.id
 
-        // Crear usuario en Auth si se proporcionan credenciales
+        // Crear usuario en Auth reutilizando supabasePortal (evita múltiples GoTrueClient)
         if (member.email && (member as any).password) {
-            const tempClient = createClient(
-                import.meta.env.VITE_SUPABASE_URL,
-                import.meta.env.VITE_SUPABASE_ANON_KEY,
-                { auth: { persistSession: false } }
-            )
-            const { data: authData, error: authError } = await tempClient.auth.signUp({
+            const { data: authData, error: authError } = await supabasePortal.auth.signUp({
                 email: member.email,
                 password: (member as any).password,
                 options: { data: { full_name: member.nombre } }
