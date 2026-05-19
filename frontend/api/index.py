@@ -846,7 +846,7 @@ APP_URLS = {
     "facturacion":      os.environ.get("FACTURACION_APP_URL",   "https://websitebillennium-quickinvoice.vercel.app/"),
     "contabilidad":     os.environ.get("CONTABILIDAD_APP_URL",  "https://websitebillennium-ledgerpro.vercel.app/"),
     "vendormanagement": os.environ.get("VENDOR_APP_URL",        "https://websitebillennium-vendor.vercel.app/"),
-    "restoflow":        os.environ.get("RESTOFLOW_APP_URL",     "https://websitebillennium-restaurantes-6i4943gb3-ernesteguezs-projects.vercel.app/"),
+    "restoflow":        os.environ.get("RESTOFLOW_APP_URL",     "https://websitebillennium-restaurantes.vercel.app/"),
 }
 
 @api_router.get("/debug/env")

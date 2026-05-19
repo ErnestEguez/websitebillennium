@@ -29,7 +29,7 @@ const productConfig = {
     name: 'RestoFlow',
     icon: UtensilsCrossed,
     color: 'bg-orange-50 text-orange-600',
-    url: 'https://websitebillennium-restaurantes-6i4943gb3-ernesteguezs-projects.vercel.app/',
+    url: 'https://websitebillennium-restaurantes.vercel.app/',
     description: 'Gestión integral de restaurantes'
   },
   sentinel: {
