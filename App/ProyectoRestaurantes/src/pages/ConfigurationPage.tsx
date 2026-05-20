@@ -957,7 +957,21 @@ export function ConfigurationPage() {
                             <h2 className="text-xl font-bold">{editingStaff?.id ? 'Editar' : 'Nuevo'} Miembro</h2>
                         </div>
                         <div className="p-8 pt-6 space-y-4 overflow-y-auto flex-1">
-                            <p className="text-xs text-slate-500">Empresa: <strong>{empresa?.nombre}</strong></p>
+                            {empresa?.id ? (
+                                <p className="text-xs text-slate-500">Empresa: <strong>{empresa.nombre}</strong></p>
+                            ) : (
+                                <div>
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Empresa *</label>
+                                    <select className="w-full px-4 py-3 rounded-xl border mt-1 bg-white text-sm"
+                                        value={editingStaff?.empresa_id || ''}
+                                        onChange={e => setEditingStaff({ ...editingStaff, empresa_id: e.target.value })}>
+                                        <option value="">Seleccionar empresa...</option>
+                                        {allEmpresas.map(emp => (
+                                            <option key={emp.id} value={emp.id}>{emp.nombre}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <input type="text" placeholder="Nombre" className="w-full px-4 py-3 rounded-xl border"
                                 value={editingStaff?.nombre || ''}
                                 onChange={e => setEditingStaff({ ...editingStaff, nombre: e.target.value })} />
