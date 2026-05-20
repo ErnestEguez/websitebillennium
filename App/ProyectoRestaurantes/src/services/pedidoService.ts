@@ -299,51 +299,24 @@ export const pedidoService = {
     },
 
     async getPedidoById(pedidoId: string) {
-        try {
-            const { data, error } = await supabase
-                .from('pedidos')
-                .select(`
+        const { data, error } = await supabase
+            .from('pedidos')
+            .select(`
+                *,
+                mesas(numero),
+                pedido_detalles(
                     *,
-                    mesas(numero),
-                    profiles(nombre),
-                    pedido_detalles(
-                        *,
-                        productos(
-                            nombre,
-                            categorias(tipo)
-                        )
+                    productos(
+                        nombre,
+                        categorias(tipo, nombre)
                     )
-                `)
-                .eq('id', pedidoId)
-                .single()
+                )
+            `)
+            .eq('id', pedidoId)
+            .single()
 
-            if (error) {
-                console.warn('Error in getPedidoById join:', error)
-                // Reintento sin el join de tipo o perfiles por si la columna/tabla no existe
-                const { data: simpleData, error: simpleError } = await supabase
-                    .from('pedidos')
-                    .select(`
-                        *,
-                        mesas(numero),
-                        pedido_detalles(
-                            *,
-                            productos(
-                                nombre,
-                                categorias(nombre)
-                            )
-                        )
-                    `)
-                    .eq('id', pedidoId)
-                    .single()
-
-                if (simpleError) throw simpleError
-                return simpleData
-            }
-            return data
-        } catch (err) {
-            console.error('Fatal error in getPedidoById:', err)
-            throw err
-        }
+        if (error) throw error
+        return data
     },
 
     async agregarItemsAPedido(pedidoId: string, nuevosItems: any[], nuevoTotal: number) {

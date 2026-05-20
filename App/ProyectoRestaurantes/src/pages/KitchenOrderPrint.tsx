@@ -12,7 +12,14 @@ export function KitchenOrderPrint() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        if (id) loadPedido()
+        if (id) {
+            loadPedido()
+        } else {
+            setLoading(false)
+        }
+        // Timeout de seguridad: nunca quedarse colgado
+        const t = setTimeout(() => setLoading(false), 8000)
+        return () => clearTimeout(t)
     }, [id])
 
     async function loadPedido() {
