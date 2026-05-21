@@ -2,7 +2,7 @@
 // All records are scoped by empresa_id to prevent multi-tenant data leaks
 
 const DB_NAME = 'quickinvoice_offline'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let _dbPromise: Promise<IDBDatabase> | null = null
 
