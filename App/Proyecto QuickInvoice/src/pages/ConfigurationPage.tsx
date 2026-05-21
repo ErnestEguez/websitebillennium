@@ -210,18 +210,13 @@ export function ConfigurationPage() {
         try {
             setSaving(true)
 
-            if (!editingEmpresa.razon_social?.trim() || !editingEmpresa.nombre?.trim() || !editingEmpresa.ruc?.trim()) {
-                alert('Razón Social, Nombre Comercial y RUC son obligatorios')
-                return
-            }
-
+            // ✅ Solo campos que existen en la tabla empresas del schema real
             const payload: Record<string, any> = {
-                nombre:       editingEmpresa.nombre.trim(),
-                razon_social: editingEmpresa.razon_social.trim(),
-                ruc:          editingEmpresa.ruc.trim(),
-                direccion:    editingEmpresa.direccion || '',
-                telefono:     editingEmpresa.telefono || null,
-                logo_url:     editingEmpresa.logo_url || null,
+                nombre: editingEmpresa.nombre || '',
+                ruc: editingEmpresa.ruc || '',
+                direccion: editingEmpresa.direccion || '',
+                telefono: editingEmpresa.telefono || null,
+                logo_url: editingEmpresa.logo_url || null,
                 usar_vendor_management: !!editingEmpresa.usar_vendor_management,
                 config_sri: {
                     ambiente: editingEmpresa.config_sri?.ambiente || 'PRUEBAS',
@@ -1265,156 +1260,91 @@ export function ConfigurationPage() {
                 </div>
             )}
 
-            {/* Modal Empresa */}
-            {isEmpresaModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl my-8 flex flex-col overflow-hidden">
-
-                        {/* Header fijo */}
-                        <div className="px-8 pt-8 pb-5 border-b border-slate-100 flex justify-between items-center shrink-0">
-                            <div>
-                                <h2 className="text-2xl font-bold text-slate-900">
-                                    {editingEmpresa?.id ? 'Editar' : 'Nueva'} Empresa
-                                </h2>
-                                <p className="text-sm text-slate-400 mt-0.5">
-                                    {editingEmpresa?.id ? 'Actualiza los datos del negocio' : 'Completa los datos para registrar el negocio'}
-                                </p>
+            {/* Modals */}
+            {/* Modals */}
+            {
+                isEmpresaModalOpen && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-8 space-y-6 my-8">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-2xl font-bold">{editingEmpresa?.id ? 'Editar' : 'Nueva'} Empresa</h2>
+                                <button onClick={() => setIsEmpresaModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400">
+                                    <X className="w-6 h-6" />
+                                </button>
                             </div>
-                            <button onClick={() => setIsEmpresaModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
 
-                        {/* Contenido scrollable */}
-                        <div className="px-8 py-6 space-y-8 overflow-y-auto">
-
-                            {/* ── Sección 1: Identificación ── */}
                             <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="w-6 h-6 bg-primary-100 text-primary-600 rounded-lg flex items-center justify-center text-xs font-black">1</div>
-                                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">Identificación</h3>
-                                </div>
-
-                                {/* Razón Social - campo más importante, ancho completo */}
-                                <div>
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                                        Razón Social <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text" placeholder="Nombre legal tal como aparece en el RUC"
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm font-medium"
-                                        value={editingEmpresa?.razon_social || ''}
-                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, razon_social: e.target.value })}
-                                    />
-                                    <p className="text-[11px] text-slate-400 mt-1">Se imprime en comprobantes SRI. Debe coincidir exactamente con el registro en el SRI.</p>
-                                </div>
-
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                                            Nombre Comercial <span className="text-red-500">*</span>
-                                        </label>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Nombre Comercial</label>
                                         <input
-                                            type="text" placeholder="Nombre con el que opera el negocio"
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                            type="text" placeholder="Nombre de la empresa" className="w-full px-4 py-3 rounded-xl border mt-1"
                                             value={editingEmpresa?.nombre || ''}
                                             onChange={e => setEditingEmpresa({ ...editingEmpresa, nombre: e.target.value })}
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                                            RUC <span className="text-red-500">*</span>
-                                        </label>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">RUC</label>
                                         <input
-                                            type="text" maxLength={13} placeholder="0000000000001"
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 font-mono focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                            type="text" placeholder="Número de RUC" className="w-full px-4 py-3 rounded-xl border mt-1"
                                             value={editingEmpresa?.ruc || ''}
                                             onChange={e => setEditingEmpresa({ ...editingEmpresa, ruc: e.target.value })}
                                         />
                                     </div>
-                                </div>
-                            </div>
-
-                            {/* ── Sección 2: Contacto ── */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="w-6 h-6 bg-primary-100 text-primary-600 rounded-lg flex items-center justify-center text-xs font-black">2</div>
-                                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">Contacto</h3>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Dirección Matriz</label>
-                                    <input
-                                        type="text" placeholder="Ciudad, calle principal, número..."
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                        value={editingEmpresa?.direccion || ''}
-                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, direccion: e.target.value })}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Teléfono</label>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Dirección</label>
                                         <input
-                                            type="text" placeholder="+593 99 999 9999"
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                            value={editingEmpresa?.telefono || ''}
-                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, telefono: e.target.value })}
+                                            type="text" placeholder="Ciudad, calle, número..." className="w-full px-4 py-3 rounded-xl border mt-1"
+                                            value={editingEmpresa?.direccion || ''}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, direccion: e.target.value })}
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Email para Facturas</label>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Teléfono</label>
                                         <input
-                                            type="email" placeholder="facturacion@empresa.com"
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                            value={editingEmpresa?.config_sri?.mail_user || ''}
-                                            onChange={e => setEditingEmpresa({
-                                                ...editingEmpresa,
-                                                config_sri: { ...(editingEmpresa?.config_sri || {}), mail_user: e.target.value }
-                                            })}
+                                            type="text" placeholder="+593 99 999 9999" className="w-full px-4 py-3 rounded-xl border mt-1"
+                                            value={editingEmpresa?.telefono || ''}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, telefono: e.target.value })}
                                         />
                                     </div>
                                 </div>
 
                                 {/* Logo Upload */}
                                 <div>
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Logo</label>
-                                    <div className="flex items-center gap-4 mt-2">
-                                        {editingEmpresa?.logo_url && (
-                                            <img src={editingEmpresa.logo_url} alt="Logo" className="w-12 h-12 object-contain rounded-xl border border-slate-200 p-1 bg-white" />
-                                        )}
-                                        <input
-                                            type="file" accept="image/*"
-                                            className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer"
-                                            onChange={async (e) => {
-                                                const file = e.target.files?.[0]
-                                                if (!file || !editingEmpresa?.id) {
-                                                    if (!editingEmpresa?.id) alert('Guarde la empresa primero para subir un logo.')
-                                                    return
-                                                }
-                                                try {
-                                                    const url = await sriService.uploadLogo(editingEmpresa.id, file)
-                                                    setEditingEmpresa({ ...editingEmpresa, logo_url: url })
-                                                } catch (err: any) {
-                                                    alert('Error al subir logo: ' + err.message)
-                                                }
-                                            }}
-                                        />
-                                    </div>
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Logo (imagen)</label>
+                                    <input
+                                        type="file" accept="image/*"
+                                        className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 mt-2"
+                                        onChange={async (e) => {
+                                            const file = e.target.files?.[0]
+                                            if (!file || !editingEmpresa?.id) {
+                                                if (!editingEmpresa?.id) alert('Guarde la empresa primero para subir un logo.')
+                                                return
+                                            }
+                                            try {
+                                                const url = await sriService.uploadLogo(editingEmpresa.id, file)
+                                                setEditingEmpresa({ ...editingEmpresa, logo_url: url })
+                                            } catch (err: any) {
+                                                alert('Error al subir logo: ' + err.message)
+                                            }
+                                        }}
+                                    />
                                 </div>
                             </div>
 
-                            {/* ── Sección 3: Configuración SRI ── */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="w-6 h-6 bg-primary-100 text-primary-600 rounded-lg flex items-center justify-center text-xs font-black">3</div>
-                                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">Facturación Electrónica SRI</h3>
-                                </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {/* ── SECCIÓN CONFIGURACIÓN SRI ──────────────── */}
+                            <div className="border-t border-slate-100 pt-6 space-y-4">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-primary-500 rounded-full" />
+                                    Configuración SRI / Facturación Electrónica
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Establecimiento</label>
                                         <input
                                             type="text" maxLength={3} placeholder="001"
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 font-mono text-center focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                            className="w-full px-4 py-3 rounded-xl border mt-1 font-mono"
                                             value={editingEmpresa?.config_sri?.establecimiento || ''}
                                             onChange={e => setEditingEmpresa({
                                                 ...editingEmpresa,
@@ -1423,10 +1353,10 @@ export function ConfigurationPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Pto. Emisión</label>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Punto Emisión</label>
                                         <input
                                             type="text" maxLength={3} placeholder="001"
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 font-mono text-center focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                            className="w-full px-4 py-3 rounded-xl border mt-1 font-mono"
                                             value={editingEmpresa?.config_sri?.punto_emision || ''}
                                             onChange={e => setEditingEmpresa({
                                                 ...editingEmpresa,
@@ -1435,70 +1365,48 @@ export function ConfigurationPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Secuencial</label>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Ambiente</label>
+                                        <select
+                                            className="w-full px-4 py-3 rounded-xl border mt-1 bg-white font-bold text-sm"
+                                            value={editingEmpresa?.config_sri?.ambiente || 'PRUEBAS'}
+                                            onChange={e => setEditingEmpresa({
+                                                ...editingEmpresa,
+                                                config_sri: { ...(editingEmpresa?.config_sri || {}), ambiente: e.target.value }
+                                            })}
+                                        >
+                                            <option value="PRUEBAS">PRUEBAS</option>
+                                            <option value="PRODUCCION">PRODUCCIÓN</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Secuencial Inicial Facturas</label>
                                         <input
                                             type="number" min={1} placeholder="1"
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 font-mono text-center focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                            className="w-full px-4 py-3 rounded-xl border mt-1 font-mono"
                                             value={editingEmpresa?.config_sri?.secuencial_inicio || 1}
                                             onChange={e => setEditingEmpresa({
                                                 ...editingEmpresa,
                                                 config_sri: { ...(editingEmpresa?.config_sri || {}), secuencial_inicio: parseInt(e.target.value) || 1 }
                                             })}
                                         />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Oblig. Cont.</label>
-                                        <select
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 bg-white font-bold text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                            value={editingEmpresa?.config_sri?.obligado_contabilidad || 'NO'}
-                                            onChange={e => setEditingEmpresa({
-                                                ...editingEmpresa,
-                                                config_sri: { ...(editingEmpresa?.config_sri || {}), obligado_contabilidad: e.target.value }
-                                            })}
-                                        >
-                                            <option value="NO">NO</option>
-                                            <option value="SI">SÍ</option>
-                                        </select>
+                                        <p className="text-[11px] text-slate-400 mt-1">Número desde el cual inicia la secuencia si no hay facturas previas</p>
                                     </div>
                                 </div>
-
-                                <div>
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Ambiente SRI</label>
-                                    <div className="flex gap-3 mt-2">
-                                        {['PRUEBAS', 'PRODUCCION'].map(amb => (
-                                            <button
-                                                key={amb}
-                                                type="button"
-                                                onClick={() => setEditingEmpresa({
-                                                    ...editingEmpresa,
-                                                    config_sri: { ...(editingEmpresa?.config_sri || {}), ambiente: amb }
-                                                })}
-                                                className={cn(
-                                                    "flex-1 py-2.5 rounded-xl text-sm font-black border-2 transition-all",
-                                                    (editingEmpresa?.config_sri?.ambiente || 'PRUEBAS') === amb
-                                                        ? amb === 'PRODUCCION'
-                                                            ? "bg-emerald-600 border-emerald-600 text-white"
-                                                            : "bg-amber-500 border-amber-500 text-white"
-                                                        : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"
-                                                )}
-                                            >
-                                                {amb === 'PRODUCCION' ? '🟢 PRODUCCIÓN' : '🧪 PRUEBAS'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
                                             Firma Electrónica (.p12)
+                                            {editingEmpresa?.config_sri?.firma_path && (
+                                                <span className="ml-2 text-emerald-600 normal-case font-normal">
+                                                    ✅ {editingEmpresa.config_sri.firma_path}
+                                                </span>
+                                            )}
                                         </label>
-                                        {editingEmpresa?.config_sri?.firma_path && (
-                                            <p className="text-xs text-emerald-600 font-semibold mt-1 mb-1">✅ {editingEmpresa.config_sri.firma_path}</p>
-                                        )}
                                         <input
                                             type="file" accept=".p12"
-                                            className="w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 mt-1 cursor-pointer"
+                                            className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 mt-1 cursor-pointer"
                                             onChange={async (e) => {
                                                 const file = e.target.files?.[0]
                                                 if (!file) return
@@ -1523,7 +1431,7 @@ export function ConfigurationPage() {
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Contraseña de la Firma</label>
                                         <input
                                             type="password" placeholder="••••••••"
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 mt-1 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                            className="w-full px-4 py-3 rounded-xl border mt-1"
                                             value={editingEmpresa?.config_sri?.firma_password || ''}
                                             onChange={e => setEditingEmpresa({
                                                 ...editingEmpresa,
@@ -1534,17 +1442,14 @@ export function ConfigurationPage() {
                                 </div>
                             </div>
 
-                            {/* ── Sección 4: Módulos ── */}
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="w-6 h-6 bg-primary-100 text-primary-600 rounded-lg flex items-center justify-center text-xs font-black">4</div>
-                                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">Módulos Integrados</h3>
-                                </div>
+                            {/* ── Módulos Integrados ──────────────────────────── */}
+                            <div className="border-t border-slate-100 pt-6 space-y-3">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Módulos Integrados</h3>
                                 <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
                                     <div>
-                                        <p className="text-sm font-bold text-slate-800">Gestión de Compras (VendorManagement)</p>
+                                        <p className="text-sm font-bold text-slate-800">Usar Gestión de Compras (VendorManagement)</p>
                                         <p className="text-xs text-slate-500 mt-0.5">
-                                            Activo → la gestión de compras se centraliza en la app VendorManagement.
+                                            ON → oculta "Proveedores" e "Ingreso de Compras" del menú de QuickInvoice (la gestión se hace desde la app de Compras).
                                         </p>
                                     </div>
                                     <input
@@ -1555,24 +1460,21 @@ export function ConfigurationPage() {
                                     />
                                 </label>
                             </div>
-                        </div>
 
-                        {/* Footer fijo */}
-                        <div className="px-8 py-6 border-t border-slate-100 flex gap-4 shrink-0 bg-white">
-                            <button onClick={() => setIsEmpresaModalOpen(false)} className="flex-1 py-3.5 font-bold border-2 border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors text-slate-600">
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleSaveEmpresaFull}
-                                disabled={saving}
-                                className="flex-1 py-3.5 font-bold bg-primary-600 text-white rounded-2xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-                            >
-                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar Empresa</>}
-                            </button>
+                            <div className="flex gap-4 pt-4">
+                                <button onClick={() => setIsEmpresaModalOpen(false)} className="flex-1 py-4 font-bold border rounded-2xl hover:bg-slate-50 transition-colors">Cancelar</button>
+                                <button
+                                    onClick={handleSaveEmpresaFull}
+                                    disabled={saving}
+                                    className="flex-1 py-4 font-bold bg-primary-600 text-white rounded-2xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar Empresa</>}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
 
             {
