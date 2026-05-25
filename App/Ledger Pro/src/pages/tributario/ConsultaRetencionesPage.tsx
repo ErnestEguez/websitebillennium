@@ -152,10 +152,10 @@ export function ConsultaRetencionesPage() {
             {/* Resumen */}
             <div className="grid grid-cols-3 gap-4">
                 {[
-                    { label: 'Retenciones encontradas', value: filtradas.length, color: 'text-purple-600', bg: 'bg-purple-50' },
-                    { label: 'Base total retenida', value: formatMoneda(totBase, sym), color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { label: 'Valor total retenido', value: formatMoneda(totVal, sym), color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                ].map(({ label, value, color, bg }) => (
+                    { label: 'Retenciones encontradas', value: filtradas.length, color: 'text-purple-600' },
+                    { label: 'Base total retenida', value: formatMoneda(totBase, sym), color: 'text-blue-600' },
+                    { label: 'Valor total retenido', value: formatMoneda(totVal, sym), color: 'text-emerald-600' },
+                ].map(({ label, value, color }) => (
                     <div key={label} className="card p-4">
                         <p className={`text-xl font-bold ${color}`}>{value}</p>
                         <p className="text-xs text-slate-500 mt-0.5">{label}</p>

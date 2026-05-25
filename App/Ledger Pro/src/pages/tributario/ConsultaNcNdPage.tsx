@@ -168,11 +168,11 @@ export function ConsultaNcNdPage() {
             {/* Resumen */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Notas de Crédito', value: nc.length, color: 'text-amber-600', bg: 'bg-amber-50' },
-                    { label: 'Total N/C', value: formatMoneda(totNC, sym), color: 'text-amber-600', bg: 'bg-amber-50' },
-                    { label: 'Notas de Débito', value: nd.length, color: 'text-orange-600', bg: 'bg-orange-50' },
-                    { label: 'Total N/D', value: formatMoneda(totND, sym), color: 'text-orange-600', bg: 'bg-orange-50' },
-                ].map(({ label, value, color, bg }) => (
+                    { label: 'Notas de Crédito', value: nc.length, color: 'text-amber-600' },
+                    { label: 'Total N/C', value: formatMoneda(totNC, sym), color: 'text-amber-600' },
+                    { label: 'Notas de Débito', value: nd.length, color: 'text-orange-600' },
+                    { label: 'Total N/D', value: formatMoneda(totND, sym), color: 'text-orange-600' },
+                ].map(({ label, value, color }) => (
                     <div key={label} className="card p-4">
                         <p className={`text-xl font-bold ${color}`}>{value}</p>
                         <p className="text-xs text-slate-500 mt-0.5">{label}</p>
