@@ -146,12 +146,7 @@ function generarXmlAts(params: {
       <valorRetServicios>0.00</valorRetServicios>
       <valRetServ100>0.00</valRetServ100>
       <totbasesImpReemb>0.00</totbasesImpReemb>
-      <pagoLocExtExtranjero>01</pagoLocExtExtranjero>
-      <pagoLocExtExtranjeroMe>NA</pagoLocExtExtranjeroMe>
-      <tipoRegi>NA</tipoRegi>
-      <paisEfecPago>NA</paisEfecPago>
-      <aplicConvDobTrib>NA</aplicConvDobTrib>
-      <pagExtSujRetNorLeg>NA</pagExtSujRetNorLeg>${detalleAir}${retBlock}
+      <pagoLocExtExtranjero>01</pagoLocExtExtranjero>${detalleAir}${retBlock}
       <formaPago>20</formaPago>
     </detalleCompras>`
     }).join('\n')
@@ -178,8 +173,8 @@ function generarXmlAts(params: {
     const totalBaseComp  = compras.reduce((s, c) => s + c.base_cero + c.base_iva, 0)
     const totalIvaComp   = compras.reduce((s, c) => s + c.iva, 0)
 
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<iva id="comprobante" version="1.31">
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<iva version="1.31">
   <TipoIDInformante>R</TipoIDInformante>
   <IdInformante>${ruc}</IdInformante>
   <razonSocial>${razonSocial}</razonSocial>
