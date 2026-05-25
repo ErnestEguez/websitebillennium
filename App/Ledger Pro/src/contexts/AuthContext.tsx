@@ -162,8 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         // Fire and forget — never await to avoid spinner hang
         supabase.auth.signOut().catch(() => {})
-        const portalUrl = import.meta.env.VITE_PORTAL_URL || 'https://websitebillennium-k4qc-ernesteguezs-projects.vercel.app'
-        window.location.replace(portalUrl)
+        window.close()
         return Promise.resolve()
     }
 

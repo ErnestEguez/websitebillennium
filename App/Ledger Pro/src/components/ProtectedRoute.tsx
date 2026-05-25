@@ -3,7 +3,6 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { Building2, LogOut } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
-const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://websitebillennium-k4qc-ernesteguezs-projects.vercel.app'
 
 function SinEmpresasAsignadas() {
     const { signOut, user } = useAuth()
@@ -42,7 +41,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (loading) return null
 
     if (!user) {
-        window.location.replace(PORTAL_URL)
+        window.close()
         return null
     }
 
