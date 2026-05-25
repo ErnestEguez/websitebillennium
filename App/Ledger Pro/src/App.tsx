@@ -27,6 +27,7 @@ const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then
 const AtsPage                = lazy(() => import('./pages/tributario/AtsPage').then(m => ({ default: m.AtsPage })))
 const ConsultaRetencionesPage = lazy(() => import('./pages/tributario/ConsultaRetencionesPage').then(m => ({ default: m.ConsultaRetencionesPage })))
 const ConsultaNcNdPage       = lazy(() => import('./pages/tributario/ConsultaNcNdPage').then(m => ({ default: m.ConsultaNcNdPage })))
+const ConsultaComprasPage    = lazy(() => import('./pages/tributario/ConsultaComprasPage').then(m => ({ default: m.ConsultaComprasPage })))
 
 function PageLoader() {
     return (
@@ -154,6 +155,12 @@ function AppRoutes() {
                 <Route path="/admin" element={
                     <ProtectedRoute>
                         <Layout><AdminPage /></Layout>
+                    </ProtectedRoute>
+                } />
+
+                <Route path="/tributario/compras" element={
+                    <ProtectedRoute>
+                        <Layout><ConsultaComprasPage /></Layout>
                     </ProtectedRoute>
                 } />
 

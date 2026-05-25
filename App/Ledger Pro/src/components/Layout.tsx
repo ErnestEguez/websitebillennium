@@ -4,7 +4,7 @@ import {
     LayoutDashboard, BookOpen, FileText, BarChart2,
     Settings, LogOut, ChevronRight, ChevronDown,
     Menu, X, Building2, PiggyBank, TrendingUp, BookMarked, Target,
-    Lock, Zap, Shield, ArrowLeftRight, Calculator, Receipt, FileDown,
+    Lock, Zap, Shield, ArrowLeftRight, Calculator, Receipt, FileDown, ShoppingCart,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
@@ -80,9 +80,10 @@ const navigation: NavItem[] = [
         icon: Calculator,
         label: 'Tributario',
         children: [
-            { to: '/tributario/ats',          label: 'ATS',                    icon: FileDown },
+            { to: '/tributario/compras',      label: 'Consulta Compras SRI',   icon: ShoppingCart },
             { to: '/tributario/retenciones',  label: 'Consulta Retenciones',   icon: Receipt },
             { to: '/tributario/nc-nd',        label: 'Consulta N/C y N/D',     icon: FileText },
+            { to: '/tributario/ats',          label: 'ATS',                    icon: FileDown },
         ],
     },
     { to: '/configuracion',    icon: Settings, label: 'Configuración' },

@@ -51,10 +51,10 @@ function parseNumero(num: string) {
         return {
             estab: p[0].padStart(3, '0'),
             ptoEmi: p[1].padStart(3, '0'),
-            sec: p[2].padStart(9, '0'),
+            sec: String(parseInt(p[2], 10) || 0),
         }
     }
-    return { estab: '001', ptoEmi: '001', sec: num.replace(/\D/g, '').padStart(9, '0').slice(-9) }
+    return { estab: '001', ptoEmi: '001', sec: String(parseInt(num.replace(/\D/g, ''), 10) || 0) }
 }
 
 function tipoIdProv(ruc: string): string {
@@ -83,52 +83,30 @@ function generarXmlAts(params: {
     año: number
     mes: number
     compras: SriComp[]
-    retenciones: SriComp[]
 }): string {
-    const { ruc, razonSocial, año, mes, compras, retenciones } = params
+    const { ruc, razonSocial, año, mes, compras } = params
 
     const mesStr = String(mes).padStart(2, '0')
 
-    // ── totalVentas: en esta versión solo compras descargadas del SRI
-    const totalVentasComp = 0  // ventas vendrán de QI en fase posterior
-
-    // Agrupar compras: una factura puede tener una retención asociada
-    // En el ATS se declara 1 detalleCompras por documento de compra
-    // Las retenciones emitidas van como detalle dentro de la compra correspondiente
-
     const xmlCompras = compras.map(c => {
         const { estab, ptoEmi, sec } = parseNumero(c.numero)
-        const tpId = tipoIdProv(c.proveedor_ruc)
-        const tipoComp = tipoCompSRI(c.tipo)
-        const baseNoGrav = 0    // no gravado con IVA ni exento — simplificado
-        const baseExe   = 0     // exento
-        const baseImp   = f2(c.base_cero)   // base 0% → baseImponible
-        const baseImpGrav = f2(c.base_iva)
+        const tpId         = tipoIdProv(c.proveedor_ruc)
+        const tipoComp     = tipoCompSRI(c.tipo)
         const autorizacion = c.clave_acceso ?? '0000000000000000000000000000000000000000000000000'
-        const fechaReg = fmtDate(c.fecha_emision)
-        const fechaEmi = fmtDate(c.fecha_emision)
+        const fechaReg     = fmtDate(c.fecha_emision)
+        const fechaEmi     = fmtDate(c.fecha_emision)
 
-        // Si tiene retención aplicada a esta compra
-        const hasRet = !!(c.codigo_retencion && c.valor_retenido && (c.valor_retenido ?? 0) > 0)
+        const hasRet = !!(c.codigo_retencion && (c.valor_retenido ?? 0) > 0)
 
-        const detalleAir = hasRet ? `
-          <detalleAirSujetos>
-            <detalleAir>
-              <codRetAir>${c.codigo_retencion ?? '303'}</codRetAir>
-              <baseImpAir>${f2(c.base_iva > 0 ? c.base_iva : c.base_cero)}</baseImpAir>
-              <porcentajeAir>${f2(c.porcentaje_ret ?? 0)}</porcentajeAir>
-              <valRetAir>${f2(c.valor_retenido ?? 0)}</valRetAir>
-            </detalleAir>
-          </detalleAirSujetos>` : ''
-
-        // Bloque de retención emitida (requerido aunque sea vacío cuando hay AIR)
-        // Se omite si no hay retención
-        const retBlock = hasRet ? `
-          <estabRetencion1>001</estabRetencion1>
-          <ptoEmiRetencion1>001</ptoEmiRetencion1>
-          <secRetencion1>000000001</secRetencion1>
-          <autRetencion1>0000000000000000000000000000000000000000000000000</autRetencion1>
-          <fechaEmiRet1>${fechaEmi}</fechaEmiRet1>` : ''
+        const airBlock = hasRet ? `
+      <air>
+        <detalleAir>
+          <codRetAir>${c.codigo_retencion}</codRetAir>
+          <baseImpAir>${f2(c.base_iva > 0 ? c.base_iva : c.base_cero)}</baseImpAir>
+          <porcentajeAir>${f2(c.porcentaje_ret ?? 0)}</porcentajeAir>
+          <valRetAir>${f2(c.valor_retenido ?? 0)}</valRetAir>
+        </detalleAir>
+      </air>` : ''
 
         return `    <detalleCompras>
       <codSustento>01</codSustento>
@@ -142,10 +120,10 @@ function generarXmlAts(params: {
       <secuencial>${sec}</secuencial>
       <fechaEmision>${fechaEmi}</fechaEmision>
       <autorizacion>${autorizacion}</autorizacion>
-      <baseNoGraIva>${f2(baseNoGrav)}</baseNoGraIva>
-      <baseImponible>${baseImp}</baseImponible>
-      <baseImpGrav>${baseImpGrav}</baseImpGrav>
-      <baseImpExe>${f2(baseExe)}</baseImpExe>
+      <baseNoGraIva>0.00</baseNoGraIva>
+      <baseImponible>${f2(c.base_cero)}</baseImponible>
+      <baseImpGrav>${f2(c.base_iva)}</baseImpGrav>
+      <baseImpExe>0.00</baseImpExe>
       <montoIce>0.00</montoIce>
       <montoIva>${f2(c.iva)}</montoIva>
       <valRetBien10>0.00</valRetBien10>
@@ -154,34 +132,14 @@ function generarXmlAts(params: {
       <valRetServ50>0.00</valRetServ50>
       <valorRetServicios>0.00</valorRetServicios>
       <valRetServ100>0.00</valRetServ100>
-      <totbasesImpReemb>0.00</totbasesImpReemb>${detalleAir}${retBlock}
-      <formaPago>20</formaPago>
+      <valorRetencionNc>0.00</valorRetencionNc>
+      <totbasesImpReemb>0.00</totbasesImpReemb>${airBlock}
+      <pagoExterior><pagoLocExt>01</pagoLocExt><paisEfecPago>NA</paisEfecPago><aplicConvDobTrib>NA</aplicConvDobTrib><pagExtSujRetNorLeg>NA</pagExtSujRetNorLeg></pagoExterior>
+      <formasDePago><formaPago>20</formaPago></formasDePago>
     </detalleCompras>`
     }).join('\n')
 
-    // ── Retenciones recibidas (que nuestros clientes nos aplicaron)
-    // Se listan aparte en sección <retenciones> del ATS para información
-    const xmlRetenciones = retenciones.map(r => {
-        const { estab, ptoEmi, sec } = parseNumero(r.numero)
-        return `    <detalleRetencion>
-      <tpIdRetentor>01</tpIdRetentor>
-      <idRetentor>${r.proveedor_ruc}</idRetentor>
-      <establecimiento>${estab}</establecimiento>
-      <puntoEmision>${ptoEmi}</puntoEmision>
-      <secuencial>${sec}</secuencial>
-      <fechaEmision>${fmtDate(r.fecha_emision)}</fechaEmision>
-      <autorizacion>${r.clave_acceso ?? '0000000000000000000000000000000000000000000000000'}</autorizacion>
-      <codRetAir>${r.codigo_retencion ?? '303'}</codRetAir>
-      <baseImpAir>${f2(r.base_iva > 0 ? r.base_iva : r.base_cero)}</baseImpAir>
-      <porcentajeAir>${f2(r.porcentaje_ret ?? 0)}</porcentajeAir>
-      <valRetAir>${f2(r.valor_retenido ?? 0)}</valRetAir>
-    </detalleRetencion>`
-    }).join('\n')
-
-    const totalBaseComp  = compras.reduce((s, c) => s + c.base_cero + c.base_iva, 0)
-    const totalIvaComp   = compras.reduce((s, c) => s + c.iva, 0)
-
-    return `<?xml version="1.0" encoding="UTF-8"?>
+    return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <iva>
   <TipoIDInformante>R</TipoIDInformante>
   <IdInformante>${ruc}</IdInformante>
@@ -189,18 +147,19 @@ function generarXmlAts(params: {
   <Anio>${año}</Anio>
   <Mes>${mesStr}</Mes>
   <numEstabRuc>001</numEstabRuc>
-  <totalVentas>${f2(totalVentasComp)}</totalVentas>
+  <totalVentas>0.00</totalVentas>
   <codigoOperativo>IVA</codigoOperativo>
   <compras>
 ${xmlCompras}
   </compras>
-  <ventas/>
-  <retenciones>
-${xmlRetenciones}
-  </retenciones>
-  <dividendos/>
-  <exportaciones/>
-  <otrosIngresos/>
+  <ventas></ventas>
+  <ventasEstablecimiento>
+    <ventaEst>
+      <codEstab>001</codEstab>
+      <ventasEstab>0.00</ventasEstab>
+      <ivaComp>0.00</ivaComp>
+    </ventaEst>
+  </ventasEstablecimiento>
 </iva>`
 }
 
@@ -264,8 +223,8 @@ export function AtsPage() {
 
     function descargarXml() {
         if (!empresaActiva) return
-        if (compras.length === 0 && retenciones.length === 0) {
-            setError('No hay datos para el período seleccionado. Importa los comprobantes del SRI primero.')
+        if (compras.length === 0) {
+            setError('No hay comprobantes de compra para el período seleccionado. Importa los comprobantes del SRI primero.')
             return
         }
 
@@ -275,7 +234,6 @@ export function AtsPage() {
             año,
             mes,
             compras,
-            retenciones,
         })
 
         const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' })
@@ -285,7 +243,7 @@ export function AtsPage() {
         a.download = `ATS_${empresaActiva.ruc ?? 'RUC'}_${año}${String(mes).padStart(2, '0')}.xml`
         a.click()
         URL.revokeObjectURL(url)
-        setOk(`ATS generado: ${compras.length} compras + ${retenciones.length} retenciones`)
+        setOk(`ATS generado: ${compras.length} comprobante(s) de compra`)
     }
 
     // ── Totales ────────────────────────────────────────────────────────────
