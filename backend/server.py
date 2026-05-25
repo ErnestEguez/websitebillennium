@@ -414,6 +414,30 @@ PRODUCTS = [
         ],
         "external_link": "https://proyecto-ferias2026.vercel.app/",
         "plans": []
+    },
+    {
+        "id": "finance",
+        "name": "Finance Suite",
+        "slug": "finance-suite",
+        "description": "Módulo bancario y de pagos. Cuentas bancarias, egresos a proveedores, cheques, anticipos, movimientos y conciliación bancaria.",
+        "icon": "Landmark",
+        "features": [
+            "Gestión de cuentas bancarias",
+            "Comprobantes de egreso a proveedores",
+            "Control de cheques y post-fechados",
+            "Anticipos a proveedores",
+            "Movimientos bancarios",
+            "Conciliación bancaria"
+        ],
+        "plans": [
+            {
+                "name": "Básico",
+                "price_before": 50,
+                "price_now": 30,
+                "billing": "mensual",
+                "features": ["1 empresa", "Hasta 3 cuentas bancarias", "Egresos y pagos", "Cheques y anticipos", "Conciliación bancaria", "Exportación a Excel"]
+            }
+        ]
     }
 ]
 
