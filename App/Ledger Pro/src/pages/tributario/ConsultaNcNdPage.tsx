@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FileText, Loader2, AlertCircle, X, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { cn, formatMoneda, mesNombre } from '../../lib/utils'
@@ -75,30 +76,23 @@ export function ConsultaNcNdPage() {
     const totNC = nc.reduce((s, r) => s + r.total, 0)
     const totND = nd.reduce((s, r) => s + r.total, 0)
 
-    function exportarCsv() {
-        const rows = [
-            ['Tipo', 'RUC Proveedor', 'Nombre Proveedor', 'Número', 'Fecha', 'Clave Acceso', 'Base 0%', 'Base Grav.', 'IVA', 'Total'],
-            ...filtradas.map(r => [
-                r.tipo === 'nota_credito' ? 'Nota de Crédito' : 'Nota de Débito',
-                r.proveedor_ruc,
-                r.proveedor_nombre,
-                r.numero,
-                r.fecha_emision,
-                r.clave_acceso ?? '',
-                r.base_cero.toFixed(2),
-                r.base_iva.toFixed(2),
-                r.iva.toFixed(2),
-                r.total.toFixed(2),
-            ]),
-        ]
-        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n')
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `NcNd_${empresaActiva?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.csv`
-        a.click()
-        URL.revokeObjectURL(url)
+    function exportarExcel() {
+        const filas = filtradas.map(r => ({
+            'Tipo':             r.tipo === 'nota_credito' ? 'Nota de Crédito' : 'Nota de Débito',
+            'RUC Proveedor':    r.proveedor_ruc,
+            'Nombre Proveedor': r.proveedor_nombre,
+            'Número':           r.numero,
+            'Fecha':            r.fecha_emision,
+            'Base 0%':          r.base_cero,
+            'Base Gravada':     r.base_iva,
+            'IVA':              r.iva,
+            'Total':            r.total,
+            'Clave Acceso':     r.clave_acceso ?? '',
+        }))
+        const ws = XLSX.utils.json_to_sheet(filas)
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'NC y ND')
+        XLSX.writeFile(wb, `NcNd_${empresaActiva?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.xlsx`)
     }
 
     return (
@@ -155,12 +149,12 @@ export function ConsultaNcNdPage() {
                         />
                     </div>
                     <button
-                        onClick={exportarCsv}
+                        onClick={exportarExcel}
                         disabled={filtradas.length === 0}
                         className="btn btn-secondary gap-2"
                     >
                         <Download className="w-4 h-4" />
-                        Exportar CSV
+                        Exportar Excel
                     </button>
                 </div>
             </div>

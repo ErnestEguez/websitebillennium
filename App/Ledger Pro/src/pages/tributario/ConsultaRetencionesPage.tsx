@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Receipt, Loader2, AlertCircle, X, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatMoneda, mesNombre } from '../../lib/utils'
@@ -68,29 +69,22 @@ export function ConsultaRetencionesPage() {
     const totVal  = filtradas.reduce((s, r) => s + (r.valor_retenido ?? 0), 0)
     const totBase = filtradas.reduce((s, r) => s + (r.base_iva > 0 ? r.base_iva : r.base_cero), 0)
 
-    function exportarCsv() {
-        const rows = [
-            ['RUC Retentor', 'Nombre Retentor', 'Número', 'Fecha', 'Clave Acceso', 'Cód. Ret.', 'Base', '% Ret.', 'Valor Retenido'],
-            ...filtradas.map(r => [
-                r.proveedor_ruc,
-                r.proveedor_nombre,
-                r.numero,
-                r.fecha_emision,
-                r.clave_acceso ?? '',
-                r.codigo_retencion ?? '',
-                (r.base_iva > 0 ? r.base_iva : r.base_cero).toFixed(2),
-                String(r.porcentaje_ret ?? 0),
-                (r.valor_retenido ?? 0).toFixed(2),
-            ]),
-        ]
-        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n')
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `Retenciones_${empresaActiva?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.csv`
-        a.click()
-        URL.revokeObjectURL(url)
+    function exportarExcel() {
+        const filas = filtradas.map(r => ({
+            'RUC Retentor':    r.proveedor_ruc,
+            'Nombre Retentor': r.proveedor_nombre,
+            'Número':          r.numero,
+            'Fecha':           r.fecha_emision,
+            'Cód. Ret.':       r.codigo_retencion ?? '',
+            'Base':            r.base_iva > 0 ? r.base_iva : r.base_cero,
+            '% Retención':     r.porcentaje_ret ?? 0,
+            'Valor Retenido':  r.valor_retenido ?? 0,
+            'Clave Acceso':    r.clave_acceso ?? '',
+        }))
+        const ws = XLSX.utils.json_to_sheet(filas)
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Retenciones')
+        XLSX.writeFile(wb, `Retenciones_${empresaActiva?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.xlsx`)
     }
 
     return (
@@ -139,12 +133,12 @@ export function ConsultaRetencionesPage() {
                         />
                     </div>
                     <button
-                        onClick={exportarCsv}
+                        onClick={exportarExcel}
                         disabled={filtradas.length === 0}
                         className="btn btn-secondary gap-2"
                     >
                         <Download className="w-4 h-4" />
-                        Exportar CSV
+                        Exportar Excel
                     </button>
                 </div>
             </div>

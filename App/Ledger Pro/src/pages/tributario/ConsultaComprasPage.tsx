@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ShoppingCart, Loader2, AlertCircle, X, Download, ChevronDown, ChevronUp, FileText } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { cn, formatMoneda, mesNombre } from '../../lib/utils'
@@ -96,34 +97,26 @@ export function ConsultaComprasPage() {
         retenido:  filtradas.reduce((s, r) => s + (r.valor_retenido ?? 0), 0),
     }
 
-    function exportarCsv() {
-        const rows = [
-            ['Tipo', 'RUC Proveedor', 'Nombre Proveedor', 'Número', 'Fecha', 'Clave Acceso',
-             'Base 0%', 'Base Grav.', 'IVA', 'Total', 'Cód. Ret.', '% Ret.', 'Valor Retenido'],
-            ...filtradas.map(r => [
-                TIPO_LABEL[r.tipo] ?? r.tipo,
-                r.proveedor_ruc,
-                r.proveedor_nombre,
-                r.numero,
-                r.fecha_emision,
-                r.clave_acceso ?? '',
-                r.base_cero.toFixed(2),
-                r.base_iva.toFixed(2),
-                r.iva.toFixed(2),
-                r.total.toFixed(2),
-                r.codigo_retencion ?? '',
-                String(r.porcentaje_ret ?? ''),
-                (r.valor_retenido ?? 0).toFixed(2),
-            ]),
-        ]
-        const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n')
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-        const url  = URL.createObjectURL(blob)
-        const a    = document.createElement('a')
-        a.href     = url
-        a.download = `Compras_SRI_${empresaActiva?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.csv`
-        a.click()
-        URL.revokeObjectURL(url)
+    function exportarExcel() {
+        const filas = filtradas.map(r => ({
+            'Tipo':             TIPO_LABEL[r.tipo] ?? r.tipo,
+            'RUC Proveedor':    r.proveedor_ruc,
+            'Nombre Proveedor': r.proveedor_nombre,
+            'Número':           r.numero,
+            'Fecha':            r.fecha_emision,
+            'Base 0%':          r.base_cero,
+            'Base Gravada':     r.base_iva,
+            'IVA':              r.iva,
+            'Total':            r.total,
+            'Cód. Ret. IR':     r.codigo_retencion ?? '',
+            '% Retención':      r.porcentaje_ret ?? '',
+            'Valor Retenido':   r.valor_retenido ?? 0,
+            'Clave Acceso':     r.clave_acceso ?? '',
+        }))
+        const ws = XLSX.utils.json_to_sheet(filas)
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Compras SRI')
+        XLSX.writeFile(wb, `Compras_SRI_${empresaActiva?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.xlsx`)
     }
 
     return (
@@ -181,12 +174,12 @@ export function ConsultaComprasPage() {
                         />
                     </div>
                     <button
-                        onClick={exportarCsv}
+                        onClick={exportarExcel}
                         disabled={filtradas.length === 0}
                         className="btn btn-secondary gap-2"
                     >
                         <Download className="w-4 h-4" />
-                        Exportar CSV
+                        Exportar Excel
                     </button>
                 </div>
             </div>
