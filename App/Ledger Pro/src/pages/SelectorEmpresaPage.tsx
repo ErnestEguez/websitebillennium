@@ -1,11 +1,14 @@
 import { useNavigate } from 'react-router-dom'
-import { Building2, ArrowRight, LogOut, X } from 'lucide-react'
+import { Building2, ArrowRight, LogOut, X, Shield } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { LpEmpresa } from '../types/conta'
 
+const ADMIN_EMAILS = ['admin@billenniumsystem.com', 'billenniumsystem@gmail.com', 'admin@billennium.com']
+
 export function SelectorEmpresaPage() {
     const { empresas, empresaActiva, setEmpresaActiva, user, signOut } = useAuth()
-    const navigate = useNavigate()
+    const navigate  = useNavigate()
+    const isAdmin   = user?.email ? ADMIN_EMAILS.includes(user.email) : false
 
     function seleccionar(empresa: LpEmpresa) {
         setEmpresaActiva(empresa)
@@ -72,8 +75,28 @@ export function SelectorEmpresaPage() {
                 })}
             </div>
 
+            {/* Acceso directo a Administración (solo admin) */}
+            {isAdmin && (
+                <div className="mt-6 w-full max-w-2xl">
+                    <button
+                        onClick={() => {
+                            if (empresaActiva) {
+                                navigate('/admin')
+                            } else if (empresas.length > 0) {
+                                setEmpresaActiva(empresas[0])
+                                navigate('/admin')
+                            }
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium text-sm transition-colors"
+                    >
+                        <Shield className="w-4 h-4" />
+                        Ir a Administración — Gestionar empresas y usuarios
+                    </button>
+                </div>
+            )}
+
             {/* Botones de acción */}
-            <div className="mt-8 flex flex-col items-center gap-3">
+            <div className="mt-6 flex flex-col items-center gap-3">
                 {/* Cancelar: solo si ya hay una empresa activa (cambio, no primera selección) */}
                 {empresaActiva && (
                     <button
