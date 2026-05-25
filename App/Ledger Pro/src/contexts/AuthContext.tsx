@@ -130,7 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setEmpresas(listaEmpresas)
 
         const guardadaId = localStorage.getItem(EMPRESA_KEY)
-        const guardada   = listaEmpresas.find(e => e.id === guardadaId) ?? listaEmpresas[0] ?? null
+        const porCookie  = listaEmpresas.find(e => e.id === guardadaId) ?? null
+        // Auto-seleccionar solo cuando hay exactamente 1 empresa o cuando ya hay preferencia guardada.
+        // Con 2+ empresas y sin preferencia, dejar null para que el selector de empresa se muestre.
+        const guardada   = porCookie ?? (listaEmpresas.length === 1 ? listaEmpresas[0] : null)
         if (guardada) {
             setEmpresaActivaState(guardada)
             const mem = (lista.find(item => item.id === guardada.id)?.membresia ?? null) as LpUsuarioEmpresa | null

@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
+import { SelectorEmpresaPage } from './pages/SelectorEmpresaPage'
 import { Loader2 } from 'lucide-react'
 
 const DashboardPage          = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })))
@@ -23,6 +24,9 @@ const IntegracionSRIPage          = lazy(() => import('./pages/integracion/Integ
 const IntegracionExcelVentasPage  = lazy(() => import('./pages/integracion/IntegracionExcelVentasPage').then(m => ({ default: m.IntegracionExcelVentasPage })))
 const ConfiguracionPage      = lazy(() => import('./pages/ConfiguracionPage').then(m => ({ default: m.ConfiguracionPage })))
 const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })))
+const AtsPage                = lazy(() => import('./pages/tributario/AtsPage').then(m => ({ default: m.AtsPage })))
+const ConsultaRetencionesPage = lazy(() => import('./pages/tributario/ConsultaRetencionesPage').then(m => ({ default: m.ConsultaRetencionesPage })))
+const ConsultaNcNdPage       = lazy(() => import('./pages/tributario/ConsultaNcNdPage').then(m => ({ default: m.ConsultaNcNdPage })))
 
 function PageLoader() {
     return (
@@ -37,6 +41,13 @@ function AppRoutes() {
         <Suspense fallback={<PageLoader />}>
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
+
+                {/* Selector de empresa para contadores con múltiples clientes */}
+                <Route path="/seleccionar-empresa" element={
+                    <ProtectedRoute>
+                        <SelectorEmpresaPage />
+                    </ProtectedRoute>
+                } />
 
                 <Route path="/" element={
                     <ProtectedRoute>
@@ -143,6 +154,24 @@ function AppRoutes() {
                 <Route path="/admin" element={
                     <ProtectedRoute>
                         <Layout><AdminPage /></Layout>
+                    </ProtectedRoute>
+                } />
+
+                <Route path="/tributario/ats" element={
+                    <ProtectedRoute>
+                        <Layout><AtsPage /></Layout>
+                    </ProtectedRoute>
+                } />
+
+                <Route path="/tributario/retenciones" element={
+                    <ProtectedRoute>
+                        <Layout><ConsultaRetencionesPage /></Layout>
+                    </ProtectedRoute>
+                } />
+
+                <Route path="/tributario/nc-nd" element={
+                    <ProtectedRoute>
+                        <Layout><ConsultaNcNdPage /></Layout>
                     </ProtectedRoute>
                 } />
 

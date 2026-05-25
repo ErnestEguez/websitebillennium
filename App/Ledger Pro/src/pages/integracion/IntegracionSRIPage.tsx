@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
     Upload, CheckCircle, AlertCircle, Loader2,
-    Settings, List, Search, ChevronDown, ChevronUp, Zap, X, Plus, Trash2,
+    Settings, List, Search, ChevronDown, ChevronUp, Zap, X, Plus, Trash2, FileDown,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -163,7 +164,8 @@ function normalizarFecha(s: string): string {
 
 export function IntegracionSRIPage() {
     const { empresaActiva } = useAuth()
-    const fileRef = useRef<HTMLInputElement>(null)
+    const navigate  = useNavigate()
+    const fileRef   = useRef<HTMLInputElement>(null)
 
     const [tab, setTab]           = useState<'importar' | 'comprobantes' | 'reglas'>('importar')
 
@@ -750,6 +752,13 @@ export function IntegracionSRIPage() {
                         </button>
                         <button onClick={aplicarReglas} className="btn border border-primary-200 text-primary-700 hover:bg-primary-50 gap-2">
                             <Settings className="w-4 h-4" /> Aplicar reglas
+                        </button>
+                        <button
+                            onClick={() => navigate(`/tributario/ats?año=${filtAño}&mes=${filtMes}`)}
+                            className="btn border border-emerald-200 text-emerald-700 hover:bg-emerald-50 gap-2"
+                            title="Ir al módulo ATS con este período seleccionado"
+                        >
+                            <FileDown className="w-4 h-4" /> Exportar ATS
                         </button>
                     </div>
 

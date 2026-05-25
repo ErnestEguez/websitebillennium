@@ -1,10 +1,10 @@
 import React from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
     LayoutDashboard, BookOpen, FileText, BarChart2,
     Settings, LogOut, ChevronRight, ChevronDown,
     Menu, X, Building2, PiggyBank, TrendingUp, BookMarked, Target,
-    Lock, Zap, Shield,
+    Lock, Zap, Shield, ArrowLeftRight, Calculator, Receipt, FileDown,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
@@ -75,6 +75,16 @@ const navigation: NavItem[] = [
     { to: '/integracion-qi',           icon: Zap,          label: 'Integración QI' },
     { to: '/integracion-sri',          icon: FileText,     label: 'Integración SRI' },
     { to: '/integracion-excel-ventas', icon: BookMarked,   label: 'Excel Ventas' },
+    {
+        type: 'group',
+        icon: Calculator,
+        label: 'Tributario',
+        children: [
+            { to: '/tributario/ats',          label: 'ATS',                    icon: FileDown },
+            { to: '/tributario/retenciones',  label: 'Consulta Retenciones',   icon: Receipt },
+            { to: '/tributario/nc-nd',        label: 'Consulta N/C y N/D',     icon: FileText },
+        ],
+    },
     { to: '/configuracion',    icon: Settings, label: 'Configuración' },
 ]
 
@@ -82,6 +92,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const { empresaActiva, empresas, setEmpresaActiva, signOut, user } = useAuth()
     const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false
     const location = useLocation()
+    const navigate = useNavigate()
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true)
     const [openGroups, setOpenGroups] = React.useState<string[]>(['Reportes'])
     const [showEmpresaMenu, setShowEmpresaMenu] = React.useState(false)
@@ -106,20 +117,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </span>
                 </div>
 
-                {/* Empresa selector */}
-                {empresas.length > 1 && (
+                {/* Empresa selector / indicador */}
+                {empresaActiva && (
                     <div className="px-4 py-3 border-b border-slate-100 shrink-0 relative">
-                        <button
-                            onClick={() => setShowEmpresaMenu(v => !v)}
-                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-left"
-                        >
-                            <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
-                            <span className="text-sm font-medium text-slate-700 truncate flex-1">
-                                {empresaActiva?.nombre ?? 'Seleccionar empresa'}
-                            </span>
-                            <ChevronDown className={cn('w-4 h-4 text-slate-400 transition-transform', showEmpresaMenu && 'rotate-180')} />
-                        </button>
-                        {showEmpresaMenu && (
+                        {empresas.length > 1 ? (
+                            <button
+                                onClick={() => setShowEmpresaMenu(v => !v)}
+                                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-left"
+                            >
+                                <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
+                                <span className="text-sm font-medium text-slate-700 truncate flex-1">
+                                    {empresaActiva.nombre}
+                                </span>
+                                <ChevronDown className={cn('w-4 h-4 text-slate-400 transition-transform', showEmpresaMenu && 'rotate-180')} />
+                            </button>
+                        ) : (
+                            <div className="flex items-center gap-2 px-3 py-2">
+                                <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
+                                <span className="text-sm font-medium text-slate-700 truncate">
+                                    {empresaActiva.nombre}
+                                </span>
+                            </div>
+                        )}
+                        {showEmpresaMenu && empresas.length > 1 && (
                             <div className="absolute left-4 right-4 top-full mt-1 bg-white rounded-lg border border-slate-200 shadow-lg z-50">
                                 {empresas.map(e => (
                                     <button
@@ -197,6 +217,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             label="Administración"
                             active={location.pathname === '/admin'}
                         />
+                    )}
+                    {/* Cambiar empresa: visible para usuarios con 2+ empresas */}
+                    {empresas.length > 1 && (
+                        <button
+                            onClick={() => navigate('/seleccionar-empresa')}
+                            className="flex items-center gap-3 w-full px-4 py-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 rounded-lg transition-colors text-sm"
+                        >
+                            <ArrowLeftRight className="w-4 h-4" />
+                            <span>Cambiar empresa</span>
+                        </button>
                     )}
                     <button
                         onClick={() => window.close()}
