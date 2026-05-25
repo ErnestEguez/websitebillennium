@@ -32,6 +32,7 @@ const PRODUCTS = [
   { id: 'vendormanagement', name: 'Gestión de Compras' },
   { id: 'dashboard', name: 'Dashboard Empresarial' },
   { id: 'plataforma-ferias', name: 'Plataforma Móvil para Ferias' },
+  { id: 'finance', name: 'Finance Suite' },
 ];
 
 const PLANS = {
@@ -44,6 +45,7 @@ const PLANS = {
   vendormanagement: ['Básico', 'Profesional', 'Empresarial'],
   dashboard: ['Básico', 'Profesional'],
   'plataforma-ferias': ['Estándar'],
+  'finance': ['Básico'],
 };
 
 const statusConfig = {
