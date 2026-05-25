@@ -494,6 +494,30 @@ PRODUCTS = [
                 "features": ["Multiempresa", "Usuarios ilimitados", "Todo lo del Plan Profesional", "Integración SRI", "Reportes avanzados"]
             }
         ]
+    },
+    {
+        "id": "finance",
+        "name": "Finance Suite",
+        "slug": "finance-suite",
+        "description": "Módulo bancario y de pagos. Cuentas bancarias, egresos a proveedores, cheques, anticipos, movimientos y conciliación bancaria.",
+        "icon": "Landmark",
+        "features": [
+            "Gestión de cuentas bancarias",
+            "Comprobantes de egreso a proveedores",
+            "Control de cheques y post-fechados",
+            "Anticipos a proveedores",
+            "Movimientos bancarios",
+            "Conciliación bancaria"
+        ],
+        "plans": [
+            {
+                "name": "Básico",
+                "price_before": 50,
+                "price_now": 30,
+                "billing": "mensual",
+                "features": ["1 empresa", "Hasta 3 cuentas bancarias", "Egresos y pagos", "Cheques y anticipos", "Conciliación bancaria", "Exportación a Excel"]
+            }
+        ]
     }
 ]
 
@@ -847,6 +871,7 @@ APP_URLS = {
     "contabilidad":     os.environ.get("CONTABILIDAD_APP_URL",  "https://websitebillennium-ledgerpro.vercel.app/"),
     "vendormanagement": os.environ.get("VENDOR_APP_URL",        "https://websitebillennium-vendor.vercel.app/"),
     "restoflow":        os.environ.get("RESTOFLOW_APP_URL",     "https://websitebillennium-restaurantes.vercel.app/"),
+    "finance":          os.environ.get("FINANCE_APP_URL",       "https://websitebillennium-finance-dacp8ft9v-ernesteguezs-projects.vercel.app/"),
 }
 
 @api_router.get("/debug/env")
