@@ -276,15 +276,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const signOut = async () => {
-        console.log('SignOut triggered — redirecting to Portal');
-        try {
-            await supabase.auth.signOut().catch(() => { });
-        } finally {
-            localStorage.clear();
-            sessionStorage.clear();
-            const portalUrl = import.meta.env.VITE_PORTAL_URL || 'https://billenniumsystem.com';
-            window.location.replace(portalUrl);
-        }
+        supabase.auth.signOut().catch(() => {})
+        Object.keys(localStorage).forEach(k => {
+            if (!k.startsWith('sb-')) localStorage.removeItem(k)
+        })
+        sessionStorage.clear()
+        window.close()
     }
 
     if (loading) {
