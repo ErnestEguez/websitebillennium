@@ -536,6 +536,7 @@ def admin_enter_app(app_id: str, admin: dict = Depends(get_admin_user)):
     APP_URLS = {
         "sentinel": os.environ.get("SENTINEL_URL", "https://pedidosbillennium.vercel.app/"),
         "importaciones": os.environ.get("IMPORTACIONES_URL", "http://localhost:5173/"),
+        "finance": os.environ.get("FINANCE_URL", "https://websitebillennium-finance-dacp8ft9v-ernesteguezs-projects.vercel.app/"),
     }
     app_url = APP_URLS.get(app_id)
     if not app_url:
@@ -573,6 +574,7 @@ def get_app_token(product_id: str, current_user: dict = Depends(get_current_user
     APP_URLS = {
         "sentinel": os.environ.get("SENTINEL_URL", "https://pedidosbillennium.vercel.app/"),
         "importaciones": os.environ.get("IMPORTACIONES_URL", "https://importaciones-billennium.vercel.app/"),
+        "finance": os.environ.get("FINANCE_URL", "https://websitebillennium-finance-dacp8ft9v-ernesteguezs-projects.vercel.app/"),
     }
     app_url = APP_URLS.get(product_id)
     if not app_url:
