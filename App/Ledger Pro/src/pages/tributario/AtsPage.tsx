@@ -31,6 +31,15 @@ interface SriComp {
 
 const f2 = (n: number) => n.toFixed(2)
 
+function xmlEsc(s: string): string {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;')
+}
+
 function fmtDate(iso: string): string {
     const [y, m, d] = iso.split('-')
     return `${(d ?? '01').padStart(2, '0')}/${(m ?? '01').padStart(2, '0')}/${y ?? '2025'}`
@@ -145,8 +154,7 @@ function generarXmlAts(params: {
       <valRetServ50>0.00</valRetServ50>
       <valorRetServicios>0.00</valorRetServicios>
       <valRetServ100>0.00</valRetServ100>
-      <totbasesImpReemb>0.00</totbasesImpReemb>
-      <pagoLocExtExtranjero>01</pagoLocExtExtranjero>${detalleAir}${retBlock}
+      <totbasesImpReemb>0.00</totbasesImpReemb>${detalleAir}${retBlock}
       <formaPago>20</formaPago>
     </detalleCompras>`
     }).join('\n')
@@ -173,11 +181,11 @@ function generarXmlAts(params: {
     const totalBaseComp  = compras.reduce((s, c) => s + c.base_cero + c.base_iva, 0)
     const totalIvaComp   = compras.reduce((s, c) => s + c.iva, 0)
 
-    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<iva version="1.31">
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<iva>
   <TipoIDInformante>R</TipoIDInformante>
   <IdInformante>${ruc}</IdInformante>
-  <razonSocial>${razonSocial}</razonSocial>
+  <razonSocial>${xmlEsc(razonSocial)}</razonSocial>
   <Anio>${año}</Anio>
   <Mes>${mesStr}</Mes>
   <numEstabRuc>001</numEstabRuc>
@@ -186,18 +194,13 @@ function generarXmlAts(params: {
   <compras>
 ${xmlCompras}
   </compras>
-  <ventas>
-  </ventas>
+  <ventas/>
   <retenciones>
 ${xmlRetenciones}
   </retenciones>
-  <dividendos>
-  </dividendos>
-  <exportaciones>
-  </exportaciones>
-  <otrosIngresos>
-  </otrosIngresos>
-  <!-- Totales compras: base=${f2(totalBaseComp)} | IVA=${f2(totalIvaComp)} -->
+  <dividendos/>
+  <exportaciones/>
+  <otrosIngresos/>
 </iva>`
 }
 
