@@ -1262,59 +1262,79 @@ export function ConfigurationPage() {
 
             {/* Modals */}
             {/* Modals */}
-            {
-                isEmpresaModalOpen && (
-                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-8 space-y-6 my-8">
-                            <div className="flex justify-between items-center">
-                                <h2 className="text-2xl font-bold">{editingEmpresa?.id ? 'Editar' : 'Nueva'} Empresa</h2>
-                                <button onClick={() => setIsEmpresaModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400">
-                                    <X className="w-6 h-6" />
-                                </button>
-                            </div>
+            {isEmpresaModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center p-4 z-50 overflow-y-auto">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl my-6 flex flex-col">
 
+                        {/* ── Cabecera fija ── */}
+                        <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 sticky top-0 bg-white rounded-t-3xl z-10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 bg-primary-100 rounded-xl flex items-center justify-center">
+                                    <Building2 className="w-5 h-5 text-primary-600" />
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-900">
+                                    {editingEmpresa?.id ? 'Editar Empresa' : 'Nueva Empresa'}
+                                </h2>
+                            </div>
+                            <button onClick={() => setIsEmpresaModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* ── Contenido scrollable ── */}
+                        <div className="px-8 py-6 space-y-6">
+
+                            {/* Sección 1: Identificación */}
                             <div className="space-y-4">
+                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Datos de la empresa</p>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nombre Comercial *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Nombre con el que opera la empresa"
+                                        autoFocus
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 text-slate-900 font-medium"
+                                        value={editingEmpresa?.nombre || ''}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, nombre: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">RUC *</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Número de RUC (13 dígitos)"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+                                        value={editingEmpresa?.ruc || ''}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, ruc: e.target.value })}
+                                    />
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Nombre Comercial</label>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Dirección</label>
                                         <input
-                                            type="text" placeholder="Nombre de la empresa" className="w-full px-4 py-3 rounded-xl border mt-1"
-                                            value={editingEmpresa?.nombre || ''}
-                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, nombre: e.target.value })}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">RUC</label>
-                                        <input
-                                            type="text" placeholder="Número de RUC" className="w-full px-4 py-3 rounded-xl border mt-1"
-                                            value={editingEmpresa?.ruc || ''}
-                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, ruc: e.target.value })}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Dirección</label>
-                                        <input
-                                            type="text" placeholder="Ciudad, calle, número..." className="w-full px-4 py-3 rounded-xl border mt-1"
+                                            type="text"
+                                            placeholder="Ciudad, calle, número..."
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
                                             value={editingEmpresa?.direccion || ''}
                                             onChange={e => setEditingEmpresa({ ...editingEmpresa, direccion: e.target.value })}
                                         />
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Teléfono</label>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Teléfono</label>
                                         <input
-                                            type="text" placeholder="+593 99 999 9999" className="w-full px-4 py-3 rounded-xl border mt-1"
+                                            type="text"
+                                            placeholder="+593 99 999 9999"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
                                             value={editingEmpresa?.telefono || ''}
                                             onChange={e => setEditingEmpresa({ ...editingEmpresa, telefono: e.target.value })}
                                         />
                                     </div>
                                 </div>
-
-                                {/* Logo Upload */}
-                                <div>
-                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Logo (imagen)</label>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Logo (imagen)</label>
                                     <input
                                         type="file" accept="image/*"
-                                        className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 mt-2"
+                                        className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
                                         onChange={async (e) => {
                                             const file = e.target.files?.[0]
                                             if (!file || !editingEmpresa?.id) {
@@ -1332,47 +1352,37 @@ export function ConfigurationPage() {
                                 </div>
                             </div>
 
-
-                            {/* ── SECCIÓN CONFIGURACIÓN SRI ──────────────── */}
+                            {/* Sección 2: Configuración SRI */}
                             <div className="border-t border-slate-100 pt-6 space-y-4">
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-primary-500 rounded-full" />
+                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Shield className="w-3.5 h-3.5 text-primary-500" />
                                     Configuración SRI / Facturación Electrónica
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Establecimiento</label>
+                                </p>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Establecimiento</label>
                                         <input
                                             type="text" maxLength={3} placeholder="001"
-                                            className="w-full px-4 py-3 rounded-xl border mt-1 font-mono"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 font-mono text-center"
                                             value={editingEmpresa?.config_sri?.establecimiento || ''}
-                                            onChange={e => setEditingEmpresa({
-                                                ...editingEmpresa,
-                                                config_sri: { ...(editingEmpresa?.config_sri || {}), establecimiento: e.target.value }
-                                            })}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, config_sri: { ...(editingEmpresa?.config_sri || {}), establecimiento: e.target.value } })}
                                         />
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Punto Emisión</label>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Punto Emisión</label>
                                         <input
                                             type="text" maxLength={3} placeholder="001"
-                                            className="w-full px-4 py-3 rounded-xl border mt-1 font-mono"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 font-mono text-center"
                                             value={editingEmpresa?.config_sri?.punto_emision || ''}
-                                            onChange={e => setEditingEmpresa({
-                                                ...editingEmpresa,
-                                                config_sri: { ...(editingEmpresa?.config_sri || {}), punto_emision: e.target.value }
-                                            })}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, config_sri: { ...(editingEmpresa?.config_sri || {}), punto_emision: e.target.value } })}
                                         />
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Ambiente</label>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Ambiente</label>
                                         <select
-                                            className="w-full px-4 py-3 rounded-xl border mt-1 bg-white font-bold text-sm"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 bg-white font-semibold text-sm"
                                             value={editingEmpresa?.config_sri?.ambiente || 'PRUEBAS'}
-                                            onChange={e => setEditingEmpresa({
-                                                ...editingEmpresa,
-                                                config_sri: { ...(editingEmpresa?.config_sri || {}), ambiente: e.target.value }
-                                            })}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, config_sri: { ...(editingEmpresa?.config_sri || {}), ambiente: e.target.value } })}
                                         >
                                             <option value="PRUEBAS">PRUEBAS</option>
                                             <option value="PRODUCCION">PRODUCCIÓN</option>
@@ -1380,46 +1390,36 @@ export function ConfigurationPage() {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Secuencial Inicial Facturas</label>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Secuencial inicial facturas</label>
                                         <input
                                             type="number" min={1} placeholder="1"
-                                            className="w-full px-4 py-3 rounded-xl border mt-1 font-mono"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 font-mono"
                                             value={editingEmpresa?.config_sri?.secuencial_inicio || 1}
-                                            onChange={e => setEditingEmpresa({
-                                                ...editingEmpresa,
-                                                config_sri: { ...(editingEmpresa?.config_sri || {}), secuencial_inicio: parseInt(e.target.value) || 1 }
-                                            })}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, config_sri: { ...(editingEmpresa?.config_sri || {}), secuencial_inicio: parseInt(e.target.value) || 1 } })}
                                         />
-                                        <p className="text-[11px] text-slate-400 mt-1">Número desde el cual inicia la secuencia si no hay facturas previas</p>
+                                        <p className="text-[11px] text-slate-400">Número inicial si no hay facturas previas</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
                                             Firma Electrónica (.p12)
                                             {editingEmpresa?.config_sri?.firma_path && (
-                                                <span className="ml-2 text-emerald-600 normal-case font-normal">
+                                                <span className="ml-2 text-emerald-600 normal-case font-normal text-[11px]">
                                                     ✅ {editingEmpresa.config_sri.firma_path}
                                                 </span>
                                             )}
                                         </label>
                                         <input
                                             type="file" accept=".p12"
-                                            className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 mt-1 cursor-pointer"
+                                            className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer"
                                             onChange={async (e) => {
                                                 const file = e.target.files?.[0]
                                                 if (!file) return
                                                 try {
                                                     const path = await sriService.uploadFirma(editingEmpresa?.id || 'new', file)
-                                                    setEditingEmpresa({
-                                                        ...editingEmpresa,
-                                                        config_sri: {
-                                                            ...(editingEmpresa?.config_sri || {}),
-                                                            firma_path: path,
-                                                            firma_url: path
-                                                        }
-                                                    })
+                                                    setEditingEmpresa({ ...editingEmpresa, config_sri: { ...(editingEmpresa?.config_sri || {}), firma_path: path, firma_url: path } })
                                                     alert(`✅ Firma "${file.name}" subida correctamente`)
                                                 } catch (err: any) {
                                                     alert('Error al subir firma: ' + err.message)
@@ -1427,29 +1427,26 @@ export function ConfigurationPage() {
                                             }}
                                         />
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Contraseña de la Firma</label>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Contraseña de la firma</label>
                                         <input
                                             type="password" placeholder="••••••••"
-                                            className="w-full px-4 py-3 rounded-xl border mt-1"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
                                             value={editingEmpresa?.config_sri?.firma_password || ''}
-                                            onChange={e => setEditingEmpresa({
-                                                ...editingEmpresa,
-                                                config_sri: { ...(editingEmpresa?.config_sri || {}), firma_password: e.target.value }
-                                            })}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, config_sri: { ...(editingEmpresa?.config_sri || {}), firma_password: e.target.value } })}
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* ── Módulos Integrados ──────────────────────────── */}
+                            {/* Sección 3: Módulos */}
                             <div className="border-t border-slate-100 pt-6 space-y-3">
-                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Módulos Integrados</h3>
+                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Módulos integrados</p>
                                 <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
                                     <div>
-                                        <p className="text-sm font-bold text-slate-800">Usar Gestión de Compras (VendorManagement)</p>
+                                        <p className="text-sm font-bold text-slate-800">Gestión de Compras (VendorManagement)</p>
                                         <p className="text-xs text-slate-500 mt-0.5">
-                                            ON → oculta "Proveedores" e "Ingreso de Compras" del menú de QuickInvoice (la gestión se hace desde la app de Compras).
+                                            Oculta Proveedores e Ingreso de Compras del menú — se gestiona desde la app de Compras.
                                         </p>
                                     </div>
                                     <input
@@ -1460,21 +1457,27 @@ export function ConfigurationPage() {
                                     />
                                 </label>
                             </div>
+                        </div>
 
-                            <div className="flex gap-4 pt-4">
-                                <button onClick={() => setIsEmpresaModalOpen(false)} className="flex-1 py-4 font-bold border rounded-2xl hover:bg-slate-50 transition-colors">Cancelar</button>
-                                <button
-                                    onClick={handleSaveEmpresaFull}
-                                    disabled={saving}
-                                    className="flex-1 py-4 font-bold bg-primary-600 text-white rounded-2xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar Empresa</>}
-                                </button>
-                            </div>
+                        {/* ── Pie fijo ── */}
+                        <div className="flex gap-3 px-8 py-5 border-t border-slate-100 bg-slate-50 rounded-b-3xl sticky bottom-0">
+                            <button
+                                onClick={() => setIsEmpresaModalOpen(false)}
+                                className="flex-1 py-3 font-bold border border-slate-200 bg-white rounded-xl hover:bg-slate-50 transition-colors text-slate-600"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSaveEmpresaFull}
+                                disabled={saving}
+                                className="flex-1 py-3 font-bold bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                            >
+                                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5" /> Guardar Empresa</>}
+                            </button>
                         </div>
                     </div>
-                )
-            }
+                </div>
+            )}
 
 
             {
