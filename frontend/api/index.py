@@ -934,7 +934,7 @@ def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
     name = admin["name"]
 
     # Para estas apps solo se genera el magic link — el perfil de admin se crea directamente en la BD de cada app
-    if product_id in ("importaciones", "facturacion", "vendormanagement", "restoflow", "contabilidad"):
+    if product_id in ("importaciones", "facturacion", "vendormanagement", "restoflow", "contabilidad", "finance"):
         try:
             result = supabase.auth.admin.generate_link({
                 "type": "magiclink",

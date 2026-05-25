@@ -13,7 +13,8 @@ import {
   Lock,
   LogOut,
   User,
-  Ticket
+  Ticket,
+  Landmark
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -88,6 +89,13 @@ const productConfig = {
     url: 'https://proyecto-ferias2026.vercel.app/',
     description: 'Gestión profesional de ferias y exposiciones'
   },
+  finance: {
+    name: 'Finance Suite',
+    icon: Landmark,
+    color: 'bg-blue-50 text-blue-700',
+    url: null,
+    description: 'Bancario y pagos: egresos, cheques, anticipos y conciliación'
+  },
 };
 
 export const UserDashboard = () => {
@@ -124,7 +132,7 @@ export const UserDashboard = () => {
   };
 
   // Productos que usan SSO (magic link) en vez de URL directa
-  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion', 'contabilidad', 'vendormanagement', 'restoflow'];
+  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion', 'contabilidad', 'vendormanagement', 'restoflow', 'finance'];
 
   const handleSsoAccess = async (productId) => {
     setSsoLoading(productId);
