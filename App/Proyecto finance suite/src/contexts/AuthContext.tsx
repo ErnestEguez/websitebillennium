@@ -52,12 +52,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return
             }
 
-            if (['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED'].includes(event) && session?.user) {
-                setUser(session.user)
-                await fetchProfile(session.user.id)
+            if (['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED'].includes(event)) {
+                if (session?.user) {
+                    setUser(session.user)
+                    await fetchProfile(session.user.id)
+                    if (isMounted.current) setLoading(false)
+                } else if (!hasMagicLink) {
+                    if (isMounted.current) setLoading(false)
+                }
+                // Con magic link activo y sin sesión aún: esperar SIGNED_IN
             }
-
-            if (isMounted.current) setLoading(false)
         })
 
         if (!hasMagicLink) {
