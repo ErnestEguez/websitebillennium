@@ -38,11 +38,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         isMounted.current = true
 
-        const hasMagicLink =
-            window.location.hash.includes('access_token') ||
-            window.location.hash.includes('type=magiclink') ||
+        // Leer tokens del hash ANTES de que el cliente Supabase los procese
+        const hash = window.location.hash.substring(1)
+        const params = new URLSearchParams(hash)
+        const refreshToken = params.get('refresh_token')
+        const hasMagicLink = !!refreshToken ||
             new URLSearchParams(window.location.search).get('token_hash') !== null
 
+        if (refreshToken) {
+            // Limpiar el hash de la URL para que el cliente Supabase no lo reprocese
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search)
+
+            // Usar refresh_token para obtener sesión fresca (evita 401 por desfase de reloj)
+            supabase.auth.refreshSession({ refresh_token: refreshToken })
+                .then(async ({ data, error }) => {
+                    if (!isMounted.current) return
+                    if (!error && data.session?.user) {
+                        setUser(data.session.user)
+                        await fetchProfile(data.session.user.id)
+                    }
+                    if (isMounted.current) setLoading(false)
+                })
+            return () => { isMounted.current = false }
+        }
+
+        // Flujo normal (sin magic link)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!isMounted.current) return
 
@@ -60,15 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 } else if (!hasMagicLink) {
                     if (isMounted.current) setLoading(false)
                 }
-                // Con magic link activo y sin sesión aún: esperar SIGNED_IN
             }
         })
 
-        if (!hasMagicLink) {
-            supabase.auth.getSession().then(({ data: { session } }) => {
-                if (!session && isMounted.current) setLoading(false)
-            })
-        }
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!session && isMounted.current) setLoading(false)
+        })
 
         return () => { isMounted.current = false; subscription.unsubscribe() }
     }, [])
@@ -106,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="w-16 h-16 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-6">
                     <div className="w-8 h-8 bg-primary-600 rounded-lg animate-spin" />
                 </div>
