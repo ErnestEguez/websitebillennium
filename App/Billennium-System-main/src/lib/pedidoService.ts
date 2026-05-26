@@ -326,6 +326,19 @@ export const pedidoService = {
     if (error) throw error;
   },
 
+  async desautorizarPedido(pedidoId: string): Promise<void> {
+    const { error } = await supabase
+      .from('pedido_cabecera')
+      .update({
+        estado: 'Pendiente',
+        fecha_autorizacion: null,
+        autorizada_por: null
+      })
+      .eq('id', pedidoId);
+
+    if (error) throw error;
+  },
+
   async deletePedido(id: string): Promise<void> {
     const { error } = await supabase
       .from('pedido_cabecera')

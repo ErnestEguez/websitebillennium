@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Mail, MessageCircle, Eye, Download, Filter, Edit, Trash2, CheckCircle, ArrowRight } from 'lucide-react';
+import { FileText, Mail, MessageCircle, Eye, Download, Filter, Edit, Trash2, CheckCircle, ArrowRight, RotateCcw } from 'lucide-react';
 import { proformaService } from '../lib/proformaService';
 import { pedidoService } from '../lib/pedidoService';
 import type { ProformaCompleta, PedidoCompleto } from '../lib/supabase';
@@ -135,6 +135,24 @@ export function DocumentosList({ tipoDocumento, onEditarDocumento, onRefresh }: 
     }
   };
 
+  const handleDesautorizar = async (documento: PedidoCompleto) => {
+    if (!confirm(`¿Revertir a Pendiente el pedido ${documento.numero}? Se eliminará la autorización actual.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await pedidoService.desautorizarPedido(documento.id);
+      if (onRefresh) onRefresh();
+      await cargarDocumentos();
+    } catch (err) {
+      console.error('Error al revertir pedido:', err);
+      alert('Error al revertir el pedido a Pendiente');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEliminarDocumento = async (documento: ProformaCompleta | PedidoCompleto) => {
     const tipo = tipoDocumento === 'proforma' ? 'proforma' : 'pedido';
     if (!confirm(`¿Está seguro de eliminar ${tipo} ${documento.numero}? Esta acción no se puede deshacer.`)) {
@@ -202,6 +220,7 @@ export function DocumentosList({ tipoDocumento, onEditarDocumento, onRefresh }: 
         onEnviarEmail={handleEnviarEmail}
         onEnviarWhatsApp={handleEnviarWhatsApp}
         onAutorizar={tipoDocumento === 'pedido' ? handleAutorizar : undefined}
+        onDesautorizar={tipoDocumento === 'pedido' ? handleDesautorizar : undefined}
       />
     );
   }
@@ -363,6 +382,15 @@ export function DocumentosList({ tipoDocumento, onEditarDocumento, onRefresh }: 
                           title="Autorizar pedido"
                         >
                           <CheckCircle className="h-4 w-4" />
+                        </button>
+                      )}
+                      {tipoDocumento === 'pedido' && doc.estado === 'Autorizada' && (
+                        <button
+                          onClick={() => handleDesautorizar(doc as PedidoCompleto)}
+                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                          title="Revertir a Pendiente"
+                        >
+                          <RotateCcw className="h-4 w-4" />
                         </button>
                       )}
                       <button

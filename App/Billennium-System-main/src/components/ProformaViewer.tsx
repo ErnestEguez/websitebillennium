@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Mail, MessageCircle, Printer, Download, CheckCircle } from 'lucide-react';
+import { X, Mail, MessageCircle, Printer, Download, CheckCircle, RotateCcw } from 'lucide-react';
 import type { ProformaCompleta, PedidoCompleto, Cliente } from '../lib/supabase';
 import { proformaService } from '../lib/proformaService';
 import { enviarProformaWhatsApp, enviarProformaEmail, descargarProformaPDF } from '../lib/pdfService';
@@ -11,9 +11,10 @@ interface ProformaViewerProps {
   onEnviarEmail?: (doc: ProformaCompleta | PedidoCompleto) => void;
   onEnviarWhatsApp?: (doc: ProformaCompleta | PedidoCompleto) => void;
   onAutorizar?: (doc: PedidoCompleto) => void;
+  onDesautorizar?: (doc: PedidoCompleto) => void;
 }
 
-export function ProformaViewer({ proforma, tipoDocumento = 'proforma', onClose, onEnviarEmail, onEnviarWhatsApp, onAutorizar }: ProformaViewerProps) {
+export function ProformaViewer({ proforma, tipoDocumento = 'proforma', onClose, onEnviarEmail, onEnviarWhatsApp, onAutorizar, onDesautorizar }: ProformaViewerProps) {
   const [cliente, setCliente] = useState<Cliente | null>(null);
 
   useEffect(() => {
@@ -125,6 +126,15 @@ export function ProformaViewer({ proforma, tipoDocumento = 'proforma', onClose, 
               title="Autorizar pedido"
             >
               <CheckCircle className="h-5 w-5" />
+            </button>
+          )}
+          {tipoDocumento === 'pedido' && proforma.estado === 'Autorizada' && onDesautorizar && (
+            <button
+              onClick={() => onDesautorizar(proforma as PedidoCompleto)}
+              className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+              title="Revertir a Pendiente"
+            >
+              <RotateCcw className="h-5 w-5" />
             </button>
           )}
           <button
