@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { supabaseFacturacion } from '../lib/supabaseFacturacion'
+import { supabase } from '../lib/supabase'
 import type { User } from '@supabase/supabase-js'
 
 export interface Profile {
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             window.location.hash.includes('type=magiclink') ||
             new URLSearchParams(window.location.search).get('token_hash') !== null
 
-        const { data: { subscription } } = supabaseFacturacion.auth.onAuthStateChange(async (event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!isMounted.current) return
 
             if (event === 'SIGNED_OUT') {
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
 
         if (!hasMagicLink) {
-            supabaseFacturacion.auth.getSession().then(({ data: { session } }) => {
+            supabase.auth.getSession().then(({ data: { session } }) => {
                 if (!session && isMounted.current) setLoading(false)
             })
         }
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function fetchProfile(userId: string) {
         try {
-            const { data: prof } = await supabaseFacturacion
+            const { data: prof } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', userId)
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile(prof as Profile)
 
             if (prof.empresa_id) {
-                const { data: emp } = await supabaseFacturacion
+                const { data: emp } = await supabase
                     .from('empresas')
                     .select('id, nombre, ruc, logo_url')
                     .eq('id', prof.empresa_id)
@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     function signOut() {
-        supabaseFacturacion.auth.signOut().catch(() => {})
+        supabase.auth.signOut().catch(() => {})
         window.close()
         setTimeout(() => { window.location.replace(PORTAL_URL) }, 300)
         return Promise.resolve()
