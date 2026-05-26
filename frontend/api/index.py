@@ -871,7 +871,7 @@ APP_URLS = {
     "contabilidad":     os.environ.get("CONTABILIDAD_APP_URL",  "https://websitebillennium-ledgerpro.vercel.app/"),
     "vendormanagement": os.environ.get("VENDOR_APP_URL",        "https://websitebillennium-vendor.vercel.app/"),
     "restoflow":        os.environ.get("RESTOFLOW_APP_URL",     "https://websitebillennium-restaurantes.vercel.app/"),
-    "finance":          os.environ.get("FINANCE_APP_URL",       "https://websitebillennium-t1as.vercel.app/"),
+    "finance":          os.environ.get("FINANCE_APP_URL",       "https://websitebillennium-finance.vercel.app/"),
 }
 
 @api_router.get("/debug/env")
