@@ -6,4 +6,5 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 // Cliente principal — schema finance
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     db: { schema: 'finance' },
+    auth: { detectSessionInUrl: false },
 })
