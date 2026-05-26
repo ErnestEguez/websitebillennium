@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabaseFacturacion as supabase } from '../lib/supabaseFacturacion'
+import { magicLinkRefreshToken } from '../lib/magicLink'
 import type { User } from '@supabase/supabase-js'
 
 export interface Profile {
@@ -38,17 +39,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         isMounted.current = true
 
-        // Leer tokens del hash ANTES de que el cliente Supabase los procese
-        const hash = window.location.hash.substring(1)
-        const params = new URLSearchParams(hash)
-        const refreshToken = params.get('refresh_token')
+        // magicLinkRefreshToken fue capturado en main.tsx antes de que Supabase inicializara
+        const refreshToken = magicLinkRefreshToken
         const hasMagicLink = !!refreshToken ||
             new URLSearchParams(window.location.search).get('token_hash') !== null
 
         if (refreshToken) {
-            // Limpiar el hash de la URL para que el cliente Supabase no lo reprocese
-            window.history.replaceState({}, document.title, window.location.pathname + window.location.search)
-
             // Usar refresh_token para obtener sesión fresca (evita 401 por desfase de reloj)
             supabase.auth.refreshSession({ refresh_token: refreshToken })
                 .then(async ({ data, error }) => {
