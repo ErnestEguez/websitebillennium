@@ -332,7 +332,8 @@ export const pedidoService = {
       .update({
         estado: 'Pendiente',
         fecha_autorizacion: null,
-        autorizada_por: null
+        autorizada_por: null,
+        sincronizada: false
       })
       .eq('id', pedidoId);
 
