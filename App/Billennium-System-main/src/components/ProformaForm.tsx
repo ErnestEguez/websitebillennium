@@ -215,7 +215,9 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       });
 
       historial.sort((a, b) => {
-        if (a.dias_diferencia !== null && b.dias_diferencia !== null) return b.dias_diferencia - a.dias_diferencia;
+        // Items con rotación primero, ordenados por proximidad a hoy (más cercanos primero)
+        if (a.dias_diferencia !== null && b.dias_diferencia !== null)
+          return Math.abs(a.dias_diferencia) - Math.abs(b.dias_diferencia);
         if (a.dias_diferencia !== null) return -1;
         if (b.dias_diferencia !== null) return 1;
         return new Date(b.ultima_compra).getTime() - new Date(a.ultima_compra).getTime();
@@ -876,7 +878,7 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
               {cargandoHistorial && <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />}
             </div>
             {historialCliente.length > 0 && (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
