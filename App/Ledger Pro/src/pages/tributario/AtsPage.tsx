@@ -108,6 +108,12 @@ function generarXmlAts(params: {
         </detalleAir>
       </air>` : ''
 
+        // SRI: formasDePago solo se reporta cuando la suma de bases > 1000 (para periodos >= 2013/01)
+        const sumaBasesComp = c.base_cero + c.base_iva
+        const formasPagoBlock = sumaBasesComp > 1000
+            ? `\n      <formasDePago><formaPago>20</formaPago></formasDePago>`
+            : ''
+
         return `    <detalleCompras>
       <codSustento>01</codSustento>
       <tpIdProv>${tpId}</tpIdProv>
@@ -134,8 +140,7 @@ function generarXmlAts(params: {
       <valRetServ100>0.00</valRetServ100>
       <valorRetencionNc>0.00</valorRetencionNc>
       <totbasesImpReemb>0.00</totbasesImpReemb>${airBlock}
-      <pagoExterior><pagoLocExt>01</pagoLocExt><paisEfecPago>NA</paisEfecPago><aplicConvDobTrib>NA</aplicConvDobTrib><pagExtSujRetNorLeg>NA</pagExtSujRetNorLeg></pagoExterior>
-      <formasDePago><formaPago>20</formaPago></formasDePago>
+      <pagoExterior><pagoLocExt>01</pagoLocExt><paisEfecPago>NA</paisEfecPago><aplicConvDobTrib>NA</aplicConvDobTrib><pagExtSujRetNorLeg>NA</pagExtSujRetNorLeg></pagoExterior>${formasPagoBlock}
     </detalleCompras>`
     }).join('\n')
 
