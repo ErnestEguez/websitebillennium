@@ -392,6 +392,35 @@ export function IntegracionSRIPage() {
         setExpandido(null)
     }
 
+    // ── Eliminar comprobantes ──────────────────────────────────────────────
+
+    async function eliminarComprobante(id: string) {
+        if (!window.confirm('¿Eliminar este comprobante? Esta acción no se puede deshacer.')) return
+        const { error: er } = await supabase.from('lp_sri_comprobantes').delete().eq('id', id)
+        if (er) { setError(er.message); return }
+        await cargarComprobantes()
+    }
+
+    async function eliminarPeriodo() {
+        if (!empresaActiva) return
+        const eliminables = compFiltrados.filter(c => c.estado !== 'contabilizado')
+        const nCont = compFiltrados.filter(c => c.estado === 'contabilizado').length
+        if (!eliminables.length) {
+            setError('Todos los comprobantes del período ya están contabilizados y no se pueden eliminar desde aquí.')
+            return
+        }
+        const aviso = nCont > 0
+            ? `Se eliminarán ${eliminables.length} comprobante(s). Los ${nCont} contabilizados no se tocarán.\n¿Confirmar?`
+            : `¿Eliminar los ${eliminables.length} comprobante(s) de ${mesNombre(filtMes)} ${filtAño}?\nEsta acción no se puede deshacer.`
+        if (!window.confirm(aviso)) return
+        const ids = eliminables.map(c => c.id)
+        for (let i = 0; i < ids.length; i += 50) {
+            const { error: er } = await supabase.from('lp_sri_comprobantes').delete().in('id', ids.slice(i, i + 50))
+            if (er) { setError(er.message); return }
+        }
+        await cargarComprobantes()
+    }
+
     // ── Aplicar reglas a pendientes ────────────────────────────────────────
 
     async function aplicarReglas() {
@@ -760,6 +789,14 @@ export function IntegracionSRIPage() {
                         >
                             <FileDown className="w-4 h-4" /> Exportar ATS
                         </button>
+                        <button
+                            onClick={eliminarPeriodo}
+                            disabled={cargandoComp || compFiltrados.filter(c => c.estado !== 'contabilizado').length === 0}
+                            className="btn border border-red-200 text-red-600 hover:bg-red-50 gap-2 disabled:opacity-40"
+                            title="Eliminar todos los comprobantes no contabilizados del período filtrado"
+                        >
+                            <Trash2 className="w-4 h-4" /> Eliminar período
+                        </button>
                     </div>
 
                     {/* Grid */}
@@ -830,7 +867,7 @@ export function IntegracionSRIPage() {
                                                             {c.estado}
                                                         </span>
                                                     </td>
-                                                    <td className="py-2 px-2">
+                                                    <td className="py-2 px-2 flex gap-0.5">
                                                         <button
                                                             title="Crear / editar regla de mapeo para este proveedor"
                                                             onClick={() => setEditMapeo({
@@ -847,6 +884,15 @@ export function IntegracionSRIPage() {
                                                         >
                                                             <Settings className="w-3.5 h-3.5" />
                                                         </button>
+                                                        {c.estado !== 'contabilizado' && (
+                                                            <button
+                                                                title="Eliminar comprobante"
+                                                                onClick={() => eliminarComprobante(c.id)}
+                                                                className="text-slate-400 hover:text-red-500 p-1 rounded transition-colors"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
                                                     </td>
                                                 </tr>
 
