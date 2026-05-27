@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Trash2, DollarSign, TrendingUp, Loader2, Save, Eye, EyeOff, MapPin } from 'lucide-react';
+import { Search, Plus, Trash2, DollarSign, TrendingUp, Loader2, Save, Eye, EyeOff, MapPin, History, CheckCircle } from 'lucide-react';
 import { proformaService, calcularUtilidad } from '../lib/proformaService';
 import { pedidoService } from '../lib/pedidoService';
 import type { Vendedor, Articulo, Cliente, ProformaCompleta, Empresa } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { aiService, AiSuggestion } from '../lib/aiService';
-import { Sparkles, ShoppingBag } from 'lucide-react';
 import { PROVINCIAS, PROVINCIAS_CIUDADES } from '../lib/ecuador';
+
+interface HistorialItem {
+  articulo_id: string;
+  descripcion: string;
+  ultima_compra: string;
+  cantidad_habitual: number;
+  precio_historico: number;
+  rotacion_dias: number | null;
+  fecha_proxima_compra: string | null;
+  dias_diferencia: number | null;
+}
 
 interface DetalleItem {
   articulo_id: string;
@@ -50,8 +59,9 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
   const [formaPago, setFormaPago] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [detalles, setDetalles] = useState<DetalleItem[]>([]);
-  const [sugerenciasAi, setSugerenciasAi] = useState<AiSuggestion[]>([]);
-  const [cargandoAi, setCargandoAi] = useState(false);
+  const [historialCliente, setHistorialCliente] = useState<HistorialItem[]>([]);
+  const [historialSeleccionados, setHistorialSeleccionados] = useState<Set<string>>(new Set());
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
   const [capturandoGeo, setCapturandoGeo] = useState(false);
   const [geoCapturada, setGeoCapturada] = useState<{ lat: number; lng: number } | null>(null);
   const [showUtilidad, setShowUtilidad] = useState<boolean>(() => {
@@ -144,6 +154,81 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
     }
   };
 
+  const cargarHistorialCliente = async (ruc: string) => {
+    if (!ruc) { setHistorialCliente([]); return; }
+    setCargandoHistorial(true);
+    try {
+      const { data: pedidos, error } = await supabase
+        .from('pedido_cabecera')
+        .select(`id, created_at, detalles:pedido_detalle(articulo_id, descripcion, cantidad, precio)`)
+        .eq('ruc_cliente', ruc)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (!pedidos || pedidos.length === 0) { setHistorialCliente([]); return; }
+
+      const articuloMap = new Map<string, { descripcion: string; compras: { fecha: string; cantidad: number; precio: number }[] }>();
+
+      pedidos.forEach((pedido: any) => {
+        (pedido.detalles || []).forEach((d: any) => {
+          if (!articuloMap.has(d.articulo_id)) {
+            articuloMap.set(d.articulo_id, { descripcion: d.descripcion, compras: [] });
+          }
+          articuloMap.get(d.articulo_id)!.compras.push({ fecha: pedido.created_at, cantidad: d.cantidad, precio: d.precio });
+        });
+      });
+
+      const hoy = new Date();
+      const historial: HistorialItem[] = [];
+
+      articuloMap.forEach((info, articulo_id) => {
+        const compras = info.compras.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+        const ultima = compras[compras.length - 1];
+        const cantidadHabitual = compras.reduce((s, c) => s + c.cantidad, 0) / compras.length;
+
+        let rotacion_dias: number | null = null;
+        let fecha_proxima_compra: string | null = null;
+        let dias_diferencia: number | null = null;
+
+        if (compras.length >= 2) {
+          let totalDias = 0;
+          for (let i = 1; i < compras.length; i++) {
+            totalDias += (new Date(compras[i].fecha).getTime() - new Date(compras[i - 1].fecha).getTime()) / 86400000;
+          }
+          rotacion_dias = Math.round(totalDias / (compras.length - 1));
+          const proxima = new Date(ultima.fecha);
+          proxima.setDate(proxima.getDate() + rotacion_dias);
+          fecha_proxima_compra = proxima.toISOString();
+          dias_diferencia = Math.round((hoy.getTime() - proxima.getTime()) / 86400000);
+        }
+
+        historial.push({
+          articulo_id,
+          descripcion: info.descripcion,
+          ultima_compra: ultima.fecha,
+          cantidad_habitual: Math.round(cantidadHabitual * 100) / 100,
+          precio_historico: ultima.precio,
+          rotacion_dias,
+          fecha_proxima_compra,
+          dias_diferencia
+        });
+      });
+
+      historial.sort((a, b) => {
+        if (a.dias_diferencia !== null && b.dias_diferencia !== null) return b.dias_diferencia - a.dias_diferencia;
+        if (a.dias_diferencia !== null) return -1;
+        if (b.dias_diferencia !== null) return 1;
+        return new Date(b.ultima_compra).getTime() - new Date(a.ultima_compra).getTime();
+      });
+
+      setHistorialCliente(historial);
+    } catch (err) {
+      console.error('Error cargando historial:', err);
+    } finally {
+      setCargandoHistorial(false);
+    }
+  };
+
   const cargarArticulos = async () => {
     try {
       const empresaId = vendedor?.empresa_id || undefined;
@@ -181,6 +266,8 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
         setDireccionCliente(cliente.direccion || '');
         setProvinciaCliente(cliente.provincia || '');
         setCiudadCliente(cliente.ciudad || '');
+        setHistorialSeleccionados(new Set());
+        cargarHistorialCliente(cliente.ruc);
       } else {
         setClienteEncontrado(null);
         setNombreCliente('');
@@ -190,6 +277,7 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
         setDireccionCliente('');
         setProvinciaCliente('');
         setCiudadCliente('');
+        setHistorialCliente([]);
       }
     } catch (err) {
       console.error('Error buscando cliente:', err);
@@ -226,6 +314,8 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
     setCiudadCliente(cliente.ciudad || '');
     setBusquedaCliente('');
     setClientesSugeridos([]);
+    setHistorialSeleccionados(new Set());
+    cargarHistorialCliente(cliente.ruc);
   };
 
   const handleRucChange = (ruc: string) => {
@@ -263,23 +353,6 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
 
     setBusquedaArticulo('');
     setArticulos([]);
-    obtenerSugerencias(articulo.id, articulo.descripcion);
-  };
-
-  const obtenerSugerencias = async (id: string, descripcion: string) => {
-    if (!vendedor?.empresa_id) return;
-    setCargandoAi(true);
-    try {
-      const suggestions = await aiService.getProductSuggestions(
-        [{ id, descripcion }],
-        vendedor.empresa_id
-      );
-      setSugerenciasAi(suggestions);
-    } catch (err) {
-      console.error('Error al obtener sugerencias IA:', err);
-    } finally {
-      setCargandoAi(false);
-    }
   };
 
   const actualizarDetalle = (index: number, campo: keyof DetalleItem, valor: string | number) => {
@@ -441,6 +514,8 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
       setFormaPago('');
       setObservaciones('');
       setDetalles([]);
+      setHistorialCliente([]);
+      setHistorialSeleccionados(new Set());
 
       onProformaCreada();
     } catch (err) {
@@ -789,39 +864,105 @@ export function ProformaForm({ tipoDocumento = 'proforma', onProformaCreada, pro
           )}
         </div>
 
-        {/* Sugerencias IA */}
-        {(sugerenciasAi.length > 0 || cargandoAi) && (
-          <div className="mb-6 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center text-indigo-700">
-                <Sparkles className="h-5 w-5 mr-2 animate-pulse" />
-                <h3 className="font-semibold text-sm">Sugerencias de la IA</h3>
+        {/* Historial del cliente */}
+        {(historialCliente.length > 0 || cargandoHistorial) && (
+          <div className="mb-6 rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-gray-700">
+                <History className="h-4 w-4" />
+                <span className="font-semibold text-sm">Artículos que suele comprar este cliente</span>
+                <span className="text-xs text-gray-400 font-normal">(clic para agregar al pedido)</span>
               </div>
-              {cargandoAi && <Loader2 className="h-4 w-4 text-indigo-500 animate-spin" />}
+              {cargandoHistorial && <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />}
             </div>
-            <div className="flex flex-wrap gap-3">
-              {sugerenciasAi.map((sug) => (
-                <button
-                  key={sug.articulo_id}
-                  type="button"
-                  onClick={async () => {
-                    const { data } = await supabase
-                      .from('articulos')
-                      .select('*')
-                      .eq('id', sug.articulo_id)
-                      .single();
-                    if (data) agregarArticulo(data);
-                    setSugerenciasAi(prev => prev.filter(s => s.articulo_id !== sug.articulo_id));
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-indigo-600 hover:text-white text-indigo-800 rounded-lg border border-indigo-200 shadow-sm transition-all group"
-                  title={sug.motivo}
-                >
-                  <ShoppingBag className="h-4 w-4 opacity-70 group-hover:scale-110 transition-transform" />
-                  <span className="text-sm font-medium">{sug.descripcion}</span>
-                  <span className="text-xs opacity-80">${sug.precio.toFixed(4)}</span>
-                </button>
-              ))}
-            </div>
+            {historialCliente.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
+                      <th className="px-4 py-2 text-left font-medium">Descripción</th>
+                      <th className="px-4 py-2 text-center font-medium">Últ. Compra</th>
+                      <th className="px-4 py-2 text-right font-medium">Cant.</th>
+                      <th className="px-4 py-2 text-right font-medium">Precio</th>
+                      <th className="px-4 py-2 text-center font-medium">Rotación</th>
+                      <th className="px-4 py-2 text-center font-medium">Próx. Compra</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {historialCliente.map((item) => {
+                      const seleccionado = historialSeleccionados.has(item.articulo_id);
+                      const vencido = item.dias_diferencia !== null && item.dias_diferencia > 0;
+                      const porVencer = item.dias_diferencia !== null && item.dias_diferencia > -7 && item.dias_diferencia <= 0;
+                      return (
+                        <tr
+                          key={item.articulo_id}
+                          onClick={async () => {
+                            if (seleccionado) return;
+                            const { data: art } = await supabase
+                              .from('articulos')
+                              .select('*')
+                              .eq('id', item.articulo_id)
+                              .maybeSingle();
+                            if (art) {
+                              const yaExiste = detalles.find(d => d.articulo_id === item.articulo_id);
+                              if (!yaExiste) agregarArticulo(art);
+                              setHistorialSeleccionados(prev => new Set([...prev, item.articulo_id]));
+                            } else {
+                              alert('Este artículo ya no está disponible en el catálogo');
+                            }
+                          }}
+                          className={`transition-colors ${
+                            seleccionado
+                              ? 'bg-green-50 cursor-default'
+                              : vencido
+                              ? 'bg-red-50 hover:bg-red-100 cursor-pointer'
+                              : porVencer
+                              ? 'bg-amber-50 hover:bg-amber-100 cursor-pointer'
+                              : 'hover:bg-blue-50 cursor-pointer'
+                          }`}
+                        >
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              {seleccionado
+                                ? <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                : vencido
+                                ? <span className="inline-block w-2 h-2 bg-red-500 rounded-full flex-shrink-0 animate-pulse" />
+                                : null}
+                              <span className={`font-medium ${seleccionado ? 'text-green-700' : 'text-gray-800'}`}>
+                                {item.descripcion}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5 text-center text-gray-600">
+                            {new Date(item.ultima_compra).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-gray-700">{item.cantidad_habitual.toFixed(0)}</td>
+                          <td className="px-4 py-2.5 text-right text-gray-700">${item.precio_historico.toFixed(2)}</td>
+                          <td className="px-4 py-2.5 text-center text-gray-600">
+                            {item.rotacion_dias !== null
+                              ? `${item.rotacion_dias} días`
+                              : <span className="text-gray-400 text-xs">sin datos</span>}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            {item.fecha_proxima_compra ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className={`text-xs font-medium ${vencido ? 'text-red-600' : porVencer ? 'text-amber-600' : 'text-gray-600'}`}>
+                                  {new Date(item.fecha_proxima_compra).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                </span>
+                                {vencido && <span className="text-xs text-red-600 font-bold">¡{item.dias_diferencia}d vencido!</span>}
+                                {porVencer && <span className="text-xs text-amber-500 font-medium">por vencer</span>}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
