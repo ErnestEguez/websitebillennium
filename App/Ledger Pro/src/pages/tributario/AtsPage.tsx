@@ -108,9 +108,9 @@ function generarXmlAts(params: {
         </detalleAir>
       </air>` : ''
 
-        // SRI: formasDePago solo se reporta cuando la suma de bases > 1000 (para periodos >= 2013/01)
-        const sumaBasesComp = c.base_cero + c.base_iva
-        const formasPagoBlock = sumaBasesComp > 1000
+        // SRI ATS v1.31: formasDePago requerido cuando bases + IVA + ICE > USD 500 (periodos >= 2013/01)
+        const totalConIva = c.base_cero + c.base_iva + c.iva
+        const formasPagoBlock = totalConIva > 500
             ? `\n      <formasDePago><formaPago>20</formaPago></formasDePago>`
             : ''
 
