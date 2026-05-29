@@ -28,6 +28,8 @@ const AtsPage                = lazy(() => import('./pages/tributario/AtsPage').t
 const ConsultaRetencionesPage = lazy(() => import('./pages/tributario/ConsultaRetencionesPage').then(m => ({ default: m.ConsultaRetencionesPage })))
 const ConsultaNcNdPage       = lazy(() => import('./pages/tributario/ConsultaNcNdPage').then(m => ({ default: m.ConsultaNcNdPage })))
 const ConsultaComprasPage    = lazy(() => import('./pages/tributario/ConsultaComprasPage').then(m => ({ default: m.ConsultaComprasPage })))
+const Formulario104Page      = lazy(() => import('./pages/tributario/Formulario104Page').then(m => ({ default: m.Formulario104Page })))
+const Formulario104DetallePage = lazy(() => import('./pages/tributario/Formulario104DetallePage').then(m => ({ default: m.Formulario104DetallePage })))
 
 function PageLoader() {
     return (
@@ -179,6 +181,18 @@ function AppRoutes() {
                 <Route path="/tributario/nc-nd" element={
                     <ProtectedRoute>
                         <Layout><ConsultaNcNdPage /></Layout>
+                    </ProtectedRoute>
+                } />
+
+                <Route path="/tributario/104" element={
+                    <ProtectedRoute>
+                        <Layout><Formulario104Page /></Layout>
+                    </ProtectedRoute>
+                } />
+
+                <Route path="/tributario/104/:id" element={
+                    <ProtectedRoute>
+                        <Layout><Formulario104DetallePage /></Layout>
                     </ProtectedRoute>
                 } />
 

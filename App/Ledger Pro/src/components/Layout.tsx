@@ -84,6 +84,7 @@ const navigation: NavItem[] = [
             { to: '/tributario/retenciones',  label: 'Consulta Retenciones',   icon: Receipt },
             { to: '/tributario/nc-nd',        label: 'Consulta N/C y N/D',     icon: FileText },
             { to: '/tributario/ats',          label: 'ATS',                    icon: FileDown },
+            { to: '/tributario/104',          label: 'Formulario 104 IVA',     icon: Calculator },
         ],
     },
     { to: '/configuracion',    icon: Settings, label: 'Configuración' },
