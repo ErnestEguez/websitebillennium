@@ -21,9 +21,18 @@ CREATE TABLE IF NOT EXISTS conta.lp_iva_104 (
     created_by          UUID        REFERENCES auth.users(id),
     updated_by          UUID        REFERENCES auth.users(id),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (empresa_id, año, mes, es_sustitutiva, COALESCE(formulario_orig_id, '00000000-0000-0000-0000-000000000000'::UUID))
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- UNIQUE parcial: una declaración original por empresa/período
+CREATE UNIQUE INDEX IF NOT EXISTS uq_iva104_original
+    ON conta.lp_iva_104 (empresa_id, año, mes)
+    WHERE es_sustitutiva = false;
+
+-- UNIQUE parcial: una sustitutiva por declaración original
+CREATE UNIQUE INDEX IF NOT EXISTS uq_iva104_sustitutiva
+    ON conta.lp_iva_104 (empresa_id, año, mes, formulario_orig_id)
+    WHERE es_sustitutiva = true;
 
 -- ── 2. DETALLE DE CASILLEROS ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS conta.lp_iva_104_detalle (
