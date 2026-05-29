@@ -5,9 +5,9 @@
 -- ============================================================
 
 -- ── 1. CABECERA DE DECLARACIÓN ─────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS conta.lp_iva_104 (
+CREATE TABLE IF NOT EXISTS contabilidad.lp_iva_104 (
     id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    empresa_id          UUID        NOT NULL REFERENCES conta.lp_empresas(id),
+    empresa_id          UUID        NOT NULL REFERENCES contabilidad.lp_empresas(id),
     año                 INT         NOT NULL,
     mes                 INT         NOT NULL CHECK (mes BETWEEN 1 AND 12),
     version_form        TEXT        NOT NULL DEFAULT 'v2024',
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS conta.lp_iva_104 (
     fecha_envio         TIMESTAMPTZ,
     numero_formulario   TEXT,
     es_sustitutiva      BOOLEAN     NOT NULL DEFAULT false,
-    formulario_orig_id  UUID        REFERENCES conta.lp_iva_104(id),
+    formulario_orig_id  UUID        REFERENCES contabilidad.lp_iva_104(id),
     created_by          UUID        REFERENCES auth.users(id),
     updated_by          UUID        REFERENCES auth.users(id),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -26,19 +26,19 @@ CREATE TABLE IF NOT EXISTS conta.lp_iva_104 (
 
 -- UNIQUE parcial: una declaración original por empresa/período
 CREATE UNIQUE INDEX IF NOT EXISTS uq_iva104_original
-    ON conta.lp_iva_104 (empresa_id, año, mes)
+    ON contabilidad.lp_iva_104 (empresa_id, año, mes)
     WHERE es_sustitutiva = false;
 
 -- UNIQUE parcial: una sustitutiva por declaración original
 CREATE UNIQUE INDEX IF NOT EXISTS uq_iva104_sustitutiva
-    ON conta.lp_iva_104 (empresa_id, año, mes, formulario_orig_id)
+    ON contabilidad.lp_iva_104 (empresa_id, año, mes, formulario_orig_id)
     WHERE es_sustitutiva = true;
 
 -- ── 2. DETALLE DE CASILLEROS ───────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS conta.lp_iva_104_detalle (
+CREATE TABLE IF NOT EXISTS contabilidad.lp_iva_104_detalle (
     id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    declaracion_id      UUID        NOT NULL REFERENCES conta.lp_iva_104(id) ON DELETE CASCADE,
-    empresa_id          UUID        NOT NULL REFERENCES conta.lp_empresas(id),
+    declaracion_id      UUID        NOT NULL REFERENCES contabilidad.lp_iva_104(id) ON DELETE CASCADE,
+    empresa_id          UUID        NOT NULL REFERENCES contabilidad.lp_empresas(id),
     casillero           TEXT        NOT NULL,
     valor_calculado     NUMERIC(18,2) NOT NULL DEFAULT 0,
     ajuste_manual       NUMERIC(18,2) NOT NULL DEFAULT 0,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS conta.lp_iva_104_detalle (
 );
 
 -- ── 3. MAPA CASILLERO ↔ ETIQUETA XML ──────────────────────────────────────
-CREATE TABLE IF NOT EXISTS conta.lp_iva_104_mapeo_xml (
+CREATE TABLE IF NOT EXISTS contabilidad.lp_iva_104_mapeo_xml (
     id              UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
     version_form    TEXT    NOT NULL DEFAULT 'v2024',
     casillero       TEXT    NOT NULL,
@@ -67,10 +67,10 @@ CREATE TABLE IF NOT EXISTS conta.lp_iva_104_mapeo_xml (
 );
 
 -- ── 4. LOG DE AUDITORÍA ────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS conta.lp_iva_104_log (
+CREATE TABLE IF NOT EXISTS contabilidad.lp_iva_104_log (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    declaracion_id  UUID        NOT NULL REFERENCES conta.lp_iva_104(id),
-    empresa_id      UUID        NOT NULL REFERENCES conta.lp_empresas(id),
+    declaracion_id  UUID        NOT NULL REFERENCES contabilidad.lp_iva_104(id),
+    empresa_id      UUID        NOT NULL REFERENCES contabilidad.lp_empresas(id),
     user_id         UUID        REFERENCES auth.users(id),
     accion          TEXT        NOT NULL
                                 CHECK (accion IN ('calcular','ajustar','generar_xml','marcar_enviado','anular')),
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS conta.lp_iva_104_log (
 );
 
 -- ── 5. VISTA DE COMPRAS CONSOLIDADA (solo lectura sobre tabla existente) ───
-CREATE OR REPLACE VIEW conta.lp_vw_iva_compras_104 AS
+CREATE OR REPLACE VIEW contabilidad.lp_vw_iva_compras_104 AS
 SELECT
     empresa_id,
     año,
@@ -97,65 +97,65 @@ SELECT
     SUM(CASE WHEN tipo IN ('factura','nota_credito','nota_debito')
               AND codigo_retencion IS NOT NULL
              THEN COALESCE(valor_retenido, 0) ELSE 0 END)           AS ret_efectuadas
-FROM  conta.lp_sri_comprobantes
+FROM  contabilidad.lp_sri_comprobantes
 GROUP BY empresa_id, año, mes;
 
 -- ── 6. ÍNDICES ─────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_iva104_empresa_periodo
-    ON conta.lp_iva_104(empresa_id, año, mes);
+    ON contabilidad.lp_iva_104(empresa_id, año, mes);
 
 CREATE INDEX IF NOT EXISTS idx_iva104_estado
-    ON conta.lp_iva_104(empresa_id, estado);
+    ON contabilidad.lp_iva_104(empresa_id, estado);
 
 CREATE INDEX IF NOT EXISTS idx_iva104_det_decl
-    ON conta.lp_iva_104_detalle(declaracion_id);
+    ON contabilidad.lp_iva_104_detalle(declaracion_id);
 
 CREATE INDEX IF NOT EXISTS idx_iva104_det_empresa
-    ON conta.lp_iva_104_detalle(empresa_id);
+    ON contabilidad.lp_iva_104_detalle(empresa_id);
 
 CREATE INDEX IF NOT EXISTS idx_iva104_mapeo_ver
-    ON conta.lp_iva_104_mapeo_xml(version_form, seccion, orden);
+    ON contabilidad.lp_iva_104_mapeo_xml(version_form, seccion, orden);
 
 CREATE INDEX IF NOT EXISTS idx_iva104_log_decl
-    ON conta.lp_iva_104_log(declaracion_id);
+    ON contabilidad.lp_iva_104_log(declaracion_id);
 
 CREATE INDEX IF NOT EXISTS idx_iva104_log_empresa
-    ON conta.lp_iva_104_log(empresa_id, created_at DESC);
+    ON contabilidad.lp_iva_104_log(empresa_id, created_at DESC);
 
 -- ── 7. ROW LEVEL SECURITY ──────────────────────────────────────────────────
-ALTER TABLE conta.lp_iva_104           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conta.lp_iva_104_detalle   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conta.lp_iva_104_mapeo_xml ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conta.lp_iva_104_log       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contabilidad.lp_iva_104           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contabilidad.lp_iva_104_detalle   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contabilidad.lp_iva_104_mapeo_xml ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contabilidad.lp_iva_104_log       ENABLE ROW LEVEL SECURITY;
 
 -- lp_iva_104: solo la empresa dueña
-CREATE POLICY iva104_all ON conta.lp_iva_104
-    FOR ALL USING (empresa_id IN (SELECT conta.lp_user_empresas()));
+CREATE POLICY iva104_all ON contabilidad.lp_iva_104
+    FOR ALL USING (empresa_id IN (SELECT contabilidad.lp_user_empresas()));
 
 -- lp_iva_104_detalle: solo la empresa dueña
-CREATE POLICY iva104_det_all ON conta.lp_iva_104_detalle
-    FOR ALL USING (empresa_id IN (SELECT conta.lp_user_empresas()));
+CREATE POLICY iva104_det_all ON contabilidad.lp_iva_104_detalle
+    FOR ALL USING (empresa_id IN (SELECT contabilidad.lp_user_empresas()));
 
 -- lp_iva_104_mapeo_xml: lectura pública (es un catálogo global)
-CREATE POLICY iva104_mapeo_read ON conta.lp_iva_104_mapeo_xml
+CREATE POLICY iva104_mapeo_read ON contabilidad.lp_iva_104_mapeo_xml
     FOR SELECT USING (true);
 
 -- lp_iva_104_log: solo la empresa dueña
-CREATE POLICY iva104_log_all ON conta.lp_iva_104_log
-    FOR ALL USING (empresa_id IN (SELECT conta.lp_user_empresas()));
+CREATE POLICY iva104_log_all ON contabilidad.lp_iva_104_log
+    FOR ALL USING (empresa_id IN (SELECT contabilidad.lp_user_empresas()));
 
 -- ── 8. PERMISOS ────────────────────────────────────────────────────────────
-GRANT ALL    ON conta.lp_iva_104           TO authenticated;
-GRANT ALL    ON conta.lp_iva_104_detalle   TO authenticated;
-GRANT SELECT ON conta.lp_iva_104_mapeo_xml TO authenticated;
-GRANT ALL    ON conta.lp_iva_104_log       TO authenticated;
-GRANT SELECT ON conta.lp_vw_iva_compras_104 TO authenticated;
+GRANT ALL    ON contabilidad.lp_iva_104           TO authenticated;
+GRANT ALL    ON contabilidad.lp_iva_104_detalle   TO authenticated;
+GRANT SELECT ON contabilidad.lp_iva_104_mapeo_xml TO authenticated;
+GRANT ALL    ON contabilidad.lp_iva_104_log       TO authenticated;
+GRANT SELECT ON contabilidad.lp_vw_iva_compras_104 TO authenticated;
 
 -- ── 9. FUNCIÓN RPC: CALCULAR CASILLEROS 104 ───────────────────────────────
 -- Llamada desde el frontend: supabase.rpc('lp_calcular_104', {...})
 -- Devuelve JSONB con { "401": 5000.00, "411": 600.00, ... }
 -- No modifica ninguna tabla — solo calcula y devuelve valores
-CREATE OR REPLACE FUNCTION conta.lp_calcular_104(
+CREATE OR REPLACE FUNCTION contabilidad.lp_calcular_104(
     p_empresa_id  UUID,
     p_año         INT,
     p_mes         INT
@@ -192,7 +192,7 @@ DECLARE
 BEGIN
     -- Verificar que el usuario tiene acceso a esta empresa
     IF NOT EXISTS (
-        SELECT 1 FROM conta.lp_usuarios_empresa
+        SELECT 1 FROM contabilidad.lp_usuarios_empresa
         WHERE  user_id    = auth.uid()
           AND  empresa_id = p_empresa_id
           AND  activo     = true
@@ -208,7 +208,7 @@ BEGIN
             COALESCE(SUM(f.base_cero),  0),
             COALESCE(SUM(f.total_iva),  0)
         INTO v_base_gravada_ventas, v_base_cero_ventas, v_iva_cobrado
-        FROM conta.lp_get_facturas_qi(p_empresa_id, v_fecha_desde, v_fecha_hasta) f;
+        FROM contabilidad.lp_get_facturas_qi(p_empresa_id, v_fecha_desde, v_fecha_hasta) f;
     EXCEPTION WHEN OTHERS THEN
         -- Si QI no está integrado aún, ventas quedan en 0 (no bloquea el cálculo)
         v_base_gravada_ventas := 0;
@@ -220,7 +220,7 @@ BEGIN
     -- tipo='retencion' en lp_sri_comprobantes = comprobantes de retención recibidos
     SELECT COALESCE(SUM(valor_retenido), 0)
     INTO   v_ret_sufridas
-    FROM   conta.lp_sri_comprobantes
+    FROM   contabilidad.lp_sri_comprobantes
     WHERE  empresa_id = p_empresa_id
       AND  año        = p_año
       AND  mes        = p_mes
@@ -232,7 +232,7 @@ BEGIN
         COALESCE(SUM(base_cero), 0),
         COALESCE(SUM(iva),       0)
     INTO v_base_gravada_compras, v_base_cero_compras, v_iva_pagado
-    FROM  conta.lp_sri_comprobantes
+    FROM  contabilidad.lp_sri_comprobantes
     WHERE empresa_id = p_empresa_id
       AND año        = p_año
       AND mes        = p_mes
@@ -241,7 +241,7 @@ BEGIN
     -- ── RETENCIONES EFECTUADAS (tú retuviste IVA a proveedores — bloque AIR) ─
     SELECT COALESCE(SUM(COALESCE(valor_retenido, 0)), 0)
     INTO   v_ret_efectuadas
-    FROM   conta.lp_sri_comprobantes
+    FROM   contabilidad.lp_sri_comprobantes
     WHERE  empresa_id        = p_empresa_id
       AND  año               = p_año
       AND  mes               = p_mes
@@ -251,14 +251,14 @@ BEGIN
     -- ── SALDO PERÍODO ANTERIOR (casillero 700 de la última declaración) ──
     SELECT COALESCE(d.valor_final, 0)
     INTO   v_saldo_anterior
-    FROM   conta.lp_iva_104 h
-    JOIN   conta.lp_iva_104_detalle d
+    FROM   contabilidad.lp_iva_104 h
+    JOIN   contabilidad.lp_iva_104_detalle d
            ON d.declaracion_id = h.id AND d.casillero = '700'
     WHERE  h.empresa_id = p_empresa_id
       AND  h.estado    != 'anulado'
       AND  (h.año * 100 + h.mes) = (
                SELECT MAX(h2.año * 100 + h2.mes)
-               FROM   conta.lp_iva_104 h2
+               FROM   contabilidad.lp_iva_104 h2
                WHERE  h2.empresa_id = p_empresa_id
                  AND  h2.estado    != 'anulado'
                  AND  (h2.año * 100 + h2.mes) < (p_año * 100 + p_mes)
@@ -298,10 +298,10 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION conta.lp_calcular_104(UUID, INT, INT) TO authenticated;
+GRANT EXECUTE ON FUNCTION contabilidad.lp_calcular_104(UUID, INT, INT) TO authenticated;
 
 -- ── 10. SEED: CASILLEROS v2024 ─────────────────────────────────────────────
-INSERT INTO conta.lp_iva_104_mapeo_xml
+INSERT INTO contabilidad.lp_iva_104_mapeo_xml
     (version_form, casillero, descripcion, etiqueta_xml, seccion, tipo_dato, obligatorio, orden)
 VALUES
 -- VENTAS ──────────────────────────────────────────────────────────────────
@@ -355,10 +355,10 @@ VALUES
 ON CONFLICT (version_form, casillero) DO NOTHING;
 
 -- ── 11. SEED: CASILLEROS v2025 (copia de v2024, lista para ajustar) ────────
-INSERT INTO conta.lp_iva_104_mapeo_xml
+INSERT INTO contabilidad.lp_iva_104_mapeo_xml
     (version_form, casillero, descripcion, etiqueta_xml, seccion, tipo_dato, obligatorio, orden)
 SELECT
     'v2025', casillero, descripcion, etiqueta_xml, seccion, tipo_dato, obligatorio, orden
-FROM  conta.lp_iva_104_mapeo_xml
+FROM  contabilidad.lp_iva_104_mapeo_xml
 WHERE version_form = 'v2024'
 ON CONFLICT (version_form, casillero) DO NOTHING;
