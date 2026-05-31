@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import {
     Mic, MicOff, X, CheckCircle2, AlertCircle,
-    Loader2, Volume2, User, Package, Briefcase,
+    Volume2, User, Briefcase, Package,
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -40,7 +39,6 @@ interface Props {
     onApply: (result: VoiceResult) => void
 }
 
-// ── Tipos SpeechRecognition (no están en TypeScript por defecto) ───────────
 declare global {
     interface Window {
         SpeechRecognition: any
@@ -48,7 +46,148 @@ declare global {
     }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Parser de patrones (sin API externa) ───────────────────────────────────
+
+function normalizar(texto: string): string {
+    return texto
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+}
+
+function extraerNumero(texto: string, patrones: RegExp[]): number {
+    for (const p of patrones) {
+        const m = texto.match(p)
+        if (m) return parseFloat((m[1] || m[2] || '0').replace(',', '.'))
+    }
+    return 0
+}
+
+function buscarEnLista(nombre: string, lista: any[]): any | null {
+    if (!nombre.trim()) return null
+    const n = normalizar(nombre)
+    // Coincidencia exacta primero
+    let found = lista.find(x => normalizar(x.nombre ?? '') === n)
+    if (found) return found
+    // Coincidencia parcial
+    found = lista.find(x =>
+        normalizar(x.nombre ?? '').includes(n) || n.includes(normalizar(x.nombre ?? ''))
+    )
+    return found ?? null
+}
+
+function parsearTranscripcion(texto: string, clientes: any[], servicios: any[]): VoiceResult {
+    const t = normalizar(texto)
+
+    // ── 1. Tipo de factura ─────────────────────────────────────────────────
+    let tipo: 'servicios' | 'inventario' | 'desconocido' = 'desconocido'
+    if (/\bservicio(s)?\b/.test(t)) tipo = 'servicios'
+    else if (/\binventario(s)?\b|\bproducto(s)?\b/.test(t)) tipo = 'inventario'
+    // Si no es claro, pero hay precio/cantidad/descripción → asumimos servicios
+    else if (/\bprecio\b|\bdolar(es)?\b|\bcantidad\b/.test(t)) tipo = 'servicios'
+
+    // ── 2. Cliente ─────────────────────────────────────────────────────────
+    let clienteNombre = ''
+    const clientePatrones = [
+        /para el cliente\s+([a-z0-9áéíóúüñ\s]+?)(?:\s+por\b|\s+a\s+un\b|\s+,|\s*$)/,
+        /cliente\s+([a-z0-9áéíóúüñ\s]+?)(?:\s+por\b|\s+a\s+un\b|\s+,|\s*$)/,
+        /\bpara\s+([a-z0-9áéíóúüñ\s]{3,40}?)(?:\s+por\b|\s+a\s+un\b|\s+,|\s*$)/,
+    ]
+    for (const p of clientePatrones) {
+        const m = t.match(p)
+        if (m?.[1]?.trim()) {
+            clienteNombre = m[1].trim()
+            // Quitar palabras de relleno al inicio
+            clienteNombre = clienteNombre.replace(/^(el|la|los|las|un|una|al)\s+/, '').trim()
+            break
+        }
+    }
+
+    const clienteEncontrado = buscarEnLista(clienteNombre, clientes)
+
+    // ── 3. Descripción del ítem ────────────────────────────────────────────
+    let itemNombre = ''
+    const itemPatrones = [
+        /por (?:el )?(?:producto|servicio)\s+(.+?)(?:\s+a\s+(?:un\s+)?precio\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
+        /(?:producto|servicio)\s+(.+?)(?:\s+a\s+(?:un\s+)?precio\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
+        /por\s+(.+?)(?:\s+a\s+(?:un\s+)?precio\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
+    ]
+    for (const p of itemPatrones) {
+        const m = t.match(p)
+        const candidato = m?.[1]?.trim() ?? ''
+        if (candidato.length > 2) {
+            itemNombre = candidato.replace(/^(el|la|los|las|un|una)\s+/, '').trim()
+            break
+        }
+    }
+
+    const itemEncontrado = tipo !== 'inventario' ? buscarEnLista(itemNombre, servicios) : null
+
+    // ── 4. Precio ──────────────────────────────────────────────────────────
+    const precio = extraerNumero(t, [
+        /precio unitario de\s+([\d]+[.,]?[\d]*)/,
+        /precio de\s+([\d]+[.,]?[\d]*)/,
+        /a\s+([\d]+[.,]?[\d]*)\s*dolar/,
+        /precio\s+([\d]+[.,]?[\d]*)/,
+        /unitario\s+([\d]+[.,]?[\d]*)/,
+        /([\d]+[.,][\d]+)\s*dolar/,     // 150.00 dólares
+        /([\d]{3,})\s*dolar/,            // 1500 dólares
+    ])
+
+    // ── 5. Cantidad ────────────────────────────────────────────────────────
+    const cantidad = extraerNumero(t, [
+        /cantidad\s+(\d+)/,
+        /(\d+)\s+unidades?/,
+        /(\d+)\s+items?/,
+    ]) || 1
+
+    // ── 6. IVA ─────────────────────────────────────────────────────────────
+    let ivaPorcentaje = 15
+    if (/sin\s+iva/.test(t)) ivaPorcentaje = 0
+    else if (/con\s+iva/.test(t)) ivaPorcentaje = 15
+
+    // ── 7. Datos faltantes ─────────────────────────────────────────────────
+    const faltantes: string[] = []
+    if (!clienteNombre) faltantes.push('Nombre del cliente')
+    if (tipo === 'servicios' && !itemNombre) faltantes.push('Descripción del servicio')
+    if (tipo === 'servicios' && !precio) faltantes.push('Precio unitario')
+    if (tipo === 'desconocido') faltantes.push('Tipo de factura (servicios o inventario)')
+
+    // ── 8. Resumen ─────────────────────────────────────────────────────────
+    const partes: string[] = []
+    if (tipo !== 'desconocido') partes.push(`Factura de ${tipo}`)
+    if (clienteNombre) partes.push(`cliente: ${clienteEncontrado?.nombre ?? clienteNombre}${clienteEncontrado ? ' ✓' : ' (nuevo)'}`)
+    if (itemNombre) partes.push(`ítem: ${itemNombre}${itemEncontrado ? ' ✓' : ''}`)
+    if (precio) partes.push(`precio: $${precio.toFixed(2)} × ${cantidad}`)
+    partes.push(ivaPorcentaje > 0 ? `IVA ${ivaPorcentaje}%` : 'Sin IVA')
+    const resumen = partes.join(' | ')
+
+    return {
+        tipo,
+        cliente: {
+            existe: !!clienteEncontrado,
+            id: clienteEncontrado?.id ?? null,
+            nombre: clienteEncontrado?.nombre ?? clienteNombre,
+            identificacion: clienteEncontrado?.identificacion ?? null,
+        },
+        item: {
+            existe: !!itemEncontrado,
+            id: itemEncontrado?.id ?? null,
+            nombre: itemNombre || (itemEncontrado?.nombre ?? ''),
+            cantidad,
+            precio_unitario: precio || (itemEncontrado?.precio_venta ?? 0),
+            iva_porcentaje: ivaPorcentaje,
+        },
+        datos_faltantes: faltantes,
+        accion_siguiente: faltantes.length === 0
+            ? 'Datos completos. Revisa y haz clic en "Aplicar a factura".'
+            : `Falta: ${faltantes.join(', ')}.`,
+        requiere_confirmacion: true,
+        resumen,
+    }
+}
+
+// ── Componente ─────────────────────────────────────────────────────────────
 
 function Badge({ label, color }: { label: string; color: string }) {
     return (
@@ -58,59 +197,60 @@ function Badge({ label, color }: { label: string; color: string }) {
     )
 }
 
-// ── Componente principal ───────────────────────────────────────────────────
+function Row({ label, icon, children }: {
+    label: string; icon?: React.ReactNode; children: React.ReactNode
+}) {
+    return (
+        <div className="flex items-center gap-2 py-1.5 border-b border-slate-50 last:border-0">
+            <span className="text-xs text-slate-400 w-28 shrink-0 flex items-center gap-1">
+                {icon}{label}
+            </span>
+            <div className="flex items-center gap-2 flex-wrap flex-1">{children}</div>
+        </div>
+    )
+}
 
 export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
-    const [open, setOpen] = useState(false)
-    const [grabando, setGrabando] = useState(false)
+    const [open, setOpen]               = useState(false)
+    const [grabando, setGrabando]       = useState(false)
     const [transcripcion, setTranscripcion] = useState('')
-    const [procesando, setProcesando] = useState(false)
-    const [resultado, setResultado] = useState<VoiceResult | null>(null)
-    const [error, setError] = useState('')
-    const [soportado, setSoportado] = useState(true)
-
-    const recognitionRef = useRef<any>(null)
+    const [resultado, setResultado]     = useState<VoiceResult | null>(null)
+    const [error, setError]             = useState('')
+    const [soportado, setSoportado]     = useState(true)
+    const recognitionRef                = useRef<any>(null)
 
     useEffect(() => {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition
         if (!SR) { setSoportado(false); return }
 
-        const recognition = new SR()
-        recognition.lang = 'es-EC'
-        recognition.interimResults = true
-        recognition.maxAlternatives = 1
-        recognition.continuous = false
+        const r = new SR()
+        r.lang             = 'es-EC'
+        r.interimResults   = true
+        r.maxAlternatives  = 1
+        r.continuous       = false
 
-        recognition.onresult = (event: any) => {
+        r.onresult = (event: any) => {
             let texto = ''
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 texto += event.results[i][0].transcript
             }
             setTranscripcion(texto)
         }
-
-        recognition.onend = () => {
+        r.onend   = () => setGrabando(false)
+        r.onerror = (event: any) => {
+            if (event.error !== 'no-speech') setError(`Error de micrófono: ${event.error}`)
             setGrabando(false)
         }
-
-        recognition.onerror = (event: any) => {
-            if (event.error !== 'no-speech') {
-                setError(`Error de micrófono: ${event.error}`)
-            }
-            setGrabando(false)
-        }
-
-        recognitionRef.current = recognition
+        recognitionRef.current = r
     }, [])
 
     function toggleGrabacion() {
         if (!soportado) {
-            setError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.')
+            setError('Tu navegador no soporta voz. Usa Chrome o Edge.')
             return
         }
         if (grabando) {
             recognitionRef.current?.stop()
-            setGrabando(false)
         } else {
             setTranscripcion('')
             setResultado(null)
@@ -120,30 +260,11 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
         }
     }
 
-    async function procesarTranscripcion() {
+    function interpretar() {
         if (!transcripcion.trim()) return
-        setProcesando(true)
         setError('')
-        setResultado(null)
-
-        try {
-            const { data, error: fnError } = await supabase.functions.invoke('voice-assistant', {
-                body: {
-                    transcripcion: transcripcion.trim(),
-                    clientes,
-                    servicios,
-                },
-            })
-
-            if (fnError) throw new Error(fnError.message)
-            if (data?.error) throw new Error(data.error)
-
-            setResultado(data as VoiceResult)
-        } catch (e: any) {
-            setError(e.message || 'Error al procesar la solicitud')
-        } finally {
-            setProcesando(false)
-        }
+        const res = parsearTranscripcion(transcripcion, clientes, servicios)
+        setResultado(res)
     }
 
     function handleApply() {
@@ -154,8 +275,6 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
         setTranscripcion('')
     }
 
-    // ── Render ─────────────────────────────────────────────────────────────
-
     return (
         <>
             {/* Botón flotante */}
@@ -165,8 +284,7 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                 className={cn(
                     'fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-lg',
                     'flex items-center justify-center transition-all duration-200',
-                    'bg-primary-600 hover:bg-primary-700 text-white',
-                    'hover:scale-110 active:scale-95'
+                    'bg-primary-600 hover:bg-primary-700 text-white hover:scale-110 active:scale-95'
                 )}
             >
                 <Mic className="w-6 h-6" />
@@ -185,7 +303,7 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-slate-900 text-sm">Asistente de Voz</h3>
-                                    <p className="text-xs text-slate-400">QuickInvoice</p>
+                                    <p className="text-xs text-slate-400">QuickInvoice — sin costo</p>
                                 </div>
                             </div>
                             <button onClick={() => { setOpen(false); recognitionRef.current?.stop() }}
@@ -199,22 +317,22 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
 
                             {/* Instrucción */}
                             {!resultado && (
-                                <p className="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
-                                    Ejemplo: <em>"Elaborar factura de servicios para Juan Pérez por consultoría técnica a 150 dólares, cantidad 1, con IVA"</em>
-                                </p>
+                                <div className="text-xs text-slate-500 bg-slate-50 rounded-lg p-3 space-y-1">
+                                    <p className="font-medium text-slate-600">Ejemplos de frases:</p>
+                                    <p><em>"Factura de servicios para Juan Pérez por consultoría a 150 dólares, cantidad 1, sin IVA"</em></p>
+                                    <p><em>"Factura de inventario para Empresa ABC"</em></p>
+                                </div>
                             )}
 
                             {/* Botón grabar */}
                             <div className="flex flex-col items-center gap-3">
                                 <button
                                     onClick={toggleGrabacion}
-                                    disabled={procesando}
                                     className={cn(
                                         'w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200',
                                         grabando
                                             ? 'bg-red-500 hover:bg-red-600 animate-pulse shadow-lg shadow-red-200'
-                                            : 'bg-primary-600 hover:bg-primary-700 shadow-lg',
-                                        procesando && 'opacity-40 cursor-not-allowed'
+                                            : 'bg-primary-600 hover:bg-primary-700 shadow-lg'
                                     )}
                                 >
                                     {grabando
@@ -236,20 +354,13 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                                     </p>
                                     {transcripcion && !grabando && !resultado && (
                                         <div className="flex gap-2 mt-3">
-                                            <button
-                                                onClick={procesarTranscripcion}
-                                                disabled={procesando}
-                                                className="btn btn-primary text-xs gap-1.5 flex-1"
-                                            >
-                                                {procesando
-                                                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Procesando...</>
-                                                    : <><CheckCircle2 className="w-3.5 h-3.5" /> Interpretar</>
-                                                }
+                                            <button onClick={interpretar}
+                                                className="btn btn-primary text-xs gap-1.5 flex-1">
+                                                <CheckCircle2 className="w-3.5 h-3.5" /> Interpretar
                                             </button>
                                             <button
                                                 onClick={() => { setTranscripcion(''); setResultado(null) }}
-                                                className="btn border border-slate-200 text-slate-500 text-xs px-3"
-                                            >
+                                                className="btn border border-slate-200 text-slate-500 text-xs px-3">
                                                 Borrar
                                             </button>
                                         </div>
@@ -265,59 +376,52 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                                 </div>
                             )}
 
-                            {/* Resultado estructurado */}
+                            {/* Resultado */}
                             {resultado && (
                                 <div className="space-y-3">
-                                    {/* Resumen */}
                                     <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
                                         <p className="text-xs text-blue-700">{resultado.resumen}</p>
                                     </div>
 
-                                    {/* Campos */}
-                                    <div className="space-y-2">
-                                        <Row label="Tipo de factura">
+                                    <div className="space-y-0">
+                                        <Row label="Tipo">
                                             {resultado.tipo === 'servicios' && <Badge label="Servicios" color="bg-blue-100 text-blue-700" />}
                                             {resultado.tipo === 'inventario' && <Badge label="Inventario" color="bg-green-100 text-green-700" />}
                                             {resultado.tipo === 'desconocido' && <Badge label="Sin definir" color="bg-slate-100 text-slate-600" />}
                                         </Row>
-
                                         <Row label="Cliente" icon={<User className="w-3.5 h-3.5" />}>
                                             <span className="text-sm font-medium text-slate-800">
                                                 {resultado.cliente.nombre || '—'}
                                             </span>
-                                            {resultado.cliente.existe
-                                                ? <Badge label="Existe" color="bg-green-100 text-green-700" />
+                                            {resultado.cliente.nombre && (resultado.cliente.existe
+                                                ? <Badge label="Existe ✓" color="bg-green-100 text-green-700" />
                                                 : <Badge label="No existe" color="bg-red-100 text-red-600" />
-                                            }
+                                            )}
                                         </Row>
-
-                                        {resultado.tipo !== 'inventario' && (
-                                            <Row label="Ítem" icon={<Briefcase className="w-3.5 h-3.5" />}>
-                                                <span className="text-sm text-slate-700 flex-1">
-                                                    {resultado.item.nombre || '—'}
-                                                </span>
-                                                {resultado.item.existe && <Badge label="En sistema" color="bg-green-100 text-green-700" />}
-                                            </Row>
-                                        )}
-
-                                        {resultado.tipo === 'inventario' && (
+                                        {resultado.tipo === 'inventario' ? (
                                             <Row label="Ítem" icon={<Package className="w-3.5 h-3.5" />}>
                                                 <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
                                                     Seleccionar del inventario manualmente
                                                 </span>
                                             </Row>
+                                        ) : (
+                                            <Row label="Ítem" icon={<Briefcase className="w-3.5 h-3.5" />}>
+                                                <span className="text-sm text-slate-700 flex-1">
+                                                    {resultado.item.nombre || '—'}
+                                                </span>
+                                                {resultado.item.existe && <Badge label="En catálogo ✓" color="bg-green-100 text-green-700" />}
+                                            </Row>
                                         )}
-
                                         <Row label="Cantidad">
                                             <span className="text-sm font-semibold">{resultado.item.cantidad}</span>
                                         </Row>
-
-                                        <Row label="Precio unitario">
+                                        <Row label="Precio unit.">
                                             <span className="text-sm font-semibold">
-                                                ${resultado.item.precio_unitario.toFixed(2)}
+                                                {resultado.item.precio_unitario > 0
+                                                    ? `$${resultado.item.precio_unitario.toFixed(2)}`
+                                                    : '—'}
                                             </span>
                                         </Row>
-
                                         <Row label="IVA">
                                             {resultado.item.iva_porcentaje > 0
                                                 ? <Badge label={`${resultado.item.iva_porcentaje}%`} color="bg-amber-100 text-amber-700" />
@@ -326,38 +430,29 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                                         </Row>
                                     </div>
 
-                                    {/* Datos faltantes */}
                                     {resultado.datos_faltantes.length > 0 && (
                                         <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
                                             <p className="text-xs font-semibold text-amber-700 mb-1">Datos faltantes:</p>
-                                            <ul className="space-y-0.5">
-                                                {resultado.datos_faltantes.map(d => (
-                                                    <li key={d} className="text-xs text-amber-600">• {d}</li>
-                                                ))}
-                                            </ul>
+                                            {resultado.datos_faltantes.map(d => (
+                                                <p key={d} className="text-xs text-amber-600">• {d}</p>
+                                            ))}
                                         </div>
                                     )}
 
-                                    {/* Acción siguiente */}
                                     <p className="text-xs text-slate-500 italic">{resultado.accion_siguiente}</p>
                                 </div>
                             )}
                         </div>
 
-                        {/* Footer con botón Aplicar */}
+                        {/* Footer */}
                         {resultado && resultado.tipo !== 'desconocido' && (
                             <div className="px-5 py-4 border-t border-slate-100 flex gap-3">
-                                <button
-                                    onClick={handleApply}
-                                    className="btn btn-primary flex-1 gap-2"
-                                >
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    Aplicar a factura
+                                <button onClick={handleApply} className="btn btn-primary flex-1 gap-2">
+                                    <CheckCircle2 className="w-4 h-4" /> Aplicar a factura
                                 </button>
                                 <button
                                     onClick={() => { setResultado(null); setTranscripcion('') }}
-                                    className="btn border border-slate-200 text-slate-500 px-4"
-                                >
+                                    className="btn border border-slate-200 text-slate-500 px-4">
                                     Reintentar
                                 </button>
                             </div>
@@ -366,24 +461,5 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                 </div>
             )}
         </>
-    )
-}
-
-// ── Sub-componente fila ────────────────────────────────────────────────────
-
-function Row({ label, icon, children }: {
-    label: string
-    icon?: React.ReactNode
-    children: React.ReactNode
-}) {
-    return (
-        <div className="flex items-center gap-2 py-1.5 border-b border-slate-50 last:border-0">
-            <span className="text-xs text-slate-400 w-28 shrink-0 flex items-center gap-1">
-                {icon}{label}
-            </span>
-            <div className="flex items-center gap-2 flex-wrap flex-1">
-                {children}
-            </div>
-        </div>
     )
 }
