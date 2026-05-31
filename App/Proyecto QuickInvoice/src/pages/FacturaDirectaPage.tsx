@@ -24,6 +24,7 @@ import { catalogCacheService } from '../services/catalogCacheService'
 import { useNetworkStatus } from '../lib/networkStatus'
 import { offlineDb } from '../lib/offlineDb'
 import { cn } from '../lib/utils'
+import { VoiceAssistant, type VoiceResult } from '../components/VoiceAssistant'
 
 // ─────────────────────────────────────────────────────
 // TIPOS DE PAGO (incluye Tarjeta D/C)
@@ -332,8 +333,60 @@ export function FacturaDirectaPage() {
         setSelectedCliente(cf || null)
     }
 
+    // ─── VOICE ASSISTANT ──────────────────────────────────
+    function handleVoiceApply(result: VoiceResult) {
+        // Pre-llenar cliente
+        if (result.cliente.existe && result.cliente.id) {
+            const c = clientes.find(x => x.id === result.cliente.id)
+            if (c) setSelectedCliente(c)
+        } else if (!result.cliente.existe && result.cliente.nombre) {
+            // Abrir formulario de nuevo cliente con los datos capturados
+            setNewClient({
+                identificacion: result.cliente.identificacion ?? '',
+                nombre: result.cliente.nombre,
+                email: '',
+                direccion: '',
+                telefono: '',
+            })
+            setIsClientFormOpen(true)
+        }
+
+        // Pre-llenar ítem (solo servicios; inventario requiere selección manual)
+        if (result.tipo === 'servicios' && result.item.nombre) {
+            if (result.item.existe && result.item.id) {
+                // Producto existente
+                const prod = productos.find(p => p.id === result.item.id)
+                if (prod) {
+                    setDetalles([{
+                        producto_id: prod.id,
+                        nombre_producto: prod.nombre,
+                        cantidad: result.item.cantidad || 1,
+                        precio_unitario: result.item.precio_unitario || prod.precio_venta,
+                        descuento: 0,
+                        iva_porcentaje: result.item.iva_porcentaje ?? prod.iva_porcentaje ?? 15,
+                        subproducto_id: null,
+                        factor_conversion: 1,
+                    }])
+                }
+            } else {
+                // Servicio libre (no está en el catálogo)
+                setDetalles([{
+                    producto_id: null,
+                    nombre_producto: result.item.nombre,
+                    cantidad: result.item.cantidad || 1,
+                    precio_unitario: result.item.precio_unitario || 0,
+                    descuento: 0,
+                    iva_porcentaje: result.item.iva_porcentaje ?? 15,
+                    subproducto_id: null,
+                    factor_conversion: 1,
+                }])
+            }
+        }
+    }
+
     // ─── RENDER ───────────────────────────────────────────
     return (
+        <>
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -949,5 +1002,13 @@ export function FacturaDirectaPage() {
                 </div>
             )}
         </div>
+
+        {/* Asistente de voz flotante */}
+        <VoiceAssistant
+            clientes={clientes}
+            servicios={productos}
+            onApply={handleVoiceApply}
+        />
+        </>
     )
 }
