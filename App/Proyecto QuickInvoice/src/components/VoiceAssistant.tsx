@@ -77,6 +77,11 @@ function buscarEnLista(nombre: string, lista: any[]): any | null {
     return found ?? null
 }
 
+function normalizarCedula(texto: string): string {
+    // Convierte "09 07 388268" o "cero nueve cero siete..." → "0907388268"
+    return texto.replace(/\s+/g, '').replace(/[^0-9]/g, '')
+}
+
 function parsearTranscripcion(texto: string, clientes: any[], servicios: any[]): VoiceResult {
     const t = normalizar(texto)
 
@@ -84,34 +89,47 @@ function parsearTranscripcion(texto: string, clientes: any[], servicios: any[]):
     let tipo: 'servicios' | 'inventario' | 'desconocido' = 'desconocido'
     if (/\bservicio(s)?\b/.test(t)) tipo = 'servicios'
     else if (/\binventario(s)?\b|\bproducto(s)?\b/.test(t)) tipo = 'inventario'
-    // Si no es claro, pero hay precio/cantidad/descripción → asumimos servicios
-    else if (/\bprecio\b|\bdolar(es)?\b|\bcantidad\b/.test(t)) tipo = 'servicios'
+    else if (/\bprecio\b|\bdolar(es)?\b|\bcantidad\b|\bvalor\b/.test(t)) tipo = 'servicios'
 
-    // ── 2. Cliente ─────────────────────────────────────────────────────────
+    // ── 2. Cédula / RUC (extraer antes del nombre para no confundirla) ─────
+    let identificacion: string | null = null
+    const cedMatch = t.match(/cedula(?:\s+numero)?\s+([\d\s]{8,20})/)
+        ?? t.match(/ruc(?:\s+numero)?\s+([\d\s]{10,20})/)
+    if (cedMatch?.[1]) {
+        identificacion = normalizarCedula(cedMatch[1]).slice(0, 13)
+    }
+    // Buscar cliente por identificación primero
+    let clienteEncontradoPorId = identificacion
+        ? clientes.find(c => (c.identificacion ?? '').replace(/\D/g,'') === identificacion)
+        : null
+
+    // ── 3. Nombre del cliente ──────────────────────────────────────────────
     let clienteNombre = ''
     const clientePatrones = [
-        /para el cliente\s+([a-z0-9áéíóúüñ\s]+?)(?:\s+por\b|\s+a\s+un\b|\s+,|\s*$)/,
-        /cliente\s+([a-z0-9áéíóúüñ\s]+?)(?:\s+por\b|\s+a\s+un\b|\s+,|\s*$)/,
-        /\bpara\s+([a-z0-9áéíóúüñ\s]{3,40}?)(?:\s+por\b|\s+a\s+un\b|\s+,|\s*$)/,
+        /a nombre de\s+([a-z\s]{3,40}?)(?:\s+cedula|\s+ruc|\s+concepto|\s+por\b|\s*$)/,
+        /para el cliente\s+([a-z\s]{3,40}?)(?:\s+cedula|\s+ruc|\s+concepto|\s+por\b|\s*$)/,
+        /cliente\s+([a-z\s]{3,40}?)(?:\s+cedula|\s+ruc|\s+concepto|\s+por\b|\s*$)/,
+        /\bpara\s+([a-z\s]{3,40}?)(?:\s+cedula|\s+ruc|\s+concepto|\s+por\b|\s*$)/,
     ]
     for (const p of clientePatrones) {
         const m = t.match(p)
-        if (m?.[1]?.trim()) {
-            clienteNombre = m[1].trim()
-            // Quitar palabras de relleno al inicio
-            clienteNombre = clienteNombre.replace(/^(el|la|los|las|un|una|al)\s+/, '').trim()
+        const cand = m?.[1]?.trim() ?? ''
+        if (cand.length > 2) {
+            clienteNombre = cand.replace(/^(el|la|los|las|un|una|al)\s+/, '').trim()
             break
         }
     }
 
-    const clienteEncontrado = buscarEnLista(clienteNombre, clientes)
+    const clienteEncontrado = clienteEncontradoPorId
+        ?? buscarEnLista(clienteNombre, clientes)
 
-    // ── 3. Descripción del ítem ────────────────────────────────────────────
+    // ── 4. Descripción del ítem ────────────────────────────────────────────
     let itemNombre = ''
     const itemPatrones = [
-        /por (?:el )?(?:producto|servicio)\s+(.+?)(?:\s+a\s+(?:un\s+)?precio\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
-        /(?:producto|servicio)\s+(.+?)(?:\s+a\s+(?:un\s+)?precio\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
-        /por\s+(.+?)(?:\s+a\s+(?:un\s+)?precio\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
+        /concepto\s+(.+?)(?:\s+valor\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
+        /por (?:el )?(?:concepto|servicio|producto)\s+(.+?)(?:\s+valor\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
+        /(?:servicio|producto)\s+(.+?)(?:\s+valor\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
+        /por\s+(.+?)(?:\s+valor\b|\s+a\s+(?:un\s+)?precio\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
     ]
     for (const p of itemPatrones) {
         const m = t.match(p)
@@ -124,40 +142,43 @@ function parsearTranscripcion(texto: string, clientes: any[], servicios: any[]):
 
     const itemEncontrado = tipo !== 'inventario' ? buscarEnLista(itemNombre, servicios) : null
 
-    // ── 4. Precio ──────────────────────────────────────────────────────────
+    // ── 5. Precio ──────────────────────────────────────────────────────────
     const precio = extraerNumero(t, [
         /precio unitario de\s+([\d]+[.,]?[\d]*)/,
         /precio de\s+([\d]+[.,]?[\d]*)/,
+        /valor\s+([\d]+[.,]?[\d]*)/,          // "valor 150"
+        /monto\s+([\d]+[.,]?[\d]*)/,
         /a\s+([\d]+[.,]?[\d]*)\s*dolar/,
         /precio\s+([\d]+[.,]?[\d]*)/,
         /unitario\s+([\d]+[.,]?[\d]*)/,
-        /([\d]+[.,][\d]+)\s*dolar/,     // 150.00 dólares
-        /([\d]{3,})\s*dolar/,            // 1500 dólares
+        /([\d]+[.,][\d]+)\s*dolar/,
+        /([\d]{2,})\s*dolar/,
     ])
 
-    // ── 5. Cantidad ────────────────────────────────────────────────────────
+    // ── 6. Cantidad ────────────────────────────────────────────────────────
     const cantidad = extraerNumero(t, [
         /cantidad\s+(\d+)/,
         /(\d+)\s+unidades?/,
         /(\d+)\s+items?/,
     ]) || 1
 
-    // ── 6. IVA ─────────────────────────────────────────────────────────────
+    // ── 7. IVA ─────────────────────────────────────────────────────────────
     let ivaPorcentaje = 15
     if (/sin\s+iva/.test(t)) ivaPorcentaje = 0
     else if (/con\s+iva/.test(t)) ivaPorcentaje = 15
 
-    // ── 7. Datos faltantes ─────────────────────────────────────────────────
+    // ── 8. Datos faltantes ─────────────────────────────────────────────────
     const faltantes: string[] = []
-    if (!clienteNombre) faltantes.push('Nombre del cliente')
+    if (!clienteNombre && !clienteEncontrado) faltantes.push('Nombre del cliente')
     if (tipo === 'servicios' && !itemNombre) faltantes.push('Descripción del servicio')
     if (tipo === 'servicios' && !precio) faltantes.push('Precio unitario')
     if (tipo === 'desconocido') faltantes.push('Tipo de factura (servicios o inventario)')
 
-    // ── 8. Resumen ─────────────────────────────────────────────────────────
+    // ── 9. Resumen ─────────────────────────────────────────────────────────
+    const nombreMostrar = clienteEncontrado?.nombre ?? clienteNombre
     const partes: string[] = []
     if (tipo !== 'desconocido') partes.push(`Factura de ${tipo}`)
-    if (clienteNombre) partes.push(`cliente: ${clienteEncontrado?.nombre ?? clienteNombre}${clienteEncontrado ? ' ✓' : ' (nuevo)'}`)
+    if (nombreMostrar) partes.push(`cliente: ${nombreMostrar}${clienteEncontrado ? ' ✓' : ' (nuevo)'}`)
     if (itemNombre) partes.push(`ítem: ${itemNombre}${itemEncontrado ? ' ✓' : ''}`)
     if (precio) partes.push(`precio: $${precio.toFixed(2)} × ${cantidad}`)
     partes.push(ivaPorcentaje > 0 ? `IVA ${ivaPorcentaje}%` : 'Sin IVA')
@@ -169,7 +190,7 @@ function parsearTranscripcion(texto: string, clientes: any[], servicios: any[]):
             existe: !!clienteEncontrado,
             id: clienteEncontrado?.id ?? null,
             nombre: clienteEncontrado?.nombre ?? clienteNombre,
-            identificacion: clienteEncontrado?.identificacion ?? null,
+            identificacion: clienteEncontrado?.identificacion ?? identificacion,
         },
         item: {
             existe: !!itemEncontrado,
@@ -215,6 +236,7 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
     const [open, setOpen]               = useState(false)
     const [grabando, setGrabando]       = useState(false)
     const [procesando, setProcesando]   = useState(false)
+    const [usandoIA, setUsandoIA]       = useState(false)
     const [transcripcion, setTranscripcion] = useState('')
     const [resultado, setResultado]     = useState<VoiceResult | null>(null)
     const [error, setError]             = useState('')
@@ -286,9 +308,11 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                 body: { transcripcion: t.trim(), clientes, servicios },
             })
             if (fnErr || data?.error) throw new Error(fnErr?.message ?? data?.error ?? 'Error')
+            setUsandoIA(true)
             setResultado(data as VoiceResult)
         } catch {
             // Fallback: parser local sin API
+            setUsandoIA(false)
             const res = parsearTranscripcion(t, clientes, servicios)
             setResultado(res)
         } finally {
@@ -411,8 +435,12 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                             {/* Resultado */}
                             {resultado && (
                                 <div className="space-y-3">
-                                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                                        <p className="text-xs text-blue-700">{resultado.resumen}</p>
+                                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-start justify-between gap-2">
+                                        <p className="text-xs text-blue-700 flex-1">{resultado.resumen}</p>
+                                        <span className={cn('text-xs px-2 py-0.5 rounded-full shrink-0 font-medium',
+                                            usandoIA ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500')}>
+                                            {usandoIA ? '✨ Gemini' : '⚙ Básico'}
+                                        </span>
                                     </div>
 
                                     <div className="space-y-0">

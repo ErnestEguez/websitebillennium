@@ -340,13 +340,12 @@ export function FacturaDirectaPage() {
             const c = clientes.find(x => x.id === result.cliente.id)
             if (c) setSelectedCliente(c)
         } else if (!result.cliente.existe && result.cliente.nombre) {
-            // Abrir formulario de nuevo cliente con los datos capturados
             setNewClient({
                 identificacion: result.cliente.identificacion ?? '',
-                nombre: result.cliente.nombre,
-                email: '',
-                direccion: '',
-                telefono: '',
+                nombre:         result.cliente.nombre,
+                email:          '',
+                direccion:      '',
+                telefono:       '',
             })
             setIsClientFormOpen(true)
         }
