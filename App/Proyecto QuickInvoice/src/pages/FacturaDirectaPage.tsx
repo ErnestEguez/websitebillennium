@@ -79,6 +79,7 @@ export function FacturaDirectaPage() {
 
     // Estado: detalle
     const [detalles, setDetalles] = useState<DetalleFacturaDirecta[]>([{ ...DETALLE_VACIO }])
+    const [esModoServicio, setEsModoServicio] = useState(false)
 
     // Estado: pagos + campo "recibido en efectivo"
     const [pagos, setPagos] = useState<PagoFactura[]>([{ metodo: 'efectivo', valor: 0, referencia: '' }])
@@ -333,8 +334,22 @@ export function FacturaDirectaPage() {
         setSelectedCliente(cf || null)
     }
 
+    // ─── MODO SERVICIO ────────────────────────────────────
+    function toggleModoServicio(activar: boolean) {
+        if (activar && detalles.some(d => d.producto_id)) {
+            if (!window.confirm('Al cambiar a modo Servicios se limpiarán las líneas actuales. ¿Continuar?')) return
+        }
+        setEsModoServicio(activar)
+        setDetalles([{ ...DETALLE_VACIO, producto_id: null }])
+        setSearchProducto({})
+    }
+
     // ─── VOICE ASSISTANT ──────────────────────────────────
     function handleVoiceApply(result: VoiceResult) {
+        // Auto-activar modo según tipo detectado por voz
+        if (result.tipo === 'servicios') setEsModoServicio(true)
+        else if (result.tipo === 'inventario') setEsModoServicio(false)
+
         // Pre-llenar cliente
         if (result.cliente.existe && result.cliente.id) {
             const c = clientes.find(x => x.id === result.cliente.id)
@@ -611,20 +626,42 @@ export function FacturaDirectaPage() {
 
                     {/* ── SECCIÓN DETALLE ─────────────── */}
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
                             <h2 className="font-bold text-slate-900 flex items-center gap-2">
-                                <Package className="w-5 h-5 text-primary-500" /> Detalle de Artículos / Servicios
+                                <Package className="w-5 h-5 text-primary-500" />
+                                {esModoServicio ? 'Detalle de Servicios' : 'Detalle de Artículos / Servicios'}
                             </h2>
-                            <button onClick={addLinea}
-                                className="text-primary-600 hover:text-primary-700 flex items-center gap-1 text-sm font-bold">
-                                <Plus className="w-4 h-4" /> Agregar línea
-                            </button>
+                            <div className="flex items-center gap-4">
+                                {/* Toggle modo servicio */}
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <div
+                                        onClick={() => toggleModoServicio(!esModoServicio)}
+                                        className={cn(
+                                            'relative w-10 h-5 rounded-full transition-colors duration-200',
+                                            esModoServicio ? 'bg-primary-600' : 'bg-slate-300'
+                                        )}
+                                    >
+                                        <span className={cn(
+                                            'absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200',
+                                            esModoServicio ? 'left-5' : 'left-0.5'
+                                        )} />
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-600">
+                                        Factura de Servicios
+                                    </span>
+                                </label>
+                                <button onClick={addLinea}
+                                    className="text-primary-600 hover:text-primary-700 flex items-center gap-1 text-sm font-bold">
+                                    <Plus className="w-4 h-4" /> Agregar línea
+                                </button>
+                            </div>
                         </div>
 
                         {/* Encabezados tabla */}
                         <div className="hidden md:grid grid-cols-12 gap-2 px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            <div className="col-span-3">Descripción</div>
-                            <div className="col-span-2 text-center">Cantidad</div>
+                            <div className={esModoServicio ? 'col-span-5' : 'col-span-3'}>Descripción</div>
+                            {!esModoServicio && <div className="col-span-2 text-center">Cantidad</div>}
+                            {esModoServicio && <div className="col-span-1 text-center">Cant.</div>}
                             <div className="col-span-2 text-right">P. Unitario</div>
                             <div className="col-span-1 text-center">Desc%</div>
                             <div className="col-span-2 text-center">IVA%</div>
@@ -641,48 +678,58 @@ export function FacturaDirectaPage() {
 
                                 return (
                                     <div key={idx} className="relative grid grid-cols-12 gap-2 items-start bg-slate-50 rounded-xl p-3 border border-slate-100 animate-in fade-in">
-                                        {/* Descripción */}
-                                        <div className="col-span-12 md:col-span-3 relative">
-                                            <input
-                                                placeholder="Buscar producto o escribir descripción..."
-                                                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-2 focus:ring-primary-400"
-                                                value={searchProducto[idx] !== undefined ? searchProducto[idx] : det.nombre_producto}
-                                                onChange={e => {
-                                                    setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
-                                                    updateLinea(idx, 'nombre_producto', e.target.value)
-                                                    setProductDropdown(idx)
-                                                }}
-                                                onFocus={() => {
-                                                    // Al enfocar, limpiar búsqueda para mostrar todos los productos
-                                                    setSearchProducto(prev => ({ ...prev, [idx]: '' }))
-                                                    setProductDropdown(idx)
-                                                }}
-                                                onBlur={() => setTimeout(() => {
-                                                    setProductDropdown(null)
-                                                    // Si no se escribió nada, restaurar el nombre del producto seleccionado
-                                                    setSearchProducto(prev => {
-                                                        const updated = { ...prev }
-                                                        delete updated[idx]
-                                                        return updated
-                                                    })
-                                                }, 200)}
-                                            />
-                                            {productDropdown === idx && filtProd.length > 0 && (
-                                                <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-                                                    {filtProd.map(p => (
-                                                        <button key={p.id} type="button"
-                                                            className="w-full px-4 py-2.5 text-left hover:bg-primary-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0"
-                                                            onMouseDown={() => selectProducto(idx, p)}>
-                                                            <span className="font-medium text-slate-800">{p.nombre}</span>
-                                                            <span className="text-primary-600 font-bold text-xs">{formatCurrency(p.precio_venta)}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
+                                        {/* Descripción — textarea en modo servicio, input+buscador en modo inventario */}
+                                        <div className={cn('col-span-12 relative', esModoServicio ? 'md:col-span-5' : 'md:col-span-3')}>
+                                            {esModoServicio ? (
+                                                <textarea
+                                                    placeholder="Descripción del servicio prestado..."
+                                                    rows={3}
+                                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-2 focus:ring-primary-400 resize-y min-h-[80px]"
+                                                    value={det.nombre_producto}
+                                                    onChange={e => updateLinea(idx, 'nombre_producto', e.target.value)}
+                                                />
+                                            ) : (
+                                                <>
+                                                <input
+                                                    placeholder="Buscar producto o escribir descripción..."
+                                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                    value={searchProducto[idx] !== undefined ? searchProducto[idx] : det.nombre_producto}
+                                                    onChange={e => {
+                                                        setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
+                                                        updateLinea(idx, 'nombre_producto', e.target.value)
+                                                        setProductDropdown(idx)
+                                                    }}
+                                                    onFocus={() => {
+                                                        setSearchProducto(prev => ({ ...prev, [idx]: '' }))
+                                                        setProductDropdown(idx)
+                                                    }}
+                                                    onBlur={() => setTimeout(() => {
+                                                        setProductDropdown(null)
+                                                        setSearchProducto(prev => {
+                                                            const updated = { ...prev }
+                                                            delete updated[idx]
+                                                            return updated
+                                                        })
+                                                    }, 200)}
+                                                />
+                                                {productDropdown === idx && filtProd.length > 0 && (
+                                                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                                                        {filtProd.map(p => (
+                                                            <button key={p.id} type="button"
+                                                                className="w-full px-4 py-2.5 text-left hover:bg-primary-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0"
+                                                                onMouseDown={() => selectProducto(idx, p)}>
+                                                                <span className="font-medium text-slate-800">{p.nombre}</span>
+                                                                <span className="text-primary-600 font-bold text-xs">{formatCurrency(p.precio_venta)}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                </>
                                             )}
                                         </div>
 
-                                        {/* Selector de presentación (subproducto) */}
-                                        {(() => {
+                                        {/* Selector de presentación (subproducto) — solo en modo inventario */}
+                                        {!esModoServicio && (() => {
                                             const prod = productos.find(p => p.id === det.producto_id)
                                             const subsActivos = (prod?.subproductos || []).filter((s: any) => s.estado)
                                             if (subsActivos.length === 0) return null
