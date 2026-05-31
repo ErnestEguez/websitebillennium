@@ -431,13 +431,28 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                                 </p>
                             </div>
 
-                            {/* Transcripción */}
+                            {/* Transcripción editable */}
                             {(transcripcion || grabando) && (
                                 <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                                    <p className="text-xs text-slate-400 mb-1 font-medium">Transcripción:</p>
-                                    <p className="text-sm text-slate-700 min-h-[40px]">
-                                        {transcripcion || <span className="text-slate-400 italic">Escuchando...</span>}
+                                    <p className="text-xs text-slate-400 mb-1 font-medium flex items-center gap-1">
+                                        Transcripción
+                                        {!grabando && <span className="text-slate-300">— edita si hay errores</span>}
                                     </p>
+                                    {grabando ? (
+                                        <p className="text-sm text-slate-700 min-h-[40px]">
+                                            {transcripcion || <span className="text-slate-400 italic">Escuchando...</span>}
+                                        </p>
+                                    ) : (
+                                        <textarea
+                                            className="w-full text-sm text-slate-700 bg-white border border-slate-200 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-primary-300 min-h-[60px]"
+                                            value={transcripcion}
+                                            onChange={e => {
+                                                setTranscripcion(e.target.value)
+                                                transcripcionRef.current = e.target.value
+                                            }}
+                                            placeholder="Edita el texto si el reconocimiento de voz no fue exacto..."
+                                        />
+                                    )}
                                     {transcripcion && !grabando && !resultado && (
                                         <div className="flex gap-2 mt-3">
                                             <button onClick={() => interpretar()} disabled={procesando}
