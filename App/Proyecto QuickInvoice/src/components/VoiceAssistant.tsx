@@ -146,11 +146,14 @@ function parsearTranscripcion(texto: string, clientes: any[], servicios: any[]):
     const precio = extraerNumero(t, [
         /precio unitario de\s+([\d]+[.,]?[\d]*)/,
         /precio de\s+([\d]+[.,]?[\d]*)/,
-        /valor\s+([\d]+[.,]?[\d]*)/,          // "valor 150"
+        /valor\s+([\d]+[.,]?[\d]*)/,
         /monto\s+([\d]+[.,]?[\d]*)/,
+        /a\s+([\d]+[.,]?[\d]*)\s*(?:con|sin|iva|dolar|\s*$)/,  // "a 150 con IVA"
         /a\s+([\d]+[.,]?[\d]*)\s*dolar/,
         /precio\s+([\d]+[.,]?[\d]*)/,
         /unitario\s+([\d]+[.,]?[\d]*)/,
+        /([\d]+[.,][\d]+)\s*(?:con|sin|iva|dolar)/,            // "150.00 con IVA"
+        /([\d]{2,})\s*(?:con\s+iva|sin\s+iva)/,               // "150 con IVA"
         /([\d]+[.,][\d]+)\s*dolar/,
         /([\d]{2,})\s*dolar/,
     ])
@@ -237,11 +240,38 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
     const [grabando, setGrabando]       = useState(false)
     const [procesando, setProcesando]   = useState(false)
     const [usandoIA, setUsandoIA]       = useState(false)
+    const [silencio, setSilencio]       = useState(0) // segundos de silencio restantes
     const [transcripcion, setTranscripcion] = useState('')
     const [resultado, setResultado]     = useState<VoiceResult | null>(null)
     const [error, setError]             = useState('')
     const [soportado, setSoportado]     = useState(true)
     const recognitionRef                = useRef<any>(null)
+    const silenceTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const silenceCountRef               = useRef<ReturnType<typeof setInterval> | null>(null)
+    const transcripcionRef              = useRef('')
+    const SILENCE_MS                    = 3000
+
+    function limpiarTimers() {
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+        if (silenceCountRef.current) clearInterval(silenceCountRef.current)
+        silenceTimerRef.current = null
+        silenceCountRef.current = null
+        setSilencio(0)
+    }
+
+    function iniciarTimerSilencio() {
+        limpiarTimers()
+        let restantes = Math.ceil(SILENCE_MS / 1000)
+        setSilencio(restantes)
+        silenceCountRef.current = setInterval(() => {
+            restantes -= 1
+            setSilencio(restantes)
+        }, 1000)
+        silenceTimerRef.current = setTimeout(() => {
+            limpiarTimers()
+            recognitionRef.current?.stop()
+        }, SILENCE_MS)
+    }
 
     useEffect(() => {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -251,25 +281,29 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
         r.lang             = 'es-EC'
         r.interimResults   = true
         r.maxAlternatives  = 1
-        r.continuous       = false
+        r.continuous       = true   // grabación continua
 
         r.onresult = (event: any) => {
             let texto = ''
-            for (let i = event.resultIndex; i < event.results.length; i++) {
+            for (let i = 0; i < event.results.length; i++) {
                 texto += event.results[i][0].transcript
             }
+            transcripcionRef.current = texto
             setTranscripcion(texto)
-            // Auto-interpretar cuando el resultado es final
-            if (event.results[event.results.length - 1]?.isFinal) {
-                setGrabando(false)
-            }
+            // Reiniciar temporizador de silencio cada vez que hay habla
+            iniciarTimerSilencio()
         }
-        r.onend   = () => setGrabando(false)
+        r.onend   = () => {
+            limpiarTimers()
+            setGrabando(false)
+        }
         r.onerror = (event: any) => {
             if (event.error !== 'no-speech') setError(`Error de micrófono: ${event.error}`)
+            limpiarTimers()
             setGrabando(false)
         }
         recognitionRef.current = r
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     function toggleGrabacion() {
@@ -278,15 +312,10 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
             return
         }
         if (grabando) {
+            limpiarTimers()
             recognitionRef.current?.stop()
-            // Interpretar la transcripción actual al detener manualmente
-            setTimeout(() => {
-                setTranscripcion(prev => {
-                    if (prev.trim()) interpretar(prev)
-                    return prev
-                })
-            }, 300)
         } else {
+            transcripcionRef.current = ''
             setTranscripcion('')
             setResultado(null)
             setError('')
@@ -394,7 +423,11 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                                     }
                                 </button>
                                 <p className="text-xs text-slate-500">
-                                    {grabando ? '🔴 Grabando... (clic para detener)' : 'Clic para hablar'}
+                                    {grabando
+                                        ? silencio > 0
+                                            ? `🔴 Grabando — para en ${silencio}s de silencio`
+                                            : '🔴 Grabando... (clic para detener)'
+                                        : 'Clic para hablar'}
                                 </p>
                             </div>
 
