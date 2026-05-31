@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import {
     Mic, MicOff, X, CheckCircle2, AlertCircle,
-    Volume2, User, Briefcase, Package,
+    Volume2, User, Briefcase, Package, Loader2,
 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -213,6 +214,7 @@ function Row({ label, icon, children }: {
 export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
     const [open, setOpen]               = useState(false)
     const [grabando, setGrabando]       = useState(false)
+    const [procesando, setProcesando]   = useState(false)
     const [transcripcion, setTranscripcion] = useState('')
     const [resultado, setResultado]     = useState<VoiceResult | null>(null)
     const [error, setError]             = useState('')
@@ -271,12 +273,27 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
         }
     }
 
-    function interpretar(texto?: string) {
+    async function interpretar(texto?: string) {
         const t = texto ?? transcripcion
         if (!t.trim()) return
         setError('')
-        const res = parsearTranscripcion(t, clientes, servicios)
-        setResultado(res)
+        setProcesando(true)
+        setResultado(null)
+
+        try {
+            // Intentar con Gemini vía Edge Function
+            const { data, error: fnErr } = await supabase.functions.invoke('voice-assistant', {
+                body: { transcripcion: t.trim(), clientes, servicios },
+            })
+            if (fnErr || data?.error) throw new Error(fnErr?.message ?? data?.error ?? 'Error')
+            setResultado(data as VoiceResult)
+        } catch {
+            // Fallback: parser local sin API
+            const res = parsearTranscripcion(t, clientes, servicios)
+            setResultado(res)
+        } finally {
+            setProcesando(false)
+        }
     }
 
     function handleApply() {
@@ -366,9 +383,12 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                                     </p>
                                     {transcripcion && !grabando && !resultado && (
                                         <div className="flex gap-2 mt-3">
-                                            <button onClick={() => interpretar()}
+                                            <button onClick={() => interpretar()} disabled={procesando}
                                                 className="btn btn-primary text-xs gap-1.5 flex-1">
-                                                <CheckCircle2 className="w-3.5 h-3.5" /> Interpretar
+                                                {procesando
+                                                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Procesando...</>
+                                                    : <><CheckCircle2 className="w-3.5 h-3.5" /> Interpretar</>
+                                                }
                                             </button>
                                             <button
                                                 onClick={() => { setTranscripcion(''); setResultado(null) }}
