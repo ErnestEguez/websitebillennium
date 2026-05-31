@@ -235,6 +235,10 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                 texto += event.results[i][0].transcript
             }
             setTranscripcion(texto)
+            // Auto-interpretar cuando el resultado es final
+            if (event.results[event.results.length - 1]?.isFinal) {
+                setGrabando(false)
+            }
         }
         r.onend   = () => setGrabando(false)
         r.onerror = (event: any) => {
@@ -251,6 +255,13 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
         }
         if (grabando) {
             recognitionRef.current?.stop()
+            // Interpretar la transcripción actual al detener manualmente
+            setTimeout(() => {
+                setTranscripcion(prev => {
+                    if (prev.trim()) interpretar(prev)
+                    return prev
+                })
+            }, 300)
         } else {
             setTranscripcion('')
             setResultado(null)
@@ -260,10 +271,11 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
         }
     }
 
-    function interpretar() {
-        if (!transcripcion.trim()) return
+    function interpretar(texto?: string) {
+        const t = texto ?? transcripcion
+        if (!t.trim()) return
         setError('')
-        const res = parsearTranscripcion(transcripcion, clientes, servicios)
+        const res = parsearTranscripcion(t, clientes, servicios)
         setResultado(res)
     }
 
@@ -354,7 +366,7 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
                                     </p>
                                     {transcripcion && !grabando && !resultado && (
                                         <div className="flex gap-2 mt-3">
-                                            <button onClick={interpretar}
+                                            <button onClick={() => interpretar()}
                                                 className="btn btn-primary text-xs gap-1.5 flex-1">
                                                 <CheckCircle2 className="w-3.5 h-3.5" /> Interpretar
                                             </button>
