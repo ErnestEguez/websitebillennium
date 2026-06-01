@@ -4,7 +4,7 @@
 -- ============================================================
 
 -- 1. Exponer schema finance a PostgREST (si no está ya en API settings)
-GRANT USAGE ON SCHEMA finance TO anon, authenticated;
+GRANT USAGE ON SCHEMA finance TO authenticated;
 
 -- 2. bancos: catálogo global, solo lectura para authenticated, escritura para service_role
 ALTER TABLE finance.bancos ENABLE ROW LEVEL SECURITY;
