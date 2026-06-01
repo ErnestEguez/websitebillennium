@@ -17,6 +17,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Leer OTP del portal antes de que Supabase inicialice (evita 401 por desfase de reloj)
+    const searchParams = new URLSearchParams(window.location.search);
+    const otpToken = searchParams.get('otp');
+    const otpEmail = searchParams.get('email');
+
+    if (otpToken && otpEmail) {
+      // Limpiar URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      supabase.auth.verifyOtp({ token_hash: otpToken, type: 'magiclink' } as any)
+        .then(({ data, error }) => {
+          if (!error && data.session?.user) {
+            setUser(data.session.user);
+            loadVendedor(data.session.user.id);
+          } else {
+            setLoading(false);
+          }
+        });
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {

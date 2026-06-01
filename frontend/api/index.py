@@ -1000,14 +1000,23 @@ def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
         }).execute()
         logger.info(f"Admin vendedor created in pedidosbillennium: {email}")
 
-    # Generar magic link
+    # Generar magic link y extraer OTP para evitar desfase de reloj (mismo patrón que finance)
     try:
+        from urllib.parse import urlparse, parse_qs, quote
         result = supabase.auth.admin.generate_link({
             "type": "magiclink",
             "email": email,
             "options": {"redirect_to": APP_URLS[product_id]}
         })
-        return {"url": result.properties.action_link, "app": product_id}
+        action_link = result.properties.action_link
+        parsed = urlparse(action_link)
+        params = parse_qs(parsed.query)
+        otp_token = params.get("token", [None])[0]
+        redirect_url = APP_URLS[product_id]
+        if otp_token:
+            app_url = f"{redirect_url}?otp={quote(otp_token)}&email={quote(email)}"
+            return {"url": app_url, "app": product_id}
+        return {"url": action_link, "app": product_id}
     except Exception as e:
         logger.error(f"Error generating admin magic link for {email}: {e}")
         raise HTTPException(status_code=500, detail=f"Error al generar acceso: {str(e)}")
