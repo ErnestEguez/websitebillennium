@@ -46,7 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // ── FLUJO 1: OTP directo desde el portal (sin desfase de reloj) ──────
         if (otpToken && otpEmail) {
-            supabase.auth.verifyOtp({ email: otpEmail, token: otpToken, type: 'magiclink' })
+            // token_hash es el formato correcto para hashed magic link tokens
+            supabase.auth.verifyOtp({ token_hash: otpToken, type: 'magiclink' } as any)
                 .then(async ({ data, error }) => {
                     if (!isMounted.current) return
                     if (!error && data.session?.user) {
