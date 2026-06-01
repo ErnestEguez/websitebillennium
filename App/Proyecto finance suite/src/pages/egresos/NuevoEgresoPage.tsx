@@ -24,7 +24,7 @@ export function NuevoEgresoPage() {
     const [proveedores, setProveedores]   = useState<Proveedor[]>([])
     const [busqProv, setBusqProv]         = useState('')
     const [provSelec, setProvSelec]       = useState<Proveedor | null>(null)
-    const [cargProv, setCargProv]         = useState(false)
+    const [cargProv]                      = useState(false)
 
     // Paso 2 — CxP
     const [cxpLista, setCxpLista]         = useState<CxPSeleccion[]>([])
@@ -55,21 +55,8 @@ export function NuevoEgresoPage() {
         }).catch(() => {})
     }, [empresa?.id])
 
-    async function buscarProveedor() {
-        if (!empresa?.id) return
-        setCargProv(true)
-        try {
-            const lista = busqProv.trim()
-                ? await proveedoresService.buscar(empresa.id, busqProv)
-                : await proveedoresService.listar(empresa.id)
-            setProveedores(lista)
-        }
-        catch (e: unknown) { setError(String(e)) }
-        finally { setCargProv(false) }
-    }
-
     async function seleccionarProveedor(p: Proveedor) {
-        setProvSelec(p); setProveedores([]); setBusqProv('')
+        setProvSelec(p); setBusqProv('')
         setCargCxp(true); setError('')
         try {
             const cxps = await cxpService.listarPendientes(empresa!.id, p.id)
@@ -190,43 +177,81 @@ export function NuevoEgresoPage() {
             {paso === 1 && (
                 <div className="card p-6 space-y-4">
                     <h2 className="font-bold text-slate-800">Seleccionar proveedor</h2>
-                    {provSelec ? (
-                        <div className="flex items-center justify-between p-4 bg-primary-50 rounded-xl border border-primary-200">
-                            <div>
-                                <p className="font-semibold text-primary-800">{provSelec.nombre_empresa}</p>
-                                <p className="text-xs text-primary-600 font-mono mt-0.5">{provSelec.ruc}</p>
-                            </div>
-                            <button onClick={() => { setProvSelec(null); setCxpLista([]) }}
-                                className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
-                        </div>
-                    ) : (
+
+                    {/* Filtro rápido + dropdown */}
+                    <div className="space-y-2">
                         <div className="flex gap-2">
-                            <input className="input flex-1" placeholder="RUC o nombre del proveedor..."
-                                value={busqProv} onChange={e => setBusqProv(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && buscarProveedor()} />
-                            <button onClick={buscarProveedor} disabled={cargProv} className="btn btn-secondary gap-2">
-                                {cargProv ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                                Buscar
-                            </button>
+                            <div className="relative flex-1">
+                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    className="input pl-9"
+                                    placeholder="Filtrar por nombre o RUC..."
+                                    value={busqProv}
+                                    onChange={e => { setBusqProv(e.target.value); setProvSelec(null) }}
+                                />
+                            </div>
+                            {cargProv && <Loader2 className="w-5 h-5 animate-spin text-slate-400 self-center" />}
                         </div>
-                    )}
-                    {proveedores.length > 0 && (
-                        <div className="border rounded-xl overflow-hidden">
-                            {proveedores.map(p => (
-                                <button key={p.id} onClick={() => seleccionarProveedor(p)}
-                                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 border-b last:border-0 text-left">
-                                    <div>
-                                        <p className="text-sm font-semibold text-slate-800">{p.nombre_empresa}</p>
-                                        <p className="text-xs text-slate-500 font-mono">{p.ruc}</p>
-                                    </div>
-                                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{p.condicion_pago}</span>
+
+                        {/* Lista desplegable */}
+                        {!provSelec && (
+                            <div className="border rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                                {proveedores.length === 0 ? (
+                                    <p className="text-center py-6 text-sm text-slate-400">
+                                        {cargProv ? 'Cargando...' : 'Sin proveedores activos'}
+                                    </p>
+                                ) : (
+                                    proveedores
+                                        .filter(p =>
+                                            !busqProv.trim() ||
+                                            p.nombre_empresa.toLowerCase().includes(busqProv.toLowerCase()) ||
+                                            (p.ruc ?? '').includes(busqProv)
+                                        )
+                                        .map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => seleccionarProveedor(p)}
+                                                className="w-full flex items-center justify-between px-4 py-3 hover:bg-primary-50 border-b last:border-0 text-left transition-colors"
+                                            >
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-800">{p.nombre_empresa}</p>
+                                                    <p className="text-xs text-slate-500 font-mono">{p.ruc}</p>
+                                                </div>
+                                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full shrink-0">
+                                                    {p.condicion_pago}
+                                                </span>
+                                            </button>
+                                        ))
+                                )}
+                            </div>
+                        )}
+
+                        {/* Proveedor seleccionado */}
+                        {provSelec && (
+                            <div className="flex items-center justify-between p-4 bg-primary-50 rounded-xl border border-primary-200">
+                                <div>
+                                    <p className="font-semibold text-primary-800">{provSelec.nombre_empresa}</p>
+                                    <p className="text-xs text-primary-600 font-mono mt-0.5">{provSelec.ruc}</p>
+                                </div>
+                                <button
+                                    onClick={() => { setProvSelec(null); setCxpLista([]); setBusqProv('') }}
+                                    className="text-slate-400 hover:text-slate-600 p-1"
+                                    title="Cambiar proveedor"
+                                >
+                                    <X className="w-4 h-4" />
                                 </button>
-                            ))}
-                        </div>
-                    )}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="flex justify-end">
-                        <button onClick={() => { if (!provSelec) { setError('Selecciona un proveedor'); return }; setError(''); setPaso(2) }}
-                            className="btn btn-primary">Continuar →</button>
+                        <button
+                            onClick={() => { if (!provSelec) { setError('Selecciona un proveedor'); return }; setError(''); setPaso(2) }}
+                            disabled={!provSelec}
+                            className="btn btn-primary disabled:opacity-50"
+                        >
+                            Continuar →
+                        </button>
                     </div>
                 </div>
             )}

@@ -65,11 +65,12 @@ export function CuentasBancariasPage() {
     }
 
     async function guardar() {
+        if (!empresa?.id)         { setError('No hay empresa activa. Verifica tu perfil en Configuración.'); return }
         if (!form.banco_id)       { setError('Selecciona un banco'); return }
         if (!form.numero_cuenta)  { setError('El número de cuenta es obligatorio'); return }
         setSaving(true); setError('')
         try {
-            const payload = { ...form, fecha_apertura: form.fecha_apertura || null }
+            const payload = { ...form, empresa_id: empresa.id, fecha_apertura: form.fecha_apertura || null }
             if (editId) await cuentasBancariasService.actualizar(editId, payload)
             else        await cuentasBancariasService.crear(payload)
             setModal(false)
