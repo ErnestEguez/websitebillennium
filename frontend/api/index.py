@@ -312,89 +312,45 @@ PRODUCTS = [
     },
     {
         "id": "facturacion",
-        "name": "Facturación Electrónica",
+        "name": "QuickInvoice",
         "slug": "facturacion-electronica",
-        "description": "Sistema en la nube para emitir comprobantes electrónicos cumpliendo normativa SRI",
+        "description": "Facturación electrónica SRI para almacenes, profesionales y cualquier negocio. Con inventario, clientes y cartera incluidos.",
         "icon": "FileText",
         "features": [
-            "Facturas electrónicas",
-            "Notas de crédito/débito",
-            "Retenciones",
-            "Guías de remisión",
-            "Liquidaciones de compra",
-            "Reportes para declaraciones"
+            "Facturas, N/C, N/D y retenciones electrónicas SRI",
+            "Control de inventario con Kardex",
+            "Gestión de clientes y cartera CxC",
+            "Múltiples puntos de emisión",
+            "Reportes de ventas y compras",
+            "Funciona en computador, tablet y celular"
         ],
         "plans": [
             {
-                "name": "Básico",
-                "price_before": 25,
-                "price_now": 15,
+                "name": "Independiente",
+                "price_before": 18,
+                "price_now": 10,
+                "price_annual": 110,
                 "billing": "mensual",
-                "features": ["Hasta 100 documentos/mes", "1 usuario", "Facturas y notas de crédito", "Envío automático al SRI", "Portal de consulta", "Soporte por email"]
-            },
-            {
-                "name": "Profesional",
-                "price_before": 50,
-                "price_now": 30,
-                "billing": "mensual",
-                "popular": True,
-                "features": ["Hasta 500 documentos/mes", "Hasta 3 usuarios", "Todos los tipos de comprobantes", "Retenciones automáticas", "Reportes para declaraciones", "Soporte prioritario"]
+                "target": "Profesionales y freelancers",
+                "features": ["Hasta 50 documentos/mes", "1 usuario", "Facturas y notas de crédito", "Envío automático al SRI", "Soporte por email", "1 mes gratis al pagar anual"]
             },
             {
                 "name": "Empresarial",
-                "price_before": 100,
-                "price_now": 60,
-                "billing": "mensual",
-                "features": ["Documentos ilimitados", "Usuarios ilimitados", "Todo lo del Plan Profesional", "API de integración", "Múltiples puntos de emisión", "Soporte dedicado"]
-            }
-        ]
-    },
-    {
-        "id": "dashboard",
-        "name": "Dashboard Empresarial",
-        "slug": "dashboard-empresarial",
-        "description": "Dashboard comercial y financiero para empresas enlazado a su propio ERP",
-        "icon": "BarChart3",
-        "features": [
-            "KPIs en tiempo real",
-            "Análisis de ventas",
-            "Control de cartera",
-            "Indicadores financieros",
-            "Reportes personalizados",
-            "Integración con ERP"
-        ],
-        "plans": [
-            {
-                "name": "Básico",
-                "price_before": 250,
-                "price_now": 150,
-                "billing": "mensual",
-                "features": [
-                    "Dashboard principal con KPIs básicos",
-                    "Ventas, compras y cobros del día anterior",
-                    "Top 10 clientes y productos",
-                    "Hasta 3 usuarios",
-                    "Exportación a Excel",
-                    "Soporte estándar"
-                ]
-            },
-            {
-                "name": "Profesional",
-                "price_before": 400,
-                "price_now": 250,
+                "price_before": 35,
+                "price_now": 20,
+                "price_annual": 220,
                 "billing": "mensual",
                 "popular": True,
-                "features": [
-                    "Todo lo del Plan Básico",
-                    "Datos en tiempo real",
-                    "Dashboard de cartera y vencimientos",
-                    "Rentabilidad por producto, vendedor y cliente",
-                    "Hasta 10 usuarios",
-                    "Alertas configurables por indicador",
-                    "Reportes personalizados en PDF/Excel",
-                    "Integración total con ERP Billennium",
-                    "Soporte prioritario"
-                ]
+                "target": "Almacenes y PyMEs",
+                "features": ["Documentos ilimitados", "Hasta 3 usuarios", "Todos los tipos de comprobantes", "Control de inventario y Kardex", "Cartera CxC", "Retenciones automáticas", "Reportes para declaraciones", "Soporte prioritario", "1 mes gratis al pagar anual"]
+            },
+            {
+                "name": "Corporativo",
+                "price_before": 65,
+                "price_now": 40,
+                "price_annual": 440,
+                "billing": "mensual",
+                "features": ["Documentos ilimitados", "Usuarios ilimitados", "Todo lo del Plan Empresarial", "Múltiples empresas", "API de integración", "Soporte dedicado", "1 mes gratis al pagar anual"]
             }
         ]
     },
@@ -433,26 +389,21 @@ PRODUCTS = [
         ],
         "plans": [
             {
-                "name": "Básico",
-                "price_before": 40,
-                "price_now": 25,
-                "billing": "mensual",
-                "features": ["1 empresa", "2 usuarios", "Plan de cuentas NIIF", "Comprobantes y balances", "Soporte básico"]
-            },
-            {
-                "name": "Profesional",
-                "price_before": 80,
-                "price_now": 50,
+                "name": "Contador",
+                "price_before": 35,
+                "price_now": 20,
+                "price_annual": 220,
                 "billing": "mensual",
                 "popular": True,
-                "features": ["Hasta 3 empresas", "5 usuarios", "Todo lo del Plan Básico", "Integración QuickInvoice", "Importación SRI", "Presupuesto", "Soporte prioritario"]
+                "features": ["1 empresa", "3 usuarios", "Plan de cuentas NIIF", "Comprobantes y balances", "ATS automático", "Importación SRI", "Integración QuickInvoice", "Soporte prioritario", "1 mes gratis al pagar anual"]
             },
             {
-                "name": "Empresarial",
-                "price_before": 150,
-                "price_now": 90,
+                "name": "Multi-empresa",
+                "price_before": 75,
+                "price_now": 45,
+                "price_annual": 495,
                 "billing": "mensual",
-                "features": ["Multiempresa ilimitada", "Usuarios ilimitados", "Todo lo del Plan Profesional", "Cierre contable anual", "Reportes avanzados", "Acompañamiento en implementación"]
+                "features": ["Hasta 5 empresas", "Usuarios ilimitados", "Todo lo del Plan Contador", "Presupuesto vs Real", "Cierre contable anual", "Reportes avanzados", "1 mes gratis al pagar anual"]
             }
         ]
     },
@@ -511,11 +462,13 @@ PRODUCTS = [
         ],
         "plans": [
             {
-                "name": "Básico",
-                "price_before": 50,
-                "price_now": 30,
+                "name": "Empresarial",
+                "price_before": 35,
+                "price_now": 20,
+                "price_annual": 220,
                 "billing": "mensual",
-                "features": ["1 empresa", "Hasta 3 cuentas bancarias", "Egresos y pagos", "Cheques y anticipos", "Conciliación bancaria", "Exportación a Excel"]
+                "popular": True,
+                "features": ["1 empresa", "3 usuarios", "Cuentas bancarias ilimitadas", "Egresos y comprobantes de pago", "Cheques al día y post-fechados", "Anticipos a proveedores", "Conciliación bancaria", "Exportación a Excel", "1 mes gratis al pagar anual"]
             }
         ]
     }
