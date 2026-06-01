@@ -3,7 +3,7 @@ import { Link, useLocation, Navigate } from 'react-router-dom'
 import {
     LayoutDashboard, Landmark, CreditCard, FileText,
     CheckSquare, ArrowDownUp, ArrowRightLeft,
-    BarChart2, Settings, Menu, X, ChevronDown,
+    BarChart2, Settings, Menu, X, ChevronDown, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
@@ -42,7 +42,8 @@ const NAV_USER: NavItem[] = [
 ]
 
 const NAV_ADMIN: NavItem[] = [
-    { to: '/configuracion', icon: Settings, label: 'Configuración' },
+    { to: '/configuracion', icon: Settings,    label: 'Configuración' },
+    { to: '/admin',         icon: ShieldCheck, label: 'Administración' },
 ]
 
 function SidebarItem({ to, icon: Icon, label, active, sub }: {

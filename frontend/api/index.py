@@ -1152,6 +1152,128 @@ def create_sentinel_vendedor(
         "empresa": empresa_data['nombre_comercial'],
     }
 
+# ============== APP INTEGRATIONS — FINANCE SUITE ==============
+
+class CreateFinanceProfileRequest(BaseModel):
+    portal_user_id: str
+    empresa_id:     str
+    rol:            str = "contador"
+
+def get_finance_app_admin(x_auth_token: str = Header(None)):
+    """Verifica que el token pertenece a un admin de Finance Suite (facturacion.profiles con rol admin)."""
+    if not x_auth_token:
+        raise HTTPException(status_code=401, detail="Token requerido")
+    try:
+        user_response = supabase.auth.get_user(x_auth_token)
+        if not user_response.user:
+            raise HTTPException(status_code=401, detail="Token inválido")
+        uid = str(user_response.user.id)
+        profile = supabase.schema('facturacion').table('profiles').select('rol').eq('id', uid).execute()
+        p = profile.data[0] if profile.data else None
+        if not p or p.get('rol') not in ('admin', 'superadmin'):
+            raise HTTPException(status_code=403, detail="No tienes permisos de administrador en Finance Suite")
+        return user_response.user
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Error de autenticación: {str(e)}")
+
+@api_router.get("/apps/finance/available-users")
+def get_finance_available_users(app_admin=Depends(get_finance_app_admin)):
+    """
+    Usuarios del Portal con suscripción finance activa
+    que aún NO tienen perfil en facturacion.profiles.
+    """
+    subs = supabase.table("subscriptions").select(
+        "user_id, user_email, user_name, company_name"
+    ).eq("product_id", "finance").eq("status", "active").eq("is_enabled", True).execute()
+
+    if not subs.data:
+        return []
+
+    existing = supabase.schema('facturacion').table('profiles').select('id').execute()
+    existing_ids = {p['id'] for p in (existing.data or [])}
+
+    return [
+        {
+            "id": s["user_id"],
+            "name": s["user_name"],
+            "email": s["user_email"],
+            "company_name": s.get("company_name"),
+        }
+        for s in subs.data
+        if s["user_id"] not in existing_ids
+    ]
+
+@api_router.get("/apps/finance/empresas")
+def get_finance_empresas(app_admin=Depends(get_finance_app_admin)):
+    """Empresas disponibles en facturacion.empresas."""
+    result = supabase.schema('facturacion').table('empresas').select('id, nombre, ruc').order('nombre').execute()
+    return result.data or []
+
+@api_router.post("/apps/finance/users")
+def create_finance_profile(
+    data: CreateFinanceProfileRequest,
+    app_admin=Depends(get_finance_app_admin)
+):
+    """
+    Crea perfil en facturacion.profiles para un usuario del Portal
+    con suscripción finance activa.
+    """
+    user_result = supabase.table("users").select("id, email, name").eq("id", data.portal_user_id).execute()
+    if not user_result.data:
+        raise HTTPException(status_code=404, detail="Usuario del Portal no encontrado")
+    portal_user = user_result.data[0]
+
+    sub_check = supabase.table("subscriptions").select("id").eq(
+        "user_id", data.portal_user_id
+    ).eq("product_id", "finance").eq("status", "active").eq("is_enabled", True).execute()
+    if not sub_check.data:
+        raise HTTPException(status_code=403, detail="El usuario no tiene suscripción activa de Finance Suite")
+
+    emp_check = supabase.schema('facturacion').table('empresas').select('id, nombre').eq('id', data.empresa_id).execute()
+    if not emp_check.data:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+
+    email = portal_user["email"]
+    name  = portal_user["name"]
+
+    # Obtener o crear usuario en Supabase Auth
+    supabase_user_id = None
+    try:
+        id_result = supabase.rpc('get_user_id_by_email', {'p_email': email}).execute()
+        if id_result.data:
+            supabase_user_id = str(id_result.data)
+    except Exception:
+        pass
+
+    if not supabase_user_id:
+        try:
+            cr = supabase.auth.admin.create_user({
+                "email": email, "email_confirm": True,
+                "password": secrets.token_urlsafe(16),
+                "user_metadata": {"name": name}
+            })
+            supabase_user_id = str(cr.user.id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error creando usuario Supabase: {str(e)}")
+
+    # Upsert en facturacion.profiles
+    supabase.schema('facturacion').table('profiles').upsert({
+        "id":         supabase_user_id,
+        "empresa_id": data.empresa_id,
+        "rol":        data.rol,
+        "nombre":     name,
+        "email":      email,
+    }).execute()
+
+    logger.info(f"Finance profile created: {email} → empresa {emp_check.data[0]['nombre']}")
+    return {
+        "message": f"Perfil creado para {name}",
+        "email":   email,
+        "empresa": emp_check.data[0]['nombre'],
+    }
+
 # ============== ROOT ==============
 
 @api_router.get("/")

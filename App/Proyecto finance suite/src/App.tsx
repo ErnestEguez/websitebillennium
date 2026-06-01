@@ -17,6 +17,7 @@ import { EstadoCuentaPage }     from './pages/reportes/EstadoCuentaPage'
 import { MovimientosPeriodoPage }from './pages/reportes/MovimientosPeriodoPage'
 import { ChequesAFechaReportePage } from './pages/reportes/ChequesAFechaReportePage'
 import { ConfiguracionPage }    from './pages/ConfiguracionPage'
+import { AdminPage }            from './pages/admin/AdminPage'
 
 function App() {
     return (
@@ -67,6 +68,9 @@ function App() {
                     } />
                     <Route path="/configuracion" element={
                         <ProtectedRoute><Layout><ConfiguracionPage /></Layout></ProtectedRoute>
+                    } />
+                    <Route path="/admin" element={
+                        <ProtectedRoute><Layout><AdminPage /></Layout></ProtectedRoute>
                     } />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
