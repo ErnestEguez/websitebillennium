@@ -77,7 +77,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = React.useState(true)
     const [openGroups, setOpenGroups]   = React.useState<string[]>(['Pagos'])
 
-    const isAdmin = profile !== null && profile.rol === 'admin_plataforma'
+    const isAdmin = profile !== null &&
+        ['admin', 'admin_plataforma', 'superadmin'].includes(profile.rol)
 
     if (isAdmin && location.pathname !== '/configuracion') {
         return <Navigate to="/configuracion" replace />

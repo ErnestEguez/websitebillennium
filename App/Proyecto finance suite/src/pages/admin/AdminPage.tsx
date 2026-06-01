@@ -92,7 +92,7 @@ export function AdminPage() {
         finally { setGuardando(false) }
     }
 
-    if (profile?.rol !== 'admin' && profile?.rol !== 'superadmin') {
+    if (!['admin', 'admin_plataforma', 'superadmin'].includes(profile?.rol ?? '')) {
         return (
             <div className="flex items-center justify-center py-24">
                 <div className="text-center space-y-3">

@@ -950,11 +950,51 @@ def admin_enter_app(product_id: str, admin: dict = Depends(get_admin_user)):
     # Para estas apps solo se genera el magic link — el perfil de admin se crea directamente en la BD de cada app
     if product_id in ("importaciones", "facturacion", "vendormanagement", "restoflow", "contabilidad", "finance"):
         try:
+            # Finance Suite: garantizar perfil admin en facturacion.profiles
+            if product_id == "finance":
+                try:
+                    from urllib.parse import urlparse, parse_qs, quote as _quote
+                    # Obtener user_id del admin
+                    admin_id_result = supabase.rpc('get_user_id_by_email', {'p_email': email}).execute()
+                    admin_supabase_id = str(admin_id_result.data) if admin_id_result.data else None
+                    if not admin_supabase_id:
+                        cr = supabase.auth.admin.create_user({
+                            "email": email, "email_confirm": True,
+                            "password": secrets.token_urlsafe(16),
+                            "user_metadata": {"name": name}
+                        })
+                        admin_supabase_id = str(cr.user.id)
+                    # Upsert perfil admin — empresa_id null hasta que se configure
+                    existing_p = supabase.schema('facturacion').table('profiles').select('id, rol').eq('id', admin_supabase_id).execute()
+                    if not existing_p.data:
+                        supabase.schema('facturacion').table('profiles').insert({
+                            "id": admin_supabase_id, "rol": "admin_plataforma",
+                            "nombre": name, "email": email, "empresa_id": None,
+                        }).execute()
+                        logger.info(f"Finance admin profile created: {email}")
+                    elif existing_p.data[0].get('rol') not in ('admin_plataforma', 'admin', 'superadmin'):
+                        supabase.schema('facturacion').table('profiles').update(
+                            {"rol": "admin_plataforma"}
+                        ).eq('id', admin_supabase_id).execute()
+                except Exception as ep:
+                    logger.warning(f"Could not upsert finance admin profile: {ep}")
+
             result = supabase.auth.admin.generate_link({
                 "type": "magiclink",
                 "email": email,
                 "options": {"redirect_to": APP_URLS[product_id]}
             })
+
+            # Finance Suite: usar OTP para evitar desfase de reloj
+            if product_id == "finance":
+                from urllib.parse import urlparse, parse_qs, quote as _quote
+                action_link = result.properties.action_link
+                parsed = urlparse(action_link)
+                params = parse_qs(parsed.query)
+                otp_token = params.get("token", [None])[0]
+                if otp_token:
+                    return {"url": f"{APP_URLS[product_id]}?otp={_quote(otp_token)}&email={_quote(email)}", "app": product_id}
+
             return {"url": result.properties.action_link, "app": product_id}
         except Exception as e:
             logger.error(f"Error generating admin magic link for {email}: {e}")
