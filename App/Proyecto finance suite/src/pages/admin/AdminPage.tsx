@@ -257,8 +257,7 @@ export function AdminPage() {
                             <label className="label">Rol</label>
                             <select className="input" value={rol} onChange={e => setRol(e.target.value)}>
                                 <option value="contador">Contador</option>
-                                <option value="auxiliar">Auxiliar</option>
-                                <option value="admin">Administrador</option>
+                                <option value="asistente_contable">Asistente Contable</option>
                             </select>
                         </div>
                         {error && <p className="text-red-600 text-xs">{error}</p>}

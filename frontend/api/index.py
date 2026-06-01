@@ -1197,7 +1197,7 @@ def create_sentinel_vendedor(
 class CreateFinanceProfileRequest(BaseModel):
     portal_user_id: str
     empresa_id:     str
-    rol:            str = "contador"
+    rol:            str = "contador"  # contador | asistente_contable
 
 def get_finance_app_admin(x_auth_token: str = Header(None)):
     """Verifica que el token pertenece a un admin de Finance Suite (facturacion.profiles con rol admin)."""
