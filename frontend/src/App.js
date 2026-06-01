@@ -14,6 +14,7 @@ import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MySubscriptions from "./pages/MySubscriptions";
+import { Blog } from "./pages/Blog";
 import UserDashboard from "./pages/UserDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -57,6 +58,7 @@ function App() {
           <Route path="/planes" element={<PublicPage><Planes /></PublicPage>} />
           <Route path="/nosotros" element={<PublicPage><About /></PublicPage>} />
           <Route path="/contacto" element={<PublicPage><Contact /></PublicPage>} />
+          <Route path="/blog" element={<PublicPage><Blog /></PublicPage>} />
 
           {/* Auth Routes (no layout) */}
           <Route path="/login" element={<Login />} />
