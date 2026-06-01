@@ -916,6 +916,20 @@ def get_app_token(
             "email": current_user["email"],
             "options": {"redirect_to": redirect_url}
         })
+
+        # Para Finance Suite: pasar OTP directamente como query param
+        # Evita el flujo de redirección con hash que falla por desfase de reloj
+        if product_id == "finance":
+            from urllib.parse import urlparse, parse_qs, urlencode
+            action_link = result.properties.action_link
+            parsed = urlparse(action_link)
+            params = parse_qs(parsed.query)
+            otp_token = params.get("token", [None])[0]
+            if otp_token:
+                import urllib.parse
+                finance_url = f"{redirect_url}?otp={urllib.parse.quote(otp_token)}&email={urllib.parse.quote(current_user['email'])}"
+                return {"url": finance_url}
+
         return {"url": result.properties.action_link}
     except Exception as e:
         logger.error(f"Error generating magic link for {current_user['email']}: {e}")

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabaseFacturacion as supabase } from '../lib/supabaseFacturacion'
 import { magicLinkAccessToken, magicLinkRefreshToken } from '../lib/magicLink'
+import { otpToken, otpEmail } from '../lib/otp'
 import type { User } from '@supabase/supabase-js'
 
 export interface Profile {
@@ -39,13 +40,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         isMounted.current = true
 
-        // magicLinkRefreshToken fue capturado en main.tsx antes de que Supabase inicializara
         const refreshToken = magicLinkRefreshToken
-        const hasMagicLink = !!refreshToken ||
+        const hasMagicLink = !!refreshToken || !!otpToken ||
             new URLSearchParams(window.location.search).get('token_hash') !== null
 
+        // ── FLUJO 1: OTP directo desde el portal (sin desfase de reloj) ──────
+        if (otpToken && otpEmail) {
+            supabase.auth.verifyOtp({ email: otpEmail, token: otpToken, type: 'magiclink' })
+                .then(async ({ data, error }) => {
+                    if (!isMounted.current) return
+                    if (!error && data.session?.user) {
+                        setUser(data.session.user)
+                        await fetchProfile(data.session.user.id)
+                    }
+                    if (isMounted.current) setLoading(false)
+                })
+            return () => { isMounted.current = false }
+        }
+
+        // ── FLUJO 2: Tokens en hash (fallback para otros entornos) ────────────
         if (magicLinkAccessToken && refreshToken) {
-            // setSession decodifica el JWT localmente — sin llamada de red, sin problema de reloj
             supabase.auth.setSession({ access_token: magicLinkAccessToken, refresh_token: refreshToken })
                 .then(async ({ data, error }) => {
                     if (!isMounted.current) return
@@ -53,7 +67,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         setUser(data.session.user)
                         await fetchProfile(data.session.user.id)
                     } else if (refreshToken) {
-                        // Fallback: si setSession falla intenta solo con refresh_token
                         const { data: d2 } = await supabase.auth.refreshSession({ refresh_token: refreshToken })
                         if (d2.session?.user && isMounted.current) {
                             setUser(d2.session.user)
