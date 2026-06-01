@@ -28,7 +28,14 @@ export function BancosPage() {
     }
 
     function abrirNuevo() {
-        setEditId(null); setForm(EMPTY); setModal(true)
+        const maxCod = lista.reduce((max, b) => {
+            const n = parseInt(b.codigo, 10)
+            return isNaN(n) ? max : Math.max(max, n)
+        }, 0)
+        const sigCodigo = String(maxCod + 1).padStart(3, '0')
+        setEditId(null)
+        setForm({ ...EMPTY, codigo: sigCodigo })
+        setModal(true)
     }
 
     function abrirEditar(b: Banco) {

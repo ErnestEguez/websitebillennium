@@ -45,15 +45,25 @@ export function NuevoEgresoPage() {
 
     useEffect(() => {
         if (!empresa?.id) return
-        cuentasBancariasService.listar(empresa.id)
-            .then(c => setCuentas(c.filter(x => x.estado === 'activa')))
-            .catch(() => {})
+        // Cargar cuentas bancarias y todos los proveedores activos al entrar
+        Promise.all([
+            cuentasBancariasService.listar(empresa.id),
+            proveedoresService.listar(empresa.id),
+        ]).then(([c, p]) => {
+            setCuentas(c.filter(x => x.estado === 'activa'))
+            setProveedores(p)
+        }).catch(() => {})
     }, [empresa?.id])
 
     async function buscarProveedor() {
-        if (!empresa?.id || !busqProv.trim()) return
+        if (!empresa?.id) return
         setCargProv(true)
-        try { setProveedores(await proveedoresService.buscar(empresa.id, busqProv)) }
+        try {
+            const lista = busqProv.trim()
+                ? await proveedoresService.buscar(empresa.id, busqProv)
+                : await proveedoresService.listar(empresa.id)
+            setProveedores(lista)
+        }
         catch (e: unknown) { setError(String(e)) }
         finally { setCargProv(false) }
     }

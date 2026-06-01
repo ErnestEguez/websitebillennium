@@ -27,12 +27,18 @@ export function CuentasBancariasPage() {
     const [form, setForm]       = useState<FormCuenta>(emptyForm(''))
     const [saving, setSaving]   = useState(false)
 
+    // Bancos es catálogo global — carga sin depender de empresa
+    useEffect(() => {
+        bancosService.listar()
+            .then(b => setBancos(b.filter(x => x.activo)))
+            .catch(() => {})
+    }, [])
+
+    // Cuentas bancarias dependen de empresa
     useEffect(() => {
         if (!empresa?.id) { setLoading(false); return }
-        Promise.all([
-            cuentasBancariasService.listar(empresa.id),
-            bancosService.listar(),
-        ]).then(([c, b]) => { setLista(c); setBancos(b.filter(x => x.activo)) })
+        cuentasBancariasService.listar(empresa.id)
+            .then(setLista)
             .catch(() => {})
             .finally(() => setLoading(false))
     }, [empresa?.id])
