@@ -12,7 +12,10 @@ import {
   Zap,
   Lock,
   HeadphonesIcon,
-  Award
+  Award,
+  BookOpen,
+  Users,
+  Landmark,
 } from 'lucide-react';
 import { Ticket } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -21,6 +24,42 @@ import { Card, CardContent } from '../components/ui/card';
 const HERO_IMAGE = "https://images.pexels.com/photos/3184418/pexels-photo-3184418.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
 
 const products = [
+  {
+    id: 'facturacion',
+    name: 'QuickInvoice',
+    description: 'Facturación electrónica SRI para almacenes, profesionales y cualquier negocio. Inventario, clientes y reportes incluidos.',
+    icon: FileText,
+    color: 'from-blue-500 to-indigo-500',
+    bgColor: 'bg-blue-50',
+    iconColor: 'text-blue-600',
+  },
+  {
+    id: 'contabilidad',
+    name: 'LedgerPro',
+    description: 'Contabilidad completa integrada con SRI. ATS automático, estados financieros en tiempo real y declaraciones listas para enviar.',
+    icon: BookOpen,
+    color: 'from-emerald-500 to-teal-500',
+    bgColor: 'bg-emerald-50',
+    iconColor: 'text-emerald-600',
+  },
+  {
+    id: 'vendormanagement',
+    name: 'Vendor Management',
+    description: 'Control integral de proveedores y cuentas por pagar. Gestiona órdenes de compra, aprobaciones y vencimientos desde un solo lugar.',
+    icon: Users,
+    color: 'from-amber-500 to-orange-500',
+    bgColor: 'bg-amber-50',
+    iconColor: 'text-amber-600',
+  },
+  {
+    id: 'finance',
+    name: 'Finance Suite',
+    description: 'Tesorería y gestión financiera. Control bancario, cheques, anticipos, conciliaciones y reportes financieros integrados.',
+    icon: Landmark,
+    color: 'from-violet-500 to-purple-500',
+    bgColor: 'bg-violet-50',
+    iconColor: 'text-violet-600',
+  },
   {
     id: 'restoflow',
     name: 'RestoFlow',
@@ -33,56 +72,29 @@ const products = [
   {
     id: 'pedidos-sentinel',
     name: 'Pedidos Sentinel',
-    description: 'Toma de pedidos móvil enlazada a tu ERP Billennium',
+    description: 'Toma de pedidos móvil enlazada a tu ERP Billennium. Trabaja offline/online.',
     icon: Smartphone,
-    color: 'from-blue-500 to-indigo-500',
-    bgColor: 'bg-blue-50',
-    iconColor: 'text-blue-600',
+    color: 'from-sky-500 to-blue-500',
+    bgColor: 'bg-sky-50',
+    iconColor: 'text-sky-600',
   },
   {
     id: 'modulo-importaciones',
     name: 'Importaciones',
-    description: 'Control de procesos de importación y costos internacionales',
+    description: 'Control de procesos de importación, costos y órdenes de compra internacionales.',
     icon: Ship,
     color: 'from-cyan-500 to-blue-500',
     bgColor: 'bg-cyan-50',
     iconColor: 'text-cyan-600',
   },
   {
-    id: 'lopdp',
-    name: 'LOPDP',
-    description: 'Cumplimiento de la Ley de Protección de Datos Personales',
-    icon: ShieldCheck,
-    color: 'from-green-500 to-emerald-500',
-    bgColor: 'bg-green-50',
-    iconColor: 'text-green-600',
-  },
-  {
-    id: 'facturacion-electronica',
-    name: 'Facturación Electrónica',
-    description: 'Comprobantes electrónicos cumpliendo normativa SRI',
-    icon: FileText,
-    color: 'from-purple-500 to-violet-500',
-    bgColor: 'bg-purple-50',
-    iconColor: 'text-purple-600',
-  },
-  {
-    id: 'dashboard-empresarial',
-    name: 'Dashboard Empresarial',
-    description: 'Indicadores comerciales y financieros en tiempo real',
-    icon: BarChart3,
+    id: 'plataforma-ferias',
+    name: 'Ferias y Exposiciones',
+    description: 'App móvil + panel web para gestión profesional de ferias y exposiciones',
+    icon: Ticket,
     color: 'from-pink-500 to-rose-500',
     bgColor: 'bg-pink-50',
     iconColor: 'text-pink-600',
-  },
-  {
-    id: 'plataforma-ferias',
-    name: 'Plataforma Móvil para Ferias',
-    description: 'App móvil + panel web para gestión profesional de ferias y exposiciones',
-    icon: Ticket,
-    color: 'from-violet-500 to-purple-500',
-    bgColor: 'bg-violet-50',
-    iconColor: 'text-violet-600',
   },
 ];
 
@@ -139,16 +151,19 @@ export const Home = () => {
               transition={{ duration: 0.6 }}
             >
               <span className="inline-block px-4 py-2 rounded-full bg-blue-500/20 text-blue-300 text-sm font-medium mb-6">
-                Software SaaS para Ecuador
+                Software SaaS · 100% Ecuador · Cumplimiento SRI
               </span>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
-                Digitaliza tu negocio con{' '}
+                Factura, contabiliza y{' '}
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">
-                  software confiable
+                  crece sin límites
                 </span>
               </h1>
-              <p className="text-lg text-slate-300 mb-8 max-w-xl">
-                Soluciones en la nube para pymes ecuatorianas. Facturación electrónica SRI, gestión de restaurantes, control de importaciones y más. Todo en un solo lugar.
+              <p className="text-lg text-slate-300 mb-4 max-w-xl">
+                QuickInvoice + LedgerPro: la solución completa para almacenes, profesionales y contadores. Facturación electrónica SRI, contabilidad e inventario integrados en la nube.
+              </p>
+              <p className="text-sm text-blue-300 mb-8 font-medium">
+                ✓ Sin instalaciones &nbsp;·&nbsp; ✓ Desde $15/mes &nbsp;·&nbsp; ✓ 30 días gratis
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link to="/contacto">
