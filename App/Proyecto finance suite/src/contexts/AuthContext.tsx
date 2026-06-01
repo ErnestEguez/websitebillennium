@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabaseFacturacion as supabase } from '../lib/supabaseFacturacion'
-import { magicLinkRefreshToken } from '../lib/magicLink'
+import { magicLinkAccessToken, magicLinkRefreshToken } from '../lib/magicLink'
 import type { User } from '@supabase/supabase-js'
 
 export interface Profile {
@@ -44,14 +44,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const hasMagicLink = !!refreshToken ||
             new URLSearchParams(window.location.search).get('token_hash') !== null
 
-        if (refreshToken) {
-            // Usar refresh_token para obtener sesión fresca (evita 401 por desfase de reloj)
-            supabase.auth.refreshSession({ refresh_token: refreshToken })
+        if (magicLinkAccessToken && refreshToken) {
+            // setSession decodifica el JWT localmente — sin llamada de red, sin problema de reloj
+            supabase.auth.setSession({ access_token: magicLinkAccessToken, refresh_token: refreshToken })
                 .then(async ({ data, error }) => {
                     if (!isMounted.current) return
                     if (!error && data.session?.user) {
                         setUser(data.session.user)
                         await fetchProfile(data.session.user.id)
+                    } else if (refreshToken) {
+                        // Fallback: si setSession falla intenta solo con refresh_token
+                        const { data: d2 } = await supabase.auth.refreshSession({ refresh_token: refreshToken })
+                        if (d2.session?.user && isMounted.current) {
+                            setUser(d2.session.user)
+                            await fetchProfile(d2.session.user.id)
+                        }
                     }
                     if (isMounted.current) setLoading(false)
                 })
