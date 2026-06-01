@@ -126,11 +126,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="w-16 h-16 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-6">
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
+                <div className="w-16 h-16 bg-white rounded-2xl shadow-xl flex items-center justify-center">
                     <div className="w-8 h-8 bg-primary-600 rounded-lg animate-spin" />
                 </div>
                 <p className="text-slate-500 text-sm">Iniciando Finance Suite...</p>
+                <div className="bg-white border rounded-xl p-4 text-xs font-mono text-slate-600 max-w-lg w-full mx-4 space-y-1">
+                    <p><b>access_token capturado:</b> {magicLinkAccessToken ? '✅ SÍ' : '❌ NO'}</p>
+                    <p><b>refresh_token capturado:</b> {magicLinkRefreshToken ? '✅ SÍ' : '❌ NO'}</p>
+                    <p><b>hash actual:</b> {window.location.hash || '(vacío)'}</p>
+                    <p><b>search actual:</b> {window.location.search || '(vacío)'}</p>
+                </div>
             </div>
         )
     }
