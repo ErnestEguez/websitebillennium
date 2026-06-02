@@ -2,97 +2,92 @@ import { useEffect, useState } from 'react'
 import { supabaseFacturacion as supabase } from '../../lib/supabaseFacturacion'
 import { useAuth } from '../../contexts/AuthContext'
 import {
-    Users, Plus, Loader2, CheckCircle, AlertCircle,
-    X, ShieldCheck,
+    Users, Loader2, CheckCircle, AlertCircle,
+    X, ShieldCheck, UserPlus, Building2,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-const PORTAL_API = import.meta.env.VITE_PORTAL_URL
-    ? `${import.meta.env.VITE_PORTAL_URL}/api`
-    : 'https://www.billenniumsystem.com/api'
+interface Empresa  { id: string; nombre: string; ruc: string }
+interface Profile  { id: string; nombre: string | null; email: string | null; rol: string; empresa_id: string | null; empresa?: { nombre: string } }
 
-interface PortalUser { id: string; name: string; email: string; company_name?: string }
-interface Empresa     { id: string; nombre: string; ruc: string }
-interface Profile     { id: string; nombre: string | null; email: string | null; rol: string; empresa_id: string | null; empresa?: { nombre: string } }
-
-async function portalFetch(path: string, opts?: RequestInit) {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) throw new Error('Sin sesión activa')
-    const res = await fetch(`${PORTAL_API}${path}`, {
-        ...opts,
-        headers: { 'X-Auth-Token': session.access_token, 'Content-Type': 'application/json', ...opts?.headers },
-    })
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.detail || 'Error en el servidor')
-    return json
-}
+const ROLES = [
+    { value: 'contador',           label: 'Contador' },
+    { value: 'asistente_contable', label: 'Asistente Contable' },
+]
 
 export function AdminPage() {
     const { profile } = useAuth()
-    const [tab, setTab]               = useState<'usuarios' | 'perfiles'>('usuarios')
 
-    // Usuarios disponibles para asignar
-    const [disponibles, setDisponibles] = useState<PortalUser[]>([])
-    const [empresas, setEmpresas]       = useState<Empresa[]>([])
-    const [cargando, setCargando]       = useState(false)
+    const [tab, setTab]           = useState<'vincular' | 'perfiles'>('vincular')
+    const [empresas, setEmpresas] = useState<Empresa[]>([])
+    const [perfiles, setPerfiles] = useState<Profile[]>([])
+    const [cargando, setCargando] = useState(false)
+    const [error, setError]       = useState('')
+    const [ok, setOk]             = useState('')
 
-    // Modal asignar
-    const [modal, setModal]             = useState(false)
-    const [selUser, setSelUser]         = useState<PortalUser | null>(null)
-    const [empId, setEmpId]             = useState('')
-    const [rol, setRol]                 = useState('contador')
-    const [guardando, setGuardando]     = useState(false)
-    const [ok, setOk]                   = useState('')
-    const [error, setError]             = useState('')
+    // Formulario vincular usuario
+    const [email, setEmail]       = useState('')
+    const [nombre, setNombre]     = useState('')
+    const [empId, setEmpId]       = useState('')
+    const [rol, setRol]           = useState('contador')
+    const [guardando, setGuardando] = useState(false)
 
-    // Perfiles actuales
-    const [perfiles, setPerfiles]       = useState<Profile[]>([])
-    const [cargPerf, setCargPerf]       = useState(false)
+    const isAdmin = ['admin', 'admin_plataforma', 'superadmin'].includes(profile?.rol ?? '')
 
-    useEffect(() => { cargarDatos() }, [])
+    useEffect(() => {
+        cargarEmpresas()
+    }, [])
 
-    async function cargarDatos() {
-        setCargando(true)
-        setError('')
-        try {
-            const [usrs, emps] = await Promise.all([
-                portalFetch('/apps/finance/available-users'),
-                portalFetch('/apps/finance/empresas'),
-            ])
-            setDisponibles(usrs)
-            setEmpresas(emps)
-        } catch (e: any) { setError(e.message) }
-        finally { setCargando(false) }
+    useEffect(() => {
+        if (tab === 'perfiles') cargarPerfiles()
+    }, [tab])
+
+    async function cargarEmpresas() {
+        const { data } = await supabase
+            .from('empresas')
+            .select('id, nombre, ruc')
+            .order('nombre')
+        setEmpresas(data ?? [])
     }
 
     async function cargarPerfiles() {
-        setCargPerf(true)
+        setCargando(true)
         const { data } = await supabase
             .from('profiles')
             .select('id, nombre, email, rol, empresa_id, empresa:empresas(nombre)')
             .order('nombre')
         setPerfiles((data ?? []) as unknown as Profile[])
-        setCargPerf(false)
+        setCargando(false)
     }
 
-    useEffect(() => { if (tab === 'perfiles') cargarPerfiles() }, [tab])
+    async function vincularUsuario(e: React.FormEvent) {
+        e.preventDefault()
+        if (!email.trim()) { setError('El email es obligatorio'); return }
+        if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
+        if (!empId)         { setError('Selecciona una empresa'); return }
 
-    async function asignar() {
-        if (!selUser || !empId) return
         setGuardando(true); setError(''); setOk('')
         try {
-            const res = await portalFetch('/apps/finance/users', {
-                method: 'POST',
-                body: JSON.stringify({ portal_user_id: selUser.id, empresa_id: empId, rol }),
+            const { data, error: rpcErr } = await supabase.rpc('dar_acceso_portal', {
+                p_email:      email.trim().toLowerCase(),
+                p_empresa_id: empId,
+                p_nombre:     nombre.trim(),
+                p_rol:        rol,
             })
-            setOk(res.message)
-            setModal(false)
-            cargarDatos()
-        } catch (e: any) { setError(e.message) }
-        finally { setGuardando(false) }
+            if (rpcErr) throw rpcErr
+            if (!(data as any)?.ok) throw new Error((data as any)?.error ?? 'Error desconocido')
+
+            setOk(`Acceso creado correctamente para ${email}`)
+            setEmail(''); setNombre(''); setEmpId(''); setRol('contador')
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : (err as any)?.message ?? JSON.stringify(err)
+            setError(msg)
+        } finally {
+            setGuardando(false)
+        }
     }
 
-    if (!['admin', 'admin_plataforma', 'superadmin'].includes(profile?.rol ?? '')) {
+    if (!isAdmin) {
         return (
             <div className="flex items-center justify-center py-24">
                 <div className="text-center space-y-3">
@@ -104,12 +99,13 @@ export function AdminPage() {
     }
 
     return (
-        <div className="space-y-5 max-w-5xl">
+        <div className="space-y-5 max-w-4xl">
             <div>
                 <h1 className="text-2xl font-bold text-slate-900">Administración — Finance Suite</h1>
-                <p className="text-slate-500 text-sm mt-0.5">Gestión de accesos y empresas</p>
+                <p className="text-slate-500 text-sm mt-0.5">Gestión de accesos y usuarios</p>
             </div>
 
+            {/* Alertas */}
             {error && (
                 <div className="card px-4 py-3 bg-red-50 border-red-200 text-red-700 text-sm flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" /><span className="flex-1">{error}</span>
@@ -125,83 +121,99 @@ export function AdminPage() {
 
             {/* Tabs */}
             <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm w-fit">
-                {([['usuarios', 'Usuarios pendientes', Users], ['perfiles', 'Perfiles activos', ShieldCheck]] as const).map(([id, label, Icon]) => (
+                {([
+                    ['vincular', 'Vincular usuario', UserPlus],
+                    ['perfiles', 'Usuarios activos', Users],
+                ] as const).map(([id, label, Icon]) => (
                     <button key={id} onClick={() => setTab(id)}
                         className={cn('flex items-center gap-2 px-5 py-2.5 border-l first:border-0',
                             tab === id ? 'bg-primary-600 text-white font-medium' : 'bg-white text-slate-600 hover:bg-slate-50')}>
                         <Icon className="w-4 h-4" />{label}
-                        {id === 'usuarios' && disponibles.length > 0 && (
-                            <span className="bg-amber-400 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
-                                {disponibles.length}
-                            </span>
-                        )}
                     </button>
                 ))}
             </div>
 
-            {/* Usuarios pendientes de asignar */}
-            {tab === 'usuarios' && (
+            {/* ── Tab: Vincular usuario ── */}
+            {tab === 'vincular' && (
+                <div className="card p-6 max-w-lg">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                            <UserPlus className="w-5 h-5 text-primary-600" />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-slate-900">Vincular usuario a empresa</h2>
+                            <p className="text-xs text-slate-500 mt-0.5">El usuario debe estar registrado en el portal Billennium System</p>
+                        </div>
+                    </div>
+
+                    <form onSubmit={vincularUsuario} className="space-y-4">
+                        <div>
+                            <label className="label">Email del usuario *</label>
+                            <input
+                                className="input"
+                                type="email"
+                                placeholder="usuario@empresa.com"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                        <div>
+                            <label className="label">Nombre completo *</label>
+                            <input
+                                className="input"
+                                placeholder="Nombre del usuario"
+                                value={nombre}
+                                onChange={e => setNombre(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="label flex items-center gap-1.5">
+                                <Building2 className="w-3.5 h-3.5" />Empresa *
+                            </label>
+                            <select className="input" value={empId} onChange={e => setEmpId(e.target.value)}>
+                                <option value="">Seleccionar empresa...</option>
+                                {empresas.map(emp => (
+                                    <option key={emp.id} value={emp.id}>
+                                        {emp.nombre} — {emp.ruc}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="label">Rol</label>
+                            <select className="input" value={rol} onChange={e => setRol(e.target.value)}>
+                                {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                            </select>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={guardando || !email || !nombre || !empId}
+                            className="btn btn-primary w-full gap-2 disabled:opacity-50"
+                        >
+                            {guardando ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                            Crear acceso
+                        </button>
+                    </form>
+                </div>
+            )}
+
+            {/* ── Tab: Usuarios activos ── */}
+            {tab === 'perfiles' && (
                 <div className="card overflow-hidden">
                     <div className="bg-slate-700 px-5 py-3 text-white text-sm font-bold flex items-center justify-between">
-                        <span>Usuarios con suscripción Finance Suite sin perfil asignado</span>
-                        <button onClick={cargarDatos} disabled={cargando}
+                        <span>Usuarios con acceso a Finance Suite</span>
+                        <button onClick={cargarPerfiles} disabled={cargando}
                             className="text-slate-300 hover:text-white text-xs">
                             {cargando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : '↻ Actualizar'}
                         </button>
                     </div>
                     {cargando ? (
                         <div className="py-10 text-center text-slate-400">
-                            <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Cargando usuarios...
-                        </div>
-                    ) : disponibles.length === 0 ? (
-                        <div className="py-10 text-center text-slate-400">
-                            <CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                            <p className="text-sm">Todos los usuarios tienen perfil asignado.</p>
-                        </div>
-                    ) : (
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-slate-50 border-b text-xs text-slate-500 uppercase tracking-wide">
-                                    <th className="py-2 px-4 text-left">Usuario</th>
-                                    <th className="py-2 px-4 text-left">Email</th>
-                                    <th className="py-2 px-4 text-left">Empresa Portal</th>
-                                    <th className="py-2 px-4 text-center">Acción</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {disponibles.map(u => (
-                                    <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                        <td className="py-3 px-4 font-medium text-slate-800">{u.name}</td>
-                                        <td className="py-3 px-4 text-slate-600 text-xs font-mono">{u.email}</td>
-                                        <td className="py-3 px-4 text-slate-500 text-xs">{u.company_name || '—'}</td>
-                                        <td className="py-3 px-4 text-center">
-                                            <button
-                                                onClick={() => { setSelUser(u); setEmpId(''); setRol('contador'); setModal(true) }}
-                                                className="btn btn-primary text-xs gap-1 py-1.5 px-3"
-                                            >
-                                                <Plus className="w-3.5 h-3.5" /> Asignar empresa
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            )}
-
-            {/* Perfiles activos */}
-            {tab === 'perfiles' && (
-                <div className="card overflow-hidden">
-                    <div className="bg-slate-700 px-5 py-3 text-white text-sm font-bold">
-                        Perfiles activos en Finance Suite
-                    </div>
-                    {cargPerf ? (
-                        <div className="py-10 text-center text-slate-400">
                             <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Cargando...
                         </div>
                     ) : perfiles.length === 0 ? (
-                        <div className="py-10 text-center text-slate-400">Sin perfiles aún.</div>
+                        <div className="py-10 text-center text-slate-400">Sin usuarios configurados aún.</div>
                     ) : (
                         <table className="w-full text-sm">
                             <thead>
@@ -217,10 +229,12 @@ export function AdminPage() {
                                     <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                                         <td className="py-2.5 px-4 font-medium text-slate-800">{p.nombre || '—'}</td>
                                         <td className="py-2.5 px-4 text-xs font-mono text-slate-600">{p.email || '—'}</td>
-                                        <td className="py-2.5 px-4 text-slate-600 text-xs">{(p.empresa as any)?.nombre || '—'}</td>
+                                        <td className="py-2.5 px-4 text-xs text-slate-600">{(p.empresa as any)?.nombre || '—'}</td>
                                         <td className="py-2.5 px-4 text-center">
                                             <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium',
-                                                p.rol === 'admin' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700')}>
+                                                p.rol === 'admin_plataforma' ? 'bg-red-100 text-red-700' :
+                                                p.rol === 'contador'         ? 'bg-blue-100 text-blue-700' :
+                                                                               'bg-slate-100 text-slate-600')}>
                                                 {p.rol}
                                             </span>
                                         </td>
@@ -229,49 +243,6 @@ export function AdminPage() {
                             </tbody>
                         </table>
                     )}
-                </div>
-            )}
-
-            {/* Modal asignar empresa */}
-            {modal && selUser && (
-                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="font-bold text-slate-900">Asignar empresa</h3>
-                            <button onClick={() => setModal(false)}><X className="w-5 h-5 text-slate-400" /></button>
-                        </div>
-                        <div className="bg-slate-50 rounded-xl p-3 text-sm">
-                            <p className="font-semibold text-slate-800">{selUser.name}</p>
-                            <p className="text-slate-500 font-mono text-xs mt-0.5">{selUser.email}</p>
-                        </div>
-                        <div>
-                            <label className="label">Empresa *</label>
-                            <select className="input" value={empId} onChange={e => setEmpId(e.target.value)}>
-                                <option value="">Seleccionar empresa...</option>
-                                {empresas.map(e => (
-                                    <option key={e.id} value={e.id}>{e.nombre} — {e.ruc}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="label">Rol</label>
-                            <select className="input" value={rol} onChange={e => setRol(e.target.value)}>
-                                <option value="contador">Contador</option>
-                                <option value="asistente_contable">Asistente Contable</option>
-                            </select>
-                        </div>
-                        {error && <p className="text-red-600 text-xs">{error}</p>}
-                        <div className="flex gap-3 pt-1">
-                            <button onClick={asignar} disabled={guardando || !empId}
-                                className="btn btn-primary flex-1 gap-2">
-                                {guardando ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                Crear perfil
-                            </button>
-                            <button onClick={() => setModal(false)} className="btn border border-slate-200 text-slate-600 px-4">
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
                 </div>
             )}
         </div>
