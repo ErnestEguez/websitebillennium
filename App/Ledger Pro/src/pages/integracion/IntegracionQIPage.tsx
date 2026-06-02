@@ -222,8 +222,9 @@ export function IntegracionQIPage() {
         setFacturas([])
         setAsientos([])
 
-        // RPC lee public.comprobantes + detalles + pagos en una sola llamada
-        // SECURITY DEFINER en la función permite cruzar de conta a public
+        // Forzar conexión fresca al pool para ver últimas facturas de QI
+        await supabase.auth.getSession()
+
         const { data, error: eComp } = await supabase.rpc('lp_get_facturas_qi', {
             p_empresa_id:  empresaActiva.id,
             p_fecha_desde: fechaDesde,
