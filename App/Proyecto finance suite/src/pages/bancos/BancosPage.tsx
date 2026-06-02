@@ -23,7 +23,7 @@ export function BancosPage() {
     async function cargar() {
         setLoading(true)
         try { setLista(await bancosService.listar()) }
-        catch (e: unknown) { setError(String(e)) }
+        catch (e: unknown) { setError(e instanceof Error ? e.message : (e as any)?.message ?? JSON.stringify(e)) }
         finally { setLoading(false) }
     }
 
@@ -52,7 +52,7 @@ export function BancosPage() {
             else        await bancosService.crear(form)
             setModal(false)
             await cargar()
-        } catch (e: unknown) { setError(String(e)) }
+        } catch (e: unknown) { setError(e instanceof Error ? e.message : (e as any)?.message ?? JSON.stringify(e)) }
         finally { setSaving(false) }
     }
 
@@ -60,7 +60,7 @@ export function BancosPage() {
         try {
             await bancosService.toggleActivo(b.id, !b.activo)
             setLista(prev => prev.map(x => x.id === b.id ? { ...x, activo: !x.activo } : x))
-        } catch (e: unknown) { setError(String(e)) }
+        } catch (e: unknown) { setError(e instanceof Error ? e.message : (e as any)?.message ?? JSON.stringify(e)) }
     }
 
     const filtrados = lista.filter(b =>

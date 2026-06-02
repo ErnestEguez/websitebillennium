@@ -75,7 +75,10 @@ export function CuentasBancariasPage() {
             else        await cuentasBancariasService.crear(payload)
             setModal(false)
             await cargar()
-        } catch (e: unknown) { setError(String(e)) }
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : (e as any)?.message ?? JSON.stringify(e)
+            setError(msg)
+        }
         finally { setSaving(false) }
     }
 
