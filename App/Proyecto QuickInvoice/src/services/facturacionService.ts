@@ -139,8 +139,12 @@ export const facturacionService = {
             const est = config.establecimiento || '001'
             const pto = config.punto_emision || '001'
 
-            // Simulación de secuencial
-            const nextSec = config.secuencial_inicio || 1
+            // Secuencial atómico: FOR UPDATE en PostgreSQL — equivalente a BEGIN/COMMIT de SQL Server
+            // Garantiza unicidad aunque varios usuarios facturen al mismo tiempo
+            const { data: nextSecData, error: secError } = await supabase
+                .rpc('qi_next_secuencial', { p_empresa_id: pedido.empresa_id })
+            if (secError) throw new Error(`Error al obtener secuencial: ${secError.message}`)
+            const nextSec = (nextSecData as number) || 1
             const secuencialFormateado = this.formatSecuencial(est, pto, nextSec)
 
             // 1.5 Generar Clave de Acceso
@@ -230,11 +234,7 @@ export const facturacionService = {
                 if (errorCartera) console.error('[cartera_cxc] Error al crear registro de cartera:', errorCartera)
             }
 
-            // ACTUALIZAR SECUENCIAL
-            await this.updateSriConfig(pedido.empresa_id, {
-                ...config,
-                secuencial_inicio: nextSec + 1
-            })
+            // SECUENCIAL ya actualizado atómicamente por qi_next_secuencial (no se actualiza aquí)
 
             // 2. Actualizar el estado del pedido a 'facturado'
             await supabase.from('pedidos').update({ estado: 'facturado' }).eq('id', pedido.id)
