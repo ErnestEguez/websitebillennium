@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Header
+from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -1319,6 +1320,29 @@ def _parse_company(c: dict) -> Company:
         is_active=c["is_active"],
         created_at=datetime.fromisoformat(c["created_at"]) if isinstance(c["created_at"], str) else c["created_at"],
     )
+
+# ============== SEO: SITEMAP Y ROBOTS ==============
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap():
+    content = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.billenniumsystem.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://www.billenniumsystem.com/productos</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://www.billenniumsystem.com/planes</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://www.billenniumsystem.com/blog</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.billenniumsystem.com/blog/que-es-ats-ecuador</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.billenniumsystem.com/blog/facturacion-electronica-obligatoria-ecuador</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.billenniumsystem.com/blog/contadores-herramienta-nube-ecuador</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://www.billenniumsystem.com/nosotros</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.billenniumsystem.com/contacto</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+</urlset>"""
+    return Response(content=content, media_type="application/xml")
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots():
+    content = "User-agent: *\nAllow: /\n\nSitemap: https://www.billenniumsystem.com/sitemap.xml"
+    return Response(content=content, media_type="text/plain")
 
 # ============== APP SETUP ==============
 
