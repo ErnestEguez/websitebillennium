@@ -69,11 +69,10 @@ export const pedidoService = {
     },
 
     async getPedidos(empresaId: string, fecha: string) {
-        const start = new Date(fecha)
-        start.setUTCHours(0, 0, 0, 0)
-
-        const end = new Date(fecha)
-        end.setUTCHours(23, 59, 59, 999)
+        // Usar hora local Ecuador para evitar desfase UTC-5
+        const [y, m, d] = fecha.split('-').map(Number)
+        const start = new Date(y, m - 1, d, 0, 0, 0, 0)
+        const end   = new Date(y, m - 1, d, 23, 59, 59, 999)
 
         const { data, error } = await supabase
             .from('pedidos')
