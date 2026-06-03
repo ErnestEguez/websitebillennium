@@ -8,7 +8,7 @@ import { PrintExportBar } from '../../components/PrintExportBar'
 import { ReportPrintHeader } from '../../components/ReportPrintHeader'
 
 const HOY = new Date().toISOString().split('T')[0]
-const PRIMER_DIA_MES = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+const PRIMER_DIA_MES = `${new Date().getFullYear()}-01-01`
 const fmt = (n: number) => `$${n.toFixed(2)}`
 const fmtF = (s?: string | null) => s ? new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 
@@ -29,7 +29,13 @@ export function ConsultaComprasPage() {
     const filtersRef = useRef({ desde, hasta, tipo, estado, provId })
     filtersRef.current = { desde, hasta, tipo, estado, provId }
 
-    useEffect(() => { if (empresa?.id) proveedorService.listar(empresa.id).then(setProveedores) }, [empresa?.id])
+    const [errorMsg, setErrorMsg] = useState('')
+    useEffect(() => {
+        if (!empresa?.id) return
+        proveedorService.listar(empresa.id)
+            .then(setProveedores)
+            .catch(e => setErrorMsg('Error: ' + (e?.message ?? JSON.stringify(e))))
+    }, [empresa?.id])
     useEffect(() => {
         if (!empresa?.id) return
         const eid = empresa.id
@@ -75,6 +81,11 @@ export function ConsultaComprasPage() {
 
     return (
         <div className="space-y-5">
+            {errorMsg && (
+                <div className="card px-4 py-3 bg-red-50 border-red-200 text-red-700 text-sm">
+                    {errorMsg}
+                </div>
+            )}
             <ReportPrintHeader
                 titulo="Consulta de Compras por Período"
                 filtros={[

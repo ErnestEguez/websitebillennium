@@ -32,8 +32,13 @@ export function EstadoCuentaProveedorPage() {
     const [loading, setLoading]      = useState(false)
     const [proveedor, setProveedor]  = useState<Proveedor | null>(null)
 
+    const [errorMsg, setErrorMsg] = useState('')
+
     useEffect(() => {
-        if (empresa?.id) proveedorService.listar(empresa.id).then(setProveedores)
+        if (!empresa?.id) return
+        proveedorService.listar(empresa.id)
+            .then(setProveedores)
+            .catch(e => setErrorMsg('Error cargando proveedores: ' + (e?.message ?? JSON.stringify(e))))
     }, [empresa?.id])
 
     async function consultar() {
@@ -121,6 +126,11 @@ export function EstadoCuentaProveedorPage() {
 
     return (
         <div className="space-y-5">
+            {errorMsg && (
+                <div className="card px-4 py-3 bg-red-50 border-red-200 text-red-700 text-sm">
+                    {errorMsg}
+                </div>
+            )}
             <ReportPrintHeader
                 titulo="Estado de Cuenta por Proveedor"
                 subtitulo={proveedor?.nombre_empresa ?? undefined}
