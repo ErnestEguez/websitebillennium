@@ -8,7 +8,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 // que nunca responde, lo que congela toda la app.
 async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const controller = new AbortController()
-    const id = setTimeout(() => controller.abort(), 10_000)
+    const id = setTimeout(() => controller.abort(), 25_000)
     try {
         const res = await fetch(input, { ...init, signal: controller.signal })
         return res

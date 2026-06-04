@@ -66,6 +66,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             supabase.auth.getSession().then(({ data: { session } }) => {
                 if (!session && isMounted.current) setLoading(false)
             })
+        } else {
+            // Si hay magic link pero _initialize() falla (p.ej. GET /auth/v1/user
+            // tarda más de 10s por carga de red), SIGNED_IN nunca se dispara.
+            // Timeout de seguridad: si en 20s no hay sesión, reenviar al portal.
+            const fallback = setTimeout(() => {
+                if (isMounted.current && loading) {
+                    setLoading(false)
+                }
+            }, 20_000)
+            return () => { isMounted.current = false; subscription.unsubscribe(); clearTimeout(fallback) }
         }
 
         return () => { isMounted.current = false; subscription.unsubscribe() }
