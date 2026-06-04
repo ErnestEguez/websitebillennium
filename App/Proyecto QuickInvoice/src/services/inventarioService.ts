@@ -63,7 +63,16 @@ export const inventarioService = {
         // 1. Cabecera
         const { data: ingresoData, error: ingresoError } = await supabase
             .from('ingresos_stock')
-            .insert({ ...ingreso, subtotal, valor_iva, total, created_at: new Date().toISOString() })
+            .insert({
+                ...ingreso,
+                subtotal,
+                valor_iva,
+                total,
+                tipo_compra: 'INVENTARIO',
+                forma_pago:  'CONTADO',
+                estado:      'ACTIVO',
+                created_at:  new Date().toISOString(),
+            })
             .select()
             .single()
         if (ingresoError) throw ingresoError
