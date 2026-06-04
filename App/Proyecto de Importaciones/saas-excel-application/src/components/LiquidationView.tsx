@@ -32,6 +32,8 @@ interface LiquidationRow {
   codigo: string;
   descripcion: string;
   cantidad: number;
+  precioFobReal: number;
+  costoFobReal: number;
   precioUnitario: number;
   fob: number;
   pesoPct: number;
@@ -113,6 +115,8 @@ export default function LiquidationView() {
           codigo: row.codigo,
           descripcion: row.descripcion,
           cantidad: row.cantidad,
+          precioFobReal: round6(row.precioFobReal),
+          costoFobReal: round2(row.precioFobReal * row.cantidad),
           precioUnitario: round6(row.precioUnitario),
           fob,
           pesoPct,
@@ -279,6 +283,7 @@ export default function LiquidationView() {
           codigo: producto?.codigo || '',
           descripcion: producto?.descripcion || '',
           cantidad,
+          precioFobReal: Number(row.precio_fob_real || precioUnitario),
           precioUnitario,
           fobRaw,
           adValoremPct: Number(arancel?.advalorem || 0),
@@ -357,7 +362,7 @@ export default function LiquidationView() {
 
   const buildExportMatrix = () => {
     const detailHeaders = [
-      'Arancel', 'Código', 'Descripción', 'Cantidad', 'P. Unitario', 'FOB', 'Peso % FOB',
+      'Arancel', 'Código', 'Descripción', 'Cantidad', 'P. FOB Real', 'C. FOB Real', 'P. Unitario', 'FOB', 'Peso % FOB',
       'Distrib. Gastos', 'Seguro', 'Flete', 'Valor CIF', 'Fodinfa', 'Ad Valorem',
       'Base IVA', 'IVA', 'Total Gastos', 'Costo Total', 'Costo Unitario', 'Gast %',
       '% Margen', 'Precio Venta Calculado', 'PVP Mercado USD', 'Venta Total Sin IVA',
@@ -370,6 +375,8 @@ export default function LiquidationView() {
       row.codigo,
       row.descripcion,
       row.cantidad,
+      row.precioFobReal,
+      row.costoFobReal,
       row.precioUnitario,
       row.fob,
       row.pesoPct,
@@ -398,7 +405,9 @@ export default function LiquidationView() {
     ]));
 
     const totalsRow = [
-      'Totales', '', '', totals.cantidad, '', totals.fob, '', totals.distribucionGastos,
+      'Totales', '', '', totals.cantidad,
+      rows.reduce((s,r)=>s+r.costoFobReal,0), '', '',
+      totals.fob, '', totals.distribucionGastos,
       totals.seguro, totals.flete, totals.valorCif, totals.fodinfa, totals.adValorem,
       totals.baseIva, totals.iva, totals.totalGastos, totals.costoTotal, '', '', '', '', '',
       totals.ventaTotalSinIva, totals.utilidadImportacion, totals.proyeccionVentas,
@@ -779,6 +788,8 @@ export default function LiquidationView() {
                 <th className="px-3 py-3 font-bold border border-blue-400">Código</th>
                 <th className="px-3 py-3 font-bold border border-blue-400 min-w-[220px]">Descripción</th>
                 <th className="px-3 py-3 font-bold border border-blue-400 text-right">Cant.</th>
+                <th className="px-3 py-3 font-bold border border-blue-400 text-right bg-amber-600">P. FOB Real</th>
+                <th className="px-3 py-3 font-bold border border-blue-400 text-right bg-amber-600">C. FOB Real</th>
                 <th className="px-3 py-3 font-bold border border-blue-400 text-right">P. Unitario</th>
                 <th className="px-3 py-3 font-bold border border-blue-400 text-right">FOB</th>
                 <th className="px-3 py-3 font-bold border border-blue-400 text-right">Peso % FOB</th>
@@ -809,7 +820,7 @@ export default function LiquidationView() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={29} className="px-6 py-10 text-center text-slate-500">No hay detalles para liquidar.</td>
+                  <td colSpan={31} className="px-6 py-10 text-center text-slate-500">No hay detalles para liquidar.</td>
                 </tr>
               ) : (
                 rows.map((row, index) => (
@@ -818,6 +829,8 @@ export default function LiquidationView() {
                     <td className="px-3 py-2 border border-slate-200">{row.codigo}</td>
                     <td className="px-3 py-2 border border-slate-200">{row.descripcion}</td>
                     <td className="px-3 py-2 border border-slate-200 text-right">{format2(row.cantidad)}</td>
+                    <td className="px-3 py-2 border border-slate-200 text-right bg-amber-50 font-semibold text-amber-800">{format6(row.precioFobReal)}</td>
+                    <td className="px-3 py-2 border border-slate-200 text-right bg-amber-50 font-semibold text-amber-800">{format2(row.costoFobReal)}</td>
                     <td className="px-3 py-2 border border-slate-200 text-right">{format6(row.precioUnitario)}</td>
                     <td className="px-3 py-2 border border-slate-200 text-right text-blue-700 font-semibold">{format2(row.fob)}</td>
                     <td className="px-3 py-2 border border-slate-200 text-right">{format2(row.pesoPct)}</td>
@@ -851,6 +864,8 @@ export default function LiquidationView() {
               <tr>
                 <td colSpan={3} className="px-3 py-3 border border-slate-300 text-right">Totales</td>
                 <td className="px-3 py-3 border border-slate-300 text-right">{format2(totals.cantidad)}</td>
+                <td className="px-3 py-3 border border-slate-300 bg-amber-50 text-right text-amber-800 font-bold">{format2(rows.reduce((s,r)=>s+r.costoFobReal,0))}</td>
+                <td className="px-3 py-3 border border-slate-300 bg-amber-50"></td>
                 <td className="px-3 py-3 border border-slate-300"></td>
                 <td className="px-3 py-3 border border-slate-300 text-right text-blue-700">{format2(totals.fob)}</td>
                 <td className="px-3 py-3 border border-slate-300"></td>

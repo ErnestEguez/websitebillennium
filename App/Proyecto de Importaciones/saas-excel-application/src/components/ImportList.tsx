@@ -155,6 +155,7 @@ export default function ImportList() {
         secuencial: details.length + 1,
         id_producto: '',
         cantidad: 1,
+        precio_fob_real: 0,
         precio_unitario: 0,
         tasa_margen_ganancia: 0,
         pvp_mercado: 0,
@@ -342,6 +343,7 @@ export default function ImportList() {
         secuencial: d.secuencial,
         id_producto: d.id_producto,
         cantidad: d.cantidad,
+        precio_fob_real: d.precio_fob_real ?? d.precio_unitario,
         precio_unitario: d.precio_unitario,
         tasa_margen_ganancia: d.tasa_margen_ganancia,
         pvp_mercado: d.pvp_mercado,
@@ -468,6 +470,7 @@ export default function ImportList() {
                     <th className="p-3 font-semibold text-gray-600 w-48">Producto</th>
                     <th className="p-3 font-semibold text-gray-600">Partida Arancelaria SENAE</th>
                     <th className="p-3 font-semibold text-gray-600 w-24">Cant.</th>
+                    <th className="p-3 font-semibold text-gray-600 w-28 bg-amber-50">P. FOB Real</th>
                     <th className="p-3 font-semibold text-gray-600 w-28">Precio Unit.</th>
                     <th className="p-3 font-semibold text-gray-600 w-28">% Margen</th>
                     <th className="p-3 font-semibold text-gray-600 w-28">PVP Mer.</th>
@@ -507,6 +510,9 @@ export default function ImportList() {
                         </td>
                         <td className="p-3">
                           <input type="number" required min="1" step="1" value={row.cantidad} onChange={e => handleDetailChange(index, 'cantidad', parseFloat(e.target.value))} className="w-full px-2 py-1.5 border border-gray-300 rounded-md outline-none" />
+                        </td>
+                        <td className="p-3 bg-amber-50">
+                          <input type="number" required min="0" step="0.000001" value={row.precio_fob_real ?? row.precio_unitario} onChange={e => handleDetailChange(index, 'precio_fob_real', parseFloat(e.target.value))} className="w-full px-2 py-1.5 border border-amber-300 rounded-md outline-none bg-amber-50 focus:ring-1 focus:ring-amber-400" placeholder="P. Real" />
                         </td>
                         <td className="p-3">
                           <input type="number" required min="0" step="0.000001" value={row.precio_unitario} onChange={e => handleDetailChange(index, 'precio_unitario', parseFloat(e.target.value))} className="w-full px-2 py-1.5 border border-gray-300 rounded-md outline-none" />
