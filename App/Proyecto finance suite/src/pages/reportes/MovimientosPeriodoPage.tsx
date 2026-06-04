@@ -10,7 +10,8 @@ import type { CuentaBancaria, MovimientoBancario, TipoMovimiento } from '../../t
 
 const TIPO_LABELS: Record<TipoMovimiento, string> = {
     deposito: 'Depósito', nota_debito: 'Nota débito', nota_credito: 'Nota crédito',
-    comision: 'Comisión', interes: 'Interés', cargo_automatico: 'Cargo automático', otro: 'Otro',
+    comision: 'Comisión', interes: 'Interés', cargo_automatico: 'Cargo automático',
+    cheque: 'Cheque', transferencia: 'Transferencia', otro: 'Otro',
 }
 
 type ResumenTipo = { tipo: string; creditos: number; debitos: number; cantidad: number }

@@ -62,7 +62,8 @@ export function MovimientosPage() {
     function cambiarTipo(tipo: TipoMovimiento) {
         const sentidoPorDefecto: Record<TipoMovimiento, SentidoMovimiento> = {
             deposito: 'credito', nota_debito: 'debito', nota_credito: 'credito',
-            comision: 'debito', interes: 'credito', cargo_automatico: 'debito', otro: 'credito',
+            comision: 'debito', interes: 'credito', cargo_automatico: 'debito',
+            cheque: 'debito', transferencia: 'debito', otro: 'credito',
         }
         setForm(f => ({ ...f, tipo, sentido: sentidoPorDefecto[tipo] }))
     }

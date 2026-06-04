@@ -76,7 +76,7 @@ export const anticipoService = {
             .eq('id', id)
             .single()
         if (gErr) throw gErr
-        const { monto, monto_aplicado } = data as { monto: number; monto_aplicado: number }
+        const { monto: _monto, monto_aplicado } = data as { monto: number; monto_aplicado: number }
         const nuevoAplicado = Math.max(0, monto_aplicado - montoRevertir)
         const estado = nuevoAplicado === 0 ? 'disponible' : 'aplicado_parcial'
         const { error } = await supabase
