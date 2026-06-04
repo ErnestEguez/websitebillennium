@@ -48,36 +48,42 @@ export function EstadoCuentaProveedorPage() {
             const prov = proveedores.find(p => p.id === provId)
             setProveedor(prov ?? null)
 
-            // Facturas de compra del proveedor en el período
-            const { data: compras } = await supabase
-                .from('ingresos_stock')
-                .select('id, numero_factura, fecha_emision, fecha_ingreso, total, estado')
-                .eq('empresa_id', empresa.id)
-                .eq('proveedor_id', provId)
-                .gte('fecha_ingreso', desde)
-                .lte('fecha_ingreso', hasta)
-                .order('fecha_ingreso')
+            const TIMEOUT = 12000
+            const timeout = <T,>(p: Promise<T>): Promise<T> =>
+                Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error('Tiempo de espera agotado')), TIMEOUT))])
 
-            // Pagos del proveedor en el período
-            const { data: pagos } = await supabase
-                .from('pagos_proveedores')
-                .select('fecha_pago, monto, forma_pago, numero_referencia, cxp_id')
-                .eq('empresa_id', empresa.id)
-                .eq('proveedor_id', provId)
-                .gte('fecha_pago', desde)
-                .lte('fecha_pago', hasta)
-                .order('fecha_pago')
+            // Queries en paralelo con timeout
+            const [comprasRes, pagosRes, retencionesRes] = await Promise.allSettled([
+                timeout(supabase
+                    .from('ingresos_stock')
+                    .select('id, numero_factura, fecha_emision, fecha_ingreso, total, estado')
+                    .eq('empresa_id', empresa.id)
+                    .eq('proveedor_id', provId)
+                    .gte('fecha_ingreso', desde)
+                    .lte('fecha_ingreso', hasta)
+                    .order('fecha_ingreso')),
+                timeout(supabase
+                    .from('pagos_proveedores')
+                    .select('fecha_pago, monto, forma_pago, numero_referencia, cxp_id')
+                    .eq('empresa_id', empresa.id)
+                    .eq('proveedor_id', provId)
+                    .gte('fecha_pago', desde)
+                    .lte('fecha_pago', hasta)
+                    .order('fecha_pago')),
+                timeout(supabase
+                    .from('retenciones_compras')
+                    .select('fecha_emision, valor, codigo_retencion, tipo')
+                    .eq('empresa_id', empresa.id)
+                    .eq('proveedor_id', provId)
+                    .gte('fecha_emision', desde)
+                    .lte('fecha_emision', hasta)
+                    .eq('estado', 'ACTIVO')
+                    .order('fecha_emision')),
+            ])
 
-            // Retenciones
-            const { data: retenciones } = await supabase
-                .from('retenciones_compras')
-                .select('fecha_emision, valor, codigo_retencion, tipo')
-                .eq('empresa_id', empresa.id)
-                .eq('proveedor_id', provId)
-                .gte('fecha_emision', desde)
-                .lte('fecha_emision', hasta)
-                .eq('estado', 'ACTIVO')
-                .order('fecha_emision')
+            const compras    = comprasRes.status    === 'fulfilled' ? comprasRes.value.data    : []
+            const pagos      = pagosRes.status      === 'fulfilled' ? pagosRes.value.data      : []
+            const retenciones = retencionesRes.status === 'fulfilled' ? retencionesRes.value.data : []
 
             // Construir movimientos ordenados por fecha
             const movs: MovProveedor[] = []
