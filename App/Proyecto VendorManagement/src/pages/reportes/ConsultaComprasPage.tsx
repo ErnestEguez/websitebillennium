@@ -51,19 +51,14 @@ export function ConsultaComprasPage() {
 
     async function buscar() {
         if (!empresa?.id) return
-        const TIMEOUT = 12000
         try {
             setLoading(true)
-            const query = compraService.listar(empresa.id, {
+            const data = await compraService.listar(empresa.id, {
                 tipo: tipo || undefined,
                 estado: estado || undefined,
                 proveedorId: provId || undefined,
                 desde, hasta,
             })
-            const data = await Promise.race([
-                query,
-                new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Tiempo de espera agotado')), TIMEOUT)),
-            ])
             setCompras(data)
         } catch (e: any) { alert('Error: ' + e.message) }
         finally { setLoading(false) }
