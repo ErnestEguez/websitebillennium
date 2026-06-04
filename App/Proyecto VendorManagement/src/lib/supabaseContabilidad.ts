@@ -12,9 +12,10 @@ const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 export const supabaseContabilidad = createClient(url, key, {
     db: { schema: 'contabilidad' },
     auth: {
-        autoRefreshToken:  false,
+        storageKey:         'vm-contabilidad-isolated',
+        autoRefreshToken:   false,
         detectSessionInUrl: false,
-        persistSession:    false,
+        persistSession:     false,
     },
     global: {
         fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
