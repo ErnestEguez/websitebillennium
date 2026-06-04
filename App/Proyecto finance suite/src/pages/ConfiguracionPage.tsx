@@ -14,8 +14,10 @@ export function ConfiguracionPage() {
     const [ok, setOk]           = useState(false)
 
     const [form, setForm] = useState({
-        enlace_contable:   false,
-        prefijo_egreso:    'EGR',
+        enlace_contable:         false,
+        prefijo_egreso:          'EGR',
+        tipo_secuencia_egreso:   'anual' as 'mensual' | 'anual',
+        consideracion_cheques:   'emision' as 'emision' | 'cobro',
     })
 
     useEffect(() => {
@@ -24,7 +26,12 @@ export function ConfiguracionPage() {
             .then(c => {
                 if (c) {
                     setConfig(c)
-                    setForm({ enlace_contable: c.enlace_contable, prefijo_egreso: c.prefijo_egreso })
+                    setForm({
+                        enlace_contable:       c.enlace_contable,
+                        prefijo_egreso:        c.prefijo_egreso,
+                        tipo_secuencia_egreso: c.tipo_secuencia_egreso ?? 'anual',
+                        consideracion_cheques: c.consideracion_cheques ?? 'emision',
+                    })
                 }
             })
             .catch(() => {})
@@ -43,6 +50,8 @@ export function ConfiguracionPage() {
                 cuenta_ret_iva_id:        config?.cuenta_ret_iva_id ?? null,
                 prefijo_egreso:           form.prefijo_egreso || 'EGR',
                 siguiente_numero_egreso:  config?.siguiente_numero_egreso ?? 1,
+                tipo_secuencia_egreso:    form.tipo_secuencia_egreso,
+                consideracion_cheques:    form.consideracion_cheques,
             })
             setConfig(result)
             setOk(true)
@@ -117,12 +126,53 @@ export function ConfiguracionPage() {
                                 onChange={e => setForm(f => ({ ...f, prefijo_egreso: e.target.value.toUpperCase() }))}
                                 maxLength={5}
                                 placeholder="EGR" />
-                            <p className="text-xs text-slate-400 mt-1">
-                                Ejemplo con prefijo actual: <span className="font-mono font-bold">
-                                    {form.prefijo_egreso || 'EGR'}-000001
+                        </div>
+                        <div>
+                            <label className="label">Secuencia de numeración</label>
+                            <div className="flex gap-4 mt-1">
+                                {(['anual', 'mensual'] as const).map(op => (
+                                    <label key={op} className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" className="accent-primary-600"
+                                            checked={form.tipo_secuencia_egreso === op}
+                                            onChange={() => setForm(f => ({ ...f, tipo_secuencia_egreso: op }))} />
+                                        <span className="text-sm text-slate-700 capitalize">{op}</span>
+                                    </label>
+                                ))}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-2">
+                                Ejemplo: <span className="font-mono font-bold">
+                                    {form.prefijo_egreso || 'EGR'}-{
+                                        form.tipo_secuencia_egreso === 'mensual'
+                                            ? `${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}`
+                                            : new Date().getFullYear()
+                                    }-000001
                                 </span>
                             </p>
                         </div>
+                    </div>
+                </div>
+
+                {/* Cheques — consideración bancaria */}
+                <div className="p-5">
+                    <h2 className="font-semibold text-slate-800 mb-1">Consideración de cheques al día</h2>
+                    <p className="text-xs text-slate-500 mb-4">
+                        Define cuándo un cheque regular (no post-fechado) afecta el saldo bancario. Los post-fechados siempre se consideran al cobro.
+                    </p>
+                    <div className="flex gap-6">
+                        {([
+                            { v: 'emision', label: 'En la emisión', desc: 'El saldo baja al generar el egreso' },
+                            { v: 'cobro',   label: 'Al cobro',      desc: 'Solo baja al marcarlo cobrado en ChequesAFecha' },
+                        ] as const).map(op => (
+                            <label key={op.v} className="flex items-start gap-3 cursor-pointer group">
+                                <input type="radio" className="accent-primary-600 mt-0.5"
+                                    checked={form.consideracion_cheques === op.v}
+                                    onChange={() => setForm(f => ({ ...f, consideracion_cheques: op.v }))} />
+                                <div>
+                                    <p className="text-sm font-medium text-slate-800 group-hover:text-primary-700">{op.label}</p>
+                                    <p className="text-xs text-slate-400">{op.desc}</p>
+                                </div>
+                            </label>
+                        ))}
                     </div>
                 </div>
 

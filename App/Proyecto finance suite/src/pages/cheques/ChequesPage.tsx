@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { CheckSquare, Loader2, AlertCircle, X, Download } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { CheckSquare, Loader2, AlertCircle, X, Download, Printer } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { chequeService } from '../../services/chequeService'
 import { cuentasBancariasService } from '../../services/bancosService'
 import { cn, formatMoneda, formatFecha } from '../../lib/utils'
+import { exportarExcelProfesional } from '../../lib/excelUtils'
+import { imprimirReporte, generarTablaHtml } from '../../lib/printUtils'
 import type { Cheque, CuentaBancaria } from '../../types/finance'
 
 const ESTADO_BADGE: Record<string, string> = {
@@ -72,22 +73,66 @@ export function ChequesPage() {
         finally { setAnulando(false) }
     }
 
+    function imprimir() {
+        const totalMonto = lista.reduce((s, c) => s + c.monto, 0)
+        const html = generarTablaHtml(
+            [
+                { label: 'N° Cheque',    key: 'num',  width: '10%' },
+                { label: 'Cuenta',       key: 'cta',  width: '22%' },
+                { label: 'Beneficiario', key: 'ben',  width: '22%' },
+                { label: 'F. Emisión',   key: 'fem',  width: '11%' },
+                { label: 'F. Cobro',     key: 'fcob', width: '11%' },
+                { label: 'Monto',        key: 'monto', align: 'right', width: '11%' },
+                { label: 'Post-f.',      key: 'pf',   align: 'center', width: '7%' },
+                { label: 'Estado',       key: 'est',  align: 'center', width: '8%' },
+            ],
+            lista.map(c => ({
+                num:   c.numero_cheque,
+                cta:   `${c.cuenta_bancaria?.banco?.nombre ?? ''} ${c.cuenta_bancaria?.numero_cuenta ?? ''}`,
+                ben:   c.beneficiario,
+                fem:   formatFecha(c.fecha_emision),
+                fcob:  c.fecha_cobro ? formatFecha(c.fecha_cobro) : '—',
+                monto: formatMoneda(c.monto),
+                pf:    c.es_postfechado ? 'Sí' : 'No',
+                est:   c.estado,
+            })),
+            { num: `${lista.length} cheques`, monto: formatMoneda(totalMonto) }
+        )
+        imprimirReporte({
+            empresa: { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:  'Cheques Emitidos',
+            html,
+        })
+    }
+
     function exportarExcel() {
-        const filas = lista.map(c => ({
-            'Cuenta':          c.cuenta_bancaria?.banco?.nombre + ' ' + c.cuenta_bancaria?.numero_cuenta,
-            'N° Cheque':       c.numero_cheque,
-            'Beneficiario':    c.beneficiario,
-            'Monto':           c.monto,
-            'Fecha Emisión':   c.fecha_emision,
-            'Fecha Cobro':     c.fecha_cobro ?? '',
-            'Post-fechado':    c.es_postfechado ? 'Sí' : 'No',
-            'Estado':          c.estado,
-            'Fecha Cobro Real':c.fecha_cobro_real ?? '',
-        }))
-        const ws = XLSX.utils.json_to_sheet(filas)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Cheques')
-        XLSX.writeFile(wb, `Cheques_${empresa?.ruc ?? ''}.xlsx`)
+        exportarExcelProfesional({
+            empresa: { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:  'Cheques Emitidos',
+            columnas: [
+                { key: 'NCheque',    label: 'N° Cheque',      width: 14 },
+                { key: 'Cuenta',     label: 'Cuenta',         width: 30 },
+                { key: 'Beneficiario', label: 'Beneficiario', width: 28 },
+                { key: 'FEmision',   label: 'F. Emisión',     width: 13 },
+                { key: 'FCobro',     label: 'F. Cobro',       width: 13 },
+                { key: 'FCReal',     label: 'F. Cobro Real',  width: 15 },
+                { key: 'Monto',      label: 'Monto',          width: 12 },
+                { key: 'PostF',      label: 'Post-fechado',   width: 13 },
+                { key: 'Estado',     label: 'Estado',         width: 12 },
+            ],
+            filas: lista.map(c => ({
+                NCheque:     c.numero_cheque,
+                Cuenta:      `${c.cuenta_bancaria?.banco?.nombre ?? ''} — ${c.cuenta_bancaria?.numero_cuenta ?? ''}`,
+                Beneficiario: c.beneficiario,
+                FEmision:    formatFecha(c.fecha_emision),
+                FCobro:      c.fecha_cobro ? formatFecha(c.fecha_cobro) : '',
+                FCReal:      c.fecha_cobro_real ? formatFecha(c.fecha_cobro_real) : '',
+                Monto:       c.monto,
+                PostF:       c.es_postfechado ? 'Sí' : 'No',
+                Estado:      c.estado,
+            })),
+            nombreArchivo: `Cheques_${empresa?.ruc ?? ''}`,
+        })
     }
 
     return (
@@ -97,6 +142,9 @@ export function ChequesPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Cheques Emitidos</h1>
                     <p className="text-slate-500 text-sm mt-0.5">{lista.length} cheque{lista.length !== 1 ? 's' : ''}</p>
                 </div>
+                <button onClick={imprimir} disabled={lista.length === 0} className="btn btn-secondary gap-2">
+                    <Printer className="w-4 h-4" />Imprimir
+                </button>
                 <button onClick={exportarExcel} disabled={lista.length === 0} className="btn btn-secondary gap-2">
                     <Download className="w-4 h-4" />Excel
                 </button>

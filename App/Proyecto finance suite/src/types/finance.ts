@@ -31,6 +31,9 @@ export interface CuentaBancaria {
     fecha_apertura: string | null
     cuenta_contable_id: string | null
     participa_conciliacion: boolean
+    cheque_desde: number | null
+    cheque_hasta: number | null
+    cheque_siguiente: number | null
     created_at: string
     updated_at: string
     // joins
@@ -49,6 +52,8 @@ export interface ConfiguracionEmpresa {
     cuenta_ret_iva_id: string | null
     prefijo_egreso: string
     siguiente_numero_egreso: number
+    tipo_secuencia_egreso: 'mensual' | 'anual'
+    consideracion_cheques: 'emision' | 'cobro'
     created_at: string
     updated_at: string
 }
@@ -87,6 +92,16 @@ export interface ComprobanteEgreso {
     proveedor?: { nombre_empresa: string; ruc: string }
     cuenta_bancaria?: Pick<CuentaBancaria, 'numero_cuenta' | 'tipo'> & { banco?: Pick<Banco, 'nombre'> }
     pagos_cxp?: EgresoPagoCxP[]
+}
+
+// ── Detalle egreso → Anticipo ────────────────────────────────
+export interface EgresoAnticipo {
+    id: string
+    empresa_id: string
+    egreso_id: string
+    anticipo_id: string
+    monto_aplicado: number
+    created_at: string
 }
 
 // ── Detalle egreso → CxP ─────────────────────────────────────
@@ -128,11 +143,14 @@ export interface Cheque {
 
 // ── Anticipos a Proveedores ──────────────────────────────────
 export type EstadoAnticipo = 'disponible' | 'aplicado_parcial' | 'aplicado_total' | 'anulado'
+export type TipoBeneficiario = 'proveedor' | 'empleado' | 'otro'
 
 export interface AnticipoProveedor {
     id: string
     empresa_id: string
-    proveedor_id: string
+    proveedor_id: string | null
+    beneficiario_libre: string | null
+    tipo_beneficiario: TipoBeneficiario
     cuenta_bancaria_id: string | null
     forma_pago: 'transferencia' | 'cheque'
     monto: number
@@ -154,7 +172,8 @@ export interface AnticipoProveedor {
 // ── Movimientos Bancarios ────────────────────────────────────
 export type TipoMovimiento =
     | 'deposito' | 'nota_debito' | 'nota_credito'
-    | 'comision' | 'interes' | 'cargo_automatico' | 'otro'
+    | 'comision' | 'interes' | 'cargo_automatico'
+    | 'cheque' | 'transferencia' | 'otro'
 
 export type SentidoMovimiento = 'debito' | 'credito'
 export type EstadoMovimiento  = 'activo' | 'anulado'
@@ -276,13 +295,15 @@ export const FORMA_PAGO_LABELS: Record<FormasPagoEgreso, string> = {
 }
 
 export const TIPO_MOVIMIENTO_LABELS: Record<TipoMovimiento, string> = {
-    deposito:        'Depósito',
-    nota_debito:     'Nota de débito',
-    nota_credito:    'Nota de crédito',
-    comision:        'Comisión',
-    interes:         'Interés',
-    cargo_automatico:'Cargo automático',
-    otro:            'Otro',
+    deposito:         'Depósito',
+    nota_debito:      'Nota de débito',
+    nota_credito:     'Nota de crédito',
+    comision:         'Comisión',
+    interes:          'Interés',
+    cargo_automatico: 'Cargo automático',
+    cheque:           'Cheque',
+    transferencia:    'Transferencia',
+    otro:             'Otro',
 }
 
 export const ESTADO_CXP_BADGE: Record<EstadoCxP, string> = {

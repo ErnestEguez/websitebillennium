@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, useLocation, Navigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
     LayoutDashboard, Landmark, CreditCard, FileText,
     CheckSquare, ArrowDownUp, ArrowRightLeft,
@@ -17,20 +17,20 @@ type NavItem = NavLink | NavGroup
 
 const NAV_USER: NavItem[] = [
     { to: '/',                  icon: LayoutDashboard, label: 'Dashboard'          },
-    { to: '/bancos',            icon: Landmark,        label: 'Bancos'             },
     { to: '/cuentas-bancarias', icon: CreditCard,      label: 'Cuentas Bancarias'  },
     {
         type: 'group', icon: FileText, label: 'Pagos',
         children: [
             { to: '/egresos',        label: 'Comprobantes de Egreso', icon: FileText       },
             { to: '/egresos/nuevo',  label: 'Nuevo Egreso',           icon: FileText       },
-            { to: '/anticipos',      label: 'Anticipos Proveedores',  icon: ArrowRightLeft },
+            { to: '/anticipos',      label: 'Cheques / Transf. Varios', icon: ArrowRightLeft },
         ],
     },
     { to: '/cheques',           icon: CheckSquare,     label: 'Cheques'            },
     { to: '/cheques/a-fecha',   icon: CheckSquare,     label: 'Cheques a Fecha'    },
     { to: '/movimientos',       icon: ArrowDownUp,     label: 'Movimientos Banc.'  },
     { to: '/conciliacion',      icon: BarChart2,       label: 'Conciliación Banc.' },
+    { to: '/configuracion',     icon: Settings,        label: 'Configuración'      },
     {
         type: 'group', icon: BarChart2, label: 'Reportes',
         children: [
@@ -42,8 +42,9 @@ const NAV_USER: NavItem[] = [
 ]
 
 const NAV_ADMIN: NavItem[] = [
-    { to: '/configuracion', icon: Settings,    label: 'Configuración' },
-    { to: '/admin',         icon: ShieldCheck, label: 'Administración' },
+    { to: '/bancos',        icon: Landmark,    label: 'Bancos (catálogo)'  },
+    { to: '/configuracion', icon: Settings,    label: 'Configuración'     },
+    { to: '/admin',         icon: ShieldCheck, label: 'Administración'    },
 ]
 
 function SidebarItem({ to, icon: Icon, label, active, sub }: {
@@ -79,10 +80,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     const isAdmin = profile !== null &&
         ['admin', 'admin_plataforma', 'superadmin'].includes(profile.rol)
-
-    if (isAdmin && location.pathname !== '/configuracion') {
-        return <Navigate to="/configuracion" replace />
-    }
 
     const navigation = isAdmin ? NAV_ADMIN : NAV_USER
 

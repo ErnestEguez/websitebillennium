@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, FileText, Loader2, X, AlertCircle, Download } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { Plus, FileText, Loader2, X, AlertCircle, Download, Printer } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { egresoService } from '../../services/egresoService'
 import { cn, formatMoneda, formatFecha } from '../../lib/utils'
+import { exportarExcelProfesional } from '../../lib/excelUtils'
+import { imprimirReporte, generarTablaHtml } from '../../lib/printUtils'
 import { FORMA_PAGO_LABELS } from '../../types/finance'
 import type { ComprobanteEgreso } from '../../types/finance'
 
@@ -25,6 +26,7 @@ export function EgresosPage() {
     const [modalAnular, setModalAnular] = useState<ComprobanteEgreso | null>(null)
     const [motivo, setMotivo]           = useState('')
     const [anulando, setAnulando]       = useState(false)
+    const [imprimiendo, setImprimiendo] = useState<string | null>(null)
 
     useEffect(() => { if (empresa?.id) cargar() }, [empresa?.id, desde, hasta, estado])
 
@@ -54,20 +56,142 @@ export function EgresosPage() {
 
     const total = filtrados.filter(e => e.estado === 'emitido').reduce((s, e) => s + e.monto_total, 0)
 
+    async function imprimirComprobante(egreso: ComprobanteEgreso) {
+        setImprimiendo(egreso.id)
+        try {
+            const { egreso: eg, proveedor, facturas } = await egresoService.obtenerParaImprimir(egreso.id)
+            const fecha = new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })
+            const filas = facturas.map(f =>
+                `<tr><td>${f.numero_factura}</td><td style="text-align:right">$${f.monto_aplicado.toFixed(2)}</td></tr>`
+            ).join('')
+
+            const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Comprobante de Egreso ${eg.numero}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px 28px}
+  .hdr{border-bottom:3px solid #1e3a5f;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start}
+  .emp{font-size:15px;font-weight:bold;color:#1e3a5f}.ruc{font-size:10px;color:#555;margin-top:2px}
+  .doc-title{text-align:right}.doc-title h1{font-size:14px;font-weight:bold;text-transform:uppercase;color:#1e3a5f;letter-spacing:1px}
+  .doc-title .num{font-size:13px;font-weight:bold;color:#c00;margin-top:4px;font-family:monospace}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+  .campo{margin-bottom:6px}.campo .lbl{font-size:9px;text-transform:uppercase;color:#888;letter-spacing:.5px}
+  .campo .val{font-size:11px;font-weight:600;color:#111;margin-top:1px;border-bottom:1px dotted #ccc;padding-bottom:1px}
+  table{width:100%;border-collapse:collapse;margin:10px 0}
+  thead tr{background:#1e3a5f;color:#fff}
+  thead th{padding:5px 8px;text-align:left;font-size:10px;text-transform:uppercase}
+  tbody tr:nth-child(even){background:#f4f6fb}
+  tbody td{padding:4px 8px;border-bottom:1px solid #e2e6ee}
+  .total-row{background:#1e3a5f!important;color:#fff;font-weight:bold}
+  .total-row td{padding:6px 8px}
+  .firmas{margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px}
+  .firma-box{border-top:1px solid #1e3a5f;padding-top:6px;text-align:center}
+  .firma-box .lbl{font-size:9px;text-transform:uppercase;color:#888;letter-spacing:.5px}
+  .nota{margin-top:16px;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:6px;text-align:center}
+  @media print{body{padding:10mm}@page{margin:12mm;size:A4 portrait}}
+</style></head><body>
+<div class="hdr">
+  <div><div class="emp">${empresa?.nombre ?? ''}</div><div class="ruc">RUC: ${empresa?.ruc ?? ''}</div></div>
+  <div class="doc-title"><h1>Comprobante de Egreso</h1><div class="num">${eg.numero}</div></div>
+</div>
+<div class="grid2">
+  <div>
+    <div class="campo"><div class="lbl">Proveedor</div><div class="val">${proveedor?.nombre_empresa ?? '—'}</div></div>
+    <div class="campo"><div class="lbl">RUC / Cédula</div><div class="val">${proveedor?.ruc ?? '—'}</div></div>
+    <div class="campo"><div class="lbl">Concepto</div><div class="val">${eg.concepto ?? 'Pago a proveedor'}</div></div>
+  </div>
+  <div>
+    <div class="campo"><div class="lbl">Fecha</div><div class="val">${new Date(eg.fecha + 'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
+    <div class="campo"><div class="lbl">Forma de pago</div><div class="val">${FORMA_PAGO_LABELS[eg.forma_pago]}</div></div>
+    <div class="campo"><div class="lbl">Cuenta bancaria</div><div class="val">${eg.cuenta_bancaria?.banco?.nombre ? eg.cuenta_bancaria.banco.nombre + ' — ' + eg.cuenta_bancaria.numero_cuenta : '—'}</div></div>
+    ${eg.referencia ? `<div class="campo"><div class="lbl">N° Referencia / Cheque</div><div class="val">${eg.referencia}</div></div>` : ''}
+  </div>
+</div>
+${facturas.length ? `
+<table>
+  <thead><tr><th>Factura aplicada</th><th style="text-align:right">Monto aplicado</th></tr></thead>
+  <tbody>${filas}</tbody>
+  <tfoot><tr class="total-row"><td>TOTAL PAGADO</td><td style="text-align:right">$${eg.monto_total.toFixed(2)}</td></tr></tfoot>
+</table>` : `<p style="margin:10px 0;color:#888;font-size:10px">Sin facturas registradas.</p>`}
+<div class="firmas">
+  <div class="firma-box"><div class="lbl">Elaborado por</div></div>
+  <div class="firma-box"><div class="lbl">Revisado por</div></div>
+  <div class="firma-box"><div class="lbl">Autorizado por</div></div>
+</div>
+<div class="nota">Finance Suite — Billennium System — ${fecha}</div>
+</body></html>`
+
+            const w = window.open('', '_blank', 'width=800,height=700')
+            if (!w) { alert('Activa las ventanas emergentes para imprimir'); return }
+            w.document.write(html)
+            w.document.close()
+            w.focus()
+            setTimeout(() => w.print(), 600)
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : JSON.stringify(e)
+            setError('Error al cargar comprobante: ' + msg)
+        } finally {
+            setImprimiendo(null)
+        }
+    }
+
+    function imprimir() {
+        const html = generarTablaHtml(
+            [
+                { label: 'Número',      key: 'numero',    width: '13%' },
+                { label: 'Fecha',       key: 'fecha',     width: '10%' },
+                { label: 'Forma Pago',  key: 'formaPago', width: '18%' },
+                { label: 'Cuenta',      key: 'cuenta',    width: '22%' },
+                { label: 'Referencia',  key: 'ref',       width: '14%' },
+                { label: 'Monto',       key: 'monto',     align: 'right', width: '11%' },
+                { label: 'Estado',      key: 'estado',    align: 'center', width: '10%' },
+            ],
+            filtrados.map(e => ({
+                numero:   e.numero,
+                fecha:    formatFecha(e.fecha),
+                formaPago: FORMA_PAGO_LABELS[e.forma_pago],
+                cuenta:   e.cuenta_bancaria?.banco?.nombre ? `${e.cuenta_bancaria.banco.nombre} — ${e.cuenta_bancaria.numero_cuenta}` : '—',
+                ref:      e.referencia ?? '—',
+                monto:    formatMoneda(e.monto_total),
+                estado:   e.estado,
+            })),
+            { numero: `${filtrados.filter(e => e.estado === 'emitido').length} emitidos`, monto: formatMoneda(total) }
+        )
+        imprimirReporte({
+            empresa: { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:  'Comprobantes de Egreso',
+            periodo: `${desde} al ${hasta}`,
+            html,
+        })
+    }
+
     function exportarExcel() {
-        const filas = filtrados.map(e => ({
-            'Número':      e.numero,
-            'Fecha':       e.fecha,
-            'Forma Pago':  FORMA_PAGO_LABELS[e.forma_pago],
-            'Monto':       e.monto_total,
-            'Referencia':  e.referencia ?? '',
-            'Concepto':    e.concepto ?? '',
-            'Estado':      e.estado,
-        }))
-        const ws = XLSX.utils.json_to_sheet(filas)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Egresos')
-        XLSX.writeFile(wb, `Egresos_${empresa?.ruc ?? ''}_${desde}_${hasta}.xlsx`)
+        exportarExcelProfesional({
+            empresa: { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:  'Comprobantes de Egreso',
+            periodo: `${desde} al ${hasta}`,
+            columnas: [
+                { key: 'Número',     label: 'Número',      width: 16 },
+                { key: 'Fecha',      label: 'Fecha',       width: 12 },
+                { key: 'FormaPago',  label: 'Forma Pago',  width: 22 },
+                { key: 'Cuenta',     label: 'Cuenta',      width: 28 },
+                { key: 'Referencia', label: 'Referencia',  width: 20 },
+                { key: 'Concepto',   label: 'Concepto',    width: 32 },
+                { key: 'Monto',      label: 'Monto',       width: 12 },
+                { key: 'Estado',     label: 'Estado',      width: 10 },
+            ],
+            filas: filtrados.map(e => ({
+                Número:     e.numero,
+                Fecha:      formatFecha(e.fecha),
+                FormaPago:  FORMA_PAGO_LABELS[e.forma_pago],
+                Cuenta:     e.cuenta_bancaria?.banco?.nombre ? `${e.cuenta_bancaria.banco.nombre} — ${e.cuenta_bancaria.numero_cuenta}` : '',
+                Referencia: e.referencia ?? '',
+                Concepto:   e.concepto ?? '',
+                Monto:      e.monto_total,
+                Estado:     e.estado,
+            })),
+            nombreArchivo: `Egresos_${empresa?.ruc ?? ''}_${desde}_${hasta}`,
+        })
     }
 
     return (
@@ -106,6 +230,9 @@ export function EgresosPage() {
                         <label className="label">Buscar número</label>
                         <input className="input" placeholder="EGR-000001..." value={busq} onChange={e => setBusq(e.target.value)} />
                     </div>
+                    <button onClick={imprimir} disabled={filtrados.length === 0} className="btn btn-secondary gap-2">
+                        <Printer className="w-4 h-4" />Imprimir
+                    </button>
                     <button onClick={exportarExcel} disabled={filtrados.length === 0} className="btn btn-secondary gap-2">
                         <Download className="w-4 h-4" />Excel
                     </button>
@@ -177,12 +304,25 @@ export function EgresosPage() {
                                             )}>{e.estado}</span>
                                         </td>
                                         <td className="py-2.5 px-4 text-center">
-                                            {e.estado === 'emitido' && (
-                                                <button onClick={() => { setModalAnular(e); setMotivo('') }}
-                                                    className="text-xs text-red-500 hover:text-red-700 hover:underline">
-                                                    Anular
+                                            <div className="flex items-center justify-center gap-3">
+                                                <button
+                                                    onClick={() => imprimirComprobante(e)}
+                                                    disabled={imprimiendo === e.id}
+                                                    className="text-xs text-primary-600 hover:underline flex items-center gap-1"
+                                                    title="Imprimir comprobante"
+                                                >
+                                                    {imprimiendo === e.id
+                                                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                        : <Printer className="w-3 h-3" />}
+                                                    Ver
                                                 </button>
-                                            )}
+                                                {e.estado === 'emitido' && (
+                                                    <button onClick={() => { setModalAnular(e); setMotivo('') }}
+                                                        className="text-xs text-red-500 hover:text-red-700 hover:underline">
+                                                        Anular
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -208,7 +348,7 @@ export function EgresosPage() {
                             <button onClick={() => setModalAnular(null)}><X className="w-5 h-5 text-slate-400" /></button>
                         </div>
                         <div className="p-6 space-y-3">
-                            <p className="text-sm text-slate-600">Esta acción revertirá el egreso. Las CxP <strong>no</strong> se reabrirán automáticamente — deberás gestionarlo en VendorManagement.</p>
+                            <p className="text-sm text-slate-600">Esta acción revertirá el egreso, anulará el movimiento bancario y reabrirá automáticamente las cuentas por pagar afectadas.</p>
                             <div>
                                 <label className="label">Motivo de anulación *</label>
                                 <textarea className="input resize-none" rows={3} value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Describe el motivo..." />

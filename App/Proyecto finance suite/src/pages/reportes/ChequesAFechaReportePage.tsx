@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { CheckSquare, Loader2, AlertCircle, X, Download, Clock, CheckCircle2 } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { useAuth } from '../../contexts/AuthContext'
 import { cuentasBancariasService } from '../../services/bancosService'
 import { chequeService } from '../../services/chequeService'
 import { cn, formatMoneda, formatFecha } from '../../lib/utils'
+import { exportarExcelProfesional } from '../../lib/excelUtils'
 import type { Cheque, CuentaBancaria } from '../../types/finance'
 
 export function ChequesAFechaReportePage() {
@@ -45,21 +45,48 @@ export function ChequesAFechaReportePage() {
     const totalCobrado   = cobrados.reduce((s, c) => s + c.monto, 0)
 
     function exportar() {
-        const filas = filtrados.map(c => ({
-            'N° Cheque':      c.numero_cheque,
-            'Cuenta':         (c.cuenta_bancaria?.banco?.nombre ?? '') + ' ' + (c.cuenta_bancaria?.numero_cuenta ?? ''),
-            'Beneficiario':   c.beneficiario,
-            'Fecha Emisión':  c.fecha_emision,
-            'Fecha Cobro':    c.fecha_cobro ?? '',
-            'Monto':          c.monto,
-            'Estado':         c.estado,
-            'Fecha Cobro Real': c.fecha_cobro_real ?? '',
-            'Vencido':        c.fecha_cobro && c.fecha_cobro <= hoy && c.estado !== 'cobrado' ? 'Sí' : 'No',
-        }))
-        const ws = XLSX.utils.json_to_sheet(filas)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Cheques a Fecha')
-        XLSX.writeFile(wb, `ChequesAFechaReporte_${empresa?.ruc ?? ''}.xlsx`)
+        exportarExcelProfesional({
+            empresa: { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:  'Reporte Cheques a Fecha',
+            columnas: [
+                { key: 'NCheque',    label: 'N° Cheque',      width: 14 },
+                { key: 'Cuenta',     label: 'Cuenta',         width: 30 },
+                { key: 'Beneficiario', label: 'Beneficiario', width: 28 },
+                { key: 'FEmision',   label: 'F. Emisión',     width: 13 },
+                { key: 'FCobro',     label: 'F. Cobro',       width: 13 },
+                { key: 'FCReal',     label: 'F. Cobro Real',  width: 15 },
+                { key: 'Monto',      label: 'Monto',          width: 12 },
+                { key: 'Estado',     label: 'Estado',         width: 12 },
+                { key: 'Vencido',    label: 'Vencido',        width: 10 },
+            ],
+            filas: filtrados.map(c => ({
+                NCheque:     c.numero_cheque,
+                Cuenta:      `${c.cuenta_bancaria?.banco?.nombre ?? ''} — ${c.cuenta_bancaria?.numero_cuenta ?? ''}`,
+                Beneficiario: c.beneficiario,
+                FEmision:    formatFecha(c.fecha_emision),
+                FCobro:      c.fecha_cobro ? formatFecha(c.fecha_cobro) : '',
+                FCReal:      c.fecha_cobro_real ? formatFecha(c.fecha_cobro_real) : '',
+                Monto:       c.monto,
+                Estado:      c.estado,
+                Vencido:     c.fecha_cobro && c.fecha_cobro <= hoy && c.estado !== 'cobrado' ? 'Sí' : 'No',
+            })),
+            nombreArchivo: `ChequesAFecha_${empresa?.ruc ?? ''}`,
+            hojaExtra: {
+                nombre: 'Resumen',
+                aoa: [
+                    [`${empresa?.nombre ?? ''} — Cheques Post-fechados`],
+                    [],
+                    ['Estado',          'Cantidad', 'Monto'],
+                    ['Vencidos',        vencidos.length,   vencidos.reduce((s,c) => s+c.monto, 0)],
+                    ['Próx. 30 días',   proxVencer.length, proxVencer.reduce((s,c) => s+c.monto, 0)],
+                    ['Futuros',         futuros.length,    futuros.reduce((s,c) => s+c.monto, 0)],
+                    ['Cobrados',        cobrados.length,   totalCobrado],
+                    ['Anulados',        anulados.length,   0],
+                    [],
+                    ['Total pendiente', pendientes.length, totalPendiente],
+                ],
+            },
+        })
     }
 
     return (

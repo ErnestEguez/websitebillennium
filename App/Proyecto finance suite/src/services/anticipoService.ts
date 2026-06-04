@@ -44,12 +44,12 @@ export const anticipoService = {
             await supabase.from('movimientos_bancarios').insert({
                 empresa_id:        anticipo.empresa_id,
                 cuenta_bancaria_id: anticipo.cuenta_bancaria_id,
-                tipo:              'otro',
+                tipo:              anticipo.forma_pago === 'cheque' ? 'cheque' : 'transferencia',
                 fecha:             anticipo.fecha,
                 monto:             anticipo.monto,
                 sentido:           'debito',
                 referencia:        anticipo.referencia,
-                descripcion:       `Anticipo proveedor — ${anticipo.concepto || ''}`,
+                descripcion:       `${anticipo.tipo_beneficiario !== 'proveedor' ? 'Pago varios' : 'Anticipo proveedor'} — ${anticipo.beneficiario_libre || anticipo.concepto || ''}`,
                 origen:            'anticipo',
                 origen_id:         (data as AnticipoProveedor).id,
                 created_by:        anticipo.created_by,
@@ -57,6 +57,33 @@ export const anticipoService = {
         }
 
         return data as AnticipoProveedor
+    },
+
+    async aplicar(id: string, montoAplicar: number, montoAplicadoActual: number, montoTotal: number): Promise<void> {
+        const nuevoAplicado = montoAplicadoActual + montoAplicar
+        const estado = nuevoAplicado >= montoTotal ? 'aplicado_total' : 'aplicado_parcial'
+        const { error } = await supabase
+            .from('anticipos_proveedores')
+            .update({ monto_aplicado: nuevoAplicado, estado, updated_at: new Date().toISOString() })
+            .eq('id', id)
+        if (error) throw error
+    },
+
+    async revertirAplicacion(id: string, montoRevertir: number): Promise<void> {
+        const { data, error: gErr } = await supabase
+            .from('anticipos_proveedores')
+            .select('monto, monto_aplicado')
+            .eq('id', id)
+            .single()
+        if (gErr) throw gErr
+        const { monto, monto_aplicado } = data as { monto: number; monto_aplicado: number }
+        const nuevoAplicado = Math.max(0, monto_aplicado - montoRevertir)
+        const estado = nuevoAplicado === 0 ? 'disponible' : 'aplicado_parcial'
+        const { error } = await supabase
+            .from('anticipos_proveedores')
+            .update({ monto_aplicado: nuevoAplicado, estado, updated_at: new Date().toISOString() })
+            .eq('id', id)
+        if (error) throw error
     },
 
     async anular(id: string): Promise<void> {

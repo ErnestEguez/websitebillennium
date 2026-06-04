@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { CheckSquare, Loader2, AlertCircle, X, Download, Clock } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { CheckSquare, Loader2, AlertCircle, X, Download, Clock, Printer } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { chequeService } from '../../services/chequeService'
+import { exportarExcelProfesional } from '../../lib/excelUtils'
+import { imprimirReporte, generarTablaHtml } from '../../lib/printUtils'
 import { formatMoneda, formatFecha } from '../../lib/utils'
 import type { Cheque } from '../../types/finance'
 
@@ -42,20 +43,57 @@ export function ChequesAFechaPage() {
     const vencidos = lista.filter(c => c.fecha_cobro && c.fecha_cobro <= hoy)
     const futuros  = lista.filter(c => !c.fecha_cobro || c.fecha_cobro > hoy)
 
+    function imprimir() {
+        const cols = [
+            { label: 'N° Cheque',    key: 'num',  width: '13%' },
+            { label: 'Cuenta',       key: 'cta',  width: '22%' },
+            { label: 'Beneficiario', key: 'ben',  width: '22%' },
+            { label: 'F. Cobro',     key: 'fcob', width: '12%' },
+            { label: 'Monto',        key: 'monto', align: 'right' as const, width: '12%' },
+            { label: 'Vencido',      key: 'venc', align: 'center' as const, width: '8%' },
+        ]
+        const toFila = (c: Cheque) => ({
+            num:   c.numero_cheque,
+            cta:   `${c.cuenta_bancaria?.banco?.nombre ?? ''} ${c.cuenta_bancaria?.numero_cuenta ?? ''}`,
+            ben:   c.beneficiario,
+            fcob:  c.fecha_cobro ? formatFecha(c.fecha_cobro) : '—',
+            monto: formatMoneda(c.monto),
+            venc:  c.fecha_cobro && c.fecha_cobro <= hoy ? 'SÍ' : 'No',
+        })
+        const htmlVenc  = vencidos.length  ? generarTablaHtml(cols, vencidos.map(toFila),  { num: `${vencidos.length} cheques`,  monto: formatMoneda(vencidos.reduce((s,c)=>s+c.monto,0))  }) : '<p style="color:#888;font-size:10px">Sin vencidos</p>'
+        const htmlFutur = futuros.length   ? generarTablaHtml(cols, futuros.map(toFila),   { num: `${futuros.length} cheques`,   monto: formatMoneda(futuros.reduce((s,c)=>s+c.monto,0))   }) : ''
+        imprimirReporte({
+            empresa: { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:  'Cheques Post-fechados Pendientes',
+            html:    htmlVenc,
+            subtablas: futuros.length ? [{ titulo: 'Próximos vencimientos', html: htmlFutur }] : undefined,
+        })
+    }
+
     function exportarExcel() {
-        const filas = lista.map(c => ({
-            'N° Cheque':    c.numero_cheque,
-            'Cuenta':       c.cuenta_bancaria?.banco?.nombre + ' — ' + c.cuenta_bancaria?.numero_cuenta,
-            'Beneficiario': c.beneficiario,
-            'Fecha Emisión':c.fecha_emision,
-            'Fecha Cobro':  c.fecha_cobro ?? '',
-            'Monto':        c.monto,
-            'Vencido':      c.fecha_cobro && c.fecha_cobro <= hoy ? 'Sí' : 'No',
-        }))
-        const ws = XLSX.utils.json_to_sheet(filas)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Cheques a Fecha')
-        XLSX.writeFile(wb, `ChequesAFecha_${empresa?.ruc ?? ''}.xlsx`)
+        exportarExcelProfesional({
+            empresa: { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:  'Cheques Post-fechados Pendientes',
+            columnas: [
+                { key: 'NCheque',    label: 'N° Cheque',    width: 14 },
+                { key: 'Cuenta',     label: 'Cuenta',       width: 28 },
+                { key: 'Beneficiario', label: 'Beneficiario', width: 28 },
+                { key: 'FEmision',   label: 'F. Emisión',   width: 13 },
+                { key: 'FCobro',     label: 'F. Cobro',     width: 13 },
+                { key: 'Monto',      label: 'Monto',        width: 12 },
+                { key: 'Vencido',    label: 'Vencido',      width: 10 },
+            ],
+            filas: lista.map(c => ({
+                NCheque:     c.numero_cheque,
+                Cuenta:      `${c.cuenta_bancaria?.banco?.nombre ?? ''} — ${c.cuenta_bancaria?.numero_cuenta ?? ''}`,
+                Beneficiario: c.beneficiario,
+                FEmision:    formatFecha(c.fecha_emision),
+                FCobro:      c.fecha_cobro ? formatFecha(c.fecha_cobro) : '',
+                Monto:       c.monto,
+                Vencido:     c.fecha_cobro && c.fecha_cobro <= hoy ? 'Sí' : 'No',
+            })),
+            nombreArchivo: `ChequesAFecha_${empresa?.ruc ?? ''}`,
+        })
     }
 
     return (
@@ -65,9 +103,14 @@ export function ChequesAFechaPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Cheques a Fecha</h1>
                     <p className="text-slate-500 text-sm mt-0.5">Post-fechados pendientes de cobro</p>
                 </div>
-                <button onClick={exportarExcel} disabled={lista.length === 0} className="btn btn-secondary gap-2">
-                    <Download className="w-4 h-4" />Excel
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={imprimir} disabled={lista.length === 0} className="btn btn-secondary gap-2">
+                        <Printer className="w-4 h-4" />Imprimir
+                    </button>
+                    <button onClick={exportarExcel} disabled={lista.length === 0} className="btn btn-secondary gap-2">
+                        <Download className="w-4 h-4" />Excel
+                    </button>
+                </div>
             </div>
 
             {error && (

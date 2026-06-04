@@ -101,7 +101,10 @@ export const configuracionService = {
     async upsert(empresaId: string, cambios: Partial<ConfiguracionEmpresa>): Promise<ConfiguracionEmpresa> {
         const { data, error } = await supabase
             .from('configuracion_empresa')
-            .upsert({ empresa_id: empresaId, ...cambios, updated_at: new Date().toISOString() })
+            .upsert(
+                { empresa_id: empresaId, ...cambios, updated_at: new Date().toISOString() },
+                { onConflict: 'empresa_id' }
+            )
             .select().single()
         if (error) throw error
         return data as ConfiguracionEmpresa
@@ -165,6 +168,17 @@ export const cxpService = {
         const { error } = await supabaseFacturacion
             .from('pagos_proveedores')
             .insert(pago)
+        if (error) throw error
+    },
+
+    async revertirPagos(empresaId: string, egresoNumero: string): Promise<void> {
+        if (!egresoNumero?.trim()) throw new Error('Número de egreso inválido para reversar pagos')
+        if (!empresaId?.trim())    throw new Error('Empresa inválida para reversar pagos')
+        const { error } = await supabaseFacturacion
+            .from('pagos_proveedores')
+            .delete()
+            .eq('empresa_id', empresaId)
+            .eq('numero_referencia', egresoNumero)
         if (error) throw error
     },
 }

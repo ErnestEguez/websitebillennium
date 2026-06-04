@@ -48,11 +48,11 @@ export const chequeService = {
             .insert({
                 empresa_id:        empresaId,
                 cuenta_bancaria_id: ch.cuenta_bancaria_id,
-                tipo:              'otro',
+                tipo:              'cheque',
                 fecha:             fechaCobro,
                 monto:             ch.monto,
                 sentido:           'debito',
-                referencia:        `Cobro cheque ${ch.numero_cheque}`,
+                referencia:        ch.numero_cheque,
                 descripcion:       `Cheque cobrado — ${ch.beneficiario}`,
                 origen:            'egreso',
                 origen_id:         id,

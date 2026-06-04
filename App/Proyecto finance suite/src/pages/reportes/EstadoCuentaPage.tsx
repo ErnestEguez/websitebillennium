@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { FileText, Loader2, AlertCircle, X, Download, Search } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { FileText, Loader2, AlertCircle, X, Download, Search, Printer } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { cuentasBancariasService } from '../../services/bancosService'
 import { movimientoService } from '../../services/movimientoService'
 import { cn, formatMoneda, formatFecha } from '../../lib/utils'
+import { exportarExcelProfesional } from '../../lib/excelUtils'
+import { imprimirReporte, generarTablaHtml } from '../../lib/printUtils'
 import type { CuentaBancaria, MovimientoBancario } from '../../types/finance'
 import { useEffect } from 'react'
 
@@ -54,20 +55,77 @@ export function EstadoCuentaPage() {
     const totalDebitos  = movimientos.filter(m => m.sentido === 'debito').reduce((s, m) => s + m.monto, 0)
     const neto          = totalCreditos - totalDebitos
 
+    function imprimir() {
+        const nombreCuenta = cuentaSel ? `${cuentaSel.banco?.nombre} — ${cuentaSel.numero_cuenta}` : ''
+        const TIPO_LABELS_EC: Record<string, string> = {
+            deposito: 'Depósito', nota_debito: 'N/D', nota_credito: 'N/C',
+            comision: 'Comisión', interes: 'Interés', cargo_automatico: 'Cargo Auto.',
+            cheque: 'Cheque', transferencia: 'Transferencia', otro: 'Otro',
+        }
+        const html = generarTablaHtml(
+            [
+                { label: 'Fecha',       key: 'fecha',  width: '10%' },
+                { label: 'Tipo',        key: 'tipo',   width: '13%' },
+                { label: 'Descripción', key: 'desc',   width: '35%' },
+                { label: 'Referencia',  key: 'ref',    width: '15%' },
+                { label: 'Débito',      key: 'deb',    align: 'right', width: '12%' },
+                { label: 'Crédito',     key: 'cred',   align: 'right', width: '12%' },
+            ],
+            movimientos.map(m => ({
+                fecha: formatFecha(m.fecha),
+                tipo:  TIPO_LABELS_EC[m.tipo] ?? m.tipo,
+                desc:  m.descripcion ?? m.referencia ?? '—',
+                ref:   m.referencia ?? '—',
+                deb:   m.sentido === 'debito'  ? formatMoneda(m.monto) : '',
+                cred:  m.sentido === 'credito' ? formatMoneda(m.monto) : '',
+            })),
+            { fecha: `${movimientos.length} movs.`, deb: formatMoneda(totalDebitos), cred: formatMoneda(totalCreditos) }
+        )
+        imprimirReporte({
+            empresa: { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:  `Estado de Cuenta — ${nombreCuenta}`,
+            periodo: `${desde} al ${hasta}`,
+            html,
+        })
+    }
+
     function exportar() {
-        const filas = movimientos.map(m => ({
-            'Fecha':       m.fecha,
-            'Tipo':        TIPO_LABELS[m.tipo] ?? m.tipo,
-            'Descripción': m.descripcion ?? m.referencia ?? '',
-            'Origen':      m.origen,
-            'Débito':      m.sentido === 'debito' ? m.monto : 0,
-            'Crédito':     m.sentido === 'credito' ? m.monto : 0,
-            'Conciliado':  m.conciliado ? 'Sí' : 'No',
-        }))
-        const ws = XLSX.utils.json_to_sheet(filas)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Estado de Cuenta')
-        XLSX.writeFile(wb, `EstadoCuenta_${empresa?.ruc ?? ''}_${desde}_${hasta}.xlsx`)
+        const nombreCuenta = cuentaSel ? `${cuentaSel.banco?.nombre} — ${cuentaSel.numero_cuenta}` : ''
+        exportarExcelProfesional({
+            empresa: { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:  `Estado de Cuenta — ${nombreCuenta}`,
+            periodo: `${desde} al ${hasta}`,
+            columnas: [
+                { key: 'Fecha',       label: 'Fecha',       width: 12 },
+                { key: 'Tipo',        label: 'Tipo',        width: 18 },
+                { key: 'Descripcion', label: 'Descripción', width: 35 },
+                { key: 'Referencia',  label: 'Referencia',  width: 18 },
+                { key: 'Debito',      label: 'Débito',      width: 13 },
+                { key: 'Credito',     label: 'Crédito',     width: 13 },
+                { key: 'Conciliado',  label: 'Conciliado',  width: 11 },
+            ],
+            filas: movimientos.map(m => ({
+                Fecha:       formatFecha(m.fecha),
+                Tipo:        TIPO_LABELS[m.tipo] ?? m.tipo,
+                Descripcion: m.descripcion ?? '',
+                Referencia:  m.referencia ?? '',
+                Debito:      m.sentido === 'debito'  ? m.monto : '',
+                Credito:     m.sentido === 'credito' ? m.monto : '',
+                Conciliado:  m.conciliado ? 'Sí' : 'No',
+            })),
+            nombreArchivo: `EstadoCuenta_${empresa?.ruc ?? ''}_${desde}_${hasta}`,
+            hojaExtra: {
+                nombre: 'Resumen',
+                aoa: [
+                    [`${empresa?.nombre ?? ''} — Estado de Cuenta`],
+                    [nombreCuenta],
+                    [`Período: ${desde} al ${hasta}`],
+                    [],
+                    ['', 'Débitos', 'Créditos', 'Neto'],
+                    ['Total', totalDebitos, totalCreditos, totalCreditos - totalDebitos],
+                ],
+            },
+        })
     }
 
     return (
@@ -78,9 +136,14 @@ export function EstadoCuentaPage() {
                     <p className="text-slate-500 text-sm mt-0.5">Movimientos por cuenta bancaria y período</p>
                 </div>
                 {buscado && movimientos.length > 0 && (
-                    <button onClick={exportar} className="btn btn-secondary gap-2">
-                        <Download className="w-4 h-4" />Excel
-                    </button>
+                    <div className="flex gap-2">
+                        <button onClick={imprimir} className="btn btn-secondary gap-2">
+                            <Printer className="w-4 h-4" />Imprimir
+                        </button>
+                        <button onClick={exportar} className="btn btn-secondary gap-2">
+                            <Download className="w-4 h-4" />Excel
+                        </button>
+                    </div>
                 )}
             </div>
 

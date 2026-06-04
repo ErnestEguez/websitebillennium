@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Loader2, AlertCircle, X, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, Loader2, AlertCircle, X, CheckCircle2, ChevronDown, ChevronUp, ArrowRightLeft, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { egresoService } from '../../services/egresoService'
 import { cuentasBancariasService, proveedoresService, cxpService } from '../../services/bancosService'
 import { chequeService } from '../../services/chequeService'
+import { anticipoService } from '../../services/anticipoService'
+import { cn } from '../../lib/utils'
 import { formatMoneda, formatFecha } from '../../lib/utils'
 import { FORMA_PAGO_LABELS, ESTADO_CXP_BADGE } from '../../types/finance'
-import type { Proveedor, CuentaBancaria, CuentaPorPagar, FormasPagoEgreso } from '../../types/finance'
+import type { Proveedor, CuentaBancaria, CuentaPorPagar, FormasPagoEgreso, AnticipoProveedor } from '../../types/finance'
 
-type CxPSeleccion = { cxp: CuentaPorPagar; monto: number; seleccionado: boolean }
+type CxPSeleccion      = { cxp: CuentaPorPagar;      monto: number; seleccionado: boolean }
+type AnticipoSeleccion = { anticipo: AnticipoProveedor; monto: number; seleccionado: boolean }
 
 export function NuevoEgresoPage() {
     const { empresa, user } = useAuth()
@@ -30,6 +33,8 @@ export function NuevoEgresoPage() {
     const [cxpLista, setCxpLista]         = useState<CxPSeleccion[]>([])
     const [cargCxp, setCargCxp]           = useState(false)
     const [expandCxp, setExpandCxp]       = useState<string | null>(null)
+    // Paso 2 — Anticipos disponibles del proveedor
+    const [anticiposLista, setAnticiposLista] = useState<AnticipoSeleccion[]>([])
 
     // Paso 3 — Pago
     const [formaPago, setFormaPago]       = useState<FormasPagoEgreso>('transferencia')
@@ -42,6 +47,15 @@ export function NuevoEgresoPage() {
     const [beneficiario, setBeneficiario] = useState('')
     const [fechaCobro, setFechaCobro]     = useState('')
     const [esPostfechado, setEsPostfechado] = useState(false)
+
+    // Auto-fill número de cheque desde la secuencia de la cuenta
+    useEffect(() => {
+        if (!['cheque', 'cheque_postfechado'].includes(formaPago) || !cuentaId) return
+        const cuenta = cuentas.find(c => c.id === cuentaId)
+        if (cuenta?.cheque_siguiente && !numeroCheque) {
+            setNumeroCheque(String(cuenta.cheque_siguiente).padStart(6, '0'))
+        }
+    }, [formaPago, cuentaId, cuentas])
 
     useEffect(() => {
         if (!empresa?.id) return
@@ -59,12 +73,12 @@ export function NuevoEgresoPage() {
         setProvSelec(p); setBusqProv('')
         setCargCxp(true); setError('')
         try {
-            const cxps = await cxpService.listarPendientes(empresa!.id, p.id)
-            setCxpLista(cxps.map(c => ({
-                cxp: c,
-                monto: c.saldo_pendiente,
-                seleccionado: false,
-            })))
+            const [cxps, anticipos] = await Promise.all([
+                cxpService.listarPendientes(empresa!.id, p.id),
+                anticipoService.listarDisponibles(empresa!.id, p.id),
+            ])
+            setCxpLista(cxps.map(c => ({ cxp: c, monto: c.saldo_pendiente, seleccionado: false })))
+            setAnticiposLista(anticipos.map(a => ({ anticipo: a, monto: a.monto - a.monto_aplicado, seleccionado: false })))
         } catch (e: unknown) { setError(String(e)) }
         finally { setCargCxp(false) }
     }
@@ -82,8 +96,11 @@ export function NuevoEgresoPage() {
         ))
     }
 
-    const seleccionadas = cxpLista.filter(x => x.seleccionado)
-    const totalSeleccion = seleccionadas.reduce((s, x) => s + x.monto, 0)
+    const seleccionadas    = cxpLista.filter(x => x.seleccionado)
+    const totalSeleccion   = seleccionadas.reduce((s, x) => s + x.monto, 0)
+    const anticiposUsados  = anticiposLista.filter(x => x.seleccionado)
+    const totalAnticipos   = anticiposUsados.reduce((s, x) => s + x.monto, 0)
+    const totalAPagar      = Math.max(0, totalSeleccion - totalAnticipos)
 
     async function confirmar() {
         if (!provSelec || !empresa?.id || !user?.id) return
@@ -99,12 +116,35 @@ export function NuevoEgresoPage() {
                 proveedorId:   provSelec.id,
                 formaPago,
                 cuentaBancariaId: necesitaCuenta ? cuentaId : undefined,
-                monto:         totalSeleccion,
+                monto:         totalAPagar,
                 referencia:    referencia || undefined,
                 concepto:      concepto || `Pago proveedor ${provSelec.nombre_empresa}`,
                 cxpSeleccionados: seleccionadas.map(x => ({ cxpId: x.cxp.id, montoAplicado: x.monto })),
                 createdBy:     user.id,
             })
+
+            // Aplicar anticipos cruzados
+            if (anticiposUsados.length > 0) {
+                for (const a of anticiposUsados) {
+                    await anticipoService.aplicar(a.anticipo.id, a.monto, a.anticipo.monto_aplicado, a.anticipo.monto)
+                }
+                // Registrar vínculo — no bloquea si la tabla aún no existe en BD
+                try {
+                    await egresoService.registrarAnticiposUsados(
+                        empresa.id,
+                        egreso.id,
+                        anticiposUsados.map(a => ({ anticipoId: a.anticipo.id, montoAplicado: a.monto }))
+                    )
+                } catch { /* tabla egreso_anticipos pendiente de migración */ }
+            }
+
+            // Incrementar secuencia de cheque en la cuenta corriente
+            if (['cheque', 'cheque_postfechado'].includes(formaPago) && cuentaId) {
+                const cuenta = cuentas.find(c => c.id === cuentaId)
+                if (cuenta?.cheque_siguiente) {
+                    await cuentasBancariasService.actualizar(cuentaId, { cheque_siguiente: cuenta.cheque_siguiente + 1 })
+                }
+            }
 
             // Registrar cheque si aplica
             if (['cheque', 'cheque_postfechado'].includes(formaPago) && cuentaId) {
@@ -114,7 +154,7 @@ export function NuevoEgresoPage() {
                     egreso_id:         egreso.id,
                     numero_cheque:     numeroCheque,
                     beneficiario:      beneficiario || provSelec.nombre_empresa,
-                    monto:             totalSeleccion,
+                    monto:             totalAPagar,
                     fecha_emision:     new Date().toISOString().slice(0, 10),
                     fecha_cobro:       esPostfechado ? fechaCobro : null,
                     es_postfechado:    esPostfechado,
@@ -128,7 +168,11 @@ export function NuevoEgresoPage() {
 
             setOk(true)
             setTimeout(() => navigate('/egresos'), 2000)
-        } catch (e: unknown) { setError(String(e)) }
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message
+                : (e as any)?.message ?? (e as any)?.error_description ?? JSON.stringify(e)
+            setError(msg)
+        }
         finally { setSaving(false) }
     }
 
@@ -261,7 +305,15 @@ export function NuevoEgresoPage() {
                 <div className="card p-6 space-y-4">
                     <div className="flex items-center justify-between">
                         <h2 className="font-bold text-slate-800">Facturas pendientes — {provSelec?.nombre_empresa}</h2>
-                        {cargCxp && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+                        <button
+                            onClick={() => provSelec && seleccionarProveedor(provSelec)}
+                            disabled={cargCxp}
+                            title="Recargar facturas desde la base de datos"
+                            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary-600 disabled:opacity-40 px-2 py-1 rounded-lg hover:bg-primary-50 transition-colors"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${cargCxp ? 'animate-spin' : ''}`} />
+                            Actualizar
+                        </button>
                     </div>
                     {cxpLista.length === 0 && !cargCxp ? (
                         <p className="text-sm text-slate-500 text-center py-8">No hay facturas pendientes para este proveedor.</p>
@@ -292,25 +344,86 @@ export function NuevoEgresoPage() {
                                             {expandCxp === cxp.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                         </button>
                                     </div>
-                                    {seleccionado && expandCxp === cxp.id && (
-                                        <div className="mt-3 pt-3 border-t border-primary-200">
-                                            <label className="label">Monto a aplicar</label>
+                                    {seleccionado && (
+                                        <div className="mt-3 pt-3 border-t border-primary-200 flex items-center gap-3">
+                                            <label className="label mb-0 shrink-0">Monto a pagar</label>
                                             <input className="input max-w-[160px] text-right"
                                                 type="number" step="0.01" min="0.01" max={cxp.saldo_pendiente}
                                                 value={monto}
                                                 onChange={e => actualizarMonto(cxp.id, e.target.value)} />
+                                            <span className="text-xs text-slate-400">máx. {formatMoneda(cxp.saldo_pendiente)}</span>
                                         </div>
                                     )}
                                 </div>
                             ))}
                         </div>
                     )}
+                    {/* Anticipos disponibles para cruzar */}
+                    {anticiposLista.length > 0 && (
+                        <div className="border border-amber-200 rounded-xl overflow-hidden">
+                            <div className="bg-amber-50 px-4 py-2 flex items-center gap-2">
+                                <ArrowRightLeft className="w-4 h-4 text-amber-600" />
+                                <span className="text-sm font-semibold text-amber-800">
+                                    Anticipos disponibles — selecciona para cruzar
+                                </span>
+                            </div>
+                            <div className="divide-y divide-amber-100">
+                                {anticiposLista.map(({ anticipo, monto, seleccionado }) => (
+                                    <div key={anticipo.id} className={`p-3 flex items-center gap-3 ${seleccionado ? 'bg-amber-50' : 'bg-white'}`}>
+                                        <input type="checkbox" className="w-4 h-4 accent-amber-500 shrink-0"
+                                            checked={seleccionado}
+                                            onChange={() => setAnticiposLista(prev => prev.map(x =>
+                                                x.anticipo.id === anticipo.id ? { ...x, seleccionado: !x.seleccionado } : x
+                                            ))} />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs text-slate-500">{formatFecha(anticipo.fecha)} — {anticipo.referencia || anticipo.concepto || 'Sin referencia'}</p>
+                                        </div>
+                                        <input className="input max-w-[130px] text-right text-sm"
+                                            type="number" step="0.01" min="0.01"
+                                            max={anticipo.monto - anticipo.monto_aplicado}
+                                            value={monto}
+                                            disabled={!seleccionado}
+                                            onChange={e => {
+                                                const max = anticipo.monto - anticipo.monto_aplicado
+                                                setAnticiposLista(prev => prev.map(x =>
+                                                    x.anticipo.id === anticipo.id
+                                                        ? { ...x, monto: Math.min(parseFloat(e.target.value) || 0, max) }
+                                                        : x
+                                                ))
+                                            }} />
+                                        <span className="text-xs font-bold text-amber-700 shrink-0 w-20 text-right">
+                                            {formatMoneda(anticipo.monto - anticipo.monto_aplicado)} disp.
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                            {anticiposUsados.length > 0 && (
+                                <div className="bg-amber-100 px-4 py-2 flex items-center justify-between">
+                                    <span className="text-xs font-semibold text-amber-800">Total anticipos a cruzar</span>
+                                    <span className="text-sm font-bold text-amber-800">− {formatMoneda(totalAnticipos)}</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {seleccionadas.length > 0 && (
-                        <div className="bg-slate-50 rounded-xl p-4 flex items-center justify-between">
-                            <span className="text-sm font-semibold text-slate-700">
-                                {seleccionadas.length} factura{seleccionadas.length > 1 ? 's' : ''} seleccionada{seleccionadas.length > 1 ? 's' : ''}
-                            </span>
-                            <span className="text-lg font-bold text-primary-700">{formatMoneda(totalSeleccion)}</span>
+                        <div className="bg-slate-50 rounded-xl p-4 space-y-1">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-slate-600">
+                                    {seleccionadas.length} factura{seleccionadas.length > 1 ? 's' : ''} — subtotal
+                                </span>
+                                <span className="text-sm font-semibold text-slate-700">{formatMoneda(totalSeleccion)}</span>
+                            </div>
+                            {anticiposUsados.length > 0 && (
+                                <div className="flex items-center justify-between text-amber-700">
+                                    <span className="text-sm">Anticipos cruzados</span>
+                                    <span className="text-sm font-semibold">− {formatMoneda(totalAnticipos)}</span>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between border-t pt-1 mt-1">
+                                <span className="text-sm font-bold text-slate-800">A pagar en banco</span>
+                                <span className="text-lg font-bold text-primary-700">{formatMoneda(totalAPagar)}</span>
+                            </div>
                         </div>
                     )}
                     <div className="flex justify-between">
@@ -324,7 +437,7 @@ export function NuevoEgresoPage() {
             {/* Paso 3: Forma de pago */}
             {paso === 3 && (
                 <div className="card p-6 space-y-5">
-                    <h2 className="font-bold text-slate-800">Forma de pago — Total: {formatMoneda(totalSeleccion)}</h2>
+                    <h2 className="font-bold text-slate-800">Forma de pago — A pagar: {formatMoneda(totalAPagar)}</h2>
 
                     <div>
                         <label className="label">Forma de pago *</label>
@@ -357,8 +470,13 @@ export function NuevoEgresoPage() {
                         <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border">
                             <div>
                                 <label className="label">Número de cheque *</label>
-                                <input className="input font-mono" value={numeroCheque}
-                                    onChange={e => setNumeroCheque(e.target.value)} placeholder="0001234" />
+                                <input className={cn('input font-mono', numeroCheque && 'border-green-400')} value={numeroCheque}
+                                    onChange={e => setNumeroCheque(e.target.value)} placeholder="000001" />
+                                {cuentas.find(c => c.id === cuentaId)?.cheque_siguiente && (
+                                    <p className="text-xs text-slate-400 mt-0.5">
+                                        Secuencia: {String(cuentas.find(c => c.id === cuentaId)!.cheque_siguiente).padStart(6, '0')}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="label">Beneficiario</label>
@@ -403,8 +521,11 @@ export function NuevoEgresoPage() {
                     <div className="bg-primary-50 rounded-xl p-4 space-y-1 border border-primary-200">
                         <p className="text-sm font-semibold text-primary-800">Resumen del pago</p>
                         <p className="text-xs text-slate-600">Proveedor: <strong>{provSelec?.nombre_empresa}</strong></p>
-                        <p className="text-xs text-slate-600">Facturas: {seleccionadas.length}</p>
-                        <p className="text-sm font-bold text-primary-700 mt-1">Total: {formatMoneda(totalSeleccion)}</p>
+                        <p className="text-xs text-slate-600">Facturas: {seleccionadas.length} — subtotal {formatMoneda(totalSeleccion)}</p>
+                        {anticiposUsados.length > 0 && (
+                            <p className="text-xs text-amber-600">Anticipos cruzados: − {formatMoneda(totalAnticipos)}</p>
+                        )}
+                        <p className="text-sm font-bold text-primary-700 mt-1">A pagar: {formatMoneda(totalAPagar)}</p>
                     </div>
 
                     <div className="flex justify-between">

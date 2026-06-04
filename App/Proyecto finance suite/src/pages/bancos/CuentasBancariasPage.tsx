@@ -12,6 +12,7 @@ function emptyForm(empresaId: string): FormCuenta {
         empresa_id: empresaId, banco_id: '', numero_cuenta: '', tipo: 'corriente',
         moneda: 'USD', descripcion: '', estado: 'activa', saldo_inicial: 0,
         fecha_apertura: '', cuenta_contable_id: null, participa_conciliacion: true,
+        cheque_desde: null, cheque_hasta: null, cheque_siguiente: null,
     }
 }
 
@@ -60,6 +61,9 @@ export function CuentasBancariasPage() {
             estado: c.estado, saldo_inicial: c.saldo_inicial,
             fecha_apertura: c.fecha_apertura ?? '', cuenta_contable_id: c.cuenta_contable_id,
             participa_conciliacion: c.participa_conciliacion,
+            cheque_desde: c.cheque_desde ?? null,
+            cheque_hasta: c.cheque_hasta ?? null,
+            cheque_siguiente: c.cheque_siguiente ?? null,
         })
         setModal(true); setError('')
     }
@@ -231,6 +235,35 @@ export function CuentasBancariasPage() {
                                     </label>
                                 </div>
                             </div>
+
+                            {/* Talonario de cheques — solo cuenta corriente */}
+                            {form.tipo === 'corriente' && (
+                                <div className="p-4 bg-slate-50 rounded-xl border space-y-3">
+                                    <p className="text-sm font-semibold text-slate-700">Talonario de cheques</p>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="label">Desde N°</label>
+                                            <input className="input font-mono text-center" type="number" min="1"
+                                                placeholder="001"
+                                                value={form.cheque_desde ?? ''}
+                                                onChange={e => setForm(f => ({ ...f, cheque_desde: parseInt(e.target.value) || null }))} />
+                                        </div>
+                                        <div>
+                                            <label className="label">Hasta N°</label>
+                                            <input className="input font-mono text-center" type="number" min="1"
+                                                placeholder="200"
+                                                value={form.cheque_hasta ?? ''}
+                                                onChange={e => setForm(f => ({ ...f, cheque_hasta: parseInt(e.target.value) || null }))} />
+                                        </div>
+                                        <div>
+                                            <label className="label">Siguiente N°</label>
+                                            <input className="input font-mono text-center" type="number" min="1"
+                                                value={form.cheque_siguiente ?? ''}
+                                                onChange={e => setForm(f => ({ ...f, cheque_siguiente: parseInt(e.target.value) || null }))} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="flex justify-end gap-3 px-6 py-4 border-t bg-slate-50 rounded-b-2xl">
                             <button onClick={() => setModal(false)} className="btn btn-secondary">Cancelar</button>
