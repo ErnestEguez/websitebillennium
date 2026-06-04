@@ -19,6 +19,8 @@ export interface DetalleIngresoStock {
     producto_id: string
     cantidad: number
     costo_unitario: number
+    iva_porcentaje?: number
+    iva_valor?: number
     subtotal?: number
 }
 
@@ -51,22 +53,33 @@ export const inventarioService = {
         ingreso: Partial<IngresoStock>,
         detalles: Omit<DetalleIngresoStock, 'ingreso_id'>[]
     ): Promise<IngresoStock> {
-        const total = detalles.reduce((sum, d) => sum + d.cantidad * d.costo_unitario, 0)
+        const subtotal  = detalles.reduce((sum, d) => sum + d.cantidad * d.costo_unitario, 0)
+        const valor_iva = detalles.reduce((sum, d) => {
+            const pct = d.iva_porcentaje ?? 0
+            return sum + Math.round(d.cantidad * d.costo_unitario * pct) / 100
+        }, 0)
+        const total = Math.round((subtotal + valor_iva) * 100) / 100
 
         // 1. Cabecera
         const { data: ingresoData, error: ingresoError } = await supabase
             .from('ingresos_stock')
-            .insert({ ...ingreso, total, created_at: new Date().toISOString() })
+            .insert({ ...ingreso, subtotal, valor_iva, total, created_at: new Date().toISOString() })
             .select()
             .single()
         if (ingresoError) throw ingresoError
 
         // 2. Detalles
-        const detallesConIngreso = detalles.map(d => ({
-            ...d,
-            ingreso_id: ingresoData.id,
-            subtotal: d.cantidad * d.costo_unitario
-        }))
+        const detallesConIngreso = detalles.map(d => {
+            const sub = d.cantidad * d.costo_unitario
+            const iva = Math.round(sub * (d.iva_porcentaje ?? 0)) / 100
+            return {
+                ...d,
+                ingreso_id: ingresoData.id,
+                subtotal:       sub,
+                iva_porcentaje: d.iva_porcentaje ?? 0,
+                iva_valor:      iva,
+            }
+        })
         const { error: detallesError } = await supabase
             .from('detalle_ingresos_stock')
             .insert(detallesConIngreso)
