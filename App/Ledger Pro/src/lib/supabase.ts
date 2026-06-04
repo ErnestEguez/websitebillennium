@@ -4,11 +4,12 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL      as string
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const url = typeof input === 'string' ? input : input.toString()
+    if (url.includes('/auth/v1/')) return fetch(input, init)
     const controller = new AbortController()
-    const id = setTimeout(() => controller.abort(), 10_000)
+    const id = setTimeout(() => controller.abort(), 25_000)
     try {
-        const res = await fetch(input, { ...init, signal: controller.signal })
-        return res
+        return await fetch(input, { ...init, signal: controller.signal })
     } finally {
         clearTimeout(id)
     }

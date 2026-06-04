@@ -7,11 +7,12 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 // storageKey propio → BroadcastChannel aislado → Finance Suite no emite
 // ni recibe eventos SIGNED_OUT hacia/desde Vendor Management u otras apps.
 async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const url = typeof input === 'string' ? input : input.toString()
+    if (url.includes('/auth/v1/')) return fetch(input, init)
     const controller = new AbortController()
-    const id = setTimeout(() => controller.abort(), 10_000)
+    const id = setTimeout(() => controller.abort(), 25_000)
     try {
-        const res = await fetch(input, { ...init, signal: controller.signal })
-        return res
+        return await fetch(input, { ...init, signal: controller.signal })
     } finally {
         clearTimeout(id)
     }

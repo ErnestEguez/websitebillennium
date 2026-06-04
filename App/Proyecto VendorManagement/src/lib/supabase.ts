@@ -3,15 +3,18 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL      as string
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-// Fetch con timeout de 10 segundos.
-// Evita que el GoTrueClient se quede bloqueado en un refresh de token
-// que nunca responde, lo que congela toda la app.
+// Timeout SOLO en queries de datos (/rest/v1/) para evitar loading infinito.
+// Las peticiones de auth (/auth/v1/) NO tienen timeout — necesitan
+// completar aunque el servidor esté lento (p.ej. validación de magic link).
 async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const url = typeof input === 'string' ? input : input.toString()
+    if (url.includes('/auth/v1/')) {
+        return fetch(input, init)
+    }
     const controller = new AbortController()
     const id = setTimeout(() => controller.abort(), 25_000)
     try {
-        const res = await fetch(input, { ...init, signal: controller.signal })
-        return res
+        return await fetch(input, { ...init, signal: controller.signal })
     } finally {
         clearTimeout(id)
     }
