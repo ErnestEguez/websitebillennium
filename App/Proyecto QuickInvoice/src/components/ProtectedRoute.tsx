@@ -26,13 +26,12 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
         return null
     }
 
-    if (!allowedRoles.includes(profile.rol)) {
-        if (profile.rol === 'mesero') return <Navigate to="/mesas" replace />
-        if (profile.rol === 'cocina') return <Navigate to="/pedidos" replace />
-        if (profile.rol === 'admin_plataforma') return <Navigate to="/configuracion" replace />
-        window.location.replace(PORTAL_URL)
-        return null
-    }
+    // Mesero y cocina tienen su propia UI — redirigir a su ruta específica
+    if (profile.rol === 'mesero' && !allowedRoles.includes('mesero'))
+        return <Navigate to="/mesas" replace />
+    if (profile.rol === 'cocina' && !allowedRoles.includes('cocina'))
+        return <Navigate to="/pedidos" replace />
 
+    // Todos los demás roles autenticados tienen acceso
     return <>{children}</>
 }
