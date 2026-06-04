@@ -23,6 +23,11 @@ async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Pr
 // El token dura 1h; al expirar los requests fallan con error manejable.
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     db:     { schema: 'facturacion' },
-    auth:   { storageKey: 'sb-vm-auth', autoRefreshToken: false },
+    auth:   {
+        storageKey:         'sb-vm-auth',
+        autoRefreshToken:   false,
+        persistSession:     false,   // ← usa lockNoOp en vez de Web Locks API
+        detectSessionInUrl: true,    // ← procesa magic links del portal
+    },
     global: { fetch: fetchConTimeout },
 })
