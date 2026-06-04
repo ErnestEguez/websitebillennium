@@ -18,6 +18,6 @@ async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Pr
 // autoRefreshToken: false → previene bloqueo de mutex en GoTrueClient.
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     db:     { schema: 'contabilidad' },
-    auth:   { storageKey: 'sb-lp-auth', autoRefreshToken: false, persistSession: false, detectSessionInUrl: true },
+    auth:   { storageKey: 'sb-lp-auth', autoRefreshToken: false },
     global: { fetch: fetchConTimeout },
 })

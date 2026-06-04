@@ -20,10 +20,8 @@ async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Pr
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     db:     { schema: 'facturacion' },
     auth:   {
-        storageKey:         'sb-qi-auth',
-        autoRefreshToken:   false,
-        persistSession:     false,   // ← usa lockNoOp en vez de Web Locks API
-        detectSessionInUrl: true,    // ← procesa magic links del portal
+        storageKey:       'sb-qi-auth',
+        autoRefreshToken: false,
     },
     global: { fetch: fetchConTimeout },
 })

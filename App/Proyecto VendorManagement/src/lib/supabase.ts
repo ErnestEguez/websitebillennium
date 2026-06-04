@@ -24,10 +24,8 @@ async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Pr
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     db:     { schema: 'facturacion' },
     auth:   {
-        storageKey:         'sb-vm-auth',
-        autoRefreshToken:   false,
-        persistSession:     false,   // ← usa lockNoOp en vez de Web Locks API
-        detectSessionInUrl: true,    // ← procesa magic links del portal
+        storageKey:       'sb-vm-auth',
+        autoRefreshToken: false,
     },
     global: { fetch: fetchConTimeout },
 })
