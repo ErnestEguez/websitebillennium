@@ -112,9 +112,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         { to: '/configuracion', icon: Settings, label: 'Configuración', roles: ['oficina'] },
     ]
 
+    const ROLES_ESPECIALES = ['mesero', 'cocina', 'admin_plataforma']
     const filteredNav = navigation.filter(item => {
         if (!profile?.rol) return false
-        return item.roles.includes(profile.rol)
+        if (item.roles.includes(profile.rol)) return true
+        // Roles no especiales (contador, auxiliar, usuario, etc.) ven el mismo menú que oficina
+        if (item.roles.includes('oficina') && !ROLES_ESPECIALES.includes(profile.rol)) return true
+        return false
     })
 
     return (
