@@ -17,10 +17,12 @@ async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Pr
     }
 }
 
-// storageKey propio → BroadcastChannel aislado → no interfiere con
-// QuickInvoice, Finance Suite ni otras apps del mismo proyecto Supabase.
+// storageKey propio → BroadcastChannel aislado → no interfiere con otras apps.
+// autoRefreshToken: false → el GoTrueClient no adquiere el mutex de refresh
+// que puede bloquearse cuando la sesión es invalidada externamente.
+// El token dura 1h; al expirar los requests fallan con error manejable.
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     db:     { schema: 'facturacion' },
-    auth:   { storageKey: 'sb-vm-auth' },
+    auth:   { storageKey: 'sb-vm-auth', autoRefreshToken: false },
     global: { fetch: fetchConTimeout },
 })

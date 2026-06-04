@@ -15,10 +15,10 @@ async function fetchConTimeout(input: RequestInfo | URL, init?: RequestInit): Pr
     }
 }
 
-// storageKey propio → BroadcastChannel aislado → no interfiere con
-// Vendor Management, Finance Suite ni otras apps del mismo proyecto Supabase.
+// storageKey propio → BroadcastChannel aislado → no interfiere con otras apps.
+// autoRefreshToken: false → previene bloqueo de mutex en GoTrueClient.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     db:     { schema: 'facturacion' },
-    auth:   { storageKey: 'sb-qi-auth' },
+    auth:   { storageKey: 'sb-qi-auth', autoRefreshToken: false },
     global: { fetch: fetchConTimeout },
 })
