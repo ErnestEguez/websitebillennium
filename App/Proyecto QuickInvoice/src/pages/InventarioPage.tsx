@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { inventarioService } from '../services/inventarioService'
 import { proveedoresService, type Proveedor } from '../services/proveedoresService'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import {
     Plus,
     FileText,
@@ -30,6 +31,7 @@ export function InventarioPage() {
     // Form state
     const [proveedorId, setProveedorId] = useState('')
     const [numeroFactura, setNumeroFactura] = useState('')
+    const [fechaVencimiento, setFechaVencimiento] = useState('')
     const [observaciones, setObservaciones] = useState('')
     const [productosIngreso, setProductosIngreso] = useState<ProductoIngreso[]>([])
     const [saving, setSaving] = useState(false)
@@ -113,6 +115,10 @@ export function InventarioPage() {
             alert('Selecciona un proveedor y agrega al menos un producto')
             return
         }
+        if (!fechaVencimiento) {
+            alert('Ingresa la fecha de vencimiento de la factura')
+            return
+        }
 
         const productosValidos = productosIngreso.filter(p => p.producto_id && p.cantidad > 0 && p.costo_unitario > 0)
         if (productosValidos.length === 0) {
@@ -120,16 +126,18 @@ export function InventarioPage() {
             return
         }
 
+        const fechaIngreso = new Date().toISOString().split('T')[0]
+
         try {
             setSaving(true)
-            await inventarioService.createIngreso(
+            const ingreso = await inventarioService.createIngreso(
                 {
-                    empresa_id: empresa!.id,
-                    proveedor_id: proveedorId,
+                    empresa_id:    empresa!.id,
+                    proveedor_id:  proveedorId,
                     numero_factura: numeroFactura,
-                    fecha_ingreso: new Date().toISOString().split('T')[0],
+                    fecha_ingreso: fechaIngreso,
                     observaciones,
-                    created_by: profile!.id
+                    created_by:    profile!.id
                 },
                 productosValidos.map(p => ({
                     producto_id:    p.producto_id,
@@ -139,10 +147,26 @@ export function InventarioPage() {
                 }))
             )
 
-            alert('Ingreso registrado exitosamente')
-            // Limpiar formulario
+            // Registrar en Cuentas por Pagar
+            const { error: cxpError } = await supabase
+                .from('cuentas_por_pagar')
+                .insert({
+                    empresa_id:       empresa!.id,
+                    proveedor_id:     proveedorId,
+                    compra_id:        ingreso.id,
+                    fecha_emision:    fechaIngreso,
+                    fecha_vencimiento: fechaVencimiento,
+                    monto_original:   ingreso.total,
+                    saldo_pendiente:  ingreso.total,
+                    estado:           'PENDIENTE',
+                    observaciones:    numeroFactura ? `Factura ${numeroFactura}` : null,
+                })
+            if (cxpError) throw cxpError
+
+            alert('Ingreso y cuenta por pagar registrados exitosamente')
             setProveedorId('')
             setNumeroFactura('')
+            setFechaVencimiento('')
             setObservaciones('')
             setProductosIngreso([])
             await loadData()
@@ -205,6 +229,17 @@ export function InventarioPage() {
                                     onChange={e => setNumeroFactura(e.target.value)}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
                                     placeholder="001-001-000123"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    Fecha de Vencimiento <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    value={fechaVencimiento}
+                                    onChange={e => setFechaVencimiento(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
                                 />
                             </div>
                         </div>
