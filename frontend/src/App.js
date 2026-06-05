@@ -25,6 +25,7 @@ import AdminSubscriptions from "./pages/admin/Subscriptions";
 import AdminUsers from "./pages/admin/Users";
 import AdminMessages from "./pages/admin/Messages";
 import AdminApps from "./pages/admin/Apps";
+import AdminERPModules from "./pages/admin/ERPModules";
 
 // Public Page Wrapper
 const PublicPage = ({ children }) => (
@@ -74,6 +75,7 @@ function App() {
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           <Route path="/admin/aplicaciones" element={<AdminRoute><AdminApps /></AdminRoute>} />
           <Route path="/admin/suscripciones" element={<AdminRoute><AdminSubscriptions /></AdminRoute>} />
+          <Route path="/admin/erp-modulos" element={<AdminRoute><AdminERPModules /></AdminRoute>} />
           <Route path="/admin/usuarios" element={<AdminRoute><AdminUsers /></AdminRoute>} />
           <Route path="/admin/mensajes" element={<AdminRoute><AdminMessages /></AdminRoute>} />
 

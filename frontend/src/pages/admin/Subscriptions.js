@@ -27,12 +27,9 @@ const PRODUCTS = [
   { id: 'sentinel', name: 'Pedidos Sentinel' },
   { id: 'importaciones', name: 'Módulo de Importaciones' },
   { id: 'lopdp', name: 'LOPDP' },
-  { id: 'facturacion', name: 'Facturación Electrónica' },
-  { id: 'contabilidad', name: 'Ledger Pro Contabilidad' },
-  { id: 'vendormanagement', name: 'Gestión de Compras' },
+  { id: 'facturacion', name: 'ERP Billennium' },
   { id: 'dashboard', name: 'Dashboard Empresarial' },
   { id: 'plataforma-ferias', name: 'Plataforma Móvil para Ferias' },
-  { id: 'finance', name: 'Finance Suite' },
 ];
 
 const PLANS = {
@@ -41,11 +38,8 @@ const PLANS = {
   importaciones: ['Estándar', 'Profesional'],
   lopdp: ['PYME', 'Profesional'],
   facturacion: ['Básico', 'Profesional', 'Empresarial'],
-  contabilidad: ['Básico', 'Profesional', 'Empresarial'],
-  vendormanagement: ['Básico', 'Profesional', 'Empresarial'],
   dashboard: ['Básico', 'Profesional'],
   'plataforma-ferias': ['Estándar'],
-  'finance': ['Básico'],
 };
 
 const statusConfig = {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
-import { Smartphone, FileText, Ship, BookOpen, ExternalLink, Loader2, Lock, UtensilsCrossed, Landmark } from 'lucide-react';
+import { Smartphone, FileText, Ship, Building2, ExternalLink, Loader2, Lock, UtensilsCrossed } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -20,10 +20,10 @@ const ADMIN_APPS = [
   },
   {
     id: 'facturacion',
-    name: 'Facturación Electrónica',
-    description: 'Emisión de comprobantes electrónicos SRI. Facturas, notas de crédito, retenciones y guías de remisión.',
-    icon: FileText,
-    color: 'bg-purple-50 text-purple-600',
+    name: 'ERP Billennium',
+    description: 'Facturación Electrónica, Inventarios, Clientes, Proveedores, Tesorería y Contabilidad integrados.',
+    icon: Building2,
+    color: 'bg-blue-50 text-blue-700',
     available: true,
   },
   {
@@ -35,35 +35,11 @@ const ADMIN_APPS = [
     available: true,
   },
   {
-    id: 'contabilidad',
-    name: 'LedgerPro Contabilidad',
-    description: 'Sistema contable completo con plan de cuentas, asientos, balances y reportes financieros.',
-    icon: BookOpen,
-    color: 'bg-green-50 text-green-600',
-    available: true,
-  },
-  {
-    id: 'vendormanagement',
-    name: 'Gestión de Compras',
-    description: 'Proveedores, compras de inventario y servicios, cuentas por pagar y órdenes de compra.',
-    icon: FileText,
-    color: 'bg-orange-50 text-orange-600',
-    available: true,
-  },
-  {
     id: 'restoflow',
     name: 'RestoFlow',
     description: 'Gestión integral de restaurantes. Mesas, pedidos, facturación electrónica, inventario y caja.',
     icon: UtensilsCrossed,
     color: 'bg-orange-50 text-orange-600',
-    available: true,
-  },
-  {
-    id: 'finance',
-    name: 'Finance Suite',
-    description: 'Módulo bancario y de pagos. Cuentas bancarias, egresos a proveedores, cheques, anticipos, movimientos y conciliación bancaria.',
-    icon: Landmark,
-    color: 'bg-blue-50 text-blue-700',
     available: true,
   },
 ];

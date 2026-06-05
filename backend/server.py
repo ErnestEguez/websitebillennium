@@ -638,6 +638,90 @@ def get_app_token(product_id: str, current_user: dict = Depends(get_current_user
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generando acceso SSO: {str(e)}")
 
+# ============== ERP MODULES ROUTES ==============
+
+class ERPModuleUpdate(BaseModel):
+    vendor: bool
+    finance: bool
+    ledgerpro: bool
+
+@api_router.get("/admin/erp-modules")
+def list_erp_modules(admin: dict = Depends(get_admin_user)):
+    """Lista registros de user_modules con email y nombre de empresa."""
+    import httpx
+
+    facturacion_headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Accept-Profile": "facturacion",
+    }
+
+    # user_modules joined with empresas
+    modules_resp = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/user_modules?select=user_id,empresa_id,vendor,finance,ledgerpro,empresas(nombre,ruc)",
+        headers=facturacion_headers, timeout=10
+    )
+    if modules_resp.status_code >= 400:
+        raise HTTPException(status_code=500, detail=f"Error consultando módulos: {modules_resp.text}")
+    modules_data = modules_resp.json()
+
+    # Auth users list to map user_id → email
+    auth_resp = httpx.get(
+        f"{SUPABASE_URL}/auth/v1/admin/users?per_page=1000",
+        headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+        timeout=10
+    )
+    users_by_id = {}
+    if auth_resp.status_code == 200:
+        users_by_id = {u["id"]: u.get("email", "") for u in auth_resp.json().get("users", [])}
+
+    result = []
+    for m in modules_data:
+        empresa = m.get("empresas") or {}
+        result.append({
+            "user_id":        m["user_id"],
+            "empresa_id":     m["empresa_id"],
+            "vendor":         m.get("vendor", False),
+            "finance":        m.get("finance", False),
+            "ledgerpro":      m.get("ledgerpro", False),
+            "email":          users_by_id.get(m["user_id"], "Desconocido"),
+            "empresa_nombre": empresa.get("nombre", m["empresa_id"]),
+            "empresa_ruc":    empresa.get("ruc", ""),
+        })
+
+    return result
+
+@api_router.put("/admin/erp-modules/{user_id}/{empresa_id}")
+def update_erp_modules(user_id: str, empresa_id: str, data: ERPModuleUpdate, admin: dict = Depends(get_admin_user)):
+    """Actualiza (upsert) los módulos ERP de un usuario/empresa."""
+    import httpx
+
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Accept-Profile": "facturacion",
+        "Content-Profile": "facturacion",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+
+    resp = httpx.post(
+        f"{SUPABASE_URL}/rest/v1/user_modules",
+        json={
+            "user_id":    user_id,
+            "empresa_id": empresa_id,
+            "vendor":     data.vendor,
+            "finance":    data.finance,
+            "ledgerpro":  data.ledgerpro,
+        },
+        headers=headers, timeout=10
+    )
+
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=500, detail=f"Error actualizando módulos: {resp.text}")
+
+    return {"ok": True}
+
 # ============== PRODUCTS ROUTES ==============
 
 @api_router.get("/products", response_model=List[Product])
