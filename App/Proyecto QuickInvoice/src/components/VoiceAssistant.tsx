@@ -125,17 +125,22 @@ function parsearTranscripcion(texto: string, clientes: any[], servicios: any[]):
 
     // ── 4. Descripción del ítem ────────────────────────────────────────────
     let itemNombre = ''
+    const PRECIO_STOP = /\s+valor\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s+\d{2,}|\s*$/
     const itemPatrones = [
-        /concepto\s+(.+?)(?:\s+valor\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
-        /por (?:el )?(?:concepto|servicio|producto)\s+(.+?)(?:\s+valor\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
-        /(?:servicio|producto)\s+(.+?)(?:\s+valor\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
-        /por\s+(.+?)(?:\s+valor\b|\s+a\s+(?:un\s+)?precio\b|\s+precio\b|\s+a\s+\d|\s+cantidad\b|\s+con\b|\s+sin\b|\s*$)/,
+        new RegExp('concepto\\s+(.+?)(?:' + PRECIO_STOP.source + ')'),
+        new RegExp('por (?:el )?(?:concepto|servicio|producto)\\s+(.+?)(?:' + PRECIO_STOP.source + ')'),
+        new RegExp('(?:servicio|producto)\\s+(.+?)(?:' + PRECIO_STOP.source + ')'),
+        new RegExp('por\\s+(.+?)(?:\\s+a\\s+(?:un\\s+)?precio\\b|' + PRECIO_STOP.source + ')'),
     ]
     for (const p of itemPatrones) {
         const m = t.match(p)
         const candidato = m?.[1]?.trim() ?? ''
         if (candidato.length > 2) {
-            itemNombre = candidato.replace(/^(el|la|los|las|un|una)\s+/, '').trim()
+            // Quitar artículos iniciales y cualquier número/precio que se haya colado al final
+            itemNombre = candidato
+                .replace(/^(el|la|los|las|un|una)\s+/, '')
+                .replace(/\s*[\d]+[.,]?[\d]*\s*(dolar|dolares|usd|con iva|sin iva)?\s*$/i, '')
+                .trim()
             break
         }
     }

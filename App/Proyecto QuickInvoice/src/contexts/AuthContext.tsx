@@ -27,11 +27,45 @@ export interface Modules {
     ledgerpro: boolean
 }
 
+export interface Permisos {
+    // Facturación
+    perm_dashboard:          boolean
+    perm_nueva_factura:      boolean
+    perm_comprobantes:       boolean
+    perm_notas_credito:      boolean
+    perm_anulacion_facturas: boolean
+    perm_cierres_caja:       boolean
+    perm_consulta_ventas:    boolean
+    // Clientes
+    perm_clientes:           boolean
+    perm_cartera_cxc:        boolean
+    perm_consulta_cartera:   boolean
+    perm_estado_cuenta:      boolean
+    // Compras / Proveedores
+    perm_proveedores:        boolean
+    perm_compras:            boolean
+    perm_cxp:                boolean
+    perm_reportes_cxp:       boolean
+    // Tesorería
+    perm_bancos:             boolean
+    perm_egresos:            boolean
+    perm_cheques:            boolean
+    perm_movimientos_banc:   boolean
+    perm_conciliacion:       boolean
+    // Contabilidad
+    perm_plan_cuentas:       boolean
+    perm_asientos:           boolean
+    perm_reportes_cont:      boolean
+    perm_tributario:         boolean
+}
+
 interface AuthContextType {
     user: User | null
     profile: Profile | null
     empresa: Empresa | null
     modules: Modules
+    permisos: Permisos
+    isAdmin: boolean
     loading: boolean
     signOut: () => Promise<void>
     cajaSesion: any | null
@@ -41,10 +75,39 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const DEFAULT_MODULES: Modules = { vendor: false, finance: false, ledgerpro: false }
 
+export const DEFAULT_PERMISOS: Permisos = {
+    perm_dashboard:          true,
+    perm_nueva_factura:      true,
+    perm_comprobantes:       true,
+    perm_notas_credito:      true,
+    perm_anulacion_facturas: true,
+    perm_cierres_caja:       true,
+    perm_consulta_ventas:    true,
+    perm_clientes:           true,
+    perm_cartera_cxc:        true,
+    perm_consulta_cartera:   true,
+    perm_estado_cuenta:      true,
+    perm_proveedores:        true,
+    perm_compras:            true,
+    perm_cxp:                true,
+    perm_reportes_cxp:       true,
+    perm_bancos:             true,
+    perm_egresos:            true,
+    perm_cheques:            true,
+    perm_movimientos_banc:   true,
+    perm_conciliacion:       true,
+    perm_plan_cuentas:       true,
+    perm_asientos:           true,
+    perm_reportes_cont:      true,
+    perm_tributario:         true,
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<Profile | null>(null)
     const [modules, setModules] = useState<Modules>(DEFAULT_MODULES)
+    const [permisos, setPermisos] = useState<Permisos>(DEFAULT_PERMISOS)
+    const [isAdmin, setIsAdmin] = useState(false)
     const [empresa, setEmpresa] = useState<Empresa | null>(null)
     const [loading, setLoading] = useState(true)
     const isMounted = React.useRef(true)
@@ -105,6 +168,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setEmpresa(null);
                 setCajaSesion(null);
                 setCajaBloqueada(null);
+                setModules(DEFAULT_MODULES);
+                setPermisos(DEFAULT_PERMISOS);
+                setIsAdmin(false);
                 setLoading(false);
             } else if (_event === 'TOKEN_REFRESHED') {
                 console.log('🔄 Token Refreshed');
@@ -202,17 +268,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setEmpresa(empresaData)
                     offlineDb.setAppCache(`empresa:${empresaData.id}`, empresaData).catch(() => {})
                     await validarCaja(userId, data.empresa_id, data.rol)
-                    // Cargar módulos habilitados para este usuario+empresa
+                    // Cargar módulos + is_admin (select * para no fallar si falta alguna columna)
                     const { data: modData, error: modError } = await supabase
                         .from('user_modules')
-                        .select('vendor, finance, ledgerpro')
+                        .select('*')
                         .eq('user_id', userId)
                         .eq('empresa_id', empresaData.id)
                         .maybeSingle()
-                    console.log('[modules] userId:', userId, 'empresaId:', empresaData.id, 'data:', modData, 'error:', modError)
+                    console.log('[modules] data:', modData, 'error:', modError)
                     setModules(modData
                         ? { vendor: !!modData.vendor, finance: !!modData.finance, ledgerpro: !!modData.ledgerpro }
                         : DEFAULT_MODULES)
+                    setIsAdmin(!!modData?.is_admin)
+
+                    // Cargar permisos de menú — siempre, sin importar is_admin
+                    try {
+                        const permQuery = supabase
+                            .from('user_permisos')
+                            .select('*')
+                            .eq('user_id', userId)
+                            .eq('empresa_id', empresaData.id)
+                            .maybeSingle()
+                        const permTimeout = new Promise<any>((_, reject) =>
+                            setTimeout(() => reject(new Error('permisos timeout')), 4000)
+                        )
+                        const { data: permData, error: permError } = await Promise.race([permQuery, permTimeout])
+                        console.log('[permisos] data:', permData, 'error:', permError)
+                        if (permData) {
+                            setPermisos({
+                                perm_dashboard:          permData.perm_dashboard          ?? true,
+                                perm_nueva_factura:      permData.perm_nueva_factura      ?? true,
+                                perm_comprobantes:       permData.perm_comprobantes       ?? true,
+                                perm_notas_credito:      permData.perm_notas_credito      ?? true,
+                                perm_anulacion_facturas: permData.perm_anulacion_facturas ?? true,
+                                perm_cierres_caja:       permData.perm_cierres_caja       ?? true,
+                                perm_consulta_ventas:    permData.perm_consulta_ventas    ?? true,
+                                perm_clientes:           permData.perm_clientes           ?? true,
+                                perm_cartera_cxc:        permData.perm_cartera_cxc        ?? true,
+                                perm_consulta_cartera:   permData.perm_consulta_cartera   ?? true,
+                                perm_estado_cuenta:      permData.perm_estado_cuenta      ?? true,
+                                perm_proveedores:        permData.perm_proveedores        ?? true,
+                                perm_compras:            permData.perm_compras            ?? true,
+                                perm_cxp:                permData.perm_cxp               ?? true,
+                                perm_reportes_cxp:       permData.perm_reportes_cxp       ?? true,
+                                perm_bancos:             permData.perm_bancos             ?? true,
+                                perm_egresos:            permData.perm_egresos            ?? true,
+                                perm_cheques:            permData.perm_cheques            ?? true,
+                                perm_movimientos_banc:   permData.perm_movimientos_banc   ?? true,
+                                perm_conciliacion:       permData.perm_conciliacion       ?? true,
+                                perm_plan_cuentas:       permData.perm_plan_cuentas       ?? true,
+                                perm_asientos:           permData.perm_asientos           ?? true,
+                                perm_reportes_cont:      permData.perm_reportes_cont      ?? true,
+                                perm_tributario:         permData.perm_tributario         ?? true,
+                            })
+                        } else {
+                            console.warn('[permisos] sin registro → DEFAULT_PERMISOS')
+                            setPermisos(DEFAULT_PERMISOS)
+                        }
+                    } catch (permErr) {
+                        console.error('[permisos] error:', permErr)
+                    }
                 } else {
                     console.error('❌ Empresa Fetch Error:', empresaError)
                     setEmpresa(null)
@@ -372,6 +487,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profile,
             empresa,
             modules,
+            permisos,
+            isAdmin,
             loading,
             signOut,
             cajaSesion

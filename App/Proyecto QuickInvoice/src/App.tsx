@@ -33,6 +33,7 @@ import { NuevaNcPage } from './pages/NuevaNcPage'
 import { NcRidePage } from './pages/NcRidePage'
 import { DashboardGerencialPage } from './pages/DashboardGerencialPage'
 import { ProtectedRoute as RoleProtectedRoute } from './components/ProtectedRoute'
+import { AdminPermisosPage } from './pages/AdminPermisosPage'
 // ── Módulo Cuentas por Pagar (Vendor Management) ─────────────
 import { ProveedoresPage as VMProveedoresPage }   from './pages/vendor/ProveedoresPage'
 import { ComprasPage }                            from './pages/vendor/ComprasPage'
@@ -292,6 +293,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <CarteraCxcPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/ajustes/permisos" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <AdminPermisosPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

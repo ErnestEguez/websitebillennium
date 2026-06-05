@@ -775,7 +775,7 @@ export function FacturaDirectaPage() {
                                                 }} />
                                         </div>
 
-                                        {/* Precio Unitario */}
+                                        {/* Precio Unitario + Total línea */}
                                         <div className="col-span-4 md:col-span-2">
                                             <div className="relative">
                                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
@@ -784,6 +784,11 @@ export function FacturaDirectaPage() {
                                                     value={det.precio_unitario}
                                                     onChange={e => updateLinea(idx, 'precio_unitario', parseFloat(e.target.value) || 0)} />
                                             </div>
+                                            {linea && (
+                                                <div className="text-right text-xs font-bold text-primary-700 mt-0.5 pr-1">
+                                                    = {formatCurrency(linea.total)}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Descuento % */}
@@ -798,7 +803,7 @@ export function FacturaDirectaPage() {
                                         </div>
 
                                         {/* IVA % */}
-                                        <div className="col-span-6 md:col-span-2">
+                                        <div className="col-span-6 md:col-span-1">
                                             <select
                                                 className="w-full px-2 py-2.5 rounded-lg border border-slate-200 text-sm text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
                                                 value={det.iva_porcentaje}
@@ -809,15 +814,8 @@ export function FacturaDirectaPage() {
                                             </select>
                                         </div>
 
-                                        {/* Total Línea */}
-                                        <div className="col-span-5 md:col-span-1 flex items-center justify-end">
-                                            <span className="font-bold text-slate-900 text-sm">
-                                                {linea ? formatCurrency(linea.total) : '$0.00'}
-                                            </span>
-                                        </div>
-
-                                        {/* Eliminar */}
-                                        <div className="col-span-1 flex items-center justify-center">
+                                        {/* Eliminar + Total */}
+                                        <div className="col-span-1 flex flex-col items-center justify-center gap-1">
                                             <button onClick={() => removeLinea(idx)} disabled={detalles.length === 1}
                                                 className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20">
                                                 <Trash2 className="w-4 h-4" />

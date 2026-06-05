@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
+import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../lib/utils'
@@ -133,7 +134,7 @@ export function ConsultaVentasPage() {
         }
     }
 
-    function exportarCSV() {
+    function exportarExcel() {
         const headers = [
             'Nro Factura', 'Fecha', 'Cliente', 'Identificación', 'Vendedor',
             'Base IVA', 'Base 0%', 'Suma Bases', 'IVA', 'Total',
@@ -141,18 +142,15 @@ export function ConsultaVentasPage() {
         ]
         const rows = filas.map(f => [
             f.secuencial, f.fecha, f.cliente, f.identificacion, f.vendedor,
-            f.base_iva.toFixed(2), f.base_cero.toFixed(2), f.suma_bases.toFixed(2), f.iva.toFixed(2), f.total.toFixed(2),
-            f.efectivo.toFixed(2), f.tarjeta.toFixed(2), f.transferencia.toFixed(2),
-            f.cheque.toFixed(2), f.credito.toFixed(2), f.otros.toFixed(2), f.estado_sri
+            +f.base_iva.toFixed(2), +f.base_cero.toFixed(2), +f.suma_bases.toFixed(2), +f.iva.toFixed(2), +f.total.toFixed(2),
+            +f.efectivo.toFixed(2), +f.tarjeta.toFixed(2), +f.transferencia.toFixed(2),
+            +f.cheque.toFixed(2), +f.credito.toFixed(2), +f.otros.toFixed(2), f.estado_sri
         ])
-        const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `Ventas_${fechaInicio}_${fechaFin}.csv`
-        a.click()
-        URL.revokeObjectURL(url)
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+        ws['!cols'] = [10,12,30,14,20,10,10,12,10,12,10,10,14,10,10,10,14].map(wch => ({ wch }))
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Ventas')
+        XLSX.writeFile(wb, `Ventas_${fechaInicio}_${fechaFin}.xlsx`)
     }
 
     // Totales
@@ -211,7 +209,7 @@ export function ConsultaVentasPage() {
                     </div>
                     {filas.length > 0 && (
                         <div className="flex gap-2">
-                            <button onClick={exportarCSV} className="flex-1 btn btn-secondary flex items-center justify-center gap-1 py-2 text-sm">
+                            <button onClick={exportarExcel} className="flex-1 btn btn-secondary flex items-center justify-center gap-1 py-2 text-sm">
                                 <Download className="w-4 h-4" /> Excel
                             </button>
                             <button onClick={() => handlePrint()} className="flex-1 btn btn-secondary flex items-center justify-center gap-1 py-2 text-sm">
