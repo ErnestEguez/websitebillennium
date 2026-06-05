@@ -7,7 +7,7 @@ import {
   Smartphone,
   Ship,
   ShieldCheck,
-  FileText,
+  Building2,
   BarChart3,
   ExternalLink,
   Lock,
@@ -54,11 +54,11 @@ const productConfig = {
     description: 'Protección de datos personales'
   },
   facturacion: {
-    name: 'Facturación Electrónica',
-    icon: FileText,
-    color: 'bg-purple-50 text-purple-600',
+    name: 'ERP Billennium',
+    icon: Building2,
+    color: 'bg-blue-50 text-blue-700',
     url: 'https://websitebillennium-quickinvoice.vercel.app/',
-    description: 'Comprobantes electrónicos SRI'
+    description: 'Facturación Electrónica · Inventarios · Clientes · Proveedores · Tesorería · Contabilidad'
   },
   dashboard: {
     name: 'Dashboard Empresarial',
