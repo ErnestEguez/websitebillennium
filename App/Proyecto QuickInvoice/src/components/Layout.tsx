@@ -55,22 +55,6 @@ const SidebarItem = ({ to, icon: Icon, label, active, sub }: SidebarItemProps) =
     </Link>
 )
 
-interface NavGroup {
-    type: 'group'
-    icon: React.ElementType
-    label: string
-    roles: string[]
-    children: { to: string; label: string; icon: React.ElementType }[]
-}
-interface NavLink {
-    type?: 'link'
-    to: string
-    icon: React.ElementType
-    label: string
-    roles: string[]
-}
-type _NavItem = NavLink | NavGroup
-
 import { CierreCajaModal } from './CierreCajaModal'
 
 // Sección expandible de módulo principal

@@ -17,6 +17,8 @@ interface Empresa {
     logo_url?: string | null
     habilitar_division_cuenta?: boolean
     usar_vendor_management?: boolean
+    usar_contabilidad_compras?: boolean
+    config_cuentas_compras?: Record<string, unknown> | null
 }
 
 export interface Modules {

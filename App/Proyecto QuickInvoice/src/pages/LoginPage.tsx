@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { Mail, Loader2, CheckCircle2 } from 'lucide-react'
 
-const _PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://billenniumsystem.com'
 
 export function LoginPage() {
     const navigate = useNavigate()

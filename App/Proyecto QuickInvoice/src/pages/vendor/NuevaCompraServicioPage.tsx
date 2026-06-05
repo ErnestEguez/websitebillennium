@@ -65,7 +65,7 @@ export function NuevaCompraServicioPage() {
         if (!usaContabilidad || !empresa?.id || cuentasGasto.length > 0) return
         import('../../services/contabilidadService')
             .then(m => m.contabilidadService.listarCuentas(empresa?.ruc ?? undefined))
-            .then(data => setCuentasGasto(data.filter(c => c.tipo === 'gasto')))
+            .then(data => setCuentasGasto(data.filter((c: { id: string; codigo: string; nombre: string; tipo: string }) => c.tipo === 'gasto')))
             .catch(() => {})
     }, [usaContabilidad, empresa?.id])
 
