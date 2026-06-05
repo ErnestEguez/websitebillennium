@@ -225,7 +225,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/anulacion-facturas" icon={Ban}             label="Anulación Facturas" active={location.pathname === '/anulacion-facturas'} sub disabled={!p.perm_anulacion_facturas} />
                             <SidebarItem to="/cierres"            icon={BookOpen}        label="Cierres de Caja"    active={location.pathname === '/cierres'} sub disabled={!p.perm_cierres_caja} />
                             <SidebarItem to="/consultas/ventas"   icon={Search}          label="Consulta Ventas"    active={location.pathname.startsWith('/consultas/ventas')} sub disabled={!p.perm_consulta_ventas} />
-                            <SidebarItem to="/configuracion"       icon={Settings}        label="Configuración"        active={location.pathname === '/configuracion'} sub />
+                            {profile?.rol === 'oficina' && (
+                                <button
+                                    onClick={() => setIsCierreCajaOpen(true)}
+                                    className="flex items-center gap-3 w-full pl-8 pr-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                                >
+                                    <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                                        <span className="font-mono font-bold text-xs border border-current rounded px-0.5">$$</span>
+                                    </div>
+                                    {isSidebarOpen && <span>Cerrar Caja</span>}
+                                </button>
+                            )}
                         </ModuleSection>}
 
                         {/* ── MÓDULO 1b: Manejo de Clientes ────────────── */}
@@ -427,19 +437,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </nav>
 
                     <div className="p-4 border-t border-slate-100 space-y-1">
-                        {/* Cerrar Caja */}
-                        {profile?.rol === 'oficina' && (
-                            <button
-                                onClick={() => setIsCierreCajaOpen(true)}
-                                className="flex items-center gap-3 w-full px-4 py-3 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition-colors group"
-                            >
-                                <div className="w-5 h-5 flex items-center justify-center">
-                                    <span className="font-mono font-bold text-xs border border-current rounded px-0.5">$$</span>
-                                </div>
-                                {isSidebarOpen && <span>Cerrar Caja</span>}
-                            </button>
-                        )}
-
                         {/* Ajustes — expandible */}
                         <div>
                             <button
