@@ -595,6 +595,37 @@ class ERPModuleUpdate(BaseModel):
     finance: bool
     ledgerpro: bool
 
+@api_router.get("/admin/erp-users")
+def list_erp_users(admin: dict = Depends(get_admin_user)):
+    """Lista usuarios de Supabase Auth para el selector del formulario."""
+    import httpx
+    resp = httpx.get(
+        f"{SUPABASE_URL}/auth/v1/admin/users?per_page=1000",
+        headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+        timeout=10
+    )
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=500, detail="Error consultando usuarios")
+    return [{"id": u["id"], "email": u.get("email", "")}
+            for u in resp.json().get("users", []) if u.get("email")]
+
+@api_router.get("/admin/erp-empresas")
+def list_erp_empresas(admin: dict = Depends(get_admin_user)):
+    """Lista empresas de facturacion.empresas para el selector del formulario."""
+    import httpx
+    resp = httpx.get(
+        f"{SUPABASE_URL}/rest/v1/empresas?select=id,nombre,ruc&order=nombre",
+        headers={
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Accept-Profile": "facturacion",
+        },
+        timeout=10
+    )
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=500, detail="Error consultando empresas")
+    return resp.json()
+
 @api_router.get("/admin/erp-modules")
 def list_erp_modules(admin: dict = Depends(get_admin_user)):
     """Lista registros de user_modules con email y nombre de empresa."""
