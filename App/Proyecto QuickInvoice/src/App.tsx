@@ -69,7 +69,7 @@ import { Formulario104Page }                      from './pages/contabilidad/tri
 import { ConfiguracionPage as ContaConfig }       from './pages/contabilidad/ConfiguracionPage'
 import { Formulario104DetallePage }               from './pages/contabilidad/tributario/Formulario104DetallePage'
 // ── Módulo Tesorería (Finance Suite) ─────────────────────────
-import { DashboardPage as FinDashboard }          from './pages/tesoreria/DashboardPage'
+
 import { CuentasBancariasPage }                   from './pages/tesoreria/bancos/CuentasBancariasPage'
 import { BancosPage }                             from './pages/tesoreria/bancos/BancosPage'
 import { EgresosPage }                            from './pages/tesoreria/egresos/EgresosPage'

@@ -69,7 +69,7 @@ interface NavLink {
     label: string
     roles: string[]
 }
-type NavItem = NavLink | NavGroup
+type _NavItem = NavLink | NavGroup
 
 import { CierreCajaModal } from './CierreCajaModal'
 
@@ -108,7 +108,7 @@ function ModuleSection({ label, icon: Icon, colorClass, isOpen, onToggle, isSide
 
 export function Layout({ children }: { children: React.ReactNode }) {
     const { profile, empresa, modules, signOut } = useAuth() as any
-    const usaVendor = !!empresa?.usar_vendor_management
+    // const usaVendor = !!empresa?.usar_vendor_management
     const location = useLocation()
     const [isSidebarOpen, setIsSidebarOpen] = React.useState(true)
     const [isCierreCajaOpen, setIsCierreCajaOpen] = React.useState(false)
