@@ -594,6 +594,7 @@ class ERPModuleUpdate(BaseModel):
     vendor: bool
     finance: bool
     ledgerpro: bool
+    is_admin: bool = False
 
 @api_router.get("/admin/erp-users")
 def list_erp_users(admin: dict = Depends(get_admin_user)):
@@ -638,7 +639,7 @@ def list_erp_modules(admin: dict = Depends(get_admin_user)):
     }
 
     modules_resp = httpx.get(
-        f"{SUPABASE_URL}/rest/v1/user_modules?select=user_id,empresa_id,vendor,finance,ledgerpro,empresas(nombre,ruc)",
+        f"{SUPABASE_URL}/rest/v1/user_modules?select=user_id,empresa_id,vendor,finance,ledgerpro,is_admin,empresas(nombre,ruc)",
         headers=facturacion_headers, timeout=10
     )
     if modules_resp.status_code >= 400:
@@ -663,6 +664,7 @@ def list_erp_modules(admin: dict = Depends(get_admin_user)):
             "vendor":         m.get("vendor", False),
             "finance":        m.get("finance", False),
             "ledgerpro":      m.get("ledgerpro", False),
+            "is_admin":       m.get("is_admin", False),
             "email":          users_by_id.get(m["user_id"], "Desconocido"),
             "empresa_nombre": empresa.get("nombre", m["empresa_id"]),
             "empresa_ruc":    empresa.get("ruc", ""),
@@ -692,6 +694,7 @@ def update_erp_modules(user_id: str, empresa_id: str, data: ERPModuleUpdate, adm
             "vendor":     data.vendor,
             "finance":    data.finance,
             "ledgerpro":  data.ledgerpro,
+            "is_admin":   data.is_admin,
         },
         headers=headers, timeout=10
     )

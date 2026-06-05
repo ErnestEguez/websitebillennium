@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { Loader2, RefreshCw, Layers, Plus, Search, X, UserPlus } from 'lucide-react';
+import { Loader2, RefreshCw, Layers, Plus, Search, X, UserPlus, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Switch } from '../../components/ui/switch';
 import { Button } from '../../components/ui/button';
@@ -100,9 +100,10 @@ export const AdminERPModules = () => {
   const [empresas, setEmpresas]     = useState([]);
   const [formUser, setFormUser]     = useState('');
   const [formEmpresa, setFormEmpresa] = useState('');
-  const [formVendor, setFormVendor]   = useState(false);
-  const [formFinance, setFormFinance] = useState(false);
-  const [formLedger, setFormLedger]   = useState(false);
+  const [formVendor, setFormVendor]     = useState(false);
+  const [formFinance, setFormFinance]   = useState(false);
+  const [formLedger, setFormLedger]     = useState(false);
+  const [formIsAdmin, setFormIsAdmin]   = useState(false);
   const [submitting, setSubmitting]   = useState(false);
   const [loadingForm, setLoadingForm] = useState(false);
 
@@ -126,7 +127,7 @@ export const AdminERPModules = () => {
   const openForm = async () => {
     setShowForm(true);
     setFormUser(''); setFormEmpresa('');
-    setFormVendor(false); setFormFinance(false); setFormLedger(false);
+    setFormVendor(false); setFormFinance(false); setFormLedger(false); setFormIsAdmin(false);
     setLoadingForm(true);
     try {
       const token = localStorage.getItem('token');
@@ -153,7 +154,7 @@ export const AdminERPModules = () => {
       const token = localStorage.getItem('token');
       await axios.put(
         `${API}/admin/erp-modules/${formUser}/${formEmpresa}`,
-        { vendor: formVendor, finance: formFinance, ledgerpro: formLedger },
+        { vendor: formVendor, finance: formFinance, ledgerpro: formLedger, is_admin: formIsAdmin },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success('Acceso ERP creado correctamente');
@@ -181,6 +182,7 @@ export const AdminERPModules = () => {
           vendor:    field === 'vendor'    ? value : current.vendor,
           finance:   field === 'finance'   ? value : current.finance,
           ledgerpro: field === 'ledgerpro' ? value : current.ledgerpro,
+          is_admin:  field === 'is_admin'  ? value : current.is_admin,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -238,9 +240,8 @@ export const AdminERPModules = () => {
                   <tr>
                     <th className="px-5 py-3 text-left font-semibold text-slate-600">Usuario</th>
                     <th className="px-5 py-3 text-left font-semibold text-slate-600">Empresa</th>
-                    <th className="px-5 py-3 text-center font-semibold text-slate-600">
-                      Compras / Proveedores
-                    </th>
+                    <th className="px-5 py-3 text-center font-semibold text-amber-600">Admin QI</th>
+                    <th className="px-5 py-3 text-center font-semibold text-slate-600">Compras / Proveedores</th>
                     <th className="px-5 py-3 text-center font-semibold text-slate-600">Tesorería</th>
                     <th className="px-5 py-3 text-center font-semibold text-slate-600">Contabilidad</th>
                   </tr>
@@ -274,6 +275,19 @@ export const AdminERPModules = () => {
                           {m.empresa_ruc && (
                             <p className="text-xs text-slate-400 mt-0.5">{m.empresa_ruc}</p>
                           )}
+                        </td>
+                        <td className="px-5 py-4 text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <Switch
+                              checked={!!m.is_admin}
+                              onCheckedChange={v => handleToggle(m.user_id, m.empresa_id, 'is_admin', v)}
+                              disabled={isSaving}
+                              className="data-[state=checked]:bg-amber-500"
+                            />
+                            <span className="text-[10px] text-amber-500 font-medium">
+                              {m.is_admin ? 'ADMIN' : 'OFF'}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-5 py-4 text-center">
                           <ModuleSwitch
@@ -357,6 +371,20 @@ export const AdminERPModules = () => {
                   </div>
                 )}
               />
+
+              {/* Admin QI */}
+              <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-semibold text-amber-800">Administrador QI</span>
+                  <span className="text-xs text-amber-600">(acceso a Ajustes / Permisos)</span>
+                </div>
+                <Switch
+                  checked={formIsAdmin}
+                  onCheckedChange={setFormIsAdmin}
+                  className="data-[state=checked]:bg-amber-500"
+                />
+              </div>
 
               {/* Módulos */}
               <div className="border border-slate-200 rounded-xl overflow-hidden">
