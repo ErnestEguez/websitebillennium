@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import {
@@ -13,8 +13,7 @@ import {
   Lock,
   LogOut,
   User,
-  Ticket,
-  Landmark
+  Ticket
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -61,20 +60,6 @@ const productConfig = {
     url: 'https://websitebillennium-quickinvoice.vercel.app/',
     description: 'Comprobantes electrónicos SRI'
   },
-  contabilidad: {
-    name: 'Ledger Pro',
-    icon: BarChart3,
-    color: 'bg-emerald-50 text-emerald-600',
-    url: 'https://websitebillennium-ledgerpro.vercel.app/',
-    description: 'Contabilidad NIIF para PYMES'
-  },
-  vendormanagement: {
-    name: 'Gestión de Compras',
-    icon: FileText,
-    color: 'bg-orange-50 text-orange-600',
-    url: 'https://websitebillennium-vendor.vercel.app/',
-    description: 'Proveedores, compras y cuentas por pagar'
-  },
   dashboard: {
     name: 'Dashboard Empresarial',
     icon: BarChart3,
@@ -88,13 +73,6 @@ const productConfig = {
     color: 'bg-violet-50 text-violet-600',
     url: 'https://proyecto-ferias2026.vercel.app/',
     description: 'Gestión profesional de ferias y exposiciones'
-  },
-  finance: {
-    name: 'Finance Suite',
-    icon: Landmark,
-    color: 'bg-blue-50 text-blue-700',
-    url: null,
-    description: 'Bancario y pagos: egresos, cheques, anticipos y conciliación'
   },
 };
 
@@ -132,7 +110,7 @@ export const UserDashboard = () => {
   };
 
   // Productos que usan SSO (magic link) en vez de URL directa
-  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion', 'contabilidad', 'vendormanagement', 'restoflow', 'finance'];
+  const SSO_PRODUCTS = ['sentinel', 'importaciones', 'facturacion', 'restoflow'];
 
   const handleSsoAccess = async (productId) => {
     setSsoLoading(productId);
