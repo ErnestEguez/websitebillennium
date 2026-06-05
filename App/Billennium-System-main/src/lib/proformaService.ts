@@ -370,6 +370,6 @@ export const proformaService = {
 };
 
 export function calcularUtilidad(precio: number, costo: number): number {
-  if (precio <= 0) return 0;
-  return ((precio - costo) / precio) * 100;
+  if (costo <= 0) return 0;
+  return ((precio - costo) / costo) * 100;
 }
