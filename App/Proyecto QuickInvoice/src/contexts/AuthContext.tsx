@@ -19,10 +19,17 @@ interface Empresa {
     usar_vendor_management?: boolean
 }
 
+export interface Modules {
+    vendor:    boolean
+    finance:   boolean
+    ledgerpro: boolean
+}
+
 interface AuthContextType {
     user: User | null
     profile: Profile | null
     empresa: Empresa | null
+    modules: Modules
     loading: boolean
     signOut: () => Promise<void>
     cajaSesion: any | null
@@ -30,9 +37,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+const DEFAULT_MODULES: Modules = { vendor: false, finance: false, ledgerpro: false }
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<Profile | null>(null)
+    const [modules, setModules] = useState<Modules>(DEFAULT_MODULES)
     const [empresa, setEmpresa] = useState<Empresa | null>(null)
     const [loading, setLoading] = useState(true)
     const isMounted = React.useRef(true)
@@ -188,9 +198,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (!empresaError && empresaData) {
                     setEmpresa(empresaData)
-                    // Persist empresa for offline use
                     offlineDb.setAppCache(`empresa:${empresaData.id}`, empresaData).catch(() => {})
-                    await validarCaja(userId, data.empresa_id, data.rol);
+                    await validarCaja(userId, data.empresa_id, data.rol)
+                    // Cargar módulos habilitados para este usuario+empresa
+                    const { data: modData, error: modError } = await supabase
+                        .from('user_modules')
+                        .select('vendor, finance, ledgerpro')
+                        .eq('user_id', userId)
+                        .eq('empresa_id', empresaData.id)
+                        .maybeSingle()
+                    console.log('[modules] userId:', userId, 'empresaId:', empresaData.id, 'data:', modData, 'error:', modError)
+                    setModules(modData
+                        ? { vendor: !!modData.vendor, finance: !!modData.finance, ledgerpro: !!modData.ledgerpro }
+                        : DEFAULT_MODULES)
                 } else {
                     console.error('❌ Empresa Fetch Error:', empresaError)
                     setEmpresa(null)
@@ -349,9 +369,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user,
             profile,
             empresa,
+            modules,
             loading,
             signOut,
-            cajaSesion // Exponemos la sesión
+            cajaSesion
         } as any}>
             {children}
         </AuthContext.Provider>

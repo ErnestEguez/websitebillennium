@@ -25,3 +25,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     },
     global: { fetch: fetchConTimeout },
 })
+
+// Aliases para compatibilidad con Finance Suite y otros módulos migrados
+export { supabase as supabaseFacturacion }

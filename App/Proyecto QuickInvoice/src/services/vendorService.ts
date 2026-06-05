@@ -53,6 +53,16 @@ export const proveedorService = {
     },
 
     async crear(proveedor: Omit<Proveedor, 'id' | 'created_at' | 'updated_at'>): Promise<Proveedor> {
+        // Verificar RUC duplicado en la misma empresa
+        const { data: existente } = await supabase
+            .from('proveedores')
+            .select('id, nombre_empresa')
+            .eq('empresa_id', proveedor.empresa_id)
+            .eq('ruc', proveedor.ruc)
+            .maybeSingle()
+        if (existente)
+            throw new Error(`Ya existe un proveedor con RUC ${proveedor.ruc}: "${(existente as any).nombre_empresa}"`)
+
         const { data, error } = await supabase
             .from('proveedores').insert(proveedor).select().single()
         if (error) throw error
@@ -145,7 +155,7 @@ export const compraService = {
     async crearInventario(
         cabecera: Omit<Compra, 'id' | 'created_at'>,
         detalle: Omit<DetalleInventario, 'id' | 'ingreso_id'>[],
-        retencion?: Omit<RetencionCompra, 'id' | 'compra_id' | 'created_at'>
+        retenciones: Omit<RetencionCompra, 'id' | 'compra_id' | 'created_at'>[] = []
     ): Promise<CompraConDetalle> {
         // 1. Crear cabecera
         const { data: compra, error: eCompra } = await supabase
@@ -154,14 +164,13 @@ export const compraService = {
             .select().single()
         if (eCompra || !compra) throw eCompra ?? new Error('Error creando compra')
 
-        // 2. Insertar detalle de inventario
-        const detalleConId = detalle.map(d => ({ ...d, ingreso_id: compra.id }))
-        const { error: eDetalle } = await supabase
-            .from('detalle_ingresos_stock').insert(detalleConId)
+        // 2. Detalle inventario
+        const { error: eDetalle } = await supabase.from('detalle_ingresos_stock')
+            .insert(detalle.map(d => ({ ...d, ingreso_id: compra.id })))
         if (eDetalle) throw eDetalle
 
-        // 3. Kardex ENTRADA por cada producto
-        const kardex = detalle.map(d => ({
+        // 3. Kardex ENTRADA
+        await supabase.from('kardex').insert(detalle.map(d => ({
             empresa_id: cabecera.empresa_id,
             producto_id: d.producto_id,
             tipo_movimiento: 'ENTRADA',
@@ -169,29 +178,25 @@ export const compraService = {
             documento_referencia: cabecera.numero_factura ?? compra.id,
             cantidad: d.cantidad,
             costo_unitario: d.costo_unitario,
-        }))
-        await supabase.from('kardex').insert(kardex)
+        })))
 
-        // 4. CxP si es crédito
+        // 4. CxP si es crédito (saldo = total - suma retenciones)
         if (cabecera.forma_pago === 'CREDITO' && cabecera.proveedor_id && cabecera.fecha_vencimiento) {
+            const totalRet = retenciones.reduce((s, r) => s + r.valor, 0)
             await cxpService.crear({
-                empresa_id: cabecera.empresa_id,
-                proveedor_id: cabecera.proveedor_id,
-                compra_id: compra.id,
-                fecha_emision: cabecera.fecha_ingreso,
+                empresa_id: cabecera.empresa_id, proveedor_id: cabecera.proveedor_id,
+                compra_id: compra.id, fecha_emision: cabecera.fecha_ingreso,
                 fecha_vencimiento: cabecera.fecha_vencimiento,
                 monto_original: cabecera.total,
-                saldo_pendiente: retencion
-                    ? cabecera.total - retencion.valor
-                    : cabecera.total,
+                saldo_pendiente: Math.max(cabecera.total - totalRet, 0),
                 estado: 'PENDIENTE',
             })
         }
 
-        // 5. Retención
-        if (retencion) {
+        // 5. Retenciones (puede haber hasta 4)
+        if (retenciones.length > 0) {
             await supabase.from('retenciones_compras')
-                .insert({ ...retencion, compra_id: compra.id, empresa_id: cabecera.empresa_id })
+                .insert(retenciones.map(r => ({ ...r, compra_id: compra.id, empresa_id: cabecera.empresa_id })))
         }
 
         return compraService.obtenerConDetalle(compra.id)
@@ -200,7 +205,7 @@ export const compraService = {
     async crearServicio(
         cabecera: Omit<Compra, 'id' | 'created_at'>,
         detalle: Omit<DetalleServicio, 'id' | 'compra_id' | 'empresa_id'>[],
-        retencion?: Omit<RetencionCompra, 'id' | 'compra_id' | 'created_at'>
+        retenciones: Omit<RetencionCompra, 'id' | 'compra_id' | 'created_at'>[] = []
     ): Promise<CompraConDetalle> {
         // 1. Crear cabecera
         const { data: compra, error: eCompra } = await supabase
@@ -210,36 +215,27 @@ export const compraService = {
         if (eCompra || !compra) throw eCompra ?? new Error('Error creando compra')
 
         // 2. Detalle servicios
-        const detalleConId = detalle.map((d, i) => ({
-            ...d,
-            compra_id: compra.id,
-            empresa_id: cabecera.empresa_id,
-            orden: i + 1,
-        }))
-        const { error: eDetalle } = await supabase
-            .from('detalle_servicios').insert(detalleConId)
+        const { error: eDetalle } = await supabase.from('detalle_servicios')
+            .insert(detalle.map((d, i) => ({ ...d, compra_id: compra.id, empresa_id: cabecera.empresa_id, orden: i + 1 })))
         if (eDetalle) throw eDetalle
 
         // 3. CxP si es crédito
         if (cabecera.forma_pago === 'CREDITO' && cabecera.proveedor_id && cabecera.fecha_vencimiento) {
+            const totalRet = retenciones.reduce((s, r) => s + r.valor, 0)
             await cxpService.crear({
-                empresa_id: cabecera.empresa_id,
-                proveedor_id: cabecera.proveedor_id,
-                compra_id: compra.id,
-                fecha_emision: cabecera.fecha_ingreso,
+                empresa_id: cabecera.empresa_id, proveedor_id: cabecera.proveedor_id,
+                compra_id: compra.id, fecha_emision: cabecera.fecha_ingreso,
                 fecha_vencimiento: cabecera.fecha_vencimiento,
                 monto_original: cabecera.total,
-                saldo_pendiente: retencion
-                    ? cabecera.total - retencion.valor
-                    : cabecera.total,
+                saldo_pendiente: Math.max(cabecera.total - totalRet, 0),
                 estado: 'PENDIENTE',
             })
         }
 
-        // 4. Retención
-        if (retencion) {
+        // 4. Retenciones
+        if (retenciones.length > 0) {
             await supabase.from('retenciones_compras')
-                .insert({ ...retencion, compra_id: compra.id, empresa_id: cabecera.empresa_id })
+                .insert(retenciones.map(r => ({ ...r, compra_id: compra.id, empresa_id: cabecera.empresa_id })))
         }
 
         return compraService.obtenerConDetalle(compra.id)
@@ -407,3 +403,27 @@ export const ocService = {
         if (error) throw error
     },
 }
+
+// ── Retenciones ──────────────────────────────────────────────
+
+export const retencionService = {
+    async siguienteNumero(empresaId: string): Promise<string> {
+        const { data } = await supabase
+            .from('retenciones_compras')
+            .select('numero_retencion')
+            .eq('empresa_id', empresaId)
+            .not('numero_retencion', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(200)
+        let maxSeq = 0
+        ;(data ?? []).forEach(r => {
+            const match = r.numero_retencion?.match(/^\d{3}-\d{3}-(\d+)$/)
+            if (match) {
+                const seq = parseInt(match[1], 10)
+                if (seq > maxSeq) maxSeq = seq
+            }
+        })
+        return `001-001-${String(maxSeq + 1).padStart(9, '0')}`
+    },
+}
+

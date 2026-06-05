@@ -115,6 +115,7 @@ export interface DetalleServicio {
     aplica_iva: boolean
     tipo_gasto: TipoGasto
     orden: number
+    cuenta_contable_id?: string | null
 }
 
 // ── Retenciones ─────────────────────────────────────────────

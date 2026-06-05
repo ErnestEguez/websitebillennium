@@ -2,60 +2,67 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { LogIn, Loader2 } from 'lucide-react'
+import { Mail, Loader2, CheckCircle2 } from 'lucide-react'
 
 const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://billenniumsystem.com'
 
 export function LoginPage() {
     const navigate = useNavigate()
-    // Redirect if already logged in AND has profile
     const { user, profile, loading: authLoading, signOut } = useAuth()
     const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
+    const [sent, setSent] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
         if (user && profile && !authLoading) {
             navigate('/', { replace: true })
         }
-        // Si hay sesión pero no perfil (y ya cargó), regresar al Portal
-        if (user && !profile && !authLoading) {
-            window.location.replace(PORTAL_URL)
-        }
     }, [user, profile, authLoading, navigate])
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
-        setLoading(true)
-        setError(null)
-
-        // Validación de formato de email (para evitar que ingresen nombres o pines aquí)
         if (!email.includes('@')) {
-            setError('Por favor ingrese un EMAIL válido (ej: usuario@quickinvoice.com).')
-            setLoading(false)
+            setError('Ingresa un correo electrónico válido.')
             return
         }
-
+        setLoading(true)
+        setError(null)
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const { error } = await supabase.auth.signInWithOtp({
                 email,
-                password,
+                options: {
+                    emailRedirectTo: window.location.origin,
+                },
             })
-
-            if (error) {
-                console.error('FULL LOGIN ERROR OBJECT:', error)
-                setError(error.message)
-            } else if (data.user) {
-                console.log('Login successful:', data)
-                navigate('/', { replace: true })
-            }
+            if (error) throw error
+            setSent(true)
         } catch (err: any) {
-            console.error('🔥 CRITICAL Login error:', err.message);
-            setError('Ocurrió un error inesperado. Por favor, inténtalo de nuevo.');
+            setError(err.message ?? 'Error al enviar el enlace.')
         } finally {
             setLoading(false)
         }
+    }
+
+    if (sent) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-200 text-center">
+                    <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Revisa tu correo</h2>
+                    <p className="text-slate-500 text-sm">
+                        Enviamos un enlace de acceso a <strong>{email}</strong>.
+                        Haz click en el enlace para entrar.
+                    </p>
+                    <button
+                        onClick={() => { setSent(false); setEmail('') }}
+                        className="mt-6 text-xs text-slate-400 hover:text-slate-600 underline"
+                    >
+                        Usar otro correo
+                    </button>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -66,34 +73,24 @@ export function LoginPage() {
                         Q
                     </div>
                     <h1 className="text-3xl font-bold text-slate-900">Bienvenido</h1>
-                    <p className="text-slate-500 mt-2">Ingresa a tu cuenta de QuickInvoice</p>
+                    <p className="text-slate-500 mt-2 text-sm">
+                        Ingresa tu correo y te enviamos un enlace de acceso
+                    </p>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-6">
+                <form onSubmit={handleLogin} className="space-y-5">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
                             Correo electrónico
                         </label>
                         <input
-                            type="text"
+                            type="email"
                             required
+                            autoFocus
                             className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
                             placeholder="correo@ejemplo.com"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Contraseña
-                        </label>
-                        <input
-                            type="password"
-                            required
-                            className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
+                            onChange={e => setEmail(e.target.value)}
                         />
                     </div>
 
@@ -104,47 +101,32 @@ export function LoginPage() {
                     )}
 
                     {user && !profile && (
-                        <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-3">
-                            <p className="text-xs text-amber-700 font-bold leading-tight">
-                                Tienes una sesión activa pero no pudimos cargar tu perfil. Es posible que el registro esté dañado.
+                        <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                            <p className="text-xs text-amber-700 font-bold mb-2">
+                                Sesión activa sin perfil. Limpia la sesión e intenta de nuevo.
                             </p>
-                            <button
-                                onClick={() => signOut()}
-                                className="w-full py-2 bg-white border border-amber-300 text-amber-700 text-xs font-black rounded-lg hover:bg-amber-100"
-                            >
-                                CERRAR SESIÓN Y REINTENTAR
+                            <button onClick={() => signOut()}
+                                className="w-full py-2 bg-white border border-amber-300 text-amber-700 text-xs font-black rounded-lg hover:bg-amber-100">
+                                CERRAR SESIÓN
                             </button>
                         </div>
                     )}
 
-
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center gap-2 group disabled:opacity-70"
+                        className="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                     >
-                        {loading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                            <>
-                                <LogIn className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                                Iniciar Sesión
-                            </>
-                        )}
+                        {loading
+                            ? <Loader2 className="w-5 h-5 animate-spin" />
+                            : <><Mail className="w-5 h-5" /> Enviar enlace de acceso</>
+                        }
                     </button>
                 </form>
 
-                <div className="mt-8 pt-6 border-t border-slate-100 text-center space-y-4">
-                    <button
-                        onClick={signOut}
-                        className="text-xs text-slate-400 hover:text-red-500 underline font-bold transition-colors"
-                    >
-                        ¿Problemas para entrar? Limpiar sesión y reintentar
-                    </button>
-                    <p className="text-[10px] text-slate-300">
-                        © 2026 QuickInvoice. Sistema de Facturación Electrónica.
-                    </p>
-                </div>
+                <p className="mt-8 text-center text-[10px] text-slate-300">
+                    © 2026 QuickInvoice — Sistema de Facturación Electrónica
+                </p>
             </div>
         </div>
     )

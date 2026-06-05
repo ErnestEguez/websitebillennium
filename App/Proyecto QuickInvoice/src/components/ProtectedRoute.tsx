@@ -21,7 +21,10 @@ export function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) 
     }
 
     if (!profile) {
-        // Sin perfil y sin carga: volver al Portal
+        // En localhost → login propio. En producción → portal
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return <Navigate to="/login" replace />
+        }
         window.location.replace(PORTAL_URL)
         return null
     }
