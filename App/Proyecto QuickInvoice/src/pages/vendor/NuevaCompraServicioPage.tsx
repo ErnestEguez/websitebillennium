@@ -13,6 +13,7 @@ import {
     ArrowLeft, Plus, Trash2, Save, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { ScanFacturaButton, type FacturaEscaneada } from '../../components/ScanFacturaButton'
 
 const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white'
 
@@ -98,6 +99,31 @@ export function NuevaCompraServicioPage() {
     const b15 = modoIvaManual ? baseIva15 : subtotalLineas
     const total    = subtotalLineas + ivaCalc
     const totalRet = retenciones.reduce((s, r) => s + r.valor, 0)
+
+    function handleScanAplicar(data: FacturaEscaneada) {
+        setEstab(data.estab ?? '')
+        setPtoEmi(data.pto_emi ?? '')
+        setSecuencial(data.secuencial ?? '')
+        setFechaEmision(data.fecha_emision ?? HOY)
+        setClaveAcceso(data.clave_acceso ?? '')
+        setModoIvaManual(true)
+        setBaseIva0(data.base_cero ?? 0)
+        setBaseIva15(data.base_iva ?? 0)
+        setValorIvaManual(data.iva ?? 0)
+        const prov = proveedores.find(p => p.ruc === data.ruc_proveedor)
+        if (prov) setProveedorId(prov.id)
+        if (data.items?.length > 0) {
+            setDetalle(data.items.map((item, idx) => ({
+                descripcion:     item.descripcion ?? '',
+                cantidad:        item.cantidad ?? 1,
+                precio_unitario: item.precio_unitario ?? 0,
+                subtotal:        (item.cantidad ?? 1) * (item.precio_unitario ?? 0),
+                aplica_iva:      item.aplica_iva ?? true,
+                tipo_gasto:      'SERVICIOS' as const,
+                orden:           idx + 1,
+            })))
+        }
+    }
 
     function addLinea() {
         setDetalle(prev => [...prev, {
@@ -209,10 +235,11 @@ export function NuevaCompraServicioPage() {
                     className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
-                <div>
+                <div className="flex-1">
                     <h1 className="text-2xl font-bold text-slate-900">Nueva Compra de Servicio</h1>
                     <p className="text-slate-500 text-sm">Honorarios, arrend., servicios básicos, etc.</p>
                 </div>
+                <ScanFacturaButton onAplicar={handleScanAplicar} />
             </div>
 
             <div className="card p-5 space-y-4">
