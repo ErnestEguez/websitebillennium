@@ -449,7 +449,7 @@ export function ProductsPage() {
                                                 <div className="flex items-center gap-1.5">
                                                     <p className="font-bold text-slate-900">{producto.nombre}</p>
                                                     {producto.cuenta_ingreso_id && (
-                                                        <BookOpen className="w-3.5 h-3.5 text-purple-400 shrink-0" title={`Cuenta ingreso: ${producto.cuenta_ingreso_codigo}`} />
+                                                        <span title={`Cuenta ingreso: ${producto.cuenta_ingreso_codigo}`}><BookOpen className="w-3.5 h-3.5 text-purple-400 shrink-0" /></span>
                                                     )}
                                                 </div>
                                                 <p className="text-xs text-slate-400 line-clamp-1">{producto.descripcion || 'Sin descripción'}</p>
