@@ -19,7 +19,9 @@ import { KitchenOrderPrint } from './pages/KitchenOrderPrint'
 import { ConfigurationPage } from './pages/ConfigurationPage'
 import { ProveedoresPage } from './pages/ProveedoresPage'
 import { InventarioPage } from './pages/InventarioPage'
+import { ValorizacionInventarioPage } from './pages/ValorizacionInventarioPage'
 import { KardexPage } from './pages/KardexPage'
+import { CodigosRetencionPage } from './pages/CodigosRetencionPage'
 import { CierresPage } from './pages/CierresPage'
 import { FacturaDirectaPage } from './pages/FacturaDirectaPage'
 import { VendedoresPage } from './pages/VendedoresPage'
@@ -267,12 +269,31 @@ function App() {
               </ProtectedRoute>
             } />
 
+            <Route path="/inventario-valorizado" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <ValorizacionInventarioPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
 
             <Route path="/kardex" element={
               <ProtectedRoute>
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <KardexPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/retenciones/codigos" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <CodigosRetencionPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { compraService, proveedorService, retencionService } from '../../services/vendorService'
-import { contabilidadService } from '../../services/contabilidadService'
-import type { CuentasCompras } from '../../services/contabilidadService'
+import { contableConfigService } from '../../services/contableConfigService'
+import { contabilidadComprasService } from '../../services/contabilidadComprasService'
 import type { Proveedor, DetalleServicio, TipoGasto } from '../../types/vendors'
 import { TIPO_SUSTENTO_LABELS, TIPO_GASTO_LABELS } from '../../types/vendors'
 import { RetencionesEditor } from '../../components/vendor/RetencionesEditor'
@@ -163,7 +163,7 @@ export function NuevaCompraServicioPage() {
                 estado: 'ACTIVO' as const, origen: 'MANUAL' as const,
                 created_by: profile?.id,
             }))
-            await compraService.crearServicio(
+            const compraGuardada = await compraService.crearServicio(
                 {
                     empresa_id: empresa!.id, proveedor_id: proveedorId,
                     numero_factura: numeroFactura || undefined,
@@ -182,43 +182,31 @@ export function NuevaCompraServicioPage() {
                 retsParaGuardar,
             )
 
-            // Asiento contable — fresh config fetch (no stale session)
-            let asientoInfo = ''
+            // Asiento contable automático (LedgerPro) — no bloquea si falla
             try {
-                const { data: cfg } = await supabase
-                    .from('empresas')
-                    .select('usar_contabilidad_compras, config_cuentas_compras')
-                    .eq('id', empresa!.id)
-                    .maybeSingle()
-
-                if (cfg?.usar_contabilidad_compras && cfg?.config_cuentas_compras) {
-                    const ctas = cfg.config_cuentas_compras as unknown as CuentasCompras
-                    if ((ctas.gastos_servicios || validas.some(d => d.cuenta_contable_id)) && ctas.cuentas_por_pagar && ctas.efectivo) {
-                        const retF = retsParaGuardar.filter(r => r.tipo === 'FUENTE').reduce((s, r) => s + r.valor, 0)
-                        const retI = retsParaGuardar.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
-                        await contabilidadService.crearAsientoCompra({
-                            empresaId: empresa!.id, portalRuc: empresa?.ruc, fecha: HOY,
-                            glosa: `Compra servicio ${numeroFactura || proveedorId.slice(0, 8)}`,
-                            subtotal: subtotalLineas, valorIva: ivaCalc,
-                            retFuente: retF, retIva: retI, formaPago,
-                            tipoCompra: 'SERVICIO', cuentas: ctas,
-                            referencia: numeroFactura || undefined, creadoPor: profile?.id,
-                            lineasServicio: validas.map(d => ({
-                                descripcion: d.descripcion,
-                                subtotal: d.cantidad * d.precio_unitario,
-                                cuenta_contable_id: d.cuenta_contable_id,
-                            })),
-                        })
-                        asientoInfo = '✓ Asiento contable registrado en LedgerPro.'
-                    } else {
-                        asientoInfo = '⚠ Contabilidad activa pero faltan cuentas configuradas.'
-                    }
+                const contaConfig = await contableConfigService.getConfig(empresa!.id)
+                if (!contaConfig?.contabilidad_en_linea) {
+                    console.info('[asientoCompra] Contabilidad en línea desactivada — asiento omitido.')
+                } else {
+                    await contabilidadComprasService.crearAsientoCompra({
+                        empresaId:       empresa!.id,
+                        portalRuc:       empresa!.ruc ?? '',
+                        fecha:           HOY,
+                        numeroFactura:   numeroFactura || secuencial || '—',
+                        proveedorNombre: prov?.nombre_empresa ?? proveedorId.slice(0, 12),
+                        subtotal:        subtotalLineas,
+                        valorIva:        ivaCalc,
+                        retenciones:     retsParaGuardar.map(r => ({ tipo: r.tipo, codigo: r.codigo_retencion, valor: r.valor })),
+                        tipoCompra:      'SERVICIO',
+                        compraId:        compraGuardada?.id,
+                    })
                 }
             } catch (contabErr: any) {
-                asientoInfo = `⚠ Sin asiento contable: ${contabErr.message}`
+                console.error('[asientoCompra] Error:', contabErr)
+                alert(`⚠️ Compra guardada correctamente.\nEl asiento contable no se generó:\n${contabErr?.message ?? contabErr}\n\nVerifica en Ajustes → Contabilidad que el toggle esté activo y las cuentas COMPRAS estén mapeadas.`)
             }
 
-            navigate('/compras', asientoInfo ? { state: { acctMsg: asientoInfo } } : {})
+            navigate('/compras')
         } catch (e: any) {
             alert('Error al guardar: ' + e.message)
         } finally {

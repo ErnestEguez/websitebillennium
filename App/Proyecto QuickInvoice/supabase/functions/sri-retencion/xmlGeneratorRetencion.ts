@@ -38,6 +38,18 @@ function fmtDate(s: string): string {
     return `${d}/${m}/${y}`
 }
 
+// SRI exige exactamente 15 dígitos sin guiones: estab(3) + pto(3) + secuencial(9)
+function fmtNumDoc(numero: string): string {
+    const partes = (numero || '').split('-')
+    if (partes.length === 3) {
+        const estab = partes[0].padStart(3, '0').slice(-3)
+        const pto   = partes[1].padStart(3, '0').slice(-3)
+        const seq   = partes[2].padStart(9, '0').slice(-9)
+        return estab + pto + seq
+    }
+    return numero.replace(/-/g, '').padStart(15, '0').slice(-15)
+}
+
 export function generarXmlRetencion(data: RetencionXmlData): string {
     const { empresa, proveedor, compra, claveAcceso, estab, pto, secuencial, retenciones, fechaEmision } = data
     const cfg     = empresa.config_sri || {}
@@ -63,7 +75,7 @@ export function generarXmlRetencion(data: RetencionXmlData): string {
       <porcentajeRetener>${r.porcentaje.toFixed(2)}</porcentajeRetener>
       <valorRetenido>${r.valor.toFixed(2)}</valorRetenido>
       <codDocSustento>01</codDocSustento>
-      <numDocSustento>${compra.numero_factura || '001-001-000000001'}</numDocSustento>
+      <numDocSustento>${fmtNumDoc(compra.numero_factura || '001-001-000000001')}</numDocSustento>
       <fechaEmisionDocSustento>${fmtDate(compra.fecha_emision)}</fechaEmisionDocSustento>
     </impuesto>`
     }).join('')

@@ -216,10 +216,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('facturacion')}
                             onToggle={() => toggleGroup('facturacion')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/dashboard','/nueva-factura','/facturacion','/productos','/vendedores','/notas-credito','/anulacion-facturas','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/dashboard','/nueva-factura','/facturacion','/productos','/vendedores','/notas-credito','/anulacion-facturas','/cierres','/consultas/ventas','/compras/nueva','/inventario-valorizado','/kardex'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/dashboard"          icon={LayoutDashboard} label="Dashboard"          active={location.pathname === '/dashboard'} sub disabled={!p.perm_dashboard} />
                             <SidebarItem to="/nueva-factura"      icon={FilePlus}        label="Nueva Factura"      active={location.pathname === '/nueva-factura'} sub disabled={!p.perm_nueva_factura} />
+                            <SidebarItem to="/productos"                icon={Package}      label="Artículos"              active={location.pathname === '/productos'} sub />
+                            <SidebarItem to="/compras/nueva-inventario"  icon={ShoppingCart} label="Ingreso Fact. Inventario"   active={location.pathname === '/compras/nueva-inventario'} sub />
+                            <SidebarItem to="/compras/nueva-servicio"    icon={FileText}     label="Ingreso Fact. Servicio"     active={location.pathname === '/compras/nueva-servicio'} sub />
+                            <SidebarItem to="/inventario-valorizado"     icon={BarChart3}    label="Inventario Valorado"        active={location.pathname === '/inventario-valorizado'} sub />
+                            <SidebarItem to="/kardex"                    icon={ArrowDownUp}  label="Kardex"                     active={location.pathname.startsWith('/kardex')} sub />
                             <SidebarItem to="/facturacion"        icon={FileText}        label="Comprobantes"       active={location.pathname === '/facturacion'} sub disabled={!p.perm_comprobantes} />
                             <SidebarItem to="/notas-credito"      icon={FileMinus}       label="Notas de Crédito"   active={location.pathname === '/notas-credito'} sub disabled={!p.perm_notas_credito} />
                             <SidebarItem to="/anulacion-facturas" icon={Ban}             label="Anulación Facturas" active={location.pathname === '/anulacion-facturas'} sub disabled={!p.perm_anulacion_facturas} />
@@ -262,7 +267,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('cxp')}
                             onToggle={() => toggleGroup('cxp')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/proveedores','/compras','/cxp','/reportes/compras','/reportes/cxp','/reportes/estado-cuenta','/ajustes'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/proveedores','/compras','/cxp','/reportes/compras','/reportes/cxp','/reportes/estado-cuenta','/ajustes','/retenciones'].some(x => location.pathname.startsWith(x))}
                         >
                             <SidebarItem to="/proveedores" icon={Truck} label="Proveedores" active={location.pathname === '/proveedores'} sub disabled={!p.perm_proveedores} />
 
@@ -454,7 +459,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             </button>
                             {openGroups.includes('ajustes') && isSidebarOpen && (
                                 <div className="mt-0.5 ml-2 border-l-2 border-slate-100 pl-1 space-y-0.5">
-                                    <SidebarItem to="/configuracion" icon={Settings} label="Configuración" active={location.pathname === '/configuracion'} sub />
+                                    <SidebarItem to="/configuracion"      icon={Settings}  label="Configuración"       active={location.pathname === '/configuracion'} sub />
+                                    <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub />
                                     {isAdmin && <SidebarItem to="/ajustes/permisos" icon={UserCog} label="Permisos de usuario" active={location.pathname === '/ajustes/permisos'} sub />}
                                     <button
                                         onClick={toggleDarkSidebar}
