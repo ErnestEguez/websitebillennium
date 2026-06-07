@@ -325,7 +325,7 @@ export function ProductsPage() {
             nombre:                editingProduct.nombre               ?? '',
             descripcion:           editingProduct.descripcion          ?? null,
             precio_venta:          editingProduct.precio_venta         ?? 0,
-            categoria_id:          editingProduct.categoria_id         ?? null,
+            categoria_id:          editingProduct.categoria_id         ?? undefined,
             iva_porcentaje:        editingProduct.iva_porcentaje       ?? 15,
             maneja_stock:          editingProduct.maneja_stock         ?? true,
             imagen_url:            editingProduct.imagen_url           ?? null,
