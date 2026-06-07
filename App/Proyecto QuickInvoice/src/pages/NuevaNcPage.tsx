@@ -89,7 +89,7 @@ export function NuevaNcPage() {
         const t = setTimeout(async () => {
             setBuscando(true)
             try { setResultados(await ncService.buscarComprobantesParaNC(empresa.id, searchText)) }
-            catch { setResultados([]) }
+            catch (e) { console.error('[NC buscar]', e); setResultados([]) }
             finally { setBuscando(false) }
         }, 350)
         return () => clearTimeout(t)

@@ -152,9 +152,7 @@ export const ncService = {
             .from('comprobantes')
             .select('id, secuencial, total, created_at, estado_sri, estado_sistema, clientes(nombre, identificacion)')
             .eq('empresa_id', empresaId)
-            .eq('estado_sri', 'AUTORIZADO')
-            .neq('estado_sistema', 'ANULADA')
-            .or(`secuencial.ilike.%${textoBusqueda}%,clientes.nombre.ilike.%${texto}%`)
+            .ilike('secuencial', `%${textoBusqueda}%`)
             .order('created_at', { ascending: false })
             .limit(20)
 

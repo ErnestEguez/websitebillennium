@@ -19,6 +19,8 @@ import {
     Layers, RotateCw,
 } from 'lucide-react'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
+import { cuentasBancariasService } from '../services/finance/bancosService'
+import type { CuentaBancaria } from '../types/finance'
 import { precioVolumenService } from '../services/precioVolumenService'
 import { catalogCacheService } from '../services/catalogCacheService'
 import { useNetworkStatus } from '../lib/networkStatus'
@@ -30,12 +32,13 @@ import { VoiceAssistant, type VoiceResult } from '../components/VoiceAssistant'
 // TIPOS DE PAGO (incluye Tarjeta D/C)
 // ─────────────────────────────────────────────────────
 const METODOS_PAGO: { value: PagoFactura['metodo']; label: string }[] = [
-    { value: 'efectivo', label: '💵 Efectivo' },
-    { value: 'tarjeta', label: '💳 Tarjeta D/C' },
-    { value: 'transferencia', label: '🏦 Transferencia' },
-    { value: 'credito', label: '📄 Crédito' },
-    { value: 'cheque', label: '✏️ Cheque' },
-    { value: 'otros', label: '🔄 Otros' },
+    { value: 'efectivo',     label: '💵 Efectivo' },
+    { value: 'tarjeta',      label: '💳 Tarjeta D/C' },
+    { value: 'transferencia',label: '🏦 Transferencia' },
+    { value: 'credito',      label: '📄 Crédito' },
+    { value: 'cheque',       label: '✏️ Cheque al día' },
+    { value: 'cheque_fecha', label: '📅 Cheque a fecha' },
+    { value: 'otros',        label: '🔄 Otros' },
 ]
 
 const DETALLE_VACIO: DetalleFacturaDirecta = {
@@ -84,6 +87,7 @@ export function FacturaDirectaPage() {
     // Estado: pagos + campo "recibido en efectivo"
     const [pagos, setPagos] = useState<PagoFactura[]>([{ metodo: 'efectivo', valor: 0, referencia: '' }])
     const [montoRecibido, setMontoRecibido] = useState<number>(0)
+    const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([])
 
     // Estado: proceso
     const [saving, setSaving] = useState(false)
@@ -109,14 +113,16 @@ export function FacturaDirectaPage() {
     async function loadData() {
         try {
             // Use catalog cache (stale-while-revalidate, works offline)
-            const [clientsList, prodList, vendedoresList] = await Promise.all([
+            const [clientsList, prodList, vendedoresList, cuentasBanc] = await Promise.all([
                 catalogCacheService.getClientes(empresa!.id),
                 catalogCacheService.getProductos(empresa!.id),
                 isOnline ? vendedorService.getVendedoresActivos(empresa!.id).catch(() => []) : [],
+                isOnline ? cuentasBancariasService.listar(empresa!.id).catch(() => []) : [],
             ])
             setClientes(clientsList)
             setProductos(prodList)
             setVendedores(vendedoresList)
+            setCuentasBancarias(cuentasBanc.filter((c: CuentaBancaria) => c.estado === 'activa'))
             if (vendedoresList.length === 1) setSelectedVendedorId(vendedoresList[0].id)
 
             // Consumidor final: buscar en la lista ya cacheada
@@ -665,8 +671,8 @@ export function FacturaDirectaPage() {
                             {esModoServicio && <div className="col-span-1 text-center">Cant.</div>}
                             <div className="col-span-2 text-right">P. Unitario</div>
                             <div className="col-span-1 text-center">Desc%</div>
-                            <div className="col-span-2 text-center">IVA%</div>
-                            <div className="col-span-1 text-right">Total</div>
+                            <div className="col-span-1 text-center">IVA%</div>
+                            <div className="col-span-2 text-right">Total</div>
                             <div className="col-span-1" />
                         </div>
 
@@ -787,13 +793,6 @@ export function FacturaDirectaPage() {
                                             </div>
                                         </div>
 
-                                        {/* Total línea */}
-                                        <div className="col-span-4 md:col-span-2 flex items-center justify-end">
-                                            <span className="text-sm font-bold text-primary-700">
-                                                {linea ? formatCurrency(linea.total) : '—'}
-                                            </span>
-                                        </div>
-
                                         {/* Descuento % */}
                                         <div className="col-span-4 md:col-span-1">
                                             <div className="relative">
@@ -817,7 +816,14 @@ export function FacturaDirectaPage() {
                                             </select>
                                         </div>
 
-                                        {/* Eliminar + Total */}
+                                        {/* Total línea */}
+                                        <div className="col-span-4 md:col-span-2 flex items-center justify-end">
+                                            <span className="text-sm font-bold text-primary-700">
+                                                {linea ? formatCurrency(linea.total) : '—'}
+                                            </span>
+                                        </div>
+
+                                        {/* Eliminar */}
                                         <div className="col-span-1 flex flex-col items-center justify-center gap-1">
                                             <button onClick={() => removeLinea(idx)} disabled={detalles.length === 1}
                                                 className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20">
@@ -853,26 +859,58 @@ export function FacturaDirectaPage() {
 
                         <div className="space-y-3">
                             {pagos.map((p, i) => (
-                                <div key={i} className="flex gap-2 items-start animate-in fade-in">
-                                    <select
-                                        className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white"
-                                        value={p.metodo}
-                                        onChange={e => updatePago(i, 'metodo', e.target.value as PagoFactura['metodo'])}>
-                                        {METODOS_PAGO.map(m => (
-                                            <option key={m.value} value={m.value}>{m.label}</option>
-                                        ))}
-                                    </select>
-                                    <div className="flex-1 relative">
-                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                                        <input type="number" min="0" step="0.01"
-                                            className="w-full pl-6 pr-2 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-400"
-                                            value={p.valor}
-                                            onChange={e => updatePago(i, 'valor', parseFloat(e.target.value) || 0)} />
+                                <div key={i} className="space-y-1.5 animate-in fade-in">
+                                    <div className="flex gap-2 items-center">
+                                        <select
+                                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+                                            value={p.metodo}
+                                            onChange={e => updatePago(i, 'metodo', e.target.value as PagoFactura['metodo'])}>
+                                            {METODOS_PAGO.map(m => (
+                                                <option key={m.value} value={m.value}>{m.label}</option>
+                                            ))}
+                                        </select>
+                                        <div className="relative w-40">
+                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                            <input type="number" min="0" step="0.01"
+                                                className="w-full pl-6 pr-2 py-2.5 rounded-lg border-2 border-primary-200 text-sm font-bold outline-none focus:ring-2 focus:ring-primary-400 text-right"
+                                                value={p.valor}
+                                                onChange={e => updatePago(i, 'valor', parseFloat(e.target.value) || 0)} />
+                                        </div>
+                                        <button onClick={() => removePago(i)} disabled={pagos.length === 1}
+                                            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
                                     </div>
-                                    <button onClick={() => removePago(i)} disabled={pagos.length === 1}
-                                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    {/* Cuenta bancaria destino — solo transferencia */}
+                                    {p.metodo === 'transferencia' && (
+                                        <select
+                                            className="w-full px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-xs outline-none focus:ring-2 focus:ring-blue-400 text-blue-900"
+                                            value={p.cuenta_bancaria_id ?? ''}
+                                            onChange={e => {
+                                                const cb = cuentasBancarias.find(c => c.id === e.target.value)
+                                                const label = cb ? `${cb.banco?.nombre ?? ''} — ${cb.numero_cuenta}` : ''
+                                                updatePago(i, 'cuenta_bancaria_id', e.target.value || null)
+                                                updatePago(i, 'cuenta_bancaria_contable_id', cb?.cuenta_contable_id ?? null)
+                                                updatePago(i, 'referencia', label || p.referencia || '')
+                                            }}
+                                        >
+                                            <option value="">🏦 Cuenta bancaria destino…</option>
+                                            {cuentasBancarias.map(cb => (
+                                                <option key={cb.id} value={cb.id}>
+                                                    {cb.banco?.nombre} — {cb.numero_cuenta}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    {/* Referencia / N° cheque */}
+                                    {(p.metodo === 'cheque' || p.metodo === 'cheque_fecha' || p.metodo === 'tarjeta') && (
+                                        <input type="text"
+                                            placeholder={p.metodo === 'tarjeta' ? 'Últimos 4 dígitos…' : 'N° de cheque…'}
+                                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+                                            value={p.referencia ?? ''}
+                                            onChange={e => updatePago(i, 'referencia', e.target.value)}
+                                        />
+                                    )}
                                 </div>
                             ))}
                         </div>

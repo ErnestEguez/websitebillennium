@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase'
 import { sriService } from './sriService'
 import { kardexService } from './kardexService'
+import { contableConfigService } from './contableConfigService'
+import { contabilidadVentasService } from './contabilidadVentasService'
 
 export interface DetalleFacturaDirecta {
     producto_id: string | null
@@ -15,9 +17,11 @@ export interface DetalleFacturaDirecta {
 }
 
 export interface PagoFactura {
-    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'otros' | 'tarjeta'
+    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'cheque_fecha' | 'otros' | 'tarjeta'
     valor: number
     referencia?: string
+    cuenta_bancaria_id?: string | null           // solo para transferencia
+    cuenta_bancaria_contable_id?: string | null  // cuenta_contable_id de la cuenta bancaria
 }
 
 export interface FacturaDirectaInput {
@@ -244,6 +248,65 @@ export const facturaDirectaService = {
             }
         } catch (kardexErr) {
             console.error('Error al registrar salida en Kardex:', kardexErr)
+        }
+
+        // 9a. Asiento contable automático (si contabilidad en línea activa)
+        try {
+            const contaConfig = await contableConfigService.getConfig(empresa_id)
+            if (contaConfig?.contabilidad_en_linea) {
+                // Obtener costo_promedio y cuenta_costo_id por producto para el COGS
+                const prodIds = detalles.filter(d => d.producto_id).map(d => d.producto_id!)
+                let prodCostoMap: Record<string, { costo_promedio: number; cuenta_costo_id: string | null }> = {}
+                if (prodIds.length > 0) {
+                    const { data: prodsCosto } = await supabase
+                        .from('productos')
+                        .select('id, costo_promedio, cuenta_costo_id')
+                        .in('id', prodIds)
+                    for (const p of (prodsCosto ?? [])) {
+                        prodCostoMap[p.id] = {
+                            costo_promedio:  Number(p.costo_promedio || 0),
+                            cuenta_costo_id: p.cuenta_costo_id ?? null,
+                        }
+                    }
+                }
+
+                const detallesContables = detalles
+                    .filter(d => d.cantidad > 0 && d.precio_unitario > 0)
+                    .map(d => {
+                        const l = calcularLinea(d)
+                        const prodInfo = d.producto_id ? prodCostoMap[d.producto_id] : null
+                        const factor = Number(d.factor_conversion || 1)
+                        const cantidadReal = d.cantidad * factor
+                        return {
+                            subtotal:        l.subtotal_neto,
+                            iva_porcentaje:  d.iva_porcentaje,
+                            iva_valor:       l.iva_valor,
+                            costo_total:     prodInfo ? prodInfo.costo_promedio * cantidadReal : 0,
+                            cuenta_costo_id: prodInfo?.cuenta_costo_id ?? null,
+                        }
+                    })
+
+                const { data: clienteData } = await supabase
+                    .from('clientes').select('nombre').eq('id', cliente_id).single()
+
+                await contabilidadVentasService.crearAsientoVenta({
+                    facturaId:     factura.id,
+                    empresaId:     empresa_id,
+                    portalRuc:     rucEmpresa,
+                    secuencial:    secuencialFormateado,
+                    clienteNombre: clienteData?.nombre ?? '—',
+                    fecha:         new Date().toISOString().split('T')[0],
+                    detalles:      detallesContables,
+                    pagos: pagos.map(p => ({
+                        metodo:                      p.metodo,
+                        valor:                       p.valor,
+                        cuenta_bancaria_id:           p.cuenta_bancaria_id ?? null,
+                        cuenta_bancaria_contable_id:  p.cuenta_bancaria_contable_id ?? null,
+                    })),
+                })
+            }
+        } catch (contaErr) {
+            console.error('[asientoVenta] Error (no bloquea factura):', contaErr)
         }
 
         // 9. Invocar Edge Function sri-signer

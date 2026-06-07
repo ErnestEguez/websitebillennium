@@ -105,9 +105,16 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                 <div className="mt-4 border-t border-dashed border-black pt-2 space-y-1">
                     <p className="font-bold">FORMAS DE PAGO:</p>
                     {factura.comprobante_pagos.map((p: any, idx: number) => (
-                        <div key={idx} className="flex justify-between text-[9px]">
-                            <span className="uppercase">{p.metodo_pago.replace('_', ' ')}:</span>
-                            <span>{formatCurrency(p.valor)}</span>
+                        <div key={idx} className="space-y-0.5">
+                            <div className="flex justify-between text-[9px]">
+                                <span className="uppercase">{p.metodo_pago.replace(/_/g, ' ')}:</span>
+                                <span>{formatCurrency(p.valor)}</span>
+                            </div>
+                            {p.referencia && (
+                                <div className="text-[8px] text-left pl-2 opacity-75">
+                                    {p.metodo_pago === 'transferencia' ? `Banco: ${p.referencia}` : `Ref: ${p.referencia}`}
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>

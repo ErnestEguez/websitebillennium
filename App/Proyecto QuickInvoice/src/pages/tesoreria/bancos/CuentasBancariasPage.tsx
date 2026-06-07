@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Loader2, X, AlertCircle, CreditCard } from 'lucide-react'
+import { Plus, Pencil, Loader2, X, AlertCircle, CreditCard, BookOpen } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { bancosService, cuentasBancariasService } from '../../../services/finance/bancosService'
+import { contableConfigService, type CuentaLP } from '../../../services/contableConfigService'
 import { cn, formatMoneda } from '../../../lib/utils'
 import type { Banco, CuentaBancaria } from '../../../types/finance'
 
@@ -19,14 +20,15 @@ function emptyForm(empresaId: string): FormCuenta {
 export function CuentasBancariasPage() {
     const { empresa } = useAuth()
 
-    const [lista, setLista]     = useState<CuentaBancaria[]>([])
-    const [bancos, setBancos]   = useState<Banco[]>([])
-    const [loading, setLoading] = useState(true)
-    const [error, setError]     = useState('')
-    const [modal, setModal]     = useState(false)
-    const [editId, setEditId]   = useState<string | null>(null)
-    const [form, setForm]       = useState<FormCuenta>(emptyForm(''))
-    const [saving, setSaving]   = useState(false)
+    const [lista, setLista]       = useState<CuentaBancaria[]>([])
+    const [bancos, setBancos]     = useState<Banco[]>([])
+    const [cuentasLP, setCuentasLP] = useState<CuentaLP[]>([])
+    const [loading, setLoading]   = useState(true)
+    const [error, setError]       = useState('')
+    const [modal, setModal]       = useState(false)
+    const [editId, setEditId]     = useState<string | null>(null)
+    const [form, setForm]         = useState<FormCuenta>(emptyForm(''))
+    const [saving, setSaving]     = useState(false)
 
     // Bancos es catálogo global — carga sin depender de empresa
     useEffect(() => {
@@ -34,6 +36,13 @@ export function CuentasBancariasPage() {
             .then(b => setBancos(b.filter(x => x.activo)))
             .catch(() => {})
     }, [])
+
+    // Cuentas LP para selector contable
+    useEffect(() => {
+        contableConfigService.getCuentas((empresa as any)?.ruc)
+            .then(setCuentasLP)
+            .catch(() => {})
+    }, [(empresa as any)?.ruc])
 
     // Cuentas bancarias dependen de empresa
     useEffect(() => {
@@ -132,7 +141,7 @@ export function CuentasBancariasPage() {
                                     <th className="py-2 px-4 text-left">Número de cuenta</th>
                                     <th className="py-2 px-4 text-left">Tipo</th>
                                     <th className="py-2 px-4 text-right">Saldo inicial</th>
-                                    <th className="py-2 px-4 text-center">Conciliación</th>
+                                    <th className="py-2 px-4 text-left">Cta. Contable</th>
                                     <th className="py-2 px-4 text-center">Estado</th>
                                     <th className="py-2 px-4 text-center">Acciones</th>
                                 </tr>
@@ -146,11 +155,15 @@ export function CuentasBancariasPage() {
                                             <span className="text-xs capitalize bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{c.tipo}</span>
                                         </td>
                                         <td className="py-2.5 px-4 text-right font-semibold">{formatMoneda(c.saldo_inicial)}</td>
-                                        <td className="py-2.5 px-4 text-center">
-                                            {c.participa_conciliacion
-                                                ? <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Sí</span>
-                                                : <span className="text-xs text-slate-400">No</span>
-                                            }
+                                        <td className="py-2.5 px-4">
+                                            {c.cuenta_contable_id ? (
+                                                <span className="flex items-center gap-1 text-xs text-purple-700">
+                                                    <BookOpen className="w-3 h-3 shrink-0" />
+                                                    {cuentasLP.find(lp => lp.id === c.cuenta_contable_id)?.codigo ?? '—'}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-slate-300">Sin mapear</span>
+                                            )}
                                         </td>
                                         <td className="py-2.5 px-4 text-center">
                                             <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium',
@@ -234,6 +247,28 @@ export function CuentasBancariasPage() {
                                         <span className="text-sm text-slate-700">Participa en conciliación</span>
                                     </label>
                                 </div>
+                            </div>
+
+                            {/* Cuenta contable */}
+                            <div>
+                                <label className="label flex items-center gap-1.5">
+                                    <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+                                    Cuenta Contable (LedgerPro)
+                                </label>
+                                <select
+                                    className="input disabled:opacity-50"
+                                    disabled={cuentasLP.length === 0}
+                                    value={form.cuenta_contable_id ?? ''}
+                                    onChange={e => setForm(f => ({ ...f, cuenta_contable_id: e.target.value || null }))}
+                                >
+                                    <option value="">— Sin mapear —</option>
+                                    {cuentasLP.map(c => (
+                                        <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>
+                                    ))}
+                                </select>
+                                {cuentasLP.length === 0 && (
+                                    <p className="text-xs text-amber-500 mt-1">LedgerPro no disponible. Configura tu plan de cuentas primero.</p>
+                                )}
                             </div>
 
                             {/* Talonario de cheques — solo cuenta corriente */}

@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase'
 
 export interface Producto {
     id: string
+    codigo?: string | null
     nombre: string
     descripcion: string | null
     precio_venta: number
@@ -10,6 +11,14 @@ export interface Producto {
     iva_porcentaje: number
     maneja_stock?: boolean
     stock?: number
+    costo_promedio?: number
+    // Cuentas contables
+    cuenta_ingreso_id?: string | null
+    cuenta_ingreso_codigo?: string | null
+    cuenta_ingreso_nombre?: string | null
+    cuenta_costo_id?: string | null
+    cuenta_costo_codigo?: string | null
+    cuenta_costo_nombre?: string | null
 }
 
 export interface Categoria {

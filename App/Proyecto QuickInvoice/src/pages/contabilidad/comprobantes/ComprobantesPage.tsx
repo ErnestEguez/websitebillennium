@@ -314,7 +314,7 @@ export function ComprobantesPage() {
                                     <td className="py-3 px-4 text-right font-mono text-slate-700">{formatMoneda(c.total_haber, sym)}</td>
                                     <td className="py-3 px-4">
                                         <div className="flex items-center gap-1 justify-end">
-                                            <Link to={`/comprobantes/${c.id}`} className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-md" title="Ver">
+                                            <Link to={`/conta/diarios/${c.id}`} className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-md" title="Ver">
                                                 <Eye className="w-3.5 h-3.5" />
                                             </Link>
                                             {c.estado === 'borrador' && (

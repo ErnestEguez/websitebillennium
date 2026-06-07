@@ -1,7 +1,6 @@
-import { supabase as supabaseBase } from '../lib/supabase'
-// Queries al schema contabilidad (LedgerPro) usando el mismo cliente principal
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const supabaseContabilidad = (supabaseBase as any)
+import { supabaseContabilidad as _supabaseContabilidad } from '../lib/supabaseContabilidad'
+const supabaseContabilidad = _supabaseContabilidad as any
 
 // LedgerPro uses its own lp_empresas table — IDs differ from facturacion.empresas.
 // Resolve the correct LP empresa_id via lp_get_mis_empresas RPC.

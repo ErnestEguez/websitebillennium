@@ -20,14 +20,16 @@ import {
     X,
     ArrowLeft,
     Bomb,
-    Tag
+    Tag,
+    BookOpen,
 } from 'lucide-react'
+import { ContabilidadConfigTab } from '../components/ContabilidadConfigTab'
 import { categoriaService, type Categoria } from '../services/categoriaService'
 import { cn } from '../lib/utils'
 
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
-    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'plataforma'>('empresa')
+    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'plataforma' | 'contabilidad'>('empresa')
     const [platformSubTab, setPlatformSubTab] = useState<'empresas' | 'personal'>('empresas')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -530,11 +532,11 @@ export function ConfigurationPage() {
 
             {/* Tabs - Only show for non-platform admins */}
             {profile?.rol !== 'admin_plataforma' && (
-                <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+                <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit flex-wrap">
                     <button
                         onClick={() => setActiveTab('empresa')}
                         className={cn(
-                            "flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all",
+                            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
                             activeTab === 'empresa' ? "bg-white text-primary-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
                         )}
                     >
@@ -544,12 +546,22 @@ export function ConfigurationPage() {
                     <button
                         onClick={() => setActiveTab('categorias')}
                         className={cn(
-                            "flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all",
+                            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
                             activeTab === 'categorias' ? "bg-white text-primary-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
                         )}
                     >
                         <Tag className="w-4 h-4" />
                         Categorías
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('contabilidad')}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
+                            activeTab === 'contabilidad' ? "bg-white text-purple-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                    >
+                        <BookOpen className="w-4 h-4" />
+                        Contabilidad
                     </button>
                 </div>
             )}
@@ -938,6 +950,8 @@ export function ConfigurationPage() {
                         )}
                     </div>
                 </div>
+            ) : activeTab === 'contabilidad' ? (
+                <ContabilidadConfigTab />
             ) : (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                     {/* Sub-tabs for Platform Admin */}

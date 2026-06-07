@@ -320,12 +320,12 @@ export const dashboardService = {
                 .lte('created_at', fin.toISOString()),
 
             supabase.from('vendedores')
-                .select('id, nombre_vendedor')
+                .select('id, nombre')
                 .eq('empresa_id', empresaId),
         ])
 
         const vendMap: Record<string, string> = {}
-        for (const v of (vendRes.data || [])) vendMap[v.id] = v.nombre_vendedor
+        for (const v of (vendRes.data || [])) vendMap[v.id] = v.nombre
 
         const byVend: Record<string, { nombre: string; ventas: number; facturas: number }> = {}
         for (const c of (compsRes.data || [])) {
