@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { compraService, proveedorService, retencionService } from '../../services/vendorService'
+import { compraService, proveedorService, retencionService, ocService } from '../../services/vendorService'
+import type { OrdenCompra } from '../../types/vendors'
 import { contableConfigService } from '../../services/contableConfigService'
 import { contabilidadComprasService } from '../../services/contabilidadComprasService'
 import { supabase } from '../../lib/supabase'
@@ -10,7 +11,7 @@ import { TIPO_SUSTENTO_LABELS } from '../../types/vendors'
 import { RetencionesEditor } from '../../components/vendor/RetencionesEditor'
 import type { RetLine } from '../../components/vendor/RetencionesEditor'
 import {
-    ArrowLeft, Plus, Trash2, Save, Package, ChevronDown, ChevronUp,
+    ArrowLeft, Plus, Trash2, Save, Package, ChevronDown, ChevronUp, CheckSquare,
 } from 'lucide-react'
 
 import { cn } from '../../lib/utils'
@@ -62,13 +63,21 @@ export function NuevaCompraInventarioPage() {
     const [retenciones, setRetenciones]         = useState<RetLine[]>([])
     const [retSeccion, setRetSeccion]            = useState(false)
 
+    // Orden de compra vinculada
+    const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([])
+    const [ocVinculada,   setOcVinculada]   = useState('')
+
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
 
     async function load() {
         try {
             const { data: prodsData } = await supabase
                 .from('productos').select('id, nombre').eq('empresa_id', empresa!.id).eq('activo', true).order('nombre')
-            const [provs] = await Promise.all([proveedorService.listar(empresa!.id)])
+            const [provs, ocs] = await Promise.all([
+                proveedorService.listar(empresa!.id),
+                ocService.listar(empresa!.id),
+            ])
+            setOrdenesCompra(ocs.filter(o => o.estado === 'ENVIADA' || o.estado === 'PARCIALMENTE_RECIBIDA'))
             setProveedores(provs.filter(p => p.estado === 'ACTIVO'))
             setProductos(prodsData ?? [])
         } catch (e: any) { alert('Error al cargar datos: ' + e.message) }
@@ -86,6 +95,23 @@ export function NuevaCompraInventarioPage() {
             retencionService.siguienteNumero(empresa.id).then(setNumeroRetencion).catch(() => {})
         }
     }, [retSeccion, empresa?.id])
+
+    async function vincularOC(ocId: string) {
+        setOcVinculada(ocId)
+        if (!ocId) return
+        try {
+            const oc = await ocService.obtener(ocId)
+            if (oc.proveedor_id) setProveedorId(oc.proveedor_id)
+            if (oc.detalle?.length) {
+                setDetalle(oc.detalle.map(d => ({
+                    producto_id:  d.producto_id ?? '',
+                    nombre:       d.descripcion ?? d.producto?.nombre ?? '',
+                    cantidad:     d.cantidad_solicitada - d.cantidad_recibida,
+                    costo_unitario: d.costo_unitario,
+                })).filter(d => d.cantidad > 0))
+            }
+        } catch { /* OC sin detalle cargado */ }
+    }
 
     const subtotalLineas = detalle.reduce((s, d) => s + d.cantidad * d.costo_unitario, 0)
     const b0  = usarIvaManual ? baseIva0  : 0
@@ -159,6 +185,7 @@ export function NuevaCompraInventarioPage() {
                     tipo_sustento: tipoSustento, tipo_regimen_pago: '01',
                     aplica_convenio_ddi: false,
                     estado: 'ACTIVO', origen: 'MANUAL', tipo_compra: 'INVENTARIO',
+                    orden_compra_id: ocVinculada || undefined,
                     created_by: profile?.id,
                 },
                 validas.map(d => ({
@@ -218,6 +245,23 @@ export function NuevaCompraInventarioPage() {
                     <p className="text-slate-500 text-sm">Factura de proveedor con ingreso al kardex</p>
                 </div>
             </div>
+
+            {/* Vincular Orden de Compra */}
+            {ordenesCompra.length > 0 && (
+                <div className="card p-4 flex items-center gap-3 bg-amber-50 border border-amber-200">
+                    <CheckSquare className="w-4 h-4 text-amber-600 shrink-0" />
+                    <label className="text-sm font-medium text-amber-800 whitespace-nowrap">Vincular OC:</label>
+                    <select className="flex-1 border border-amber-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none"
+                        value={ocVinculada} onChange={e => vincularOC(e.target.value)}>
+                        <option value="">— Sin orden de compra —</option>
+                        {ordenesCompra.map(oc => (
+                            <option key={oc.id} value={oc.id}>
+                                {oc.numero_oc} — {(oc.proveedor as any)?.nombre_empresa ?? 'Sin proveedor'}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
 
             {/* Datos del comprobante */}
             <div className="card p-5 space-y-4">

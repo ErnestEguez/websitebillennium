@@ -281,10 +281,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 </button>
                                 {openGroups.includes('vm-compras') && isSidebarOpen && (
                                     <div className="ml-4 border-l border-slate-100 pl-1 space-y-0.5">
-                                        <SidebarItem to="/compras"                  icon={FileText}  label="Lista de Compras"       active={location.pathname === '/compras'} sub disabled={!p.perm_compras} />
-                                        <SidebarItem to="/compras/nueva-inventario" icon={Package}   label="Nueva Fact. Inventario" active={location.pathname === '/compras/nueva-inventario'} sub disabled={!p.perm_compras} />
-                                        <SidebarItem to="/compras/nueva-servicio"   icon={FileText}  label="Nueva Fact. Servicio"   active={location.pathname === '/compras/nueva-servicio'} sub disabled={!p.perm_compras} />
-                                        <SidebarItem to="/retenciones"              icon={UserCheck} label="Retenciones"            active={location.pathname === '/retenciones'} sub disabled={!p.perm_compras} />
+                                        <SidebarItem to="/compras"                  icon={FileText}   label="Lista de Compras"       active={location.pathname === '/compras'} sub disabled={!p.perm_compras} />
+                                        <SidebarItem to="/compras/ordenes"          icon={CheckSquare} label="Órdenes de Compra"    active={location.pathname.startsWith('/compras/ordenes')} sub disabled={!p.perm_compras} />
+                                        <SidebarItem to="/compras/nueva-inventario" icon={Package}    label="Nueva Fact. Inventario" active={location.pathname === '/compras/nueva-inventario'} sub disabled={!p.perm_compras} />
+                                        <SidebarItem to="/compras/nueva-servicio"   icon={FileText}   label="Nueva Fact. Servicio"   active={location.pathname === '/compras/nueva-servicio'} sub disabled={!p.perm_compras} />
+                                        <SidebarItem to="/retenciones"              icon={UserCheck}  label="Retenciones"            active={location.pathname === '/retenciones'} sub disabled={!p.perm_compras} />
                                     </div>
                                 )}
                             </div>

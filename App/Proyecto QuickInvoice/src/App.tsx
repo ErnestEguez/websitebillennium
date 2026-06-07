@@ -41,6 +41,8 @@ import { ProveedoresPage as VMProveedoresPage }   from './pages/vendor/Proveedor
 import { ComprasPage }                            from './pages/vendor/ComprasPage'
 import { NuevaCompraInventarioPage }              from './pages/vendor/NuevaCompraInventarioPage'
 import { NuevaCompraServicioPage }                from './pages/vendor/NuevaCompraServicioPage'
+import { OrdenesCompraPage }                      from './pages/vendor/OrdenesCompraPage'
+import { NuevaOrdenCompraPage }                   from './pages/vendor/NuevaOrdenCompraPage'
 import { CxPPage }                                from './pages/vendor/CxPPage'
 import { AjustesPage }                            from './pages/vendor/AjustesPage'
 import { ConsultaComprasPage }                    from './pages/vendor/reportes/ConsultaComprasPage'
@@ -414,6 +416,9 @@ function App() {
             <Route path="/compras" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><ComprasPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
             <Route path="/compras/nueva-inventario" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaCompraInventarioPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
             <Route path="/compras/nueva-servicio" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaCompraServicioPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
+            <Route path="/compras/ordenes" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><OrdenesCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
+            <Route path="/compras/ordenes/nueva" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaOrdenCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
+            <Route path="/compras/ordenes/:id" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaOrdenCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
             <Route path="/cxp" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><CxPPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
             <Route path="/ajustes" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><AjustesPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
             <Route path="/retenciones" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><ComprobantesRetencionPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
