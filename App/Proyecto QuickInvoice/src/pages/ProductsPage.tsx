@@ -319,14 +319,30 @@ export function ProductsPage() {
         e.preventDefault()
         if (!empresa?.id || !editingProduct) return
 
+        // Campos explícitos — excluye joins y campos calculados que Supabase rechaza
+        const campos = {
+            codigo:                editingProduct.codigo               ?? null,
+            nombre:                editingProduct.nombre               ?? '',
+            descripcion:           editingProduct.descripcion          ?? null,
+            precio_venta:          editingProduct.precio_venta         ?? 0,
+            categoria_id:          editingProduct.categoria_id         ?? null,
+            iva_porcentaje:        editingProduct.iva_porcentaje       ?? 15,
+            maneja_stock:          editingProduct.maneja_stock         ?? true,
+            imagen_url:            editingProduct.imagen_url           ?? null,
+            cuenta_ingreso_id:     editingProduct.cuenta_ingreso_id    ?? null,
+            cuenta_ingreso_codigo: editingProduct.cuenta_ingreso_codigo ?? null,
+            cuenta_ingreso_nombre: editingProduct.cuenta_ingreso_nombre ?? null,
+            cuenta_costo_id:       editingProduct.cuenta_costo_id      ?? null,
+            cuenta_costo_codigo:   editingProduct.cuenta_costo_codigo  ?? null,
+            cuenta_costo_nombre:   editingProduct.cuenta_costo_nombre  ?? null,
+        }
+
         try {
             if (editingProduct.id) {
-                const cleanProduct = { ...editingProduct } as any
-                delete cleanProduct.categorias
-                await productoService.updateProducto(editingProduct.id, cleanProduct)
+                await productoService.updateProducto(editingProduct.id, campos)
             } else {
                 await productoService.createProducto({
-                    ...editingProduct,
+                    ...campos,
                     empresa_id: empresa.id,
                     activo: true
                 } as any)
@@ -334,9 +350,9 @@ export function ProductsPage() {
             setIsModalOpen(false)
             setEditingProduct(null)
             loadData()
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving product:', error)
-            alert('Error al guardar el producto')
+            alert('Error al guardar el producto: ' + (error?.message ?? error))
         }
     }
 
