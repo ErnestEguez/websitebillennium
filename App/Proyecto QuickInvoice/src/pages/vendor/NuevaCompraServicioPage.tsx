@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { supabase } from '../../lib/supabase'
 import { compraService, proveedorService, retencionService } from '../../services/vendorService'
 import { contableConfigService } from '../../services/contableConfigService'
 import { contabilidadComprasService } from '../../services/contabilidadComprasService'
@@ -113,7 +112,7 @@ export function NuevaCompraServicioPage() {
         const prov = proveedores.find(p => p.ruc === data.ruc_proveedor)
         if (prov) setProveedorId(prov.id)
         if (data.items?.length > 0) {
-            setDetalle(data.items.map((item, idx) => ({
+            setDetalle(data.items.map((item: any, idx: number) => ({
                 descripcion:     item.descripcion ?? '',
                 cantidad:        item.cantidad ?? 1,
                 precio_unitario: item.precio_unitario ?? 0,
