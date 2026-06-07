@@ -117,6 +117,7 @@ export function FacturaDirectaPage() {
             setClientes(clientsList)
             setProductos(prodList)
             setVendedores(vendedoresList)
+            if (vendedoresList.length === 1) setSelectedVendedorId(vendedoresList[0].id)
 
             // Consumidor final: buscar en la lista ya cacheada
             const consumidor = clientsList.find((c: any) => c.identificacion === '9999999999999') ?? null
@@ -775,7 +776,7 @@ export function FacturaDirectaPage() {
                                                 }} />
                                         </div>
 
-                                        {/* Precio Unitario + Total línea */}
+                                        {/* Precio Unitario */}
                                         <div className="col-span-4 md:col-span-2">
                                             <div className="relative">
                                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
@@ -784,11 +785,13 @@ export function FacturaDirectaPage() {
                                                     value={det.precio_unitario}
                                                     onChange={e => updateLinea(idx, 'precio_unitario', parseFloat(e.target.value) || 0)} />
                                             </div>
-                                            {linea && (
-                                                <div className="text-right text-xs font-bold text-primary-700 mt-0.5 pr-1">
-                                                    = {formatCurrency(linea.total)}
-                                                </div>
-                                            )}
+                                        </div>
+
+                                        {/* Total línea */}
+                                        <div className="col-span-4 md:col-span-2 flex items-center justify-end">
+                                            <span className="text-sm font-bold text-primary-700">
+                                                {linea ? formatCurrency(linea.total) : '—'}
+                                            </span>
                                         </div>
 
                                         {/* Descuento % */}

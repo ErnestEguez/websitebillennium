@@ -143,13 +143,18 @@ export const ncService = {
         estado_sri: string; estado_sistema: string;
         clientes: { nombre: string; identificacion: string }
     }>> {
+        // Normalizar "001-005-7" → "001-005-000000007" para coincidir con el formato almacenado
+        const textoBusqueda = texto.replace(
+            /^(\d{3}-\d{3}-)(\d+)$/,
+            (_, prefix, seq) => prefix + seq.padStart(9, '0')
+        )
         const { data, error } = await supabase
             .from('comprobantes')
             .select('id, secuencial, total, created_at, estado_sri, estado_sistema, clientes(nombre, identificacion)')
             .eq('empresa_id', empresaId)
             .eq('estado_sri', 'AUTORIZADO')
             .neq('estado_sistema', 'ANULADA')
-            .or(`secuencial.ilike.%${texto}%`)
+            .or(`secuencial.ilike.%${textoBusqueda}%,clientes.nombre.ilike.%${texto}%`)
             .order('created_at', { ascending: false })
             .limit(20)
 
