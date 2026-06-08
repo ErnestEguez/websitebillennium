@@ -3,8 +3,10 @@ import { useReactToPrint } from 'react-to-print'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { bodegaService } from '../services/bodegaService'
 import { formatCurrency } from '../lib/utils'
-import { Printer, Download, RefreshCw, Loader2, Package, BarChart3, Filter, Hash } from 'lucide-react'
+import { Printer, Download, RefreshCw, Loader2, Package, BarChart3, Filter, Hash, Warehouse } from 'lucide-react'
+import type { Bodega } from '../types/vendors'
 
 interface ItemInventario {
     id: string
@@ -27,9 +29,11 @@ export function ValorizacionInventarioPage() {
 
     const [items, setItems]           = useState<ItemInventario[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
+    const [bodegas, setBodegas]       = useState<Bodega[]>([])
     const [loading, setLoading]       = useState(false)
     const [tipoCosto, setTipoCosto]   = useState<'promedio' | 'ultimo'>('promedio')
     const [catFiltro, setCatFiltro]   = useState<string>('TODOS')
+    const [bodegaId, setBodegaId]     = useState<string>('')   // '' = todas
     const [fechaCorte, setFechaCorte] = useState<string>(hoy())
     const [showCodigo, setShowCodigo] = useState(true)
 
@@ -39,12 +43,18 @@ export function ValorizacionInventarioPage() {
     })
 
     useEffect(() => {
-        if (empresa?.id) cargar()
+        if (empresa?.id) {
+            bodegaService.listar(empresa.id).then(setBodegas).catch(console.error)
+            cargar()
+        }
     }, [empresa?.id])
 
-    async function cargar(corte?: string) {
+    async function cargar(fechaOverride?: string, bodegaOverride?: string) {
         if (!empresa?.id) return
-        const fechaUso = corte ?? fechaCorte
+        const fechaUso    = fechaOverride    ?? fechaCorte
+        const bodegaFiltro = bodegaOverride !== undefined ? bodegaOverride : bodegaId
+        const esHoy       = fechaUso === hoy()
+
         setLoading(true)
         try {
             const [{ data: prods }, { data: cats }] = await Promise.all([
@@ -67,12 +77,28 @@ export function ValorizacionInventarioPage() {
             setCategorias(cats ?? [])
 
             const prodIds = (prods ?? []).map(p => p.id)
+
+            // Mapa de stock y costo para bodega específica
+            const stockBodegaMap: Record<string, { cantidad: number; costo_promedio: number }> = {}
+            if (bodegaFiltro && prodIds.length > 0) {
+                const { data: sbData } = await supabase
+                    .from('stock_bodega')
+                    .select('producto_id, cantidad, costo_promedio')
+                    .eq('empresa_id', empresa.id)
+                    .eq('bodega_id', bodegaFiltro)
+                for (const sb of (sbData ?? [])) {
+                    stockBodegaMap[sb.producto_id] = {
+                        cantidad:       Number(sb.cantidad),
+                        costo_promedio: Number(sb.costo_promedio),
+                    }
+                }
+            }
+
             const ultimoCostoMap: Record<string, number> = {}
-            const stockCorteMap: Record<string, number>  = {}
+            const stockCorteMap:  Record<string, number> = {}
 
             if (prodIds.length > 0) {
-                // Stock histórico al corte: suma de movimientos kardex <= fechaCorte
-                const { data: kardexAll } = await supabase
+                let kardexQuery = supabase
                     .from('kardex')
                     .select('producto_id, tipo_movimiento, cantidad, costo_unitario, fecha, created_at')
                     .eq('empresa_id', empresa.id)
@@ -80,26 +106,42 @@ export function ValorizacionInventarioPage() {
                     .lte('fecha', fechaUso)
                     .order('created_at', { ascending: false })
 
+                if (bodegaFiltro) {
+                    kardexQuery = (kardexQuery as any).eq('bodega_id', bodegaFiltro)
+                }
+
+                const { data: kardexAll } = await kardexQuery
+
                 for (const k of (kardexAll ?? [])) {
                     const delta = k.tipo_movimiento === 'ENTRADA'
                         ? Number(k.cantidad)
                         : -Number(k.cantidad)
                     stockCorteMap[k.producto_id] = (stockCorteMap[k.producto_id] ?? 0) + delta
 
-                    // Último costo de ENTRADA hasta la fecha
                     if (k.tipo_movimiento === 'ENTRADA' && !ultimoCostoMap[k.producto_id] && k.costo_unitario) {
                         ultimoCostoMap[k.producto_id] = Number(k.costo_unitario)
                     }
                 }
             }
 
-            const esHoy = fechaUso === hoy()
-
             setItems(
                 (prods ?? []).map(p => {
-                    const stockVal = esHoy
-                        ? Number(p.stock || 0)
-                        : Math.max(0, stockCorteMap[p.id] ?? 0)
+                    let stockVal: number
+                    let costoPromedioVal: number
+
+                    if (bodegaFiltro) {
+                        if (esHoy) {
+                            stockVal       = stockBodegaMap[p.id]?.cantidad       ?? 0
+                            costoPromedioVal = stockBodegaMap[p.id]?.costo_promedio ?? Number(p.costo_promedio || 0)
+                        } else {
+                            stockVal       = Math.max(0, stockCorteMap[p.id] ?? 0)
+                            costoPromedioVal = stockBodegaMap[p.id]?.costo_promedio ?? Number(p.costo_promedio || 0)
+                        }
+                    } else {
+                        stockVal       = esHoy ? Number(p.stock || 0) : Math.max(0, stockCorteMap[p.id] ?? 0)
+                        costoPromedioVal = Number(p.costo_promedio || 0)
+                    }
+
                     return {
                         id:               p.id,
                         codigo:           p.codigo ?? '',
@@ -107,8 +149,8 @@ export function ValorizacionInventarioPage() {
                         categoria_id:     p.categoria_id,
                         categoria_nombre: p.categoria_id ? (catMap[p.categoria_id] ?? '—') : '—',
                         stock:            stockVal,
-                        costo_promedio:   Number(p.costo_promedio || 0),
-                        ultimo_costo:     ultimoCostoMap[p.id] ?? Number(p.costo_promedio || 0),
+                        costo_promedio:   costoPromedioVal,
+                        ultimo_costo:     ultimoCostoMap[p.id] ?? costoPromedioVal,
                     }
                 })
             )
@@ -117,10 +159,11 @@ export function ValorizacionInventarioPage() {
         }
     }
 
-    function aplicarCorte() { cargar(fechaCorte) }
+    function aplicarFiltros() { cargar(fechaCorte, bodegaId) }
 
     const filtrados = items
         .filter(i => catFiltro === 'TODOS' || i.categoria_id === catFiltro)
+        .filter(i => !bodegaId || i.stock > 0)   // cuando hay bodega, sólo con stock en ella
         .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 
     const costo = (i: ItemInventario) =>
@@ -130,6 +173,7 @@ export function ValorizacionInventarioPage() {
     const totalValor    = filtrados.reduce((s, i) => s + i.stock * costo(i), 0)
     const labelCosto    = tipoCosto === 'promedio' ? 'Costo Promedio' : 'Último Costo'
     const fechaLabel    = new Date(fechaCorte + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })
+    const bodegaActual  = bodegas.find(b => b.id === bodegaId)
 
     function exportarExcel() {
         const colCosto = labelCosto
@@ -155,7 +199,8 @@ export function ValorizacionInventarioPage() {
         const ws = XLSX.utils.json_to_sheet(rows)
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, 'Inventario')
-        XLSX.writeFile(wb, `Inventario_${fechaCorte}.xlsx`)
+        const sufijoBodega = bodegaActual?.codigo ? `_${bodegaActual.codigo}` : bodegaActual ? '_bod' : ''
+        XLSX.writeFile(wb, `Inventario${sufijoBodega}_${fechaCorte}.xlsx`)
     }
 
     return (
@@ -165,7 +210,14 @@ export function ValorizacionInventarioPage() {
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Inventario Valorado</h1>
-                    <p className="text-slate-500 text-sm">Corte al {fechaLabel}</p>
+                    <p className="text-slate-500 text-sm">
+                        Corte al {fechaLabel}
+                        {bodegaActual && (
+                            <span className="ml-2 text-primary-600 font-medium">
+                                — {bodegaActual.nombre}
+                            </span>
+                        )}
+                    </p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                     <button onClick={() => cargar()} disabled={loading}
@@ -187,21 +239,21 @@ export function ValorizacionInventarioPage() {
             </div>
 
             {/* Filtros */}
-            <div className="card p-4 flex flex-wrap gap-5 items-end">
+            <div className="card p-4 flex flex-wrap gap-4 items-end">
 
                 {/* Tipo de costo */}
                 <div className="flex items-center gap-2">
                     <BarChart3 className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Valorar con:</span>
+                    <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Valorar:</span>
                     <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
-                        <button
-                            onClick={() => setTipoCosto('promedio')}
-                            className={`px-3 py-1.5 font-medium transition-colors ${tipoCosto === 'promedio' ? 'bg-primary-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-                        >Costo Promedio</button>
-                        <button
-                            onClick={() => setTipoCosto('ultimo')}
-                            className={`px-3 py-1.5 font-medium transition-colors ${tipoCosto === 'ultimo' ? 'bg-primary-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
-                        >Último Costo</button>
+                        <button onClick={() => setTipoCosto('promedio')}
+                            className={`px-3 py-1.5 font-medium transition-colors ${tipoCosto === 'promedio' ? 'bg-primary-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+                            Costo Promedio
+                        </button>
+                        <button onClick={() => setTipoCosto('ultimo')}
+                            className={`px-3 py-1.5 font-medium transition-colors ${tipoCosto === 'ultimo' ? 'bg-primary-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>
+                            Último Costo
+                        </button>
                     </div>
                 </div>
 
@@ -209,11 +261,8 @@ export function ValorizacionInventarioPage() {
                 <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-slate-400 shrink-0" />
                     <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Categoría:</span>
-                    <select
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-primary-400"
-                        value={catFiltro}
-                        onChange={e => setCatFiltro(e.target.value)}
-                    >
+                    <select className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-primary-400"
+                        value={catFiltro} onChange={e => setCatFiltro(e.target.value)}>
                         <option value="TODOS">Todas</option>
                         {categorias.map(c => (
                             <option key={c.id} value={c.id}>{c.nombre}</option>
@@ -221,32 +270,42 @@ export function ValorizacionInventarioPage() {
                     </select>
                 </div>
 
+                {/* Bodega */}
+                {bodegas.length > 0 && (
+                    <div className="flex items-center gap-2">
+                        <Warehouse className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Bodega:</span>
+                        <select
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-primary-400"
+                            value={bodegaId}
+                            onChange={e => setBodegaId(e.target.value)}>
+                            <option value="">Todas las bodegas</option>
+                            {bodegas.map(b => (
+                                <option key={b.id} value={b.id}>
+                                    {b.codigo ? `[${b.codigo}] ` : ''}{b.nombre}{b.es_principal ? ' ★' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
                 {/* Mostrar código */}
                 <div className="flex items-center gap-2">
                     <Hash className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Mostrar código:</span>
-                    <button
-                        onClick={() => setShowCodigo(v => !v)}
-                        className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors shrink-0 ${showCodigo ? 'bg-primary-600' : 'bg-slate-300'}`}
-                    >
+                    <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Código:</span>
+                    <button onClick={() => setShowCodigo(v => !v)}
+                        className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors shrink-0 ${showCodigo ? 'bg-primary-600' : 'bg-slate-300'}`}>
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${showCodigo ? 'translate-x-5' : 'translate-x-1'}`} />
                     </button>
                 </div>
 
-                {/* Fecha de corte */}
+                {/* Fecha de corte + Aplicar */}
                 <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Fecha de corte:</span>
-                    <input
-                        type="date"
-                        value={fechaCorte}
-                        onChange={e => setFechaCorte(e.target.value)}
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-primary-400"
-                    />
-                    <button
-                        onClick={aplicarCorte}
-                        disabled={loading}
-                        className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50"
-                    >
+                    <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Corte:</span>
+                    <input type="date" value={fechaCorte} onChange={e => setFechaCorte(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-primary-400" />
+                    <button onClick={aplicarFiltros} disabled={loading}
+                        className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50">
                         Aplicar
                     </button>
                 </div>
@@ -257,6 +316,9 @@ export function ValorizacionInventarioPage() {
                 <div className="card p-4">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Artículos</p>
                     <p className="text-2xl font-black text-slate-900 mt-1">{filtrados.length}</p>
+                    {bodegaActual && (
+                        <p className="text-xs text-slate-400 mt-0.5">{bodegaActual.nombre}</p>
+                    )}
                 </div>
                 <div className="card p-4">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Unidades en Stock</p>
@@ -346,6 +408,12 @@ export function ValorizacionInventarioPage() {
                         )}
                         <h2 className="text-lg font-bold mt-2">INVENTARIO VALORADO</h2>
                         <p className="text-xs text-gray-600">Valoración: {labelCosto}</p>
+                        <p className="text-xs text-gray-600">
+                            Bodega: {bodegaActual
+                                ? `${bodegaActual.nombre}${bodegaActual.codigo ? ` [${bodegaActual.codigo}]` : ''}`
+                                : 'Todas las bodegas'
+                            }
+                        </p>
                         {catFiltro !== 'TODOS' && (
                             <p className="text-xs text-gray-600">
                                 Categoría: {categorias.find(c => c.id === catFiltro)?.nombre ?? '—'}

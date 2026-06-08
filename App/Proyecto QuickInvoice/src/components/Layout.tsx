@@ -28,6 +28,8 @@ import {
     UserCog,
     CreditCard,
     FileSearch,
+    SlidersHorizontal,
+    ArrowLeftRight,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -216,15 +218,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('facturacion')}
                             onToggle={() => toggleGroup('facturacion')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/dashboard','/nueva-factura','/facturacion','/productos','/vendedores','/notas-credito','/anulacion-facturas','/cierres','/consultas/ventas','/compras/nueva','/inventario-valorizado','/kardex'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/dashboard','/nueva-factura','/facturacion','/vendedores','/notas-credito','/anulacion-facturas','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/dashboard"          icon={LayoutDashboard} label="Dashboard"          active={location.pathname === '/dashboard'} sub disabled={!p.perm_dashboard} />
                             <SidebarItem to="/nueva-factura"      icon={FilePlus}        label="Nueva Factura"      active={location.pathname === '/nueva-factura'} sub disabled={!p.perm_nueva_factura} />
-                            <SidebarItem to="/productos"                icon={Package}      label="Artículos"              active={location.pathname === '/productos'} sub />
-                            <SidebarItem to="/compras/nueva-inventario"  icon={ShoppingCart} label="Ingreso Fact. Inventario"   active={location.pathname === '/compras/nueva-inventario'} sub />
-                            <SidebarItem to="/compras/nueva-servicio"    icon={FileText}     label="Ingreso Fact. Servicio"     active={location.pathname === '/compras/nueva-servicio'} sub />
-                            <SidebarItem to="/inventario-valorizado"     icon={BarChart3}    label="Inventario Valorado"        active={location.pathname === '/inventario-valorizado'} sub />
-                            <SidebarItem to="/kardex"                    icon={ArrowDownUp}  label="Kardex"                     active={location.pathname.startsWith('/kardex')} sub />
                             <SidebarItem to="/facturacion"        icon={FileText}        label="Comprobantes"       active={location.pathname === '/facturacion'} sub disabled={!p.perm_comprobantes} />
                             <SidebarItem to="/notas-credito"      icon={FileMinus}       label="Notas de Crédito"   active={location.pathname === '/notas-credito'} sub disabled={!p.perm_notas_credito} />
                             <SidebarItem to="/anulacion-facturas" icon={Ban}             label="Anulación Facturas" active={location.pathname === '/anulacion-facturas'} sub disabled={!p.perm_anulacion_facturas} />
@@ -241,6 +238,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     {isSidebarOpen && <span>Cerrar Caja</span>}
                                 </button>
                             )}
+                        </ModuleSection>}
+
+                        {/* ── MÓDULO INVENTARIOS ────────────────────────── */}
+                        {esOficina && <ModuleSection
+                            label="Módulo Inventarios"
+                            icon={Package}
+                            colorClass="text-orange-600"
+                            isOpen={openGroups.includes('inventario')}
+                            onToggle={() => toggleGroup('inventario')}
+                            isSidebarOpen={isSidebarOpen}
+                            anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
+                        >
+                            <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub />
+                            <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub />
+                            <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub />
+                            <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub />
+                            <SidebarItem to="/transferencia-bodega"     icon={ArrowLeftRight}    label="Transfer. Bodegas"     active={location.pathname === '/transferencia-bodega'} sub />
+                            <SidebarItem to="/inventario-valorizado"    icon={BarChart3}         label="Inventario Valorado"   active={location.pathname === '/inventario-valorizado'} sub />
+                            <SidebarItem to="/kardex"                   icon={ArrowDownUp}       label="Kardex"                active={location.pathname.startsWith('/kardex')} sub />
                         </ModuleSection>}
 
                         {/* ── MÓDULO 1b: Manejo de Clientes ────────────── */}
@@ -281,11 +297,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 </button>
                                 {openGroups.includes('vm-compras') && isSidebarOpen && (
                                     <div className="ml-4 border-l border-slate-100 pl-1 space-y-0.5">
-                                        <SidebarItem to="/compras"                  icon={FileText}   label="Lista de Compras"       active={location.pathname === '/compras'} sub disabled={!p.perm_compras} />
-                                        <SidebarItem to="/compras/ordenes"          icon={CheckSquare} label="Órdenes de Compra"    active={location.pathname.startsWith('/compras/ordenes')} sub disabled={!p.perm_compras} />
-                                        <SidebarItem to="/compras/nueva-inventario" icon={Package}    label="Nueva Fact. Inventario" active={location.pathname === '/compras/nueva-inventario'} sub disabled={!p.perm_compras} />
-                                        <SidebarItem to="/compras/nueva-servicio"   icon={FileText}   label="Nueva Fact. Servicio"   active={location.pathname === '/compras/nueva-servicio'} sub disabled={!p.perm_compras} />
-                                        <SidebarItem to="/retenciones"              icon={UserCheck}  label="Retenciones"            active={location.pathname === '/retenciones'} sub disabled={!p.perm_compras} />
+                                        <SidebarItem to="/compras"                icon={FileText}  label="Lista de Compras"     active={location.pathname === '/compras'} sub disabled={!p.perm_compras} />
+                                        <SidebarItem to="/compras/nueva-servicio" icon={FileText}  label="Compras de Servicios" active={location.pathname === '/compras/nueva-servicio'} sub disabled={!p.perm_compras} />
+                                        <SidebarItem to="/retenciones"            icon={UserCheck} label="Retenciones"          active={location.pathname === '/retenciones'} sub disabled={!p.perm_compras} />
                                     </div>
                                 )}
                             </div>

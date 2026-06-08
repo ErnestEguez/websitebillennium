@@ -22,14 +22,19 @@ import {
     Bomb,
     Tag,
     BookOpen,
+    Warehouse,
+    Star,
+    PowerOff,
 } from 'lucide-react'
 import { ContabilidadConfigTab } from '../components/ContabilidadConfigTab'
 import { categoriaService, type Categoria } from '../services/categoriaService'
+import { bodegaService } from '../services/bodegaService'
+import type { Bodega } from '../types/vendors'
 import { cn } from '../lib/utils'
 
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
-    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'plataforma' | 'contabilidad'>('empresa')
+    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'bodegas' | 'plataforma' | 'contabilidad'>('empresa')
     const [platformSubTab, setPlatformSubTab] = useState<'empresas' | 'personal'>('empresas')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -58,6 +63,11 @@ export function ConfigurationPage() {
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [isCategoriaModalOpen, setIsCategoriaModalOpen] = useState(false)
     const [editingCategoria, setEditingCategoria] = useState<Partial<Categoria> | null>(null)
+
+    // Bodegas State
+    const [bodegas, setBodegas] = useState<Bodega[]>([])
+    const [isBodegaModalOpen, setIsBodegaModalOpen] = useState(false)
+    const [editingBodega, setEditingBodega] = useState<Partial<Bodega> | null>(null)
 
     // Plataforma State (Admin)
     const [allEmpresas, setAllEmpresas] = useState<any[]>([])
@@ -198,6 +208,15 @@ export function ConfigurationPage() {
                         console.error('Error en fallback categorías:', e2)
                         setCategorias([])
                     }
+                }
+
+                // ── Cargar bodegas ──
+                try {
+                    const bodegasData = await bodegaService.listarTodas(empresa!.id)
+                    setBodegas(bodegasData)
+                } catch (e) {
+                    console.error('Error cargando bodegas:', e)
+                    setBodegas([])
                 }
             }
         } catch (error) {
@@ -448,6 +467,68 @@ export function ConfigurationPage() {
         }
     }
 
+    async function handleSaveBodega() {
+        try {
+            setSaving(true)
+            if (!editingBodega?.nombre?.trim()) {
+                alert('El nombre de la bodega es obligatorio')
+                return
+            }
+
+            if (editingBodega.id) {
+                // Si se marca como principal, desmarcar la anterior
+                if (editingBodega.es_principal) {
+                    await supabase
+                        .from('bodegas')
+                        .update({ es_principal: false })
+                        .eq('empresa_id', empresa!.id)
+                        .neq('id', editingBodega.id)
+                }
+                const { id, empresa_id, created_at, updated_at, ...updates } = editingBodega as any
+                await bodegaService.actualizar(editingBodega.id, updates)
+            } else {
+                // Si la nueva es principal, desmarcar la anterior
+                if (editingBodega.es_principal) {
+                    await supabase
+                        .from('bodegas')
+                        .update({ es_principal: false })
+                        .eq('empresa_id', empresa!.id)
+                }
+                await bodegaService.crear({
+                    nombre: editingBodega.nombre!,
+                    codigo: editingBodega.codigo || undefined,
+                    descripcion: editingBodega.descripcion || undefined,
+                    direccion: editingBodega.direccion || undefined,
+                    es_principal: editingBodega.es_principal ?? false,
+                    activo: true,
+                    empresa_id: empresa!.id,
+                })
+            }
+
+            setIsBodegaModalOpen(false)
+            setEditingBodega(null)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al guardar bodega: ${error.message}`)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    async function handleBajaBodega(id: string, nombre: string, esPrincipal: boolean) {
+        if (esPrincipal) {
+            alert('No se puede dar de baja la bodega principal. Primero asigna otra bodega como principal.')
+            return
+        }
+        if (!confirm(`¿Está seguro de dar de baja la bodega "${nombre}"? No se eliminará, quedará inactiva.`)) return
+        try {
+            await bodegaService.desactivar(id)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al dar de baja: ${error.message}`)
+        }
+    }
+
     async function handleBajaCategoria(id: string, nombre: string) {
         if (!confirm(`¿Está seguro de dar de baja la categoría "${nombre}"? No se eliminará, quedará inactiva.`)) return
         try {
@@ -552,6 +633,16 @@ export function ConfigurationPage() {
                     >
                         <Tag className="w-4 h-4" />
                         Categorías
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('bodegas')}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
+                            activeTab === 'bodegas' ? "bg-white text-amber-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                    >
+                        <Warehouse className="w-4 h-4" />
+                        Bodegas
                     </button>
                     <button
                         onClick={() => setActiveTab('contabilidad')}
@@ -949,6 +1040,117 @@ export function ConfigurationPage() {
                             </div>
                         )}
                     </div>
+                </div>
+            ) : activeTab === 'bodegas' ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900">Bodegas / Almacenes</h2>
+                            <p className="text-sm text-slate-500">Gestiona los puntos de almacenamiento de inventario</p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                setEditingBodega({ nombre: '', codigo: '', descripcion: '', direccion: '', es_principal: false, activo: true })
+                                setIsBodegaModalOpen(true)
+                            }}
+                            className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" /> Nueva Bodega
+                        </button>
+                    </div>
+
+                    <div className="card overflow-hidden">
+                        {bodegas.length === 0 ? (
+                            <div className="py-16 text-center">
+                                <Warehouse className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                                <p className="text-slate-400 font-medium">No hay bodegas registradas.</p>
+                                <p className="text-slate-300 text-sm mt-1">Crea la primera bodega con el botón de arriba.</p>
+                            </div>
+                        ) : (
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-700 text-white">
+                                    <tr>
+                                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Nombre</th>
+                                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Código</th>
+                                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Dirección</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Principal</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Estado</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {bodegas.map((bod, idx) => (
+                                        <tr key={bod.id} className={cn(
+                                            'hover:bg-slate-50 transition-colors',
+                                            !bod.activo && 'opacity-50',
+                                            idx % 2 === 0 ? '' : 'bg-slate-50/40',
+                                        )}>
+                                            <td className="py-3 px-4 font-semibold text-slate-900">
+                                                {bod.nombre}
+                                                {bod.descripcion && (
+                                                    <p className="text-xs text-slate-400 font-normal mt-0.5">{bod.descripcion}</p>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-4 font-mono text-slate-600">
+                                                {bod.codigo || <span className="text-slate-300">—</span>}
+                                            </td>
+                                            <td className="py-3 px-4 text-slate-500 text-xs">
+                                                {bod.direccion || <span className="text-slate-300">—</span>}
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                {bod.es_principal ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                                        <Star className="w-3 h-3" /> Principal
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-300 text-xs">—</span>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                {bod.activo ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                                        Activa
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-bold">
+                                                        Inactiva
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button
+                                                        title="Editar"
+                                                        onClick={() => { setEditingBodega({ ...bod }); setIsBodegaModalOpen(true) }}
+                                                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    {bod.activo && !bod.es_principal && (
+                                                        <button
+                                                            title="Dar de baja"
+                                                            onClick={() => handleBajaBodega(bod.id, bod.nombre, bod.es_principal)}
+                                                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <PowerOff className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {bod.es_principal && (
+                                                        <span title="La bodega principal no puede darse de baja" className="p-1.5 text-slate-200 cursor-not-allowed">
+                                                            <PowerOff className="w-4 h-4" />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                        Las bodegas dadas de baja no aparecen en los formularios de compras y ventas, pero se conservan en el historial de movimientos.
+                    </p>
                 </div>
             ) : activeTab === 'contabilidad' ? (
                 <ContabilidadConfigTab />
@@ -1656,6 +1858,147 @@ export function ConfigurationPage() {
                     </div>
                 )
             }
+            {/* ── Modal Bodega ──────────────────────────────────────── */}
+            {isBodegaModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 space-y-5 animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                                    <Warehouse className="w-5 h-5" />
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-900">
+                                    {editingBodega?.id ? 'Editar Bodega' : 'Nueva Bodega'}
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => { setIsBodegaModalOpen(false); setEditingBodega(null) }}
+                                className="p-2 hover:bg-slate-100 rounded-full text-slate-400"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Campos */}
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2 space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Nombre de la Bodega *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Bodega Principal, Almacén Externo..."
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-amber-400 font-bold text-slate-900"
+                                        value={editingBodega?.nombre || ''}
+                                        onChange={e => setEditingBodega({ ...editingBodega, nombre: e.target.value })}
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Código <span className="normal-case font-normal text-slate-300">(opcional)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: BOD1, ALM-EXT..."
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-amber-400 font-mono text-slate-900"
+                                        value={editingBodega?.codigo || ''}
+                                        onChange={e => setEditingBodega({ ...editingBodega, codigo: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Dirección <span className="normal-case font-normal text-slate-300">(opcional)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Dirección física..."
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-amber-400 text-slate-900"
+                                        value={editingBodega?.direccion || ''}
+                                        onChange={e => setEditingBodega({ ...editingBodega, direccion: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-span-2 space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Descripción <span className="normal-case font-normal text-slate-300">(opcional)</span>
+                                    </label>
+                                    <textarea
+                                        rows={2}
+                                        placeholder="Descripción de esta bodega..."
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-amber-400 text-sm resize-none"
+                                        value={editingBodega?.descripcion || ''}
+                                        onChange={e => setEditingBodega({ ...editingBodega, descripcion: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Bodega principal */}
+                            <div className={cn(
+                                'flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors',
+                                editingBodega?.es_principal
+                                    ? 'bg-amber-50 border-amber-200'
+                                    : 'bg-slate-50 border-slate-200 hover:border-amber-200'
+                            )}
+                                onClick={() => setEditingBodega({ ...editingBodega, es_principal: !editingBodega?.es_principal })}
+                            >
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        'relative inline-flex h-6 w-10 items-center rounded-full transition-colors shrink-0',
+                                        editingBodega?.es_principal ? 'bg-amber-500' : 'bg-slate-300'
+                                    )}
+                                >
+                                    <span className={cn(
+                                        'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                                        editingBodega?.es_principal ? 'translate-x-5' : 'translate-x-1'
+                                    )} />
+                                </button>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                                        <Star className="w-3.5 h-3.5 text-amber-500" />
+                                        Bodega principal
+                                    </p>
+                                    <p className="text-xs text-slate-400">Se pre-selecciona automáticamente en compras, ventas y órdenes de compra</p>
+                                </div>
+                            </div>
+
+                            {/* Estado — solo al editar */}
+                            {editingBodega?.id && (
+                                <div className={cn(
+                                    'flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border',
+                                    editingBodega.activo === false
+                                        ? 'bg-red-50 text-red-600 border-red-100'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                )}>
+                                    <span className={cn('w-2 h-2 rounded-full', editingBodega.activo === false ? 'bg-red-400' : 'bg-emerald-400')} />
+                                    Estado: {editingBodega.activo === false ? 'Inactiva (dada de baja)' : 'Activa'}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Botones */}
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => { setIsBodegaModalOpen(false); setEditingBodega(null) }}
+                                className="flex-1 py-3 font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSaveBodega}
+                                disabled={saving || !editingBodega?.nombre?.trim()}
+                                className="flex-1 py-3 font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* ── Modal Categoría ──────────────────────────────────── */}
             {
                 isCategoriaModalOpen && (
                     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">

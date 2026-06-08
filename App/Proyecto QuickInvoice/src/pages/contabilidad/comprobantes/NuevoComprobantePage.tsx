@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useFormDraft } from '../../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, Loader2, AlertCircle, CheckCircle2, Search, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
@@ -83,6 +84,20 @@ export function NuevoComprobantePage() {
     ])
     const [guardando, setGuardando] = useState(false)
     const [error, setError] = useState<string | null>(null)
+
+    // ── Draft ─────────────────────────────────────────────────────
+    const clearDraft = useFormDraft(
+        'draft_nuevo_comprobante',
+        () => ({ tipoId, periodoId, fecha, glosa, lineas }),
+        (d) => {
+            if (d.tipoId)        setTipoId(d.tipoId)
+            if (d.periodoId)     setPeriodoId(d.periodoId)
+            if (d.fecha)         setFecha(d.fecha)
+            if (d.glosa)         setGlosa(d.glosa)
+            if (d.lineas?.length) setLineas(d.lineas)
+        },
+        [tipoId, periodoId, fecha, glosa, lineas],
+    )
 
     useEffect(() => { if (empresaActiva) cargarCatalogos() }, [empresaActiva])
 
@@ -185,6 +200,7 @@ export function NuevoComprobantePage() {
             })
         }
 
+        clearDraft()
         navigate('/comprobantes')
     }
 

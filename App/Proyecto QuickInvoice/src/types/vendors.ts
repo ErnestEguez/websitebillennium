@@ -2,6 +2,36 @@
 // Tipos TypeScript — Módulo VendorManagement
 // ============================================================
 
+// ── Bodegas ─────────────────────────────────────────────────
+export interface Bodega {
+    id: string
+    empresa_id: string
+    nombre: string
+    codigo?: string
+    descripcion?: string
+    direccion?: string
+    cuenta_inventario_id?:     string | null
+    cuenta_inventario_codigo?: string | null
+    cuenta_inventario_nombre?: string | null
+    es_principal: boolean
+    activo: boolean
+    created_at?: string
+    updated_at?: string
+}
+
+export interface StockBodega {
+    id?: string
+    empresa_id: string
+    bodega_id: string
+    producto_id: string
+    cantidad: number
+    costo_promedio: number
+    updated_at?: string
+    // Joins opcionales
+    bodega?:   Pick<Bodega, 'nombre' | 'codigo'>
+    producto?: { nombre: string; codigo: string | null }
+}
+
 export type TipoIdentificacion = 'RUC' | 'CEDULA' | 'PASAPORTE' | 'EXTERIOR'
 export type TipoProveedor      = 'PERSONA_NATURAL' | 'SOCIEDAD'
 export type EstadoProveedor    = 'ACTIVO' | 'INACTIVO'
@@ -76,8 +106,10 @@ export interface Compra {
     pais_pago_exterior?: string
     aplica_convenio_ddi: boolean
     orden_compra_id?:   string
+    bodega_id?:         string
     // Joins opcionales
     proveedor?: Pick<Proveedor, 'nombre_empresa' | 'ruc'>
+    bodega?:    Pick<Bodega, 'nombre' | 'codigo'>
 }
 
 export interface CompraConDetalle extends Compra {
@@ -87,7 +119,7 @@ export interface CompraConDetalle extends Compra {
     cxp?:                    CuentaPorPagar
 }
 
-// ── Detalle inventario (existente, sin cambios) ─────────────
+// ── Detalle inventario ──────────────────────────────────────
 export interface DetalleInventario {
     id?: string
     ingreso_id: string
@@ -95,6 +127,7 @@ export interface DetalleInventario {
     cantidad: number
     costo_unitario: number
     subtotal?: number
+    bodega_id?: string
     producto?: { nombre: string; codigo: string }
 }
 
@@ -197,11 +230,13 @@ export interface OrdenCompra {
     observaciones?: string
     subtotal: number
     total: number
+    bodega_id?: string
     created_by?: string
     created_at?: string
     updated_at?: string
     // Joins
     proveedor?: Pick<Proveedor, 'nombre_empresa' | 'ruc'>
+    bodega?:    Pick<Bodega, 'nombre' | 'codigo'>
     detalle?: DetalleOrdenCompra[]
 }
 
@@ -214,6 +249,7 @@ export interface DetalleOrdenCompra {
     cantidad_recibida: number
     costo_unitario: number
     subtotal: number
+    bodega_id?: string
     producto?: { nombre: string; codigo: string; unidad?: string }
 }
 

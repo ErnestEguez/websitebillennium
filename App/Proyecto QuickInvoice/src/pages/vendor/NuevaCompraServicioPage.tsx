@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useFormDraft } from '../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { compraService, proveedorService, retencionService } from '../../services/vendorService'
@@ -58,6 +59,44 @@ export function NuevaCompraServicioPage() {
     // Accounts for "Cuenta de gasto" per line (only if contabilidad enabled)
     const [cuentasGasto, setCuentasGasto] = useState<{ id: string; codigo: string; nombre: string }[]>([])
     const usaContabilidad = !!empresa?.usar_contabilidad_compras
+
+    // ── Draft: persiste el formulario en sessionStorage ──────────
+    const clearDraft = useFormDraft(
+        'draft_compra_servicio',
+        () => ({
+            proveedorId, fechaEmision, estab, ptoEmi, secuencial,
+            claveAcceso, tipoSustento, formaPago, fechaVenc, observaciones,
+            detalle, baseIva0, baseIva5, baseIva15, valorIvaManual, modoIvaManual,
+            numeroRetencion, retenciones, retSeccion,
+        }),
+        (d) => {
+            if (d.proveedorId)    setProveedorId(d.proveedorId)
+            if (d.fechaEmision)   setFechaEmision(d.fechaEmision)
+            if (d.estab)          setEstab(d.estab)
+            if (d.ptoEmi)         setPtoEmi(d.ptoEmi)
+            if (d.secuencial)     setSecuencial(d.secuencial)
+            if (d.claveAcceso)    setClaveAcceso(d.claveAcceso)
+            if (d.tipoSustento)   setTipoSustento(d.tipoSustento)
+            if (d.formaPago)      setFormaPago(d.formaPago)
+            if (d.fechaVenc)      setFechaVenc(d.fechaVenc)
+            if (d.observaciones)  setObservaciones(d.observaciones)
+            if (d.detalle?.length)       setDetalle(d.detalle)
+            if (d.baseIva0)       setBaseIva0(d.baseIva0)
+            if (d.baseIva5)       setBaseIva5(d.baseIva5)
+            if (d.baseIva15)      setBaseIva15(d.baseIva15)
+            if (d.valorIvaManual) setValorIvaManual(d.valorIvaManual)
+            if (d.modoIvaManual)  setModoIvaManual(d.modoIvaManual)
+            if (d.numeroRetencion) setNumeroRetencion(d.numeroRetencion)
+            if (d.retenciones?.length)   setRetenciones(d.retenciones)
+            if (d.retSeccion)     setRetSeccion(d.retSeccion)
+        },
+        [
+            proveedorId, fechaEmision, estab, ptoEmi, secuencial,
+            claveAcceso, tipoSustento, formaPago, fechaVenc, observaciones,
+            detalle, baseIva0, baseIva5, baseIva15, valorIvaManual, modoIvaManual,
+            numeroRetencion, retenciones, retSeccion,
+        ],
+    )
 
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
 
@@ -205,6 +244,7 @@ export function NuevaCompraServicioPage() {
                 alert(`⚠️ Compra guardada correctamente.\nEl asiento contable no se generó:\n${contabErr?.message ?? contabErr}\n\nVerifica en Ajustes → Contabilidad que el toggle esté activo y las cuentas COMPRAS estén mapeadas.`)
             }
 
+            clearDraft()
             navigate('/compras')
         } catch (e: any) {
             alert('Error al guardar: ' + e.message)

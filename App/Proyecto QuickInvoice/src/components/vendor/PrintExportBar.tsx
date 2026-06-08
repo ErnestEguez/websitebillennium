@@ -6,9 +6,10 @@ interface Props {
     nombreArchivo: string
     columnas?:     Record<string, string>
     titulo?:       string
+    onPrint?:      () => void
 }
 
-export function PrintExportBar({ datos, nombreArchivo, columnas, titulo }: Props) {
+export function PrintExportBar({ datos, nombreArchivo, columnas, titulo, onPrint }: Props) {
     return (
         <div className="no-print flex items-center gap-2 justify-end">
             {titulo && <span className="text-xs text-slate-400 mr-2">{titulo}</span>}
@@ -21,7 +22,7 @@ export function PrintExportBar({ datos, nombreArchivo, columnas, titulo }: Props
                 Excel
             </button>
             <button
-                onClick={imprimirPagina}
+                onClick={onPrint ?? imprimirPagina}
                 className="btn btn-secondary flex items-center gap-2 text-sm py-1.5 px-3"
                 title="Imprimir"
             >

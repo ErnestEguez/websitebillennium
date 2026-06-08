@@ -3,6 +3,7 @@
 // ============================================================
 
 import { supabase } from '../lib/supabase'
+import { kardexService } from './kardexService'
 import type {
     Proveedor, Compra, CompraConDetalle,
     DetalleInventario, DetalleServicio,
@@ -169,16 +170,20 @@ export const compraService = {
             .insert(detalle.map(d => ({ ...d, ingreso_id: compra.id })))
         if (eDetalle) throw eDetalle
 
-        // 3. Kardex ENTRADA
-        await supabase.from('kardex').insert(detalle.map(d => ({
-            empresa_id: cabecera.empresa_id,
-            producto_id: d.producto_id,
-            tipo_movimiento: 'ENTRADA',
-            motivo: 'Compra inventario',
-            documento_referencia: cabecera.numero_factura ?? compra.id,
-            cantidad: d.cantidad,
-            costo_unitario: d.costo_unitario,
-        })))
+        // 3. Kardex ENTRADA — usa kardexService para actualizar stock_bodega correctamente
+        for (const d of detalle) {
+            await kardexService.registrarMovimiento({
+                empresa_id:           cabecera.empresa_id,
+                producto_id:          d.producto_id,
+                bodega_id:            cabecera.bodega_id ?? d.bodega_id,
+                tipo_movimiento:      'ENTRADA',
+                motivo:               'Compra inventario',
+                documento_referencia: cabecera.numero_factura ?? compra.id,
+                cantidad:             d.cantidad,
+                costo_unitario:       d.costo_unitario,
+                fecha:                cabecera.fecha_ingreso,
+            })
+        }
 
         // 4. CxP si es crédito (saldo = total - suma retenciones)
         if (cabecera.forma_pago === 'CREDITO' && cabecera.proveedor_id && cabecera.fecha_vencimiento) {

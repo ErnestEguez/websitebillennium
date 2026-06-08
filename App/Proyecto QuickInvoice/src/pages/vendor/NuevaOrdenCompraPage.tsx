@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useFormDraft } from '../../hooks/useFormDraft'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { ocService, proveedorService } from '../../services/vendorService'
+import { bodegaService } from '../../services/bodegaService'
 import { supabase } from '../../lib/supabase'
-import type { Proveedor, EstadoOC } from '../../types/vendors'
+import type { Proveedor, EstadoOC, Bodega } from '../../types/vendors'
 import { ArrowLeft, Plus, Trash2, Save, Send } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
@@ -29,10 +31,12 @@ export function NuevaOrdenCompraPage() {
 
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
     const [productos,   setProductos]   = useState<ProductoOpc[]>([])
+    const [bodegas,     setBodegas]     = useState<Bodega[]>([])
     const [loading,     setLoading]     = useState(true)
     const [saving,      setSaving]      = useState(false)
 
     // Campos cabecera
+    const [bodegaId,            setBodegaId]            = useState('')
     const [proveedorId,         setProveedorId]         = useState('')
     const [fechaEmision,        setFechaEmision]        = useState(HOY)
     const [fechaEntrega,        setFechaEntrega]        = useState('')
@@ -43,25 +47,46 @@ export function NuevaOrdenCompraPage() {
     // Líneas
     const [lineas, setLineas] = useState<LineaOC[]>([])
 
+    const clearDraft = useFormDraft(
+        'draft_nueva_oc',
+        () => ({ proveedorId, fechaEmision, fechaEntrega, observaciones, lineas }),
+        (d) => {
+            if (modoEdicion) return
+            if (d.proveedorId) setProveedorId(d.proveedorId)
+            if (d.fechaEmision) setFechaEmision(d.fechaEmision)
+            if (d.fechaEntrega) setFechaEntrega(d.fechaEntrega)
+            if (d.observaciones) setObservaciones(d.observaciones)
+            if (d.lineas?.length) setLineas(d.lineas)
+        },
+        [proveedorId, fechaEmision, fechaEntrega, observaciones, lineas],
+    )
+
     useEffect(() => { if (empresa?.id) cargar() }, [empresa?.id])
 
     async function cargar() {
         try {
             setLoading(true)
-            const [provs, { data: prods }] = await Promise.all([
+            const [provs, { data: prods }, bods] = await Promise.all([
                 proveedorService.listar(empresa!.id),
                 supabase.from('productos')
                     .select('id, nombre, codigo, costo_promedio')
                     .eq('empresa_id', empresa!.id)
                     .eq('activo', true)
                     .order('nombre'),
+                bodegaService.listar(empresa!.id),
             ])
             setProveedores(provs.filter(p => p.estado === 'ACTIVO'))
             setProductos((prods ?? []) as ProductoOpc[])
+            setBodegas(bods)
+            if (bods.length > 0 && !bodegaId) {
+                const principal = bods.find(b => b.es_principal) ?? bods[0]
+                setBodegaId(principal.id)
+            }
 
             if (modoEdicion && ocId) {
                 const oc = await ocService.obtener(ocId)
                 setProveedorId(oc.proveedor_id ?? '')
+                if (oc.bodega_id) setBodegaId(oc.bodega_id)
                 setFechaEmision(oc.fecha_emision)
                 setFechaEntrega(oc.fecha_entrega_esperada ?? '')
                 setObservaciones(oc.observaciones ?? '')
@@ -141,10 +166,12 @@ export function NuevaOrdenCompraPage() {
                     observaciones:          observaciones || undefined,
                     subtotal:               total,
                     total,
+                    bodega_id:              bodegaId || undefined,
                     created_by:             profile?.id,
                 },
                 detalle,
             )
+            clearDraft()
             navigate('/compras/ordenes')
         } catch (e: any) {
             alert('Error al guardar: ' + e.message)
@@ -179,7 +206,7 @@ export function NuevaOrdenCompraPage() {
             <div className="card p-5 space-y-4">
                 <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Datos generales</h2>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="label">Proveedor <span className="text-red-500">*</span></label>
                         <select className={inp} value={proveedorId} disabled={soloLectura}
@@ -187,6 +214,18 @@ export function NuevaOrdenCompraPage() {
                             <option value="">Seleccionar proveedor...</option>
                             {proveedores.map(p => (
                                 <option key={p.id} value={p.id}>{p.nombre_empresa} — {p.ruc}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="label">Bodega destino <span className="text-red-500">*</span></label>
+                        <select className={inp} value={bodegaId} disabled={soloLectura}
+                            onChange={e => setBodegaId(e.target.value)}>
+                            <option value="">Seleccionar bodega...</option>
+                            {bodegas.map(b => (
+                                <option key={b.id} value={b.id}>
+                                    {b.codigo ? `[${b.codigo}] ` : ''}{b.nombre}{b.es_principal ? ' ★' : ''}
+                                </option>
                             ))}
                         </select>
                     </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useFormDraft } from '../../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
 import { Search, Loader2, AlertCircle, X, CheckCircle2, ChevronDown, ChevronUp, ArrowRightLeft, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -47,6 +48,26 @@ export function NuevoEgresoPage() {
     const [beneficiario, setBeneficiario] = useState('')
     const [fechaCobro, setFechaCobro]     = useState('')
     const [esPostfechado, setEsPostfechado] = useState(false)
+
+    // ── Draft ─────────────────────────────────────────────────────
+    const clearDraft = useFormDraft(
+        'draft_nuevo_egreso',
+        () => ({ paso, provSelec, busqProv, formaPago, cuentaId, referencia, concepto, numeroCheque, beneficiario, fechaCobro, esPostfechado }),
+        (d) => {
+            if (d.paso && d.paso < 3)  setPaso(d.paso as 1 | 2 | 3)
+            if (d.provSelec)           setProvSelec(d.provSelec)
+            if (d.busqProv)            setBusqProv(d.busqProv)
+            if (d.formaPago)           setFormaPago(d.formaPago)
+            if (d.cuentaId)            setCuentaId(d.cuentaId)
+            if (d.referencia)          setReferencia(d.referencia)
+            if (d.concepto)            setConcepto(d.concepto)
+            if (d.numeroCheque)        setNumeroCheque(d.numeroCheque)
+            if (d.beneficiario)        setBeneficiario(d.beneficiario)
+            if (d.fechaCobro)          setFechaCobro(d.fechaCobro)
+            if (d.esPostfechado)       setEsPostfechado(d.esPostfechado)
+        },
+        [paso, provSelec, busqProv, formaPago, cuentaId, referencia, concepto, numeroCheque, beneficiario, fechaCobro, esPostfechado],
+    )
 
     // Auto-fill número de cheque desde la secuencia de la cuenta
     useEffect(() => {
@@ -166,6 +187,7 @@ export function NuevoEgresoPage() {
                 })
             }
 
+            clearDraft()
             setOk(true)
             setTimeout(() => navigate('/egresos'), 2000)
         } catch (e: unknown) {

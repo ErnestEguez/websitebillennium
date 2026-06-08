@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useFormDraft } from '../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { compraService, proveedorService, retencionService, ocService } from '../../services/vendorService'
-import type { OrdenCompra } from '../../types/vendors'
+import { bodegaService } from '../../services/bodegaService'
+import type { OrdenCompra, Bodega } from '../../types/vendors'
 import { contableConfigService } from '../../services/contableConfigService'
 import { contabilidadComprasService } from '../../services/contabilidadComprasService'
 import { supabase } from '../../lib/supabase'
@@ -33,10 +35,12 @@ export function NuevaCompraInventarioPage() {
 
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
     const [productos, setProductos]     = useState<{ id: string; nombre: string }[]>([])
+    const [bodegas, setBodegas]         = useState<Bodega[]>([])
     const [loading, setLoading]         = useState(true)
     const [saving, setSaving]           = useState(false)
 
     // Cabecera
+    const [bodegaId, setBodegaId]           = useState('')
     const [proveedorId, setProveedorId]     = useState('')
     const [fechaEmision, setFechaEmision]   = useState(HOY)
     const [estab, setEstab]                 = useState('')
@@ -67,19 +71,63 @@ export function NuevaCompraInventarioPage() {
     const [ordenesCompra, setOrdenesCompra] = useState<OrdenCompra[]>([])
     const [ocVinculada,   setOcVinculada]   = useState('')
 
+    // ── Draft: persiste el formulario en sessionStorage ──────────
+    const clearDraft = useFormDraft(
+        'draft_compra_inventario',
+        () => ({
+            proveedorId, fechaEmision, estab, ptoEmi, secuencial,
+            claveAcceso, tipoSustento, formaPago, fechaVenc, observaciones,
+            detalle, usarIvaManual, baseIva0, baseIva5, baseIva15,
+            numeroRetencion, retenciones, retSeccion, ocVinculada,
+        }),
+        (d) => {
+            if (d.proveedorId)    setProveedorId(d.proveedorId)
+            if (d.fechaEmision)   setFechaEmision(d.fechaEmision)
+            if (d.estab)          setEstab(d.estab)
+            if (d.ptoEmi)         setPtoEmi(d.ptoEmi)
+            if (d.secuencial)     setSecuencial(d.secuencial)
+            if (d.claveAcceso)    setClaveAcceso(d.claveAcceso)
+            if (d.tipoSustento)   setTipoSustento(d.tipoSustento)
+            if (d.formaPago)      setFormaPago(d.formaPago)
+            if (d.fechaVenc)      setFechaVenc(d.fechaVenc)
+            if (d.observaciones)  setObservaciones(d.observaciones)
+            if (d.detalle?.length)       setDetalle(d.detalle)
+            if (d.usarIvaManual)  setUsarIvaManual(d.usarIvaManual)
+            if (d.baseIva0)       setBaseIva0(d.baseIva0)
+            if (d.baseIva5)       setBaseIva5(d.baseIva5)
+            if (d.baseIva15)      setBaseIva15(d.baseIva15)
+            if (d.numeroRetencion) setNumeroRetencion(d.numeroRetencion)
+            if (d.retenciones?.length)   setRetenciones(d.retenciones)
+            if (d.retSeccion)     setRetSeccion(d.retSeccion)
+            if (d.ocVinculada)    setOcVinculada(d.ocVinculada)
+        },
+        [
+            proveedorId, fechaEmision, estab, ptoEmi, secuencial,
+            claveAcceso, tipoSustento, formaPago, fechaVenc, observaciones,
+            detalle, usarIvaManual, baseIva0, baseIva5, baseIva15,
+            numeroRetencion, retenciones, retSeccion, ocVinculada,
+        ],
+    )
+
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
 
     async function load() {
         try {
             const { data: prodsData } = await supabase
                 .from('productos').select('id, nombre').eq('empresa_id', empresa!.id).eq('activo', true).order('nombre')
-            const [provs, ocs] = await Promise.all([
+            const [provs, ocs, bods] = await Promise.all([
                 proveedorService.listar(empresa!.id),
                 ocService.listar(empresa!.id),
+                bodegaService.listar(empresa!.id),
             ])
             setOrdenesCompra(ocs.filter(o => o.estado === 'ENVIADA' || o.estado === 'PARCIALMENTE_RECIBIDA'))
             setProveedores(provs.filter(p => p.estado === 'ACTIVO'))
             setProductos(prodsData ?? [])
+            setBodegas(bods)
+            if (bods.length > 0 && !bodegaId) {
+                const principal = bods.find(b => b.es_principal) ?? bods[0]
+                setBodegaId(principal.id)
+            }
         } catch (e: any) { alert('Error al cargar datos: ' + e.message) }
         finally { setLoading(false) }
     }
@@ -186,6 +234,7 @@ export function NuevaCompraInventarioPage() {
                     aplica_convenio_ddi: false,
                     estado: 'ACTIVO', origen: 'MANUAL', tipo_compra: 'INVENTARIO',
                     orden_compra_id: ocVinculada || undefined,
+                    bodega_id: bodegaId || undefined,
                     created_by: profile?.id,
                 },
                 validas.map(d => ({
@@ -222,6 +271,7 @@ export function NuevaCompraInventarioPage() {
                 alert(`⚠️ Compra guardada correctamente.\nEl asiento contable no se generó:\n${contabErr?.message ?? contabErr}\n\nVerifica en Ajustes → Contabilidad que el toggle esté activo y las cuentas COMPRAS estén mapeadas.`)
             }
 
+            clearDraft()
             navigate('/compras')
         } catch (e: any) {
             alert('Error al guardar: ' + e.message)
@@ -287,6 +337,20 @@ export function NuevaCompraInventarioPage() {
                             ))}
                         </select>
                     </div>
+                    <div>
+                        <label className="label">Bodega destino <span className="text-red-500">*</span></label>
+                        <select className={inp} value={bodegaId} onChange={e => setBodegaId(e.target.value)}>
+                            <option value="">Seleccionar bodega...</option>
+                            {bodegas.map(b => (
+                                <option key={b.id} value={b.id}>
+                                    {b.codigo ? `[${b.codigo}] ` : ''}{b.nombre}{b.es_principal ? ' ★' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="label">Fecha emisión factura</label>
                         <input type="date" className={inp} value={fechaEmision}

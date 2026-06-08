@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useFormDraft } from '../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
 import { ncService } from '../services/ncService'
 import type { ComprobanteParaNC, NCDetalle, NotaCredito } from '../services/ncService'
@@ -77,6 +78,20 @@ export function NuevaNcPage() {
     // ── Step 3: confirmación / procesamiento
     const [procesando, setProcesando] = useState(false)
     const [errProceso, setErrProceso] = useState('')
+
+    // ── Draft ─────────────────────────────────────────────────────
+    const clearDraft = useFormDraft(
+        'draft_nueva_nc',
+        () => ({ step, facturaSeleccionada, motivoSri, motivoDesc, items }),
+        (d) => {
+            if (d.step && d.step < 3)          setStep(d.step)
+            if (d.facturaSeleccionada)          setFacturaSeleccionada(d.facturaSeleccionada)
+            if (d.motivoSri)                    setMotivoSri(d.motivoSri)
+            if (d.motivoDesc)                   setMotivoDesc(d.motivoDesc)
+            if (d.items?.length)                setItems(d.items)
+        },
+        [step, facturaSeleccionada, motivoSri, motivoDesc, items],
+    )
 
     // ── Step 4: resultado
     const [ncCreada, setNcCreada] = useState<NotaCredito | null>(null)
@@ -205,6 +220,7 @@ export function NuevaNcPage() {
                 }
             }
 
+            clearDraft()
             setNcCreada({
                 ...nc,
                 estado_sri:          resultado.estado_sri as any,

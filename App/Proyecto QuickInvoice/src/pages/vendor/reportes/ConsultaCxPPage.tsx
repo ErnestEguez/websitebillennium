@@ -1,28 +1,79 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useReactToPrint } from 'react-to-print'
 import { useAuth } from '../../../contexts/AuthContext'
 import { cxpService, proveedorService } from '../../../services/vendorService'
 import type { CuentaPorPagar, Proveedor } from '../../../types/vendors'
 import { Wallet, AlertCircle, Clock, Loader2 } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 import { PrintExportBar } from '../../../components/vendor/PrintExportBar'
-import { ReportPrintHeader } from '../../../components/vendor/ReportPrintHeader'
 
 const HOY = new Date().toISOString().split('T')[0]
-const fmt = (n: number) => `$${n.toFixed(2)}`
-const fmtF = (s?: string | null) => s ? new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+const fmt  = (n: number) => `$${n.toFixed(2)}`
+const fmtF = (s?: string | null) =>
+    s ? new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+const fmtFLong = (s?: string | null) =>
+    s ? new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' }) : '—'
+
+const PRINT_CSS = `
+    @page { size: A4 portrait; margin: 14mm 16mm; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 9.5px; color:#111; }
+    .rpt-header { display:flex; justify-content:space-between; align-items:flex-start;
+        border-bottom:3px solid #1e3a5f; padding-bottom:8px; margin-bottom:12px; }
+    .emp-nombre { font-size:15px; font-weight:900; color:#1e3a5f; text-transform:uppercase; }
+    .emp-sub    { font-size:9px; color:#666; margin-top:2px; }
+    .rpt-header-right { text-align:right; }
+    .rpt-titulo  { font-size:13px; font-weight:900; color:#1e3a5f; text-transform:uppercase; letter-spacing:1px; }
+    .rpt-corte   { font-size:9.5px; color:#555; font-weight:bold; margin-top:2px; }
+    .rpt-gen     { font-size:8px; color:#aaa; margin-top:3px; }
+    .filtros-bar { display:flex; gap:14px; flex-wrap:wrap;
+        padding:5px 0; margin-bottom:10px;
+        border-bottom:1px solid #e4e9f2; font-size:8.5px; color:#666; }
+    .filtros-bar span { font-weight:bold; color:#333; }
+    .aging-row { display:flex; gap:8px; margin-bottom:12px; }
+    .aging-box { flex:1; border-radius:4px; padding:6px 8px; text-align:center; }
+    .aging-label { font-size:7.5px; text-transform:uppercase; color:#555; }
+    .aging-val   { font-size:12px; font-weight:900; margin-top:2px; font-family:'Courier New',monospace; }
+    .ag-green  { background:#f0fdf4; }  .ag-green  .aging-val { color:#15803d; }
+    .ag-amber  { background:#fffbeb; }  .ag-amber  .aging-val { color:#b45309; }
+    .ag-orange { background:#fff7ed; }  .ag-orange .aging-val { color:#c2410c; }
+    .ag-red    { background:#fef2f2; }  .ag-red    .aging-val { color:#b91c1c; }
+    .ag-darkred{ background:#fee2e2; }  .ag-darkred .aging-val { color:#991b1b; }
+    table { width:100%; border-collapse:collapse; }
+    thead tr { background:#1e3a5f; color:#fff; }
+    thead th { padding:5px 7px; font-size:8.5px; text-transform:uppercase; letter-spacing:0.4px; font-weight:bold; }
+    thead th.r { text-align:right; }
+    tbody tr.alt { background:#f4f7fc; }
+    tbody tr.venc { background:#fff5f5; }
+    tbody td { padding:4px 7px; border-bottom:1px solid #e4e9f2; font-size:9px; }
+    tbody td.r { text-align:right; font-family:'Courier New',monospace; }
+    tfoot tr { background:#1e3a5f; color:#fff; }
+    tfoot td { padding:5px 7px; font-size:9px; font-weight:bold; }
+    tfoot td.r { text-align:right; font-family:'Courier New',monospace; }
+    .badge { display:inline-block; padding:1px 5px; border-radius:99px;
+        font-size:7.5px; font-weight:800; text-transform:uppercase; }
+    .badge-pg  { background:#dcfce7; color:#15803d; }
+    .badge-pa  { background:#dbeafe; color:#1d4ed8; }
+    .badge-vn  { background:#fef3c7; color:#b45309; }
+    .badge-ve  { background:#fee2e2; color:#b91c1c; }
+    .rpt-footer { margin-top:16px; border-top:1px solid #cbd5e0; padding-top:6px;
+        display:flex; justify-content:space-between; font-size:8px; color:#94a3b8; }
+`
 
 function diasVenc(fecha: string) {
-    const diff = Math.floor((new Date(fecha).getTime() - new Date(HOY).getTime()) / 86400000)
-    return diff
+    return Math.floor((new Date(fecha).getTime() - new Date(HOY).getTime()) / 86400000)
 }
 
 export function ConsultaCxPPage() {
-    const { empresa }           = useAuth()
-    const [lista, setLista]     = useState<CuentaPorPagar[]>([])
+    const { empresa }               = useAuth()
+    const printRef                  = useRef<HTMLDivElement>(null)
+    const [lista, setLista]         = useState<CuentaPorPagar[]>([])
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
-    const [loading, setLoading] = useState(true)
-    const [provId, setProvId]   = useState('')
-    const [estado, setEstado]   = useState('')
+    const [loading, setLoading]     = useState(true)
+    const [provId, setProvId]       = useState('')
+    const [estado, setEstado]       = useState('')
+
+    const generadoEl = new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' } as any)
 
     useEffect(() => {
         if (empresa?.id) {
@@ -36,8 +87,8 @@ export function ConsultaCxPPage() {
         try {
             setLoading(true)
             const data = await cxpService.listar(empresa.id, {
-                estado: estado || undefined,
-                proveedorId: provId || undefined,
+                estado:      estado     || undefined,
+                proveedorId: provId     || undefined,
             })
             setLista(data)
         } catch (e: any) { alert('Error: ' + e.message) }
@@ -46,35 +97,30 @@ export function ConsultaCxPPage() {
 
     const pendientes = lista.filter(c => c.estado !== 'PAGADO' && c.estado !== 'ANULADO')
     const vencidas   = pendientes.filter(c => c.fecha_vencimiento < HOY)
-    const porVencer7 = pendientes.filter(c => {
-        const d = diasVenc(c.fecha_vencimiento)
-        return d >= 0 && d <= 7
-    })
+    const porVencer7 = pendientes.filter(c => { const d = diasVenc(c.fecha_vencimiento); return d >= 0 && d <= 7 })
 
     const totalPendiente = pendientes.reduce((s, c) => s + c.saldo_pendiente, 0)
-    const totalVencido   = vencidas.reduce((s, c) => s + c.saldo_pendiente, 0)
+    const totalVencido   = vencidas.reduce((s, c)   => s + c.saldo_pendiente, 0)
 
-    // Aging (antigüedad de saldos)
     const aging = {
-        vigente:     pendientes.filter(c => diasVenc(c.fecha_vencimiento) > 30).reduce((s,c)=>s+c.saldo_pendiente,0),
-        por_vencer:  pendientes.filter(c => { const d=diasVenc(c.fecha_vencimiento); return d>=0&&d<=30 }).reduce((s,c)=>s+c.saldo_pendiente,0),
-        vencido_30:  vencidas.filter(c => { const d=Math.abs(diasVenc(c.fecha_vencimiento)); return d<=30 }).reduce((s,c)=>s+c.saldo_pendiente,0),
-        vencido_60:  vencidas.filter(c => { const d=Math.abs(diasVenc(c.fecha_vencimiento)); return d>30&&d<=60 }).reduce((s,c)=>s+c.saldo_pendiente,0),
-        vencido_90:  vencidas.filter(c => { const d=Math.abs(diasVenc(c.fecha_vencimiento)); return d>60 }).reduce((s,c)=>s+c.saldo_pendiente,0),
+        vigente:    pendientes.filter(c => diasVenc(c.fecha_vencimiento) > 30).reduce((s,c)=>s+c.saldo_pendiente,0),
+        por_vencer: pendientes.filter(c => { const d=diasVenc(c.fecha_vencimiento); return d>=0&&d<=30 }).reduce((s,c)=>s+c.saldo_pendiente,0),
+        venc_30:    vencidas.filter(c => Math.abs(diasVenc(c.fecha_vencimiento)) <= 30).reduce((s,c)=>s+c.saldo_pendiente,0),
+        venc_60:    vencidas.filter(c => { const d=Math.abs(diasVenc(c.fecha_vencimiento)); return d>30&&d<=60 }).reduce((s,c)=>s+c.saldo_pendiente,0),
+        venc_90:    vencidas.filter(c => Math.abs(diasVenc(c.fecha_vencimiento)) > 60).reduce((s,c)=>s+c.saldo_pendiente,0),
     }
+
+    const labelProv = provId ? proveedores.find(p => p.id === provId)?.nombre_empresa : ''
+
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        documentTitle: `CxP_Proveedores_${HOY}`,
+        pageStyle: PRINT_CSS,
+    })
 
     return (
         <div className="space-y-5">
-            <ReportPrintHeader
-                titulo="Cuentas por Pagar — Aging de Saldos"
-                filtros={[
-                    { label: 'Corte', valor: fmtF(HOY) },
-                    ...(estado ? [{ label: 'Estado', valor: estado }] : []),
-                    ...(provId ? [{ label: 'Proveedor', valor: proveedores.find(p => p.id === provId)?.nombre_empresa ?? provId }] : []),
-                ]}
-            />
-
-            <div className="no-print">
+            <div>
                 <h1 className="text-2xl font-bold text-slate-900">Consulta General CxP</h1>
                 <p className="text-slate-500 text-sm">Análisis de antigüedad de saldos y vencimientos</p>
             </div>
@@ -102,11 +148,11 @@ export function ConsultaCxPPage() {
                 <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Antigüedad de Saldos (Aging)</h2>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     {[
-                        { label: 'Por vencer (+30d)', val: aging.vigente,    color: 'bg-green-50 text-green-700'  },
-                        { label: 'Vence 0-30 días',   val: aging.por_vencer, color: 'bg-amber-50 text-amber-700' },
-                        { label: 'Venc. 1-30 días',   val: aging.vencido_30, color: 'bg-orange-50 text-orange-700'},
-                        { label: 'Venc. 31-60 días',  val: aging.vencido_60, color: 'bg-red-50 text-red-600'     },
-                        { label: 'Venc. +60 días',    val: aging.vencido_90, color: 'bg-red-100 text-red-800'    },
+                        { label: 'Por vencer (+30d)', val: aging.vigente,    color: 'bg-green-50 text-green-700'   },
+                        { label: 'Vence 0-30 días',   val: aging.por_vencer, color: 'bg-amber-50 text-amber-700'  },
+                        { label: 'Venc. 1-30 días',   val: aging.venc_30,    color: 'bg-orange-50 text-orange-700' },
+                        { label: 'Venc. 31-60 días',  val: aging.venc_60,    color: 'bg-red-50 text-red-600'      },
+                        { label: 'Venc. +60 días',    val: aging.venc_90,    color: 'bg-red-100 text-red-800'     },
                     ].map(a => (
                         <div key={a.label} className={`rounded-xl p-4 text-center ${a.color}`}>
                             <p className="text-xs font-medium mb-1 opacity-80">{a.label}</p>
@@ -116,7 +162,7 @@ export function ConsultaCxPPage() {
                 </div>
             </div>
 
-            <div className="no-print"><PrintExportBar
+            <PrintExportBar
                 datos={lista.map(c => ({
                     Proveedor:        (c.proveedor as any)?.nombre_empresa ?? '',
                     RUC:              (c.proveedor as any)?.ruc ?? '',
@@ -128,10 +174,11 @@ export function ConsultaCxPPage() {
                     Estado:           c.estado,
                 }))}
                 nombreArchivo="cxp_proveedores"
-            /></div>
+                onPrint={() => handlePrint()}
+            />
 
             {/* Filtros */}
-            <div className="flex gap-3 flex-wrap no-print">
+            <div className="flex gap-3 flex-wrap">
                 <select className="input text-sm max-w-xs" value={provId} onChange={e => setProvId(e.target.value)}>
                     <option value="">Todos los proveedores</option>
                     {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre_empresa}</option>)}
@@ -163,7 +210,7 @@ export function ConsultaCxPPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {lista.map(c => {
-                                    const dias   = diasVenc(c.fecha_vencimiento)
+                                    const dias    = diasVenc(c.fecha_vencimiento)
                                     const vencida = dias < 0 && c.estado !== 'PAGADO'
                                     return (
                                         <tr key={c.id} className={cn('hover:bg-slate-50', vencida && 'bg-red-50/30')}>
@@ -180,15 +227,16 @@ export function ConsultaCxPPage() {
                                             </td>
                                             <td className={cn('px-4 py-3 text-center text-xs font-bold',
                                                 vencida ? 'text-red-600' : dias <= 7 ? 'text-orange-600' : 'text-green-600')}>
-                                                {vencida ? `${Math.abs(dias)}d venc.` : dias <= 7 ? `${dias}d` : `${dias}d`}
+                                                {vencida ? `${Math.abs(dias)}d venc.` : `${dias}d`}
                                             </td>
                                             <td className="px-4 py-3 text-right font-mono text-xs">{fmt(c.monto_original)}</td>
                                             <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">{fmt(c.saldo_pendiente)}</td>
                                             <td className="px-4 py-3">
                                                 <span className={cn('text-xs px-2 py-0.5 rounded-full font-semibold',
-                                                    c.estado === 'PAGADO' ? 'bg-green-100 text-green-700' :
-                                                    c.estado === 'PARCIALMENTE_PAGADO' ? 'bg-blue-100 text-blue-700' :
-                                                    vencida ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
+                                                    c.estado === 'PAGADO'               ? 'bg-green-100 text-green-700'  :
+                                                    c.estado === 'PARCIALMENTE_PAGADO'  ? 'bg-blue-100 text-blue-700'   :
+                                                    vencida                             ? 'bg-red-100 text-red-700'      :
+                                                                                          'bg-amber-100 text-amber-700')}>
                                                     {c.estado === 'PARCIALMENTE_PAGADO' ? 'Parcial' : c.estado}
                                                 </span>
                                             </td>
@@ -208,7 +256,116 @@ export function ConsultaCxPPage() {
                     </div>
                 )}
             </div>
+
+            {/* ── ÁREA DE IMPRESIÓN ── */}
+            <div className="hidden">
+                <div ref={printRef}>
+                    <div className="rpt-header">
+                        <div>
+                            <div className="emp-nombre">{empresa?.nombre ?? 'Empresa'}</div>
+                            <div className="emp-sub">RUC: {(empresa as any)?.ruc ?? '—'}</div>
+                        </div>
+                        <div className="rpt-header-right">
+                            <div className="rpt-titulo">Cuentas por Pagar — Aging de Saldos</div>
+                            <div className="rpt-corte">Corte al: {fmtFLong(HOY)}</div>
+                            <div className="rpt-gen">Generado: {generadoEl}</div>
+                        </div>
+                    </div>
+
+                    <div className="filtros-bar">
+                        {labelProv && <div>Proveedor: <span>{labelProv}</span></div>}
+                        {estado    && <div>Estado: <span>{estado}</span></div>}
+                        <div>Total documentos: <span>{lista.length}</span></div>
+                        <div>Pendientes: <span>{pendientes.length}</span></div>
+                        <div>Vencidos: <span>{vencidas.length}</span></div>
+                    </div>
+
+                    {/* Aging */}
+                    <div className="aging-row">
+                        {[
+                            { label:'Por vencer (+30d)', val:aging.vigente,    cls:'ag-green'   },
+                            { label:'Vence 0-30 días',   val:aging.por_vencer, cls:'ag-amber'   },
+                            { label:'Venc. 1-30 días',   val:aging.venc_30,    cls:'ag-orange'  },
+                            { label:'Venc. 31-60 días',  val:aging.venc_60,    cls:'ag-red'     },
+                            { label:'Venc. +60 días',    val:aging.venc_90,    cls:'ag-darkred' },
+                        ].map(a => (
+                            <div key={a.label} className={`aging-box ${a.cls}`}>
+                                <div className="aging-label">{a.label}</div>
+                                <div className="aging-val">{fmt(a.val)}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style={{textAlign:'left'}}>Proveedor</th>
+                                <th style={{textAlign:'left', width:'76px'}}>Factura</th>
+                                <th style={{textAlign:'left', width:'70px'}}>Emisión</th>
+                                <th style={{textAlign:'left', width:'72px'}}>Vencimiento</th>
+                                <th style={{textAlign:'center', width:'46px'}}>Días</th>
+                                <th className="r" style={{width:'74px'}}>Original</th>
+                                <th className="r" style={{width:'74px'}}>Saldo</th>
+                                <th style={{textAlign:'left', width:'72px'}}>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {lista.map((c, i) => {
+                                const dias    = diasVenc(c.fecha_vencimiento)
+                                const vencida = dias < 0 && c.estado !== 'PAGADO'
+                                return (
+                                    <tr key={c.id} className={vencida ? 'venc' : i%2!==0 ? 'alt' : ''}>
+                                        <td>
+                                            <div style={{fontWeight:'600'}}>{(c.proveedor as any)?.nombre_empresa ?? '—'}</div>
+                                            <div style={{fontSize:'8px',color:'#888'}}>{(c.proveedor as any)?.ruc}</div>
+                                        </td>
+                                        <td style={{fontFamily:"'Courier New',monospace",fontSize:'8.5px',color:'#555'}}>
+                                            {(c.compra as any)?.numero_factura ?? '—'}
+                                        </td>
+                                        <td>{fmtF(c.fecha_emision)}</td>
+                                        <td style={{color: vencida ? '#b91c1c' : '#111', fontWeight: vencida ? 'bold' : 'normal'}}>
+                                            {fmtF(c.fecha_vencimiento)}
+                                        </td>
+                                        <td style={{textAlign:'center', fontWeight:'bold',
+                                            color: vencida ? '#b91c1c' : dias <= 7 ? '#c2410c' : '#15803d'}}>
+                                            {vencida ? `${Math.abs(dias)}v` : `${dias}d`}
+                                        </td>
+                                        <td className="r">{fmt(c.monto_original)}</td>
+                                        <td className="r" style={{fontWeight:'bold'}}>{fmt(c.saldo_pendiente)}</td>
+                                        <td>
+                                            <span className={
+                                                c.estado === 'PAGADO'              ? 'badge badge-pg' :
+                                                c.estado === 'PARCIALMENTE_PAGADO' ? 'badge badge-pa' :
+                                                vencida                            ? 'badge badge-ve' : 'badge badge-vn'
+                                            }>
+                                                {c.estado === 'PARCIALMENTE_PAGADO' ? 'Parcial' : c.estado}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colSpan={5} style={{fontSize:'8px',color:'#ccd3e0'}}>
+                                    {lista.length} documentos · {pendientes.length} pendientes · {vencidas.length} vencidas
+                                </td>
+                                <td className="r">{fmt(lista.reduce((s,c)=>s+c.monto_original,0))}</td>
+                                <td className="r" style={{fontSize:'11px',color:'#fbbf24'}}>{fmt(totalPendiente)}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div className="rpt-footer">
+                        <span>QuickInvoice — Finance Suite · Billennium System</span>
+                        <span>Documento confidencial — uso exclusivo de {empresa?.nombre ?? 'la empresa'}</span>
+                        <span>{generadoEl}</span>
+                    </div>
+                </div>
+            </div>
+            {/* ── Fin área de impresión ── */}
+
         </div>
     )
 }
-

@@ -33,6 +33,7 @@ export interface FacturaDirectaInput {
     observaciones?: string
     vendedor_id?: string | null      // FK a vendedores.id (puede ser null)
     dias_plazo_credito?: number      // Solo aplica cuando hay pago a crédito; default 30
+    bodega_id?: string | null        // Bodega desde la que se descuenta el stock
 }
 
 // Calcula los valores de una línea de detalle
@@ -67,7 +68,7 @@ export function calcularTotalesFactura(detalles: DetalleFacturaDirecta[]) {
 export const facturaDirectaService = {
 
     async generarFacturaDirecta(input: FacturaDirectaInput) {
-        const { empresa_id, cliente_id, detalles, pagos, caja_sesion_id, vendedor_id, dias_plazo_credito } = input
+        const { empresa_id, cliente_id, detalles, pagos, caja_sesion_id, vendedor_id, dias_plazo_credito, bodega_id } = input
 
         // 1. Obtener configuración SRI
         const { data: empData } = await supabase
@@ -138,7 +139,8 @@ export const facturaDirectaService = {
                 fecha_autorizacion: null,
                 sri_utilizacion_sistema_financiero: false,
                 caja_sesion_id: caja_sesion_id || null,
-                vendedor_id: vendedor_id || null
+                vendedor_id: vendedor_id || null,
+                bodega_id: bodega_id || null,
             })
             .select()
             .single()
@@ -244,7 +246,7 @@ export const facturaDirectaService = {
                 })
 
             if (kardexDetalles.length > 0) {
-                await kardexService.generarSalidaVenta(empresa_id, factura.id, kardexDetalles)
+                await kardexService.generarSalidaVenta(empresa_id, factura.id, kardexDetalles, bodega_id ?? undefined)
             }
         } catch (kardexErr) {
             console.error('Error al registrar salida en Kardex:', kardexErr)

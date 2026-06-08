@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useReactToPrint } from 'react-to-print'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { proveedorService } from '../../services/vendorService'
@@ -14,6 +15,46 @@ const HOY = new Date().toISOString().split('T')[0]
 const PRIMER_DIA_MES = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
 const fmt  = (n: number) => `$${n.toFixed(2)}`
 const fmtF = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' })
+
+const PRINT_CSS = `
+    @page { size: A4 portrait; margin: 14mm 16mm; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 9.5px; color:#111; }
+    .rpt-header { display:flex; justify-content:space-between; align-items:flex-start;
+        border-bottom:3px solid #1e3a5f; padding-bottom:8px; margin-bottom:12px; }
+    .emp-nombre { font-size:15px; font-weight:900; color:#1e3a5f; text-transform:uppercase; }
+    .emp-sub    { font-size:9px; color:#666; margin-top:2px; }
+    .rpt-header-right { text-align:right; }
+    .rpt-titulo  { font-size:13px; font-weight:900; color:#1e3a5f; text-transform:uppercase; letter-spacing:1px; }
+    .rpt-periodo { font-size:9.5px; color:#555; font-weight:bold; margin-top:2px; }
+    .rpt-gen     { font-size:8px; color:#aaa; margin-top:3px; }
+    .filtros-bar { display:flex; gap:14px; flex-wrap:wrap;
+        padding:5px 0; margin-bottom:10px;
+        border-bottom:1px solid #e4e9f2; font-size:8.5px; color:#666; }
+    .filtros-bar span { font-weight:bold; color:#333; }
+    table { width:100%; border-collapse:collapse; }
+    thead tr { background:#1e3a5f; color:#fff; }
+    thead th { padding:5px 7px; font-size:8.5px; text-transform:uppercase; letter-spacing:0.4px; font-weight:bold; }
+    thead th.r { text-align:right; }
+    tbody tr.alt { background:#f4f7fc; }
+    tbody tr.anu { opacity:0.4; }
+    tbody td { padding:4px 7px; border-bottom:1px solid #e4e9f2; font-size:9px; vertical-align:top; }
+    tbody td.r { text-align:right; font-family:'Courier New',monospace; }
+    .lineas-table { width:100%; border-collapse:collapse; margin-top:3px; }
+    .lineas-table td { padding:2px 0; font-size:8px; border:none; color:#555; }
+    .lineas-table td.r { text-align:right; font-family:'Courier New',monospace; }
+    tfoot tr { background:#1e3a5f; color:#fff; }
+    tfoot td { padding:5px 7px; font-size:9px; font-weight:bold; }
+    tfoot td.r { text-align:right; font-family:'Courier New',monospace; }
+    .badge { display:inline-block; padding:1px 5px; border-radius:99px;
+        font-size:7.5px; font-weight:800; text-transform:uppercase; }
+    .badge-aut { background:#dcfce7; color:#15803d; }
+    .badge-env { background:#dbeafe; color:#1d4ed8; }
+    .badge-pen { background:#fef3c7; color:#b45309; }
+    .badge-rec { background:#fee2e2; color:#b91c1c; }
+    .rpt-footer { margin-top:16px; border-top:1px solid #cbd5e0; padding-top:6px;
+        display:flex; justify-content:space-between; font-size:8px; color:#94a3b8; }
+`
 
 type EstadoSri = 'NO_FIRMADA' | 'ENVIADO' | 'AUTORIZADO' | 'RECHAZADO' | null
 
@@ -53,6 +94,7 @@ const SRI_BADGE: Record<NonNullable<EstadoSri>, { cls: string; label: string }> 
 
 export function ComprobantesRetencionPage() {
     const { empresa }                 = useAuth()
+    const printRef                    = useRef<HTMLDivElement>(null)
     const [docs, setDocs]             = useState<RetencionDocumento[]>([])
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
     const [loading, setLoading]       = useState(true)
@@ -65,6 +107,14 @@ export function ComprobantesRetencionPage() {
     const [sriMsg, setSriMsg]         = useState<{ tipo: 'ok' | 'err'; texto: string } | null>(null)
     const mountedRef = useRef(true)
     useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
+
+    const generadoEl = new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' } as any)
+
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        documentTitle: `Retenciones_${desde}_${hasta}`,
+        pageStyle: PRINT_CSS,
+    })
 
     useEffect(() => {
         if (empresa?.id) {
@@ -283,6 +333,7 @@ export function ComprobantesRetencionPage() {
                             Autorizacion:    d.numero_autorizacion ?? '',
                         }))}
                         nombreArchivo="comprobantes_retencion"
+                        onPrint={() => handlePrint()}
                     />
                 </div>
             </div>
@@ -488,9 +539,115 @@ export function ComprobantesRetencionPage() {
                     })}
                 </div>
             )}
+
+            {/* ── ÁREA DE IMPRESIÓN ── */}
+            <div className="hidden">
+                <div ref={printRef}>
+                    <div className="rpt-header">
+                        <div>
+                            <div className="emp-nombre">{empresa?.nombre ?? 'Empresa'}</div>
+                            <div className="emp-sub">RUC: {(empresa as any)?.ruc ?? '—'}</div>
+                        </div>
+                        <div className="rpt-header-right">
+                            <div className="rpt-titulo">Comprobantes de Retención</div>
+                            <div className="rpt-periodo">
+                                Período: {fmtF(desde)} al {fmtF(hasta)}
+                            </div>
+                            <div className="rpt-gen">Generado: {generadoEl}</div>
+                        </div>
+                    </div>
+
+                    <div className="filtros-bar">
+                        {provId && <div>Proveedor: <span>{proveedores.find(p=>p.id===provId)?.nombre_empresa ?? provId}</span></div>}
+                        <div>Registros: <span>{visibles.length}</span></div>
+                        <div>Total retenido: <span>{fmt(visibles.filter(d=>d.estado==='ACTIVO').reduce((s,d)=>s+d.total,0))}</span></div>
+                        <div>Autorizadas SRI: <span>{visibles.filter(d=>d.estado_sri==='AUTORIZADO').length}</span></div>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style={{textAlign:'left', width:'68px'}}>Fecha</th>
+                                <th style={{textAlign:'left', width:'90px'}}>Nº Retención</th>
+                                <th style={{textAlign:'left'}}>Proveedor</th>
+                                <th style={{textAlign:'left', width:'80px'}}>Fact. Rel.</th>
+                                <th style={{textAlign:'left', width:'80px'}}>Estado SRI</th>
+                                <th className="r" style={{width:'70px'}}>Total</th>
+                                <th style={{textAlign:'left', width:'60px'}}>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {visibles.map((d, i) => (
+                                <tr key={i} className={`${i%2!==0?'alt':''} ${d.estado==='ANULADO'?'anu':''}`}>
+                                    <td>{fmtF(d.fecha_emision)}</td>
+                                    <td style={{fontFamily:"'Courier New',monospace", fontSize:'8.5px'}}>
+                                        {d.numero_retencion ?? '—'}
+                                    </td>
+                                    <td>
+                                        <div style={{fontWeight:'600'}}>{d.proveedor_nombre}</div>
+                                        <div style={{fontSize:'8px',color:'#888'}}>{d.proveedor_ruc}</div>
+                                        {d.lineas.length > 0 && (
+                                            <table className="lineas-table">
+                                                <tbody>
+                                                    {d.lineas.map((l, li) => (
+                                                        <tr key={li}>
+                                                            <td style={{width:'36px',color:'#6d28d9',fontWeight:'bold'}}>{l.codigo_retencion}</td>
+                                                            <td style={{width:'34px'}}>{l.tipo}</td>
+                                                            <td>{l.descripcion}</td>
+                                                            <td className="r" style={{width:'52px'}}>{fmt(l.base_imponible)} × {l.porcentaje}%</td>
+                                                            <td className="r" style={{width:'50px',fontWeight:'bold',color:'#b45309'}}>{fmt(l.valor)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        )}
+                                    </td>
+                                    <td style={{fontFamily:"'Courier New',monospace",fontSize:'8.5px',color:'#555'}}>
+                                        {d.factura_numero ?? '—'}
+                                    </td>
+                                    <td>
+                                        <span className={
+                                            d.estado_sri === 'AUTORIZADO' ? 'badge badge-aut' :
+                                            d.estado_sri === 'ENVIADO'    ? 'badge badge-env' :
+                                            d.estado_sri === 'RECHAZADO'  ? 'badge badge-rec' : 'badge badge-pen'
+                                        }>
+                                            {d.estado_sri === 'AUTORIZADO' ? 'Autorizada' :
+                                             d.estado_sri === 'ENVIADO'    ? 'Enviada'    :
+                                             d.estado_sri === 'RECHAZADO'  ? 'Rechazada'  : 'Pendiente'}
+                                        </span>
+                                    </td>
+                                    <td className="r" style={{fontWeight:'bold',color:'#b45309'}}>{fmt(d.total)}</td>
+                                    <td>
+                                        <span className={d.estado==='ACTIVO' ? 'badge badge-aut' : 'badge badge-rec'}>
+                                            {d.estado}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colSpan={5} style={{fontSize:'8px',color:'#ccd3e0'}}>
+                                    {visibles.length} comprobantes · {visibles.filter(d=>d.estado_sri==='AUTORIZADO').length} autorizadas SRI
+                                </td>
+                                <td className="r" style={{fontSize:'11px',color:'#fbbf24'}}>
+                                    {fmt(visibles.filter(d=>d.estado==='ACTIVO').reduce((s,d)=>s+d.total,0))}
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div className="rpt-footer">
+                        <span>QuickInvoice — Finance Suite · Billennium System</span>
+                        <span>Documento confidencial — uso exclusivo de {empresa?.nombre ?? 'la empresa'}</span>
+                        <span>{generadoEl}</span>
+                    </div>
+                </div>
+            </div>
+            {/* ── Fin área de impresión ── */}
+
         </div>
     )
 }
-
-
 

@@ -21,6 +21,8 @@ import { ProveedoresPage } from './pages/ProveedoresPage'
 import { InventarioPage } from './pages/InventarioPage'
 import { ValorizacionInventarioPage } from './pages/ValorizacionInventarioPage'
 import { KardexPage } from './pages/KardexPage'
+import { AjusteInventarioPage } from './pages/AjusteInventarioPage'
+import { TransferenciaBodegaPage } from './pages/TransferenciaBodegaPage'
 import { CodigosRetencionPage } from './pages/CodigosRetencionPage'
 import { CierresPage } from './pages/CierresPage'
 import { FacturaDirectaPage } from './pages/FacturaDirectaPage'
@@ -286,6 +288,26 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <KardexPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/ajuste-inventario" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <AjusteInventarioPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/transferencia-bodega" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <TransferenciaBodegaPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

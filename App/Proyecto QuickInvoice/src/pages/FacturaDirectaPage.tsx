@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useFormDraft } from '../hooks/useFormDraft'
 import { useReactToPrint } from 'react-to-print'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -19,6 +20,8 @@ import {
     Layers, RotateCw,
 } from 'lucide-react'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
+import { bodegaService } from '../services/bodegaService'
+import type { Bodega } from '../types/vendors'
 import { cuentasBancariasService } from '../services/finance/bancosService'
 import type { CuentaBancaria } from '../types/finance'
 import { precioVolumenService } from '../services/precioVolumenService'
@@ -71,6 +74,10 @@ export function FacturaDirectaPage() {
     const [selectedVendedorId, setSelectedVendedorId] = useState<string>('')
     const [diasPlazoCredito, setDiasPlazoCredito] = useState<number>(30)
 
+    // Estado: bodegas
+    const [bodegas, setBodegas] = useState<Bodega[]>([])
+    const [selectedBodegaId, setSelectedBodegaId] = useState<string>('')
+
     // Estado: secciones colapsables
     const [clienteCollapsed, setClienteCollapsed] = useState(false)
     const [vendedorCollapsed, setVendedorCollapsed] = useState(false)
@@ -92,6 +99,23 @@ export function FacturaDirectaPage() {
     // Estado: proceso
     const [saving, setSaving] = useState(false)
     const [facturaFinal, setFacturaFinal] = useState<any>(null)
+
+    // ── Draft ────────────────────────────────────────────────────
+    const clearDraft = useFormDraft(
+        'draft_factura_directa',
+        () => ({ selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, detalles, pagos, montoRecibido, esModoServicio }),
+        (d) => {
+            if (d.selectedCliente)    setSelectedCliente(d.selectedCliente)
+            if (d.selectedVendedorId) setSelectedVendedorId(d.selectedVendedorId)
+            if (d.selectedBodegaId)   setSelectedBodegaId(d.selectedBodegaId)
+            if (d.diasPlazoCredito)   setDiasPlazoCredito(d.diasPlazoCredito)
+            if (d.detalles?.length)   setDetalles(d.detalles)
+            if (d.pagos?.length)      setPagos(d.pagos)
+            if (d.montoRecibido)      setMontoRecibido(d.montoRecibido)
+            if (d.esModoServicio)     setEsModoServicio(d.esModoServicio)
+        },
+        [selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, detalles, pagos, montoRecibido, esModoServicio],
+    )
     const printRef = useRef<HTMLDivElement>(null)
 
     const handlePrint = useReactToPrint({
@@ -113,17 +137,23 @@ export function FacturaDirectaPage() {
     async function loadData() {
         try {
             // Use catalog cache (stale-while-revalidate, works offline)
-            const [clientsList, prodList, vendedoresList, cuentasBanc] = await Promise.all([
+            const [clientsList, prodList, vendedoresList, cuentasBanc, bodsList] = await Promise.all([
                 catalogCacheService.getClientes(empresa!.id),
                 catalogCacheService.getProductos(empresa!.id),
                 isOnline ? vendedorService.getVendedoresActivos(empresa!.id).catch(() => []) : [],
                 isOnline ? cuentasBancariasService.listar(empresa!.id).catch(() => []) : [],
+                isOnline ? bodegaService.listar(empresa!.id).catch(() => []) : [],
             ])
             setClientes(clientsList)
             setProductos(prodList)
             setVendedores(vendedoresList)
             setCuentasBancarias(cuentasBanc.filter((c: CuentaBancaria) => c.estado === 'activa'))
+            setBodegas(bodsList)
             if (vendedoresList.length === 1) setSelectedVendedorId(vendedoresList[0].id)
+            if (bodsList.length > 0 && !selectedBodegaId) {
+                const principal = bodsList.find((b: Bodega) => b.es_principal) ?? bodsList[0]
+                setSelectedBodegaId(principal.id)
+            }
 
             // Consumidor final: buscar en la lista ya cacheada
             const consumidor = clientsList.find((c: any) => c.identificacion === '9999999999999') ?? null
@@ -316,9 +346,11 @@ export function FacturaDirectaPage() {
                 caja_sesion_id: cajaSesion!.id,
                 vendedor_id: selectedVendedorId || null,
                 dias_plazo_credito: diasPlazoCredito,
+                bodega_id: selectedBodegaId || null,
             })
 
             const facturaCompleta = await facturaDirectaService.getComprobanteCompleto(factura.id)
+            clearDraft()
             setFacturaFinal(facturaCompleta)
         } catch (e: any) {
             alert('Error al generar factura: ' + e.message)
@@ -605,6 +637,25 @@ export function FacturaDirectaPage() {
                                         <p className="text-xs text-slate-400 mt-1">No hay vendedores activos.</p>
                                     )}
                                 </div>
+
+                                {/* Bodega de despacho */}
+                                {bodegas.length > 0 && (
+                                    <div>
+                                        <label className="text-xs font-semibold text-slate-500 uppercase mb-1 block">Bodega de despacho</label>
+                                        <select
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                                            value={selectedBodegaId}
+                                            onChange={e => setSelectedBodegaId(e.target.value)}
+                                        >
+                                            <option value="">— Sin bodega específica —</option>
+                                            {bodegas.map(b => (
+                                                <option key={b.id} value={b.id}>
+                                                    {b.codigo ? `[${b.codigo}] ` : ''}{b.nombre}{b.es_principal ? ' ★' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
 
                                 {/* Plazo de crédito — solo visible cuando hay pago a crédito */}
                                 {pagos.some(p => p.metodo === 'credito') && (
