@@ -10,6 +10,10 @@ import {
     CreditCard, DollarSign, AlertCircle, CheckCircle2, X,
     Save, ChevronDown, ChevronUp, Search, Printer, Users,
 } from 'lucide-react'
+import { cuentasBancariasService } from '../services/finance/bancosService'
+import type { CuentaBancaria } from '../types/finance'
+import { contabilidadVentasService } from '../services/contabilidadVentasService'
+import { contableConfigService } from '../services/contableConfigService'
 
 const METODOS_PAGO: { value: CarteraCxcPago['metodo_pago']; label: string }[] = [
     { value: 'efectivo',      label: 'Efectivo' },
@@ -52,27 +56,60 @@ export function CarteraCxcPage() {
     const [expandedId, setExpandedId]   = useState<string | null>(null)
     const [pagosDetalle, setPagosDetalle] = useState<Record<string, CarteraCxcPago[]>>({})
 
+    // ── Cuentas bancarias de la empresa (para transferencias) ──
+    const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([])
+
     // ── Modal pago individual ──
     const [pagoModal, setPagoModal]     = useState<CarteraCxc | null>(null)
     const [pagoValor, setPagoValor]     = useState('')
     const [pagoMetodo, setPagoMetodo]   = useState<CarteraCxcPago['metodo_pago']>('efectivo')
     const [pagoRef, setPagoRef]         = useState('')
+    const [pagoBanco, setPagoBanco]     = useState('')            // banco del cheque
+    const [pagoCuentaId, setPagoCuentaId] = useState('')          // cuenta bancaria destino (transferencia)
     const [savingPago, setSavingPago]   = useState(false)
 
     // ── Modal pago multi-factura ──
     const [multiModal, setMultiModal]   = useState(false)
-    const [multiCliente, setMultiCliente] = useState('')          // texto búsqueda
+    const [multiCliente, setMultiCliente] = useState('')
     const [multiClienteId, setMultiClienteId] = useState<string | null>(null)
     const [multiFacturas, setMultiFacturas] = useState<CarteraCxc[]>([])
     const [multiTotal, setMultiTotal]   = useState('')
     const [multiMetodo, setMultiMetodo] = useState<CarteraCxcPago['metodo_pago']>('cheque')
     const [multiRef, setMultiRef]       = useState('')
+    const [multiBanco, setMultiBanco]   = useState('')            // banco del cheque
+    const [multiCuentaId, setMultiCuentaId] = useState('')        // cuenta bancaria destino
     const [savingMulti, setSavingMulti] = useState(false)
     const [loadingMultiFacturas, setLoadingMultiFacturas] = useState(false)
 
     useEffect(() => {
         if (empresa?.id) loadCartera()
     }, [empresa?.id, filtroEstado])
+
+    useEffect(() => {
+        if (empresa?.id) {
+            cuentasBancariasService.listar(empresa.id)
+                .then(data => setCuentasBancarias(data.filter(c => c.estado === 'activa')))
+                .catch(() => {})
+        }
+    }, [empresa?.id])
+
+    async function crearAsientoCobroSeguro(valor: number, metodoPago: string, clienteNombre: string, facturaSecuencial?: string) {
+        try {
+            const config = await contableConfigService.getConfig(empresa!.id)
+            if (!config?.contabilidad_en_linea) return
+            await contabilidadVentasService.crearAsientoCobro({
+                empresaId:   empresa!.id,
+                portalRuc:   (empresa as any)?.ruc ?? '',
+                clienteNombre,
+                fecha:       new Date().toISOString().split('T')[0],
+                valor,
+                metodoPago,
+                facturaSecuencial,
+            })
+        } catch (e) {
+            console.warn('[cobro] Asiento contable omitido:', e)
+        }
+    }
 
     async function loadCartera() {
         try {
@@ -102,16 +139,34 @@ export function CarteraCxcPage() {
         const valor = parseFloat(pagoValor)
         if (isNaN(valor) || valor <= 0) { alert('Ingresa un valor válido mayor a 0'); return }
         if (valor > pagoModal.saldo) { alert(`El valor no puede superar el saldo (${formatCurrency(pagoModal.saldo)})`); return }
+
+        const ctaSeleccionada = cuentasBancarias.find(c => c.id === pagoCuentaId)
+        const ctaLabel = ctaSeleccionada
+            ? `${(ctaSeleccionada as any).banco?.nombre || ''} ${ctaSeleccionada.numero_cuenta}`.trim()
+            : ''
+
+        // Referencia enriquecida con banco/cuenta
+        let refFinal = pagoRef
+        if (pagoMetodo === 'cheque' && pagoBanco)
+            refFinal = pagoBanco + (pagoRef ? ' | Nro. ' + pagoRef : '')
+        else if (pagoMetodo === 'transferencia' && ctaLabel)
+            refFinal = ctaLabel + (pagoRef ? ' | Ref: ' + pagoRef : '')
+
         try {
             setSavingPago(true)
-            await carteraCxcService.registrarPago(pagoModal.id, empresa!.id, valor, pagoMetodo, pagoRef)
+            await carteraCxcService.registrarPago(pagoModal.id, empresa!.id, valor, pagoMetodo, refFinal)
             const nuevoSaldo = Math.round((pagoModal.saldo - valor) * 100) / 100
-            // Imprimir comprobante
-            imprimirComprobante([{
-                cartera: { ...pagoModal, saldo: pagoModal.saldo },
-                aplicado: valor,
-            }], valor, pagoMetodo, pagoRef, nuevoSaldo)
-            setPagoModal(null); setPagoValor(''); setPagoRef('')
+
+            imprimirComprobante(
+                [{ cartera: { ...pagoModal, saldo: pagoModal.saldo }, aplicado: valor }],
+                valor, pagoMetodo, pagoRef, nuevoSaldo,
+                pagoMetodo === 'cheque' ? pagoBanco : ctaLabel
+            )
+
+            // Asiento contable no-bloqueante
+            crearAsientoCobroSeguro(valor, pagoMetodo, pagoModal.clientes?.nombre ?? '', pagoModal.comprobantes?.secuencial)
+
+            setPagoModal(null); setPagoValor(''); setPagoRef(''); setPagoBanco(''); setPagoCuentaId('')
             await loadCartera()
         } catch (e: any) {
             alert(`Error al registrar pago: ${e.message}`)
@@ -153,17 +208,34 @@ export function CarteraCxcPage() {
         if (excede) { alert(`El valor supera el total de la deuda (${formatCurrency(totalSaldoCliente)})`); return }
         const dists = distribucion.filter(d => d.aplicado > 0)
         if (dists.length === 0) { alert('Sin facturas a pagar'); return }
+
+        const ctaSeleccionada = cuentasBancarias.find(c => c.id === multiCuentaId)
+        const ctaLabel = ctaSeleccionada
+            ? `${(ctaSeleccionada as any).banco?.nombre || ''} ${ctaSeleccionada.numero_cuenta}`.trim()
+            : ''
+
+        let refFinal = multiRef
+        if (multiMetodo === 'cheque' && multiBanco)
+            refFinal = multiBanco + (multiRef ? ' | Nro. ' + multiRef : '')
+        else if (multiMetodo === 'transferencia' && ctaLabel)
+            refFinal = ctaLabel + (multiRef ? ' | Ref: ' + multiRef : '')
+
         try {
             setSavingMulti(true)
             await carteraCxcService.registrarPagoMultiple(
                 dists.map(d => ({ carteraId: d.cartera.id, valor: d.aplicado })),
-                empresa!.id,
-                multiMetodo,
-                multiRef
+                empresa!.id, multiMetodo, refFinal
             )
-            // Imprimir comprobante multi
             const saldoRestante = Math.round((totalSaldoCliente - totalAplicado) * 100) / 100
-            imprimirComprobante(dists, total, multiMetodo, multiRef, saldoRestante)
+            imprimirComprobante(
+                dists, total, multiMetodo, multiRef, saldoRestante,
+                multiMetodo === 'cheque' ? multiBanco : ctaLabel
+            )
+
+            // Asiento contable no-bloqueante
+            const clienteNombre = dists[0]?.cartera.clientes?.nombre ?? ''
+            crearAsientoCobroSeguro(total, multiMetodo, clienteNombre)
+
             cerrarMultiModal()
             await loadCartera()
         } catch (e: any) {
@@ -176,7 +248,7 @@ export function CarteraCxcPage() {
     function cerrarMultiModal() {
         setMultiModal(false); setMultiCliente(''); setMultiClienteId(null)
         setMultiFacturas([]); setMultiTotal(''); setMultiRef('')
-        setMultiMetodo('cheque')
+        setMultiMetodo('cheque'); setMultiBanco(''); setMultiCuentaId('')
     }
 
     // ── Imprimir comprobante de pago (A4 y 80mm) ──
@@ -185,7 +257,8 @@ export function CarteraCxcPage() {
         totalPagado: number,
         metodo: string,
         referencia: string,
-        saldoRestante: number
+        saldoRestante: number,
+        bancoLabel?: string        // banco del cheque o cuenta destino de la transferencia
     ) {
         const primerCliente = dists[0]?.cartera
         const ahora = new Date()
@@ -266,7 +339,6 @@ export function CarteraCxcPage() {
 
   @media print{
     .ctrl,.no-print{display:none!important}
-    .a4,.mm80{display:block!important}
   }
 </style>
 <script>
@@ -316,6 +388,7 @@ export function CarteraCxcPage() {
 
   <div class="paginfo">
     <div><label>Forma de pago</label><p>${metodoLabel}</p></div>
+    ${bancoLabel ? `<div><label>${metodo === 'cheque' ? 'Banco emisor' : 'Cuenta destino'}</label><p>${bancoLabel}</p></div>` : '<div></div>'}
     <div><label>Referencia / Nro.</label><p>${referencia || '—'}</p></div>
     <div><label>Fecha y hora</label><p>${fechaHora}</p></div>
   </div>
@@ -350,6 +423,7 @@ export function CarteraCxcPage() {
   </table>
   <div class="sep"></div>
   <div class="total-row"><span>Forma pago:</span><span><b>${metodoLabel}</b></span></div>
+  ${bancoLabel ? `<div class="total-row"><span>${metodo === 'cheque' ? 'Banco:' : 'Cta. destino:'}</span><span>${bancoLabel}</span></div>` : ''}
   ${referencia ? `<div class="total-row"><span>Referencia:</span><span>${referencia}</span></div>` : ''}
   <div class="sep"></div>
   <div class="total-big"><span>TOTAL PAGADO:</span><span>${formatCurrency(totalPagado)}</span></div>
@@ -739,18 +813,52 @@ export function CarteraCxcPage() {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Método de pago</label>
                                 <select
                                     value={pagoMetodo}
-                                    onChange={e => setPagoMetodo(e.target.value as CarteraCxcPago['metodo_pago'])}
+                                    onChange={e => { setPagoMetodo(e.target.value as CarteraCxcPago['metodo_pago']); setPagoBanco(''); setPagoCuentaId('') }}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
                                 >
                                     {METODOS_PAGO.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                 </select>
                             </div>
+
+                            {/* Banco emisor — solo para cheque */}
+                            {pagoMetodo === 'cheque' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Banco emisor del cheque</label>
+                                    <input
+                                        type="text" value={pagoBanco} onChange={e => setPagoBanco(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                        placeholder="Ej: Banco Pichincha"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Cuenta bancaria destino — solo para transferencia */}
+                            {pagoMetodo === 'transferencia' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Cuenta destino (nuestra)</label>
+                                    <select
+                                        value={pagoCuentaId}
+                                        onChange={e => setPagoCuentaId(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                    >
+                                        <option value="">— Selecciona cuenta —</option>
+                                        {cuentasBancarias.map(c => (
+                                            <option key={c.id} value={c.id}>
+                                                {(c as any).banco?.nombre || ''} — {c.numero_cuenta} ({c.tipo})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Referencia / Número</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                    {pagoMetodo === 'cheque' ? 'Número de cheque' : pagoMetodo === 'transferencia' ? 'Número de comprobante / referencia' : 'Referencia / Número'}
+                                </label>
                                 <input
                                     type="text" value={pagoRef} onChange={e => setPagoRef(e.target.value)}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
-                                    placeholder="Nro. transferencia, cheque, etc."
+                                    placeholder={pagoMetodo === 'cheque' ? 'Nro. cheque' : pagoMetodo === 'transferencia' ? 'Nro. comprobante' : 'Referencia'}
                                 />
                             </div>
                         </div>
@@ -862,37 +970,72 @@ export function CarteraCxcPage() {
 
                                     {/* Paso 3: Datos del pago */}
                                     {multiFacturas.length > 0 && (
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-semibold text-slate-700 mb-1">3. Valor a pagar <span className="text-red-500">*</span></label>
-                                                <input
-                                                    type="number" min="0.01" step="0.01"
-                                                    value={multiTotal}
-                                                    onChange={e => setMultiTotal(e.target.value)}
-                                                    className={`w-full px-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-primary-500 font-mono text-lg font-bold ${excede ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
-                                                    placeholder="0.00"
-                                                    autoFocus
-                                                />
-                                                {excede && <p className="text-xs text-red-500 mt-1">Supera la deuda total</p>}
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-slate-700 mb-1">3. Valor a pagar <span className="text-red-500">*</span></label>
+                                                    <input
+                                                        type="number" min="0.01" step="0.01"
+                                                        value={multiTotal}
+                                                        onChange={e => setMultiTotal(e.target.value)}
+                                                        className={`w-full px-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-primary-500 font-mono text-lg font-bold ${excede ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
+                                                        placeholder="0.00"
+                                                        autoFocus
+                                                    />
+                                                    {excede && <p className="text-xs text-red-500 mt-1">Supera la deuda total</p>}
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Método</label>
+                                                    <select
+                                                        value={multiMetodo}
+                                                        onChange={e => { setMultiMetodo(e.target.value as CarteraCxcPago['metodo_pago']); setMultiBanco(''); setMultiCuentaId('') }}
+                                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                                    >
+                                                        {METODOS_PAGO.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-slate-700 mb-1">
+                                                        {multiMetodo === 'cheque' ? 'Nro. de cheque' : multiMetodo === 'transferencia' ? 'Nro. comprobante' : 'Referencia'}
+                                                    </label>
+                                                    <input
+                                                        type="text" value={multiRef} onChange={e => setMultiRef(e.target.value)}
+                                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                                        placeholder={multiMetodo === 'cheque' ? 'Nro. cheque' : multiMetodo === 'transferencia' ? 'Nro. comprobante' : 'Referencia'}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Método</label>
-                                                <select
-                                                    value={multiMetodo}
-                                                    onChange={e => setMultiMetodo(e.target.value as CarteraCxcPago['metodo_pago'])}
-                                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
-                                                >
-                                                    {METODOS_PAGO.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-semibold text-slate-700 mb-1">Referencia</label>
-                                                <input
-                                                    type="text" value={multiRef} onChange={e => setMultiRef(e.target.value)}
-                                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
-                                                    placeholder="Nro. cheque, transferencia..."
-                                                />
-                                            </div>
+
+                                            {/* Banco emisor (cheque) */}
+                                            {multiMetodo === 'cheque' && (
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Banco emisor del cheque</label>
+                                                    <input
+                                                        type="text" value={multiBanco} onChange={e => setMultiBanco(e.target.value)}
+                                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                                        placeholder="Ej: Banco Pichincha"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Cuenta destino (transferencia) */}
+                                            {multiMetodo === 'transferencia' && (
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Cuenta destino (nuestra)</label>
+                                                    <select
+                                                        value={multiCuentaId}
+                                                        onChange={e => setMultiCuentaId(e.target.value)}
+                                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                                    >
+                                                        <option value="">— Selecciona cuenta —</option>
+                                                        {cuentasBancarias.map(c => (
+                                                            <option key={c.id} value={c.id}>
+                                                                {(c as any).banco?.nombre || ''} — {c.numero_cuenta} ({c.tipo})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 

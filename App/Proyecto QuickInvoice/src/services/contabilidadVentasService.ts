@@ -266,4 +266,103 @@ export const contabilidadVentasService = {
 
         console.log(`[asientoVenta] ✅ Asiento ${comp.id} creado para factura ${secuencial}`)
     },
+
+    // ── Asiento de cobro (abono / pago de cartera CxC) ─────────────────────
+    async crearAsientoCobro(input: {
+        empresaId: string
+        portalRuc: string
+        clienteNombre: string
+        fecha: string
+        valor: number
+        metodoPago: string
+        facturaSecuencial?: string
+    }): Promise<void> {
+        const db = supabaseContabilidad as any
+        const { empresaId, portalRuc, clienteNombre, fecha, valor, metodoPago, facturaSecuencial } = input
+
+        const mapeoMap = await contableConfigService.getMapeoAsMap(empresaId)
+        const cuenta = (proceso: string, concepto: string): string | null =>
+            mapeoMap[`${proceso}:${concepto}`]?.cuenta_id ?? null
+
+        const { data: memberships } = await db
+            .from('lp_usuarios_empresa')
+            .select('empresa_id, empresa:lp_empresas(id, ruc)')
+            .eq('activo', true)
+
+        const lista: Array<{ empresa_id: string; empresa: { id: string; ruc?: string | null } }> = memberships ?? []
+        if (!lista.length) return
+
+        let lpEmpresaId = lista[0].empresa_id
+        if (portalRuc) {
+            const match = lista.find(m => m.empresa?.ruc === portalRuc)
+            if (match) lpEmpresaId = match.empresa_id
+        }
+
+        const [año, mes] = fecha.split('-').map(Number)
+        const { data: periodo } = await db
+            .from('lp_periodos').select('id')
+            .eq('empresa_id', lpEmpresaId).eq('año', año).eq('mes', mes)
+            .in('estado', ['abierto']).maybeSingle()
+
+        if (!periodo) {
+            console.warn(`[asientoCobro] Sin período abierto ${mes}/${año}. Asiento omitido.`)
+            return
+        }
+
+        const { data: tipos } = await db
+            .from('lp_tipos_comprobante').select('id, codigo').eq('activo', true).order('codigo')
+        const listaTipos: Array<{ id: string; codigo: string }> = tipos ?? []
+        let tipoId: string | null = null
+        let tipoCodigo = 'RC'
+        for (const pref of ['RC', 'RV', 'CI', 'V']) {
+            const t = listaTipos.find(t => t.codigo === pref)
+            if (t) { tipoId = t.id; tipoCodigo = t.codigo; break }
+        }
+        if (!tipoId && listaTipos.length > 0) { tipoId = listaTipos[0].id; tipoCodigo = listaTipos[0].codigo }
+        if (!tipoId) return
+
+        const { data: numero } = await db.rpc('lp_generar_numero_comprobante', {
+            p_empresa_id: lpEmpresaId, p_tipo_codigo: tipoCodigo, p_año: año, p_mes: mes,
+        })
+
+        const metodo = metodoPago.toLowerCase()
+        const ctaDebe = metodo === 'transferencia' ? cuenta('COBROS', 'BANCO')
+            : metodo === 'cheque'                  ? cuenta('COBROS', 'CHEQUE')
+            : metodo === 'tarjeta'                 ? cuenta('COBROS', 'TARJETA')
+            :                                        cuenta('COBROS', 'EFECTIVO')
+
+        const ctaHaber = cuenta('VENTAS', 'CARTERA_CLIENTES')
+
+        if (!ctaDebe || !ctaHaber) {
+            console.warn('[asientoCobro] Faltan cuentas mapeadas (COBROS o VENTAS:CARTERA_CLIENTES). Configura en Ajustes → Contabilidad.')
+            return
+        }
+
+        const r2 = (n: number) => Math.round(n * 100) / 100
+        const glosa = `Cobro cartera — ${clienteNombre}${facturaSecuencial ? ' / Fac. ' + facturaSecuencial : ''}`
+
+        const { data: comp, error: errComp } = await db
+            .from('lp_comprobantes')
+            .insert({
+                empresa_id: lpEmpresaId, periodo_id: periodo.id,
+                tipo_comprobante_id: tipoId,
+                numero: numero || `COB-${Date.now()}`, secuencial: 1,
+                fecha, glosa, estado: 'confirmado',
+                total_debe: r2(valor), total_haber: r2(valor),
+                moneda_id: null, tipo_cambio: 1,
+                origen: 'quickinvoice', referencia_externa: null, created_by: null,
+            })
+            .select('id').single()
+
+        if (errComp || !comp) throw errComp ?? new Error('Error creando comprobante LP cobro')
+
+        const { error: errLineas } = await db.from('lp_comprobante_lineas').insert([
+            { comprobante_id: comp.id, empresa_id: lpEmpresaId, cuenta_id: ctaDebe, descripcion: `Cobro ${metodoPago}`, debe: r2(valor), haber: 0, orden: 0 },
+            { comprobante_id: comp.id, empresa_id: lpEmpresaId, cuenta_id: ctaHaber, descripcion: 'Cuentas por cobrar', debe: 0, haber: r2(valor), orden: 1 },
+        ])
+        if (errLineas) throw errLineas
+
+        await db.rpc('lp_actualizar_saldos', { p_comprobante_id: comp.id, p_operacion: 'sumar' })
+        console.log(`[asientoCobro] ✅ Asiento cobro creado`)
+    },
 }
