@@ -80,6 +80,7 @@ export function CarteraCxcPage() {
     const [multiCuentaId, setMultiCuentaId] = useState('')        // cuenta bancaria destino
     const [savingMulti, setSavingMulti] = useState(false)
     const [loadingMultiFacturas, setLoadingMultiFacturas] = useState(false)
+    const [avisoContable, setAvisoContable] = useState<string | null>(null)
 
     useEffect(() => {
         if (empresa?.id) loadCartera()
@@ -96,7 +97,10 @@ export function CarteraCxcPage() {
     async function crearAsientoCobroSeguro(valor: number, metodoPago: string, clienteNombre: string, facturaSecuencial?: string) {
         try {
             const config = await contableConfigService.getConfig(empresa!.id)
-            if (!config?.contabilidad_en_linea) return
+            if (!config?.contabilidad_en_linea) {
+                setAvisoContable('Contabilidad en línea está desactivada. Actívala en Configuración → Contabilidad para generar asientos automáticos.')
+                return
+            }
             await contabilidadVentasService.crearAsientoCobro({
                 empresaId:   empresa!.id,
                 portalRuc:   (empresa as any)?.ruc ?? '',
@@ -106,7 +110,9 @@ export function CarteraCxcPage() {
                 metodoPago,
                 facturaSecuencial,
             })
-        } catch (e) {
+        } catch (e: any) {
+            const msg = e?.message ?? 'Error desconocido al generar asiento contable.'
+            setAvisoContable(`Pago registrado, pero asiento contable no generado: ${msg}`)
             console.warn('[cobro] Asiento contable omitido:', e)
         }
     }
@@ -563,6 +569,16 @@ export function CarteraCxcPage() {
 
     return (
         <div className="space-y-6">
+            {/* Aviso contable no-bloqueante */}
+            {avisoContable && (
+                <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-xl text-sm text-amber-900">
+                    <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                    <span className="flex-1">{avisoContable}</span>
+                    <button onClick={() => setAvisoContable(null)} className="text-amber-500 hover:text-amber-700 shrink-0">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
             {/* Encabezado */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>

@@ -305,8 +305,7 @@ export const contabilidadVentasService = {
             .in('estado', ['abierto']).maybeSingle()
 
         if (!periodo) {
-            console.warn(`[asientoCobro] Sin período abierto ${mes}/${año}. Asiento omitido.`)
-            return
+            throw new Error(`Sin período contable abierto para ${mes}/${año}. Abre el período en LedgerPro antes de registrar cobros.`)
         }
 
         const { data: tipos } = await db
@@ -319,7 +318,7 @@ export const contabilidadVentasService = {
             if (t) { tipoId = t.id; tipoCodigo = t.codigo; break }
         }
         if (!tipoId && listaTipos.length > 0) { tipoId = listaTipos[0].id; tipoCodigo = listaTipos[0].codigo }
-        if (!tipoId) return
+        if (!tipoId) throw new Error('No existe ningún tipo de comprobante activo en LedgerPro. Crea al menos uno (RC, RV, CI o V).')
 
         const { data: numero } = await db.rpc('lp_generar_numero_comprobante', {
             p_empresa_id: lpEmpresaId, p_tipo_codigo: tipoCodigo, p_año: año, p_mes: mes,
@@ -334,8 +333,10 @@ export const contabilidadVentasService = {
         const ctaHaber = cuenta('VENTAS', 'CARTERA_CLIENTES')
 
         if (!ctaDebe || !ctaHaber) {
-            console.warn('[asientoCobro] Faltan cuentas mapeadas (COBROS o VENTAS:CARTERA_CLIENTES). Configura en Ajustes → Contabilidad.')
-            return
+            const faltaDebe  = !ctaDebe  ? `COBROS → ${metodoPago.toUpperCase()} (método de pago)` : null
+            const faltaHaber = !ctaHaber ? 'VENTAS → CARTERA_CLIENTES' : null
+            const faltantes  = [faltaDebe, faltaHaber].filter(Boolean).join(' y ')
+            throw new Error(`Falta mapear: ${faltantes}. Ve a Configuración → Contabilidad → Mapeo de cuentas.`)
         }
 
         const r2 = (n: number) => Math.round(n * 100) / 100
