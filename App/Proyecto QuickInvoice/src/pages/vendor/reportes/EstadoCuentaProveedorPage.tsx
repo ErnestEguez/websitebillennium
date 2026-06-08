@@ -218,7 +218,7 @@ export function EstadoCuentaProveedorPage() {
         if (!movimientos.length) return
         const filas = movimientos.map(m => ({
             'Fecha':        fmtF(m.fecha),
-            'Tipo':         m.tipo,
+            'Tipo':         m.tipo as string,
             'Descripción':  m.descripcion,
             'Cargo (+)':    m.cargo   > 0 ? m.cargo   : '',
             'Abono (-)':    m.abono   > 0 ? m.abono   : '',

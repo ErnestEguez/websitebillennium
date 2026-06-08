@@ -6,7 +6,7 @@ import type { Compra, CompraConDetalle, Proveedor } from '../../types/vendors'
 import {
     ShoppingCart, Search, Filter, Eye, Ban,
     Package, Wrench, ChevronDown, Loader2, RefreshCw,
-    FileText, Calendar, AlertCircle, X, Download, Printer,
+    Calendar, AlertCircle, X, Download, Printer,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import * as XLSX from 'xlsx'

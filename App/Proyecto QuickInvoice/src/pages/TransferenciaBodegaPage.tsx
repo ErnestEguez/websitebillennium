@@ -168,22 +168,6 @@ export function TransferenciaBodegaPage() {
 
     // ── Helpers de línea ──────────────────────────────────────────────────────
 
-    function actualizarLinea<K extends keyof LineaTransferencia>(idx: number, campo: K, valor: LineaTransferencia[K]) {
-        setLineas(prev => {
-            const copia = [...prev]
-            copia[idx] = { ...copia[idx], [campo]: valor }
-            if (campo === 'producto_id') {
-                const prod = productos.find(p => p.id === valor)
-                const info = valor ? (stockOrigenMap[valor as string] ?? null) : null
-                copia[idx].producto_nombre = prod?.nombre ?? ''
-                copia[idx].producto_codigo = prod?.codigo ?? ''
-                copia[idx].stock_origen    = info ? info.cantidad : (prod ? 0 : null)
-                copia[idx].costo_promedio  = info ? info.costo : Number(prod?.costo_promedio ?? 0)
-            }
-            return copia
-        })
-    }
-
     // ── Validación ────────────────────────────────────────────────────────────
 
     function validar(): string[] {
