@@ -139,7 +139,8 @@ const PERM_RUTAS: [string, string][] = [
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {
-    const { profile, empresa, modules, permisos, isAdmin, loading: authLoading, signOut } = useAuth() as any
+    const { profile, empresa, empresasDisponibles, modules, permisos, isAdmin, loading: authLoading, signOut, selectEmpresa } = useAuth() as any
+    const [showEmpresaDropdown, setShowEmpresaDropdown] = React.useState(false)
     const p = permisos ?? {}
     const navigate = useNavigate()
     // const usaVendor = !!empresa?.usar_vendor_management
@@ -166,6 +167,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const toggleGroup = (label: string) => {
         setOpenGroups(prev => prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label])
     }
+
+    // Cerrar dropdown de empresa al hacer click fuera
+    React.useEffect(() => {
+        if (!showEmpresaDropdown) return
+        const close = () => setShowEmpresaDropdown(false)
+        document.addEventListener('mousedown', close)
+        return () => document.removeEventListener('mousedown', close)
+    }, [showEmpresaDropdown])
 
     // Guardia de ruta: si el usuario no tiene permiso, redirige al dashboard
     React.useEffect(() => {
@@ -477,6 +486,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     <SidebarItem to="/configuracion"      icon={Settings}  label="Configuración"       active={location.pathname === '/configuracion'} sub />
                                     <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub />
                                     {isAdmin && <SidebarItem to="/ajustes/permisos" icon={UserCog} label="Permisos de usuario" active={location.pathname === '/ajustes/permisos'} sub />}
+                                    {profile?.rol === 'admin_plataforma' && <SidebarItem to="/admin/user-empresas" icon={ArrowLeftRight} label="Asignar empresas" active={location.pathname === '/admin/user-empresas'} sub />}
                                     <button
                                         onClick={toggleDarkSidebar}
                                         className="flex items-center gap-3 w-full pl-8 pr-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors"
@@ -520,16 +530,66 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
                         <div className="h-10 w-px bg-slate-200 mx-2" />
 
-                        {/* Business Logo */}
-                        <div className="flex items-center gap-3">
-                            {empresa?.logo_url ? (
-                                <img src={empresa.logo_url} alt={empresa.nombre} className="h-10 w-auto object-contain" />
-                            ) : (
-                                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 font-bold">
-                                    {empresa?.nombre?.[0] || 'E'}
+                        {/* Business Logo / Empresa Switcher */}
+                        <div className="relative">
+                            <button
+                                onClick={() => empresasDisponibles?.length > 1 && setShowEmpresaDropdown(v => !v)}
+                                className={cn(
+                                    "flex items-center gap-3",
+                                    empresasDisponibles?.length > 1 ? "hover:bg-slate-100 rounded-lg px-2 py-1 cursor-pointer transition-colors" : "cursor-default"
+                                )}
+                            >
+                                {empresa?.logo_url ? (
+                                    <img src={empresa.logo_url} alt={empresa.nombre} className="h-10 w-auto object-contain" />
+                                ) : (
+                                    <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 font-bold">
+                                        {empresa?.nombre?.[0] || 'E'}
+                                    </div>
+                                )}
+                                <div className="hidden md:block text-left">
+                                    <span className="text-sm font-bold text-slate-700 block">{empresa?.nombre || 'Mi Negocio'}</span>
+                                    {empresasDisponibles?.length > 1 && (
+                                        <span className="text-[10px] text-primary-600 font-semibold uppercase tracking-wide">Cambiar empresa ▾</span>
+                                    )}
+                                </div>
+                            </button>
+
+                            {showEmpresaDropdown && empresasDisponibles?.length > 1 && (
+                                <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                        Seleccionar empresa
+                                    </div>
+                                    {(empresasDisponibles as any[]).map((emp: any) => (
+                                        <button
+                                            key={emp.id}
+                                            onClick={async () => {
+                                                setShowEmpresaDropdown(false)
+                                                await selectEmpresa(emp.id)
+                                                navigate('/')
+                                            }}
+                                            className={cn(
+                                                "w-full flex items-center gap-3 px-4 py-3 hover:bg-primary-50 transition-colors text-left",
+                                                empresa?.id === emp.id ? "bg-primary-50" : ""
+                                            )}
+                                        >
+                                            {emp.logo_url ? (
+                                                <img src={emp.logo_url} alt={emp.nombre} className="w-8 h-8 object-contain rounded shrink-0" />
+                                            ) : (
+                                                <div className="w-8 h-8 bg-primary-100 rounded flex items-center justify-center text-primary-700 font-bold text-sm shrink-0">
+                                                    {emp.nombre[0]}
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-slate-800 truncate">{emp.nombre}</p>
+                                                <p className="text-xs text-slate-400">{emp.ruc}</p>
+                                            </div>
+                                            {empresa?.id === emp.id && (
+                                                <span className="w-2 h-2 bg-primary-500 rounded-full shrink-0" />
+                                            )}
+                                        </button>
+                                    ))}
                                 </div>
                             )}
-                            <span className="text-sm font-bold text-slate-700 hidden md:block">{empresa?.nombre || 'Mi Negocio'}</span>
                         </div>
                     </div>
 

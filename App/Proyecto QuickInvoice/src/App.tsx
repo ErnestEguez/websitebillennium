@@ -38,6 +38,7 @@ import { NcRidePage } from './pages/NcRidePage'
 import { DashboardGerencialPage } from './pages/DashboardGerencialPage'
 import { ProtectedRoute as RoleProtectedRoute } from './components/ProtectedRoute'
 import { AdminPermisosPage } from './pages/AdminPermisosPage'
+import { AdminUserEmpresasPage } from './pages/AdminUserEmpresasPage'
 // ── Módulo Cuentas por Pagar (Vendor Management) ─────────────
 import { ProveedoresPage as VMProveedoresPage }   from './pages/vendor/ProveedoresPage'
 import { ComprasPage }                            from './pages/vendor/ComprasPage'
@@ -348,6 +349,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <AdminPermisosPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/admin/user-empresas" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
+                  <Layout>
+                    <AdminUserEmpresasPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

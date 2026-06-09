@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { supabaseContabilidad } from '../lib/supabaseContabilidad'
 import { offlineDb } from '../lib/offlineDb'
 import type { User } from '@supabase/supabase-js'
+import { EmpresaSelectorScreen } from '../components/EmpresaSelectorScreen'
+import type { EmpresaOption } from '../components/EmpresaSelectorScreen'
+
+export type { EmpresaOption }
 
 export interface Profile {
     id: string
@@ -63,12 +68,14 @@ interface AuthContextType {
     user: User | null
     profile: Profile | null
     empresa: Empresa | null
+    empresasDisponibles: EmpresaOption[]
     modules: Modules
     permisos: Permisos
     isAdmin: boolean
     loading: boolean
     signOut: () => Promise<void>
     cajaSesion: any | null
+    selectEmpresa: (empresaId: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -109,18 +116,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [permisos, setPermisos] = useState<Permisos>(DEFAULT_PERMISOS)
     const [isAdmin, setIsAdmin] = useState(false)
     const [empresa, setEmpresa] = useState<Empresa | null>(null)
+    const [empresasDisponibles, setEmpresasDisponibles] = useState<EmpresaOption[]>([])
+    const [needsEmpresaSelection, setNeedsEmpresaSelection] = useState(false)
     const [loading, setLoading] = useState(true)
     const isMounted = React.useRef(true)
 
     const [cajaSesion, setCajaSesion] = useState<any | null>(null);
-    const [cajaBloqueada, setCajaBloqueada] = useState<string | null>(null); // Nombre del usuario que bloquea
+    const [cajaBloqueada, setCajaBloqueada] = useState<string | null>(null);
 
     useEffect(() => {
         isMounted.current = true;
         const initializeAuth = async () => {
             console.log('🏁 Auth Initialization Started');
             try {
-                // Timeout para gertSession por si acaso cuelga
                 const sessionPromise = supabase.auth.getSession();
                 const timeoutPromise = new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
@@ -135,7 +143,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUser(session.user);
                     await fetchProfile(session.user.id);
                 } else {
-                    // Si hay magic link en la URL, onAuthStateChange lo procesará — no apagar loading todavía
                     const hasMagicLink =
                         window.location.hash.includes('access_token') ||
                         window.location.hash.includes('type=magiclink') ||
@@ -156,16 +163,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             if (!isMounted.current) return;
             console.log('🔔 AUTH STATE CHANGE EVENT:', _event);
-            console.log('👤 Session User:', session?.user?.email || 'NONE');
 
             if (_event === 'SIGNED_IN') {
                 setUser(session?.user ?? null);
                 if (session?.user) await fetchProfile(session.user.id);
             } else if (_event === 'SIGNED_OUT') {
-                console.warn('⚠️ SIGNED_OUT event received - Clearing state');
                 setUser(null);
                 setProfile(null);
                 setEmpresa(null);
+                setEmpresasDisponibles([]);
+                setNeedsEmpresaSelection(false);
                 setCajaSesion(null);
                 setCajaBloqueada(null);
                 setModules(DEFAULT_MODULES);
@@ -175,7 +182,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else if (_event === 'TOKEN_REFRESHED') {
                 console.log('🔄 Token Refreshed');
             } else if (_event === 'USER_UPDATED') {
-                console.log('👤 User Updated');
                 if (session?.user) await fetchProfile(session.user.id);
             }
         });
@@ -194,8 +200,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, [])
 
+    // Carga empresa, módulos, permisos y caja para un empresa_id dado
+    async function loadEmpresaById(userId: string, empresaId: string, userRol: string) {
+        const { data: empresaData, error: empresaError } = await supabase
+            .from('empresas')
+            .select('*')
+            .eq('id', empresaId)
+            .single()
+
+        if (empresaError || !empresaData) {
+            console.error('❌ Empresa Fetch Error:', empresaError)
+            setEmpresa(null)
+            return
+        }
+
+        setEmpresa(empresaData)
+        offlineDb.setAppCache(`empresa:${empresaData.id}`, empresaData).catch(() => {})
+        await validarCaja(userId, empresaId, userRol)
+
+        const { data: modData, error: modError } = await supabase
+            .from('user_modules')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('empresa_id', empresaId)
+            .maybeSingle()
+        console.log('[modules] data:', modData, 'error:', modError)
+        setModules(modData
+            ? { vendor: !!modData.vendor, finance: !!modData.finance, ledgerpro: !!modData.ledgerpro }
+            : DEFAULT_MODULES)
+        setIsAdmin(!!modData?.is_admin)
+
+        try {
+            const permQuery = supabase
+                .from('user_permisos')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('empresa_id', empresaId)
+                .maybeSingle()
+            const permTimeout = new Promise<any>((_, reject) =>
+                setTimeout(() => reject(new Error('permisos timeout')), 4000)
+            )
+            const { data: permData, error: permError } = await Promise.race([permQuery, permTimeout])
+            console.log('[permisos] data:', permData, 'error:', permError)
+            if (permData) {
+                setPermisos({
+                    perm_dashboard:          permData.perm_dashboard          ?? true,
+                    perm_nueva_factura:      permData.perm_nueva_factura      ?? true,
+                    perm_comprobantes:       permData.perm_comprobantes       ?? true,
+                    perm_notas_credito:      permData.perm_notas_credito      ?? true,
+                    perm_anulacion_facturas: permData.perm_anulacion_facturas ?? true,
+                    perm_cierres_caja:       permData.perm_cierres_caja       ?? true,
+                    perm_consulta_ventas:    permData.perm_consulta_ventas    ?? true,
+                    perm_clientes:           permData.perm_clientes           ?? true,
+                    perm_cartera_cxc:        permData.perm_cartera_cxc        ?? true,
+                    perm_consulta_cartera:   permData.perm_consulta_cartera   ?? true,
+                    perm_estado_cuenta:      permData.perm_estado_cuenta      ?? true,
+                    perm_proveedores:        permData.perm_proveedores        ?? true,
+                    perm_compras:            permData.perm_compras            ?? true,
+                    perm_cxp:                permData.perm_cxp               ?? true,
+                    perm_reportes_cxp:       permData.perm_reportes_cxp       ?? true,
+                    perm_bancos:             permData.perm_bancos             ?? true,
+                    perm_egresos:            permData.perm_egresos            ?? true,
+                    perm_cheques:            permData.perm_cheques            ?? true,
+                    perm_movimientos_banc:   permData.perm_movimientos_banc   ?? true,
+                    perm_conciliacion:       permData.perm_conciliacion       ?? true,
+                    perm_plan_cuentas:       permData.perm_plan_cuentas       ?? true,
+                    perm_asientos:           permData.perm_asientos           ?? true,
+                    perm_reportes_cont:      permData.perm_reportes_cont      ?? true,
+                    perm_tributario:         permData.perm_tributario         ?? true,
+                })
+            } else {
+                console.warn('[permisos] sin registro → DEFAULT_PERMISOS')
+                setPermisos(DEFAULT_PERMISOS)
+            }
+        } catch (permErr) {
+            console.error('[permisos] error:', permErr)
+        }
+    }
+
+    // Llamado desde EmpresaSelectorScreen o el switcher del header
+    async function selectEmpresa(empresaId: string) {
+        if (!user || !profile) return
+        setNeedsEmpresaSelection(false)
+        setLoading(true)
+        setCajaSesion(null)
+        setCajaBloqueada(null)
+        await loadEmpresaById(user.id, empresaId, profile.rol)
+        if (isMounted.current) setLoading(false)
+    }
+
     async function fetchProfile(userId: string) {
-        // Avoid fetching if we already have the profile for this user
         if (profile?.id === userId && empresa) {
             console.log('⚡ Profile already loaded for', userId)
             await validarCaja(userId, empresa.id, profile.rol);
@@ -203,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return
         }
 
-        // ── Offline path: use IndexedDB cache ────────────────────────────────
+        // ── Offline path ─────────────────────────────────────────────────────
         if (!navigator.onLine) {
             try {
                 console.log('📴 Offline — loading profile from IndexedDB cache')
@@ -245,7 +339,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.error('❌ Profile Fetch Error:', profileError)
                 if (profileError.code === 'PGRST116' || profileError.status === 406) {
                     console.warn('⚠️ User has no profile in DB yet')
-                    setEmpresa(null)
                 }
                 setLoading(false)
                 return
@@ -254,91 +347,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const data = profileData || {}
             console.log('✅ Profile loaded:', data.rol);
             setProfile(data)
-            // Persist profile for offline use
             offlineDb.setAppCache(`profile:${userId}`, data).catch(() => {})
 
-            if (data.empresa_id) {
-                const { data: empresaData, error: empresaError } = await supabase
+            // Admin de plataforma no necesita empresa
+            if (data.rol === 'admin_plataforma') {
+                setEmpresa(null)
+                return
+            }
+
+            // Buscar empresas asignadas en lp_usuarios_empresa
+            const { data: ueRows, error: ueError } = await supabaseContabilidad
+                .from('lp_usuarios_empresa')
+                .select('empresa_id, rol')
+                .eq('user_id', userId)
+                .eq('activo', true)
+
+            if (ueError) console.warn('[multiempresa] error leyendo lp_usuarios_empresa:', ueError)
+
+            if (ueRows && ueRows.length > 0) {
+                const empresaIds = ueRows.map((r: any) => r.empresa_id)
+                const { data: eList } = await supabase
                     .from('empresas')
-                    .select('*')
-                    .eq('id', data.empresa_id)
-                    .single()
+                    .select('id, nombre, ruc, logo_url')
+                    .in('id', empresaIds)
 
-                if (!empresaError && empresaData) {
-                    setEmpresa(empresaData)
-                    offlineDb.setAppCache(`empresa:${empresaData.id}`, empresaData).catch(() => {})
-                    await validarCaja(userId, data.empresa_id, data.rol)
-                    // Cargar módulos + is_admin (select * para no fallar si falta alguna columna)
-                    const { data: modData, error: modError } = await supabase
-                        .from('user_modules')
-                        .select('*')
-                        .eq('user_id', userId)
-                        .eq('empresa_id', empresaData.id)
-                        .maybeSingle()
-                    console.log('[modules] data:', modData, 'error:', modError)
-                    setModules(modData
-                        ? { vendor: !!modData.vendor, finance: !!modData.finance, ledgerpro: !!modData.ledgerpro }
-                        : DEFAULT_MODULES)
-                    setIsAdmin(!!modData?.is_admin)
+                const options: EmpresaOption[] = (eList || []).map((e: any) => ({
+                    id: e.id,
+                    nombre: e.nombre,
+                    ruc: e.ruc,
+                    logo_url: e.logo_url,
+                    rol: ueRows.find((r: any) => r.empresa_id === e.id)?.rol || 'oficina',
+                }))
+                setEmpresasDisponibles(options)
 
-                    // Cargar permisos de menú — siempre, sin importar is_admin
-                    try {
-                        const permQuery = supabase
-                            .from('user_permisos')
-                            .select('*')
-                            .eq('user_id', userId)
-                            .eq('empresa_id', empresaData.id)
-                            .maybeSingle()
-                        const permTimeout = new Promise<any>((_, reject) =>
-                            setTimeout(() => reject(new Error('permisos timeout')), 4000)
-                        )
-                        const { data: permData, error: permError } = await Promise.race([permQuery, permTimeout])
-                        console.log('[permisos] data:', permData, 'error:', permError)
-                        if (permData) {
-                            setPermisos({
-                                perm_dashboard:          permData.perm_dashboard          ?? true,
-                                perm_nueva_factura:      permData.perm_nueva_factura      ?? true,
-                                perm_comprobantes:       permData.perm_comprobantes       ?? true,
-                                perm_notas_credito:      permData.perm_notas_credito      ?? true,
-                                perm_anulacion_facturas: permData.perm_anulacion_facturas ?? true,
-                                perm_cierres_caja:       permData.perm_cierres_caja       ?? true,
-                                perm_consulta_ventas:    permData.perm_consulta_ventas    ?? true,
-                                perm_clientes:           permData.perm_clientes           ?? true,
-                                perm_cartera_cxc:        permData.perm_cartera_cxc        ?? true,
-                                perm_consulta_cartera:   permData.perm_consulta_cartera   ?? true,
-                                perm_estado_cuenta:      permData.perm_estado_cuenta      ?? true,
-                                perm_proveedores:        permData.perm_proveedores        ?? true,
-                                perm_compras:            permData.perm_compras            ?? true,
-                                perm_cxp:                permData.perm_cxp               ?? true,
-                                perm_reportes_cxp:       permData.perm_reportes_cxp       ?? true,
-                                perm_bancos:             permData.perm_bancos             ?? true,
-                                perm_egresos:            permData.perm_egresos            ?? true,
-                                perm_cheques:            permData.perm_cheques            ?? true,
-                                perm_movimientos_banc:   permData.perm_movimientos_banc   ?? true,
-                                perm_conciliacion:       permData.perm_conciliacion       ?? true,
-                                perm_plan_cuentas:       permData.perm_plan_cuentas       ?? true,
-                                perm_asientos:           permData.perm_asientos           ?? true,
-                                perm_reportes_cont:      permData.perm_reportes_cont      ?? true,
-                                perm_tributario:         permData.perm_tributario         ?? true,
-                            })
-                        } else {
-                            console.warn('[permisos] sin registro → DEFAULT_PERMISOS')
-                            setPermisos(DEFAULT_PERMISOS)
-                        }
-                    } catch (permErr) {
-                        console.error('[permisos] error:', permErr)
-                    }
-                } else {
-                    console.error('❌ Empresa Fetch Error:', empresaError)
-                    setEmpresa(null)
+                if (options.length === 1) {
+                    // Una sola empresa → entrar directo
+                    await loadEmpresaById(userId, options[0].id, data.rol)
+                } else if (options.length > 1) {
+                    // Varias empresas → mostrar selector
+                    setNeedsEmpresaSelection(true)
+                    if (isMounted.current) setLoading(false)
+                    return
                 }
+            } else if (data.empresa_id) {
+                // Fallback: usar profiles.empresa_id (usuarios sin fila en lp_usuarios_empresa)
+                console.warn('[multiempresa] sin filas en lp_usuarios_empresa, usando profiles.empresa_id')
+                setEmpresasDisponibles([])
+                await loadEmpresaById(userId, data.empresa_id, data.rol)
             } else {
                 setEmpresa(null)
             }
         } catch (error: any) {
             console.error('🔥 Auth context profile fetch error:', error.message);
-            // Ya no reseteamos el perfil a null en errores genéricos para evitar "Usuario" fallback
-            // El loading sí debe terminar
         } finally {
             if (isMounted.current) setLoading(false)
         }
@@ -349,7 +409,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const esRolOficina = userRol === 'oficina' || userRol === 'admin_plataforma';
             const esRolOperativo = userRol === 'mesero' || userRol === 'cocina';
 
-            // Buscar caja abierta en la empresa
             const { data: cajaAbierta, error } = await supabase
                 .from('caja_sesiones')
                 .select('*')
@@ -363,24 +422,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (cajaAbierta) {
                 if (cajaAbierta.usuario_id === userId) {
-                    console.log('✅ Caja abierta propia encontrada');
                     setCajaSesion(cajaAbierta);
                     setCajaBloqueada(null);
                     offlineDb.setAppCache(`cajaSesion:${empresaId}`, cajaAbierta).catch(() => {})
                 } else if (esRolOficina) {
-                    console.log('ℹ️ Caja abierta por otro usuario, rol oficina puede continuar');
                     setCajaSesion(cajaAbierta);
                     setCajaBloqueada(null);
                     offlineDb.setAppCache(`cajaSesion:${empresaId}`, cajaAbierta).catch(() => {})
                 } else {
-                    console.log('✅ Mesero/cocina: caja de oficina disponible');
                     setCajaSesion(cajaAbierta);
                     setCajaBloqueada(null);
                     offlineDb.setAppCache(`cajaSesion:${empresaId}`, cajaAbierta).catch(() => {})
                 }
             } else {
                 if (esRolOficina) {
-                    console.log('✨ Oficina: abriendo nueva caja para:', userId);
                     const { data: nuevaCaja, error: errorInsert } = await supabase
                         .from('caja_sesiones')
                         .insert({
@@ -401,8 +456,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         offlineDb.setAppCache(`cajaSesion:${empresaId}`, nuevaCaja).catch(() => {})
                     }
                 } else if (esRolOperativo) {
-                    // Mesero/cocina NO puede abrir caja. Debe esperar que oficina la abra.
-                    console.warn('⛔ Mesero/cocina: no hay caja abierta por oficina');
                     setCajaSesion(null);
                     setCajaBloqueada('SIN_CAJA');
                 }
@@ -431,13 +484,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 <p className="text-slate-500 font-medium">
                     {user ? 'Validando tu perfil de acceso...' : 'Iniciando sistema...'}
                 </p>
-
                 <div className="mt-12 max-w-xs w-full space-y-4">
                     <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
                         <div className="h-full bg-primary-600 animate-[loading_10s_ease-in-out_infinite]"></div>
                     </div>
                 </div>
-
                 {user && (
                     <div className="mt-12 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
                         <p className="text-xs text-slate-400 mb-3">Si la carga tarda demasiado, puede haber un problema con tu conexión o perfil.</p>
@@ -453,8 +504,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         )
     }
 
-    // PANTALLA DE ESPERA DE CAJA (solo para cuando hay caja de OTRO usuario que bloquea)
-    // Nota: SIN_CAJA NO bloquea la pantalla — el mesero puede tomar pedidos sin caja abierta
+    if (needsEmpresaSelection) {
+        return (
+            <EmpresaSelectorScreen
+                empresas={empresasDisponibles}
+                onSelect={selectEmpresa}
+                onSignOut={signOut}
+                userName={profile?.nombre ?? undefined}
+            />
+        )
+    }
+
     if (cajaBloqueada && cajaBloqueada !== 'SIN_CAJA' && user) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 p-6 text-center">
@@ -486,12 +546,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user,
             profile,
             empresa,
+            empresasDisponibles,
             modules,
             permisos,
             isAdmin,
             loading,
             signOut,
-            cajaSesion
+            cajaSesion,
+            selectEmpresa,
         } as any}>
             {children}
         </AuthContext.Provider>
