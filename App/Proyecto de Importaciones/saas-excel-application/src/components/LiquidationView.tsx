@@ -864,8 +864,8 @@ export default function LiquidationView() {
               <tr>
                 <td colSpan={3} className="px-3 py-3 border border-slate-300 text-right">Totales</td>
                 <td className="px-3 py-3 border border-slate-300 text-right">{format2(totals.cantidad)}</td>
-                <td className="px-3 py-3 border border-slate-300 bg-amber-50 text-right text-amber-800 font-bold">{format2(rows.reduce((s,r)=>s+r.costoFobReal,0))}</td>
                 <td className="px-3 py-3 border border-slate-300 bg-amber-50"></td>
+                <td className="px-3 py-3 border border-slate-300 bg-amber-50 text-right text-amber-800 font-bold">{format2(rows.reduce((s,r)=>s+r.costoFobReal,0))}</td>
                 <td className="px-3 py-3 border border-slate-300"></td>
                 <td className="px-3 py-3 border border-slate-300 text-right text-blue-700">{format2(totals.fob)}</td>
                 <td className="px-3 py-3 border border-slate-300"></td>

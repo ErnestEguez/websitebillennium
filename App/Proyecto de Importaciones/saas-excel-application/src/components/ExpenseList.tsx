@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, X, Save, Receipt } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Edit2, Trash2, X, Save, Receipt, Filter } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface Expense {
@@ -14,12 +14,13 @@ interface Expense {
 }
 
 export default function ExpenseList() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [imports, setImports] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [expenses, setExpenses]       = useState<Expense[]>([]);
+  const [imports, setImports]         = useState<any[]>([]);
+  const [loading, setLoading]         = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState<Partial<Expense>>({});
-  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [formData, setFormData]       = useState<Partial<Expense>>({});
+  const [companyId, setCompanyId]     = useState<string | null>(null);
+  const [filterImportId, setFilterImportId] = useState<string>('');   // '' = todas
 
   useEffect(() => {
     fetchExpensesAndImports();
@@ -28,10 +29,10 @@ export default function ExpenseList() {
   const fetchExpensesAndImports = async () => {
     try {
       setLoading(true);
-      
+
       const { data: { session } } = await supabase.auth.getSession();
       const email = session?.user?.email;
-      
+
       let currentCompanyId = null;
       if (email) {
         const { data: userDb } = await supabase.from('usuarios').select('id_empresa').eq('email', email).maybeSingle();
@@ -46,7 +47,6 @@ export default function ExpenseList() {
         return;
       }
 
-      // Traer gastos con el cruce a importaciones
       const { data: expensesData, error: expensesError } = await supabase
         .from('gastos')
         .select('*, importaciones(numero_importacion)')
@@ -56,17 +56,13 @@ export default function ExpenseList() {
       if (expensesError) throw expensesError;
       setExpenses(expensesData || []);
 
-      // Traer lista de importaciones activas para el menú desplegable
       const { data: importsData, error: importsError } = await supabase
         .from('importaciones')
         .select('id, numero_importacion, fecha_importacion')
         .eq('id_empresa', currentCompanyId)
         .order('fecha_creacion', { ascending: false });
 
-      if (!importsError && importsData) {
-        setImports(importsData);
-      }
-
+      if (!importsError && importsData) setImports(importsData);
     } catch (error: any) {
       console.error(error);
       alert('Error cargando datos: ' + error.message);
@@ -77,23 +73,16 @@ export default function ExpenseList() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyId) {
-      alert('Error: No se ha detectado la empresa del usuario.');
-      return;
-    }
-
-    if (!formData.id_importacion) {
-      alert('Por favor seleccione una Importación.');
-      return;
-    }
+    if (!companyId) { alert('Error: No se detectó la empresa del usuario.'); return; }
+    if (!formData.id_importacion) { alert('Por favor seleccione una Importación.'); return; }
 
     try {
       const expenseData = {
-        id_empresa: companyId,
-        id_importacion: formData.id_importacion,
+        id_empresa:        companyId,
+        id_importacion:    formData.id_importacion,
         descripcion_gasto: formData.descripcion_gasto,
-        valor_gasto: formData.valor_gasto || 0,
-        estado: formData.estado || 'ACTIVO'
+        valor_gasto:       formData.valor_gasto || 0,
+        estado:            formData.estado || 'ACTIVO',
       };
 
       if (formData.id) {
@@ -129,10 +118,24 @@ export default function ExpenseList() {
     if (expense) {
       setFormData(expense);
     } else {
-      setFormData({ estado: 'ACTIVO', valor_gasto: 0 });
+      // Pre-seleccionar la importación del filtro activo
+      setFormData({ estado: 'ACTIVO', valor_gasto: 0, id_importacion: filterImportId || undefined });
     }
     setIsModalOpen(true);
   };
+
+  // Gastos filtrados según importación seleccionada
+  const gastosFiltrados = useMemo(() => {
+    if (!filterImportId) return expenses;
+    return expenses.filter(e => e.id_importacion === filterImportId);
+  }, [expenses, filterImportId]);
+
+  const totalFiltrado = useMemo(() =>
+    gastosFiltrados.reduce((sum, e) => sum + Number(e.valor_gasto || 0), 0),
+    [gastosFiltrados]
+  );
+
+  const importacionFiltrada = imports.find(i => i.id === filterImportId);
 
   if (loading) {
     return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
@@ -140,6 +143,7 @@ export default function ExpenseList() {
 
   return (
     <div className="space-y-6">
+      {/* Encabezado */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <Receipt className="text-blue-600" />
@@ -154,6 +158,49 @@ export default function ExpenseList() {
         </button>
       </div>
 
+      {/* Filtro por importación */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-2 text-slate-600 font-medium shrink-0">
+            <Filter size={18} className="text-blue-500" />
+            <span>Filtrar por importación:</span>
+          </div>
+          <select
+            value={filterImportId}
+            onChange={(e) => setFilterImportId(e.target.value)}
+            className="flex-1 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+          >
+            <option value="">Todas las importaciones</option>
+            {imports.map((imp) => (
+              <option key={imp.id} value={imp.id}>
+                #{imp.numero_importacion} — {new Date(imp.fecha_importacion).toLocaleDateString()}
+              </option>
+            ))}
+          </select>
+          {filterImportId && (
+            <button
+              onClick={() => setFilterImportId('')}
+              className="text-sm text-slate-500 hover:text-slate-800 flex items-center gap-1 shrink-0"
+            >
+              <X size={14} /> Limpiar
+            </button>
+          )}
+        </div>
+
+        {filterImportId && (
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-sm text-slate-500">
+              Importación <span className="font-semibold text-blue-700">#{importacionFiltrada?.numero_importacion}</span>
+              {' '}— {gastosFiltrados.length} gasto{gastosFiltrados.length !== 1 ? 's' : ''}
+            </span>
+            <span className="text-base font-bold text-slate-800">
+              Total: <span className="text-blue-700">${totalFiltrado.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Tabla */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -167,14 +214,16 @@ export default function ExpenseList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {expenses.length === 0 ? (
+              {gastosFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-slate-500">
-                    No hay gastos registrados.
+                    {filterImportId
+                      ? 'Esta importación no tiene gastos registrados.'
+                      : 'No hay gastos registrados.'}
                   </td>
                 </tr>
               ) : (
-                expenses.map((expense) => (
+                gastosFiltrados.map((expense) => (
                   <tr key={expense.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4 font-semibold text-blue-600">
                       #{expense.importaciones?.numero_importacion || 'S/N'}
@@ -202,10 +251,24 @@ export default function ExpenseList() {
                 ))
               )}
             </tbody>
+            {gastosFiltrados.length > 0 && (
+              <tfoot>
+                <tr className="bg-slate-50 font-bold border-t-2 border-slate-300">
+                  <td colSpan={2} className="p-4 text-right text-slate-600">
+                    {filterImportId ? `Total Importación #${importacionFiltrada?.numero_importacion}` : 'Total General'}
+                  </td>
+                  <td className="p-4 text-right text-blue-700 text-base">
+                    ${totalFiltrado.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>
 
+      {/* Modal nuevo/editar gasto */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
@@ -217,7 +280,7 @@ export default function ExpenseList() {
                 <X size={24} />
               </button>
             </div>
-            
+
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Importación *</label>

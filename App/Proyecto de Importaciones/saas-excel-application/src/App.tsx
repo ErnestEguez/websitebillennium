@@ -118,16 +118,26 @@ export default function App() {
   const renderContent = () => {
     if (isSuperAdmin) return <SuperAdminPanel />;
 
-    switch (activeTab) {
-      case 'dashboard': return <Dashboard />;
-      case 'imports': return <ImportList />;
-      case 'liquidacion': return <LiquidationView />;
-      case 'products': return <ProductList />;
-      case 'suppliers': return <SupplierList />;
-      case 'currencies': return <CurrencyList />;
-      case 'expenses': return <ExpenseList />;
-      default: return <Dashboard />;
-    }
+    // Importaciones, Liquidación y Gastos se mantienen montados (display:none cuando inactivos)
+    // para que el usuario no pierda los datos al navegar al sidebar y volver.
+    // Los demás tabs se montan/desmontan normalmente.
+    const persistentTabs = ['imports', 'liquidacion', 'expenses'];
+    const isPersistent = persistentTabs.includes(activeTab);
+
+    return (
+      <>
+        {/* Tabs con estado persistente — siempre en el DOM */}
+        <div style={{ display: activeTab === 'imports'     ? 'block' : 'none' }}><ImportList /></div>
+        <div style={{ display: activeTab === 'liquidacion' ? 'block' : 'none' }}><LiquidationView /></div>
+        <div style={{ display: activeTab === 'expenses'    ? 'block' : 'none' }}><ExpenseList /></div>
+
+        {/* Tabs normales — se montan solo cuando están activos */}
+        {!isPersistent && activeTab === 'dashboard'  && <Dashboard />}
+        {!isPersistent && activeTab === 'products'   && <ProductList />}
+        {!isPersistent && activeTab === 'suppliers'  && <SupplierList />}
+        {!isPersistent && activeTab === 'currencies' && <CurrencyList />}
+      </>
+    );
   };
 
   return (
