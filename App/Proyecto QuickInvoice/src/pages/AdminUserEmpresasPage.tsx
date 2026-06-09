@@ -107,8 +107,8 @@ export function AdminUserEmpresasPage() {
 
     async function toggleActivo(asig: AsignacionRow) {
         try {
-            const { error } = await supabaseContabilidad
-                .from('lp_usuarios_empresa')
+            const { error } = await supabase
+                .from('usuario_empresas')
                 .update({ activo: !asig.activo })
                 .eq('id', asig.id)
             if (error) throw error
@@ -121,8 +121,8 @@ export function AdminUserEmpresasPage() {
     async function handleEliminar(id: string) {
         if (!confirm('¿Eliminar esta asignación?')) return
         try {
-            const { error } = await supabaseContabilidad
-                .from('lp_usuarios_empresa')
+            const { error } = await supabase
+                .from('usuario_empresas')
                 .delete()
                 .eq('id', id)
             if (error) throw error
