@@ -172,8 +172,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     React.useEffect(() => {
         if (!showEmpresaDropdown) return
         const close = () => setShowEmpresaDropdown(false)
-        document.addEventListener('mousedown', close)
-        return () => document.removeEventListener('mousedown', close)
+        document.addEventListener('click', close)
+        return () => document.removeEventListener('click', close)
     }, [showEmpresaDropdown])
 
     // Guardia de ruta: si el usuario no tiene permiso, redirige al dashboard
@@ -533,7 +533,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         {/* Business Logo / Empresa Switcher */}
                         <div className="relative">
                             <button
-                                onClick={() => empresasDisponibles?.length > 1 && setShowEmpresaDropdown(v => !v)}
+                                onClick={(e) => {
+                                    if (empresasDisponibles?.length > 1) {
+                                        e.stopPropagation()
+                                        setShowEmpresaDropdown(v => !v)
+                                    }
+                                }}
                                 className={cn(
                                     "flex items-center gap-3",
                                     empresasDisponibles?.length > 1 ? "hover:bg-slate-100 rounded-lg px-2 py-1 cursor-pointer transition-colors" : "cursor-default"

@@ -7,6 +7,7 @@ interface UsuarioPerfil {
     nombre: string
     email: string
     rol: string
+    empresa_id: string | null
 }
 
 interface EmpresaRow {
@@ -47,13 +48,13 @@ export function AdminUserEmpresasPage() {
         setLoading(true)
         try {
             const [{ data: perfiles }, { data: emps }, { data: asigs }] = await Promise.all([
-                supabase.from('profiles').select('id, nombre, email, rol').order('nombre'),
+                supabase.from('profiles').select('id, nombre, email, rol, empresa_id').order('nombre'),
                 supabase.from('empresas').select('id, nombre, ruc').order('nombre'),
                 supabase.from('usuario_empresas').select('*').order('created_at', { ascending: false }),
             ])
 
             const usuariosData: UsuarioPerfil[] = (perfiles || []).map((p: any) => ({
-                id: p.id, nombre: p.nombre || p.email, email: p.email, rol: p.rol,
+                id: p.id, nombre: p.nombre || p.email, email: p.email, rol: p.rol, empresa_id: p.empresa_id ?? null,
             }))
             const empresasData: EmpresaRow[] = (emps || []).map((e: any) => ({
                 id: e.id, nombre: e.nombre, ruc: e.ruc,
@@ -88,12 +89,28 @@ export function AdminUserEmpresasPage() {
         }
         setSaving(true)
         try {
-            const { error } = await supabase.from('usuario_empresas').insert({
+            const rows = [{
                 user_id: form.user_id,
                 empresa_id: form.empresa_id,
                 rol: form.rol,
                 activo: true,
-            })
+            }]
+
+            // Si es la primera asignación de este usuario y su empresa actual
+            // (profiles.empresa_id) es distinta, la agregamos también para
+            // que no pierda acceso a ella (ver fallback en AuthContext).
+            const tieneAsignaciones = asignaciones.some(a => a.user_id === form.user_id)
+            const usuario = usuarios.find(u => u.id === form.user_id)
+            if (!tieneAsignaciones && usuario?.empresa_id && usuario.empresa_id !== form.empresa_id) {
+                rows.push({
+                    user_id: form.user_id,
+                    empresa_id: usuario.empresa_id,
+                    rol: usuario.rol,
+                    activo: true,
+                })
+            }
+
+            const { error } = await supabase.from('usuario_empresas').insert(rows)
             if (error) throw error
             setForm({ user_id: '', empresa_id: '', rol: 'oficina' })
             setShowForm(false)
