@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { supabaseContabilidad } from '../lib/supabaseContabilidad'
 import { Building2, Plus, Trash2, Loader2, RefreshCw, UserCheck } from 'lucide-react'
 
 interface UsuarioPerfil {
@@ -50,7 +49,7 @@ export function AdminUserEmpresasPage() {
             const [{ data: perfiles }, { data: emps }, { data: asigs }] = await Promise.all([
                 supabase.from('profiles').select('id, nombre, email, rol').order('nombre'),
                 supabase.from('empresas').select('id, nombre, ruc').order('nombre'),
-                supabaseContabilidad.from('lp_usuarios_empresa').select('*').order('created_at', { ascending: false }),
+                supabase.from('usuario_empresas').select('*').order('created_at', { ascending: false }),
             ])
 
             const usuariosData: UsuarioPerfil[] = (perfiles || []).map((p: any) => ({
@@ -89,7 +88,7 @@ export function AdminUserEmpresasPage() {
         }
         setSaving(true)
         try {
-            const { error } = await supabaseContabilidad.from('lp_usuarios_empresa').insert({
+            const { error } = await supabase.from('usuario_empresas').insert({
                 user_id: form.user_id,
                 empresa_id: form.empresa_id,
                 rol: form.rol,

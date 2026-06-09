@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { supabaseContabilidad } from '../lib/supabaseContabilidad'
 import { offlineDb } from '../lib/offlineDb'
 import type { User } from '@supabase/supabase-js'
 import { EmpresaSelectorScreen } from '../components/EmpresaSelectorScreen'
@@ -355,9 +354,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return
             }
 
-            // Buscar empresas asignadas en lp_usuarios_empresa
-            const { data: ueRows, error: ueError } = await supabaseContabilidad
-                .from('lp_usuarios_empresa')
+            // Buscar empresas asignadas en usuario_empresas
+            const { data: ueRows, error: ueError } = await supabase
+                .from('usuario_empresas')
                 .select('empresa_id, rol')
                 .eq('user_id', userId)
                 .eq('activo', true)
