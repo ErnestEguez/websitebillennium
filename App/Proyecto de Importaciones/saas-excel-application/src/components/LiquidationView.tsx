@@ -81,13 +81,13 @@ export default function LiquidationView() {
     if (!header || baseRows.length === 0) return [];
     
     const totalFobRaw = baseRows.reduce((sum, row) => sum + row.fobRaw, 0);
-    const totalFobBase = Number(header.fob_total || 0) > 0 ? Number(header.fob_total || 0) : totalFobRaw;
+    const totalFobBase = totalFobRaw;
 
     return baseRows.map((row) => {
         const fob = round2(row.fobRaw);
         const pesoPct = totalFobBase > 0 ? round2((fob / totalFobBase) * 100) : 0;
         const pesoFactor = pesoPct / 100;
-        const distribucionGastos = round2((header.total_gastos_generales + header.total_flete) * pesoFactor);
+        const distribucionGastos = round2(header.total_gastos_generales * pesoFactor);
         const seguro = round2(header.total_seguro * pesoFactor);
         const flete = round2(header.total_flete * pesoFactor);
         const valorCif = round2(fob + seguro + flete);
@@ -273,7 +273,7 @@ export default function LiquidationView() {
         const arancel = producto?.partida_senae ? arancelesMap.get(producto.partida_senae) : null;
         const cantidad = Number(row.cantidad || 0);
         const precioUnitario = Number(row.precio_unitario || 0);
-        const fobRaw = cantidad * precioUnitario;
+        const fobRaw = cantidad * Number(row.precio_fob_real || precioUnitario);
 
         return {
           detailId: String(row.id || ''),
