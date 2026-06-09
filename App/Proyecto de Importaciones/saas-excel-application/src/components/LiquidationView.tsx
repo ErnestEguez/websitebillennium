@@ -81,7 +81,7 @@ export default function LiquidationView() {
     if (!header || baseRows.length === 0) return [];
     
     const totalFobRaw = baseRows.reduce((sum, row) => sum + row.fobRaw, 0);
-    const totalFobBase = totalFobRaw;
+    const totalFobBase = Number(header.fob_total || 0) > 0 ? Number(header.fob_total || 0) : totalFobRaw;
 
     return baseRows.map((row) => {
         const fob = round2(row.fobRaw);
@@ -96,7 +96,7 @@ export default function LiquidationView() {
         const baseIva = round2(valorCif + fodinfa + adValorem);
         const iva = round2(baseIva * (header.tasa_iva / 100));
         const totalGastos = round2(distribucionGastos + seguro + flete + fodinfa + adValorem);
-        const costoTotal = round2(fob + totalGastos);
+        const costoTotal = round2(round2(row.precioFobReal * row.cantidad) + totalGastos);
         const costoUnitario = row.cantidad > 0 ? round6(costoTotal / row.cantidad) : 0;
         const gastoPct = row.precioUnitario > 0 ? round2(((costoUnitario / row.precioUnitario) - 1) * 100) : 0;
         const precioVentaCalculado = round6(costoUnitario * (1 + (row.margenGanancia / 100)));
@@ -273,7 +273,7 @@ export default function LiquidationView() {
         const arancel = producto?.partida_senae ? arancelesMap.get(producto.partida_senae) : null;
         const cantidad = Number(row.cantidad || 0);
         const precioUnitario = Number(row.precio_unitario || 0);
-        const fobRaw = cantidad * Number(row.precio_fob_real || precioUnitario);
+        const fobRaw = cantidad * precioUnitario;
 
         return {
           detailId: String(row.id || ''),
