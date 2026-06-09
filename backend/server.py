@@ -559,7 +559,7 @@ def admin_enter_app(app_id: str, admin: dict = Depends(get_admin_user)):
     """Genera magic link SSO para que el admin entre al panel de una app."""
     APP_URLS = {
         "sentinel":        os.environ.get("SENTINEL_URL",        "https://pedidosbillennium.vercel.app/"),
-        "importaciones":   os.environ.get("IMPORTACIONES_URL",   "https://import-cloud-34hpy6xjk-ernesteguezs-projects.vercel.app/"),
+        "importaciones":   os.environ.get("IMPORTACIONES_URL",   "https://websitebillennium-5gsk.vercel.app/"),
         "facturacion":     os.environ.get("FACTURACION_URL",     "https://websitebillennium-quickinvoice.vercel.app/"),
         "vendormanagement":os.environ.get("VENDOR_URL",          "https://websitebillennium-vendor.vercel.app/"),
         "contabilidad":    os.environ.get("CONTABILIDAD_URL",    "https://websitebillennium-ledgerpro.vercel.app/"),
@@ -601,7 +601,7 @@ def get_app_token(product_id: str, current_user: dict = Depends(get_current_user
     """Genera un magic link de Supabase Auth para SSO hacia apps internas."""
     APP_URLS = {
         "sentinel":        os.environ.get("SENTINEL_URL",        "https://pedidosbillennium.vercel.app/"),
-        "importaciones":   os.environ.get("IMPORTACIONES_URL",   "https://import-cloud-34hpy6xjk-ernesteguezs-projects.vercel.app/"),
+        "importaciones":   os.environ.get("IMPORTACIONES_URL",   "https://websitebillennium-5gsk.vercel.app/"),
         "facturacion":     os.environ.get("FACTURACION_URL",     "https://websitebillennium-quickinvoice.vercel.app/"),
         "vendormanagement":os.environ.get("VENDOR_URL",          "https://websitebillennium-vendor.vercel.app/"),
         "contabilidad":    os.environ.get("CONTABILIDAD_URL",    "https://websitebillennium-ledgerpro.vercel.app/"),
