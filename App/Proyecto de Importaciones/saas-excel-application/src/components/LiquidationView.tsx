@@ -98,7 +98,8 @@ export default function LiquidationView() {
         const totalGastos = round2(distribucionGastos + seguro + flete + fodinfa + adValorem);
         const costoTotal = round2(round2(row.precioFobReal * row.cantidad) + totalGastos);
         const costoUnitario = row.cantidad > 0 ? round6(costoTotal / row.cantidad) : 0;
-        const gastoPct = row.precioUnitario > 0 ? round2(((costoUnitario / row.precioUnitario) - 1) * 100) : 0;
+        const costoFobRealRow = round2(row.precioFobReal * row.cantidad);
+        const gastoPct = costoFobRealRow > 0 ? round2((totalGastos / costoFobRealRow) * 100) : 0;
         const precioVentaCalculado = round6(costoUnitario * (1 + (row.margenGanancia / 100)));
         const ventaTotalSinIva = round2(row.cantidad * precioVentaCalculado);
         const utilidadImportacion = round2(ventaTotalSinIva - costoTotal);
