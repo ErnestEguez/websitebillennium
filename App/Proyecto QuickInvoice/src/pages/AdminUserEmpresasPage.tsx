@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
-import { Building2, Plus, Trash2, Loader2, RefreshCw, UserCheck } from 'lucide-react'
+import { Building2, Plus, Trash2, Loader2, RefreshCw, UserCheck, ChevronDown, ChevronUp, Save } from 'lucide-react'
+import { cn } from '../lib/utils'
 
 interface UsuarioPerfil {
     id: string
@@ -29,6 +30,22 @@ interface AsignacionRow {
     empresa_nombre?: string
 }
 
+interface ModulosForm {
+    vendor: boolean
+    finance: boolean
+    ledgerpro: boolean
+    is_admin: boolean
+}
+
+const DEFAULT_MODULOS: ModulosForm = { vendor: false, finance: false, ledgerpro: false, is_admin: false }
+
+const MODULO_FIELDS: { key: keyof ModulosForm; label: string; short: string }[] = [
+    { key: 'vendor',    label: 'Compras / Proveedores (CxP)', short: 'C' },
+    { key: 'finance',   label: 'Tesorería',                    short: 'T' },
+    { key: 'ledgerpro', label: 'Contabilidad',                 short: 'L' },
+    { key: 'is_admin',  label: 'Administrador de la empresa',  short: 'A' },
+]
+
 const ROLES = ['oficina', 'mesero', 'cocina', 'contador', 'admin']
 
 export function AdminUserEmpresasPage() {
@@ -42,15 +59,22 @@ export function AdminUserEmpresasPage() {
     const [form, setForm] = useState({ user_id: '', empresa_id: '', rol: 'oficina' })
     const [showForm, setShowForm] = useState(false)
 
+    // Módulos por (usuario, empresa)
+    const [modulosPorPar, setModulosPorPar] = useState<Record<string, ModulosForm>>({})
+    const [expandedId, setExpandedId] = useState<string | null>(null)
+    const [modulosForm, setModulosForm] = useState<Record<string, ModulosForm>>({})
+    const [savingModulos, setSavingModulos] = useState<string | null>(null)
+
     useEffect(() => { fetchAll() }, [])
 
     async function fetchAll() {
         setLoading(true)
         try {
-            const [{ data: perfiles }, { data: emps }, { data: asigs }] = await Promise.all([
+            const [{ data: perfiles }, { data: emps }, { data: asigs }, { data: mods }] = await Promise.all([
                 supabase.from('profiles').select('id, nombre, email, rol, empresa_id').order('nombre'),
                 supabase.from('empresas').select('id, nombre, ruc').order('nombre'),
                 supabase.from('usuario_empresas').select('*').order('created_at', { ascending: false }),
+                supabase.from('user_modules').select('*'),
             ])
 
             const usuariosData: UsuarioPerfil[] = (perfiles || []).map((p: any) => ({
@@ -67,9 +91,17 @@ export function AdminUserEmpresasPage() {
                 empresa_nombre: empresasData.find(e => e.id === a.empresa_id)?.nombre || a.empresa_id,
             }))
 
+            const modulosPorParData: Record<string, ModulosForm> = {}
+            ;(mods || []).forEach((m: any) => {
+                modulosPorParData[`${m.user_id}_${m.empresa_id}`] = {
+                    vendor: !!m.vendor, finance: !!m.finance, ledgerpro: !!m.ledgerpro, is_admin: !!m.is_admin,
+                }
+            })
+
             setUsuarios(usuariosData)
             setEmpresas(empresasData)
             setAsignaciones(asigEnriquecidas)
+            setModulosPorPar(modulosPorParData)
         } catch (err: any) {
             alert('Error cargando datos: ' + err.message)
         } finally {
@@ -146,6 +178,58 @@ export function AdminUserEmpresasPage() {
             await fetchAll()
         } catch (err: any) {
             alert('Error eliminando: ' + err.message)
+        }
+    }
+
+    function toggleModulos(asig: AsignacionRow) {
+        if (expandedId === asig.id) {
+            setExpandedId(null)
+            return
+        }
+        const key = `${asig.user_id}_${asig.empresa_id}`
+        setModulosForm(prev => ({ ...prev, [asig.id]: prev[asig.id] ?? modulosPorPar[key] ?? { ...DEFAULT_MODULOS } }))
+        setExpandedId(asig.id)
+    }
+
+    function updateModulo(asigId: string, field: keyof ModulosForm, value: boolean) {
+        setModulosForm(prev => ({
+            ...prev,
+            [asigId]: { ...(prev[asigId] ?? DEFAULT_MODULOS), [field]: value },
+        }))
+    }
+
+    async function guardarModulos(asig: AsignacionRow) {
+        const form = modulosForm[asig.id] ?? DEFAULT_MODULOS
+        setSavingModulos(asig.id)
+        try {
+            const { data: existing, error: selError } = await supabase
+                .from('user_modules')
+                .select('user_id')
+                .eq('user_id', asig.user_id)
+                .eq('empresa_id', asig.empresa_id)
+                .maybeSingle()
+            if (selError) throw selError
+
+            if (existing) {
+                const { error } = await supabase
+                    .from('user_modules')
+                    .update({ ...form, updated_at: new Date().toISOString() })
+                    .eq('user_id', asig.user_id)
+                    .eq('empresa_id', asig.empresa_id)
+                if (error) throw error
+            } else {
+                const { error } = await supabase
+                    .from('user_modules')
+                    .insert({ user_id: asig.user_id, empresa_id: asig.empresa_id, ...form })
+                if (error) throw error
+            }
+
+            setModulosPorPar(prev => ({ ...prev, [`${asig.user_id}_${asig.empresa_id}`]: form }))
+            setExpandedId(null)
+        } catch (err: any) {
+            alert('Error guardando módulos: ' + err.message)
+        } finally {
+            setSavingModulos(null)
         }
     }
 
@@ -249,19 +333,21 @@ export function AdminUserEmpresasPage() {
                             <th className="px-4 py-3 text-left">Empresa</th>
                             <th className="px-4 py-3 text-left">Rol</th>
                             <th className="px-4 py-3 text-center">Estado</th>
+                            <th className="px-4 py-3 text-center">Módulos</th>
                             <th className="px-4 py-3 text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {asignaciones.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                                <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
                                     No hay asignaciones. Crea la primera con el botón "Nueva asignación".
                                 </td>
                             </tr>
                         )}
                         {asignaciones.map(a => (
-                            <tr key={a.id} className="hover:bg-slate-50 transition-colors">
+                            <Fragment key={a.id}>
+                            <tr className="hover:bg-slate-50 transition-colors">
                                 <td className="px-4 py-3">
                                     <p className="font-semibold text-slate-800">{a.usuario_nombre}</p>
                                     <p className="text-xs text-slate-400">{a.usuario_email}</p>
@@ -288,6 +374,26 @@ export function AdminUserEmpresasPage() {
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                     <button
+                                        onClick={() => toggleModulos(a)}
+                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 hover:border-primary-300 transition-colors"
+                                        title="Configurar módulos"
+                                    >
+                                        {MODULO_FIELDS.map(m => {
+                                            const activo = modulosPorPar[`${a.user_id}_${a.empresa_id}`]?.[m.key]
+                                            return (
+                                                <span key={m.key} className={cn(
+                                                    'w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold',
+                                                    activo ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-400'
+                                                )}>
+                                                    {m.short}
+                                                </span>
+                                            )
+                                        })}
+                                        {expandedId === a.id ? <ChevronUp className="w-4 h-4 text-slate-400 ml-1" /> : <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />}
+                                    </button>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                    <button
                                         onClick={() => handleEliminar(a.id)}
                                         className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                         title="Eliminar asignación"
@@ -296,6 +402,34 @@ export function AdminUserEmpresasPage() {
                                     </button>
                                 </td>
                             </tr>
+                            {expandedId === a.id && (
+                                <tr className="bg-slate-50">
+                                    <td colSpan={6} className="px-4 py-4">
+                                        <div className="flex flex-wrap items-center gap-4">
+                                            {MODULO_FIELDS.map(m => (
+                                                <label key={m.key} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={modulosForm[a.id]?.[m.key] ?? false}
+                                                        onChange={e => updateModulo(a.id, m.key, e.target.checked)}
+                                                        className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                                                    />
+                                                    {m.label}
+                                                </label>
+                                            ))}
+                                            <button
+                                                onClick={() => guardarModulos(a)}
+                                                disabled={savingModulos === a.id}
+                                                className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-60 ml-auto"
+                                            >
+                                                {savingModulos === a.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                                Guardar módulos
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                            </Fragment>
                         ))}
                     </tbody>
                 </table>
