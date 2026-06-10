@@ -43,14 +43,25 @@ export function ContabilidadProvider({ children }: { children: React.ReactNode }
 
             if (!isMounted.current) return
 
-            const lista: LpEmpresa[] = (memberships ?? [])
+            let lista: LpEmpresa[] = (memberships ?? [])
                 .map((m: any) => m.empresa)
                 .filter(Boolean)
+
+            // La empresa activa en QuickInvoice todavía no existe en LedgerPro: crearla
+            if (qiEmpresa?.id && !lista.some(e => e.qi_empresa_id === qiEmpresa.id)) {
+                const nueva = await provisionarEmpresa(qiEmpresa)
+                if (nueva) lista = [...lista, nueva]
+            }
+
+            if (!isMounted.current) return
             setEmpresas(lista)
 
-            // Restaurar empresa activa desde localStorage o usar la que coincide con QI
+            // Restaurar empresa activa desde localStorage, o la vinculada a QI, o la que coincide por RUC
             const saved = localStorage.getItem(EMPRESA_KEY)
             let activa = lista.find(e => e.id === saved)
+            if (!activa && qiEmpresa?.id) {
+                activa = lista.find(e => e.qi_empresa_id === qiEmpresa.id)
+            }
             if (!activa && qiEmpresa?.ruc) {
                 activa = lista.find(e => e.ruc === qiEmpresa.ruc)
             }
@@ -65,6 +76,64 @@ export function ContabilidadProvider({ children }: { children: React.ReactNode }
             console.error('ContabilidadContext:', e)
         } finally {
             if (isMounted.current) setLoading(false)
+        }
+    }
+
+    // Registra en LedgerPro (lp_empresas + lp_usuarios_empresa) la empresa activa de
+    // QuickInvoice la primera vez que alguien de esa empresa entra a Contabilidad.
+    async function provisionarEmpresa(qi: any): Promise<LpEmpresa | null> {
+        try {
+            // Por si otro usuario de la misma empresa ya la registró antes
+            const { data: existente } = await supabaseContabilidad
+                .from('lp_empresas')
+                .select('*')
+                .eq('qi_empresa_id', qi.id)
+                .maybeSingle()
+
+            let lpEmpresa = existente as LpEmpresa | null
+
+            if (!lpEmpresa) {
+                const { data: moneda } = await supabaseContabilidad
+                    .from('lp_monedas')
+                    .select('id')
+                    .eq('codigo', 'USD')
+                    .single()
+
+                const nuevaEmpresa = {
+                    id: crypto.randomUUID(),
+                    nombre: qi.nombre,
+                    razon_social: qi.razon_social || qi.nombre,
+                    ruc: qi.ruc ?? null,
+                    direccion: qi.direccion ?? null,
+                    telefono: qi.telefono ?? null,
+                    email: qi.email ?? null,
+                    logo_url: qi.logo_url ?? null,
+                    moneda_id: moneda?.id,
+                    qi_empresa_id: qi.id,
+                    activa: true,
+                }
+
+                const { error: errEmpresa } = await supabaseContabilidad
+                    .from('lp_empresas')
+                    .insert(nuevaEmpresa)
+
+                if (errEmpresa) {
+                    console.error('LedgerPro: error creando empresa', errEmpresa)
+                    return null
+                }
+                lpEmpresa = nuevaEmpresa as unknown as LpEmpresa
+            }
+
+            const { error: errMemb } = await supabaseContabilidad
+                .from('lp_usuarios_empresa')
+                .insert({ user_id: user.id, empresa_id: lpEmpresa.id, rol: 'admin_conta', activo: true })
+
+            if (errMemb) console.error('LedgerPro: error creando membresía', errMemb)
+
+            return lpEmpresa
+        } catch (e) {
+            console.error('LedgerPro: error provisionando empresa', e)
+            return null
         }
     }
 
