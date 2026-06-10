@@ -777,7 +777,10 @@ export function FacturaDirectaPage() {
                                                                 className="w-full px-4 py-2.5 text-left hover:bg-primary-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0"
                                                                 onMouseDown={() => selectProducto(idx, p)}>
                                                                 <span className="font-medium text-slate-800">{p.nombre}</span>
-                                                                <span className="text-primary-600 font-bold text-xs">{formatCurrency(p.precio_venta)}</span>
+                                                                <span className="flex flex-col items-end">
+                                                                    <span className="text-primary-600 font-bold text-xs">{formatCurrency(p.precio_venta)}</span>
+                                                                    <span className="text-slate-400 text-[10px]">Stock: {p.stock ?? 0}</span>
+                                                                </span>
                                                             </button>
                                                         ))}
                                                     </div>
@@ -920,7 +923,7 @@ export function FacturaDirectaPage() {
                                                 <option key={m.value} value={m.value}>{m.label}</option>
                                             ))}
                                         </select>
-                                        <div className="relative w-40">
+                                        <div className="relative w-[calc(10rem+1cm)]">
                                             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
                                             <input type="number" min="0" step="0.01"
                                                 className="w-full pl-6 pr-2 py-2.5 rounded-lg border-2 border-primary-200 text-sm font-bold outline-none focus:ring-2 focus:ring-primary-400 text-right"

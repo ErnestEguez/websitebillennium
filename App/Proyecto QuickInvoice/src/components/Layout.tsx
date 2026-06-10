@@ -487,6 +487,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub />
                                     {isAdmin && <SidebarItem to="/ajustes/permisos" icon={UserCog} label="Permisos de usuario" active={location.pathname === '/ajustes/permisos'} sub />}
                                     {profile?.rol === 'admin_plataforma' && <SidebarItem to="/admin/user-empresas" icon={ArrowLeftRight} label="Asignar empresas" active={location.pathname === '/admin/user-empresas'} sub />}
+                                    {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub />}
                                     <button
                                         onClick={toggleDarkSidebar}
                                         className="flex items-center gap-3 w-full pl-8 pr-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors"
