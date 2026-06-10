@@ -18,7 +18,6 @@ interface EmpresaRow {
 }
 
 interface AsignacionRow {
-    id: string
     user_id: string
     empresa_id: string
     rol: string
@@ -28,6 +27,11 @@ interface AsignacionRow {
     usuario_nombre?: string
     usuario_email?: string
     empresa_nombre?: string
+}
+
+// usuario_empresas no tiene columna id propia: la clave natural es (user_id, empresa_id)
+function pairKey(a: { user_id: string; empresa_id: string }) {
+    return `${a.user_id}_${a.empresa_id}`
 }
 
 interface ModulosForm {
@@ -159,7 +163,8 @@ export function AdminUserEmpresasPage() {
             const { error } = await supabase
                 .from('usuario_empresas')
                 .update({ activo: !asig.activo })
-                .eq('id', asig.id)
+                .eq('user_id', asig.user_id)
+                .eq('empresa_id', asig.empresa_id)
             if (error) throw error
             await fetchAll()
         } catch (err: any) {
@@ -167,13 +172,14 @@ export function AdminUserEmpresasPage() {
         }
     }
 
-    async function handleEliminar(id: string) {
+    async function handleEliminar(asig: AsignacionRow) {
         if (!confirm('¿Eliminar esta asignación?')) return
         try {
             const { error } = await supabase
                 .from('usuario_empresas')
                 .delete()
-                .eq('id', id)
+                .eq('user_id', asig.user_id)
+                .eq('empresa_id', asig.empresa_id)
             if (error) throw error
             await fetchAll()
         } catch (err: any) {
@@ -182,25 +188,26 @@ export function AdminUserEmpresasPage() {
     }
 
     function toggleModulos(asig: AsignacionRow) {
-        if (expandedId === asig.id) {
+        const key = pairKey(asig)
+        if (expandedId === key) {
             setExpandedId(null)
             return
         }
-        const key = `${asig.user_id}_${asig.empresa_id}`
-        setModulosForm(prev => ({ ...prev, [asig.id]: prev[asig.id] ?? modulosPorPar[key] ?? { ...DEFAULT_MODULOS } }))
-        setExpandedId(asig.id)
+        setModulosForm(prev => ({ ...prev, [key]: prev[key] ?? modulosPorPar[key] ?? { ...DEFAULT_MODULOS } }))
+        setExpandedId(key)
     }
 
-    function updateModulo(asigId: string, field: keyof ModulosForm, value: boolean) {
+    function updateModulo(key: string, field: keyof ModulosForm, value: boolean) {
         setModulosForm(prev => ({
             ...prev,
-            [asigId]: { ...(prev[asigId] ?? DEFAULT_MODULOS), [field]: value },
+            [key]: { ...(prev[key] ?? DEFAULT_MODULOS), [field]: value },
         }))
     }
 
     async function guardarModulos(asig: AsignacionRow) {
-        const form = modulosForm[asig.id] ?? DEFAULT_MODULOS
-        setSavingModulos(asig.id)
+        const key = pairKey(asig)
+        const form = modulosForm[key] ?? DEFAULT_MODULOS
+        setSavingModulos(key)
         try {
             const { data: existing, error: selError } = await supabase
                 .from('user_modules')
@@ -224,7 +231,7 @@ export function AdminUserEmpresasPage() {
                 if (error) throw error
             }
 
-            setModulosPorPar(prev => ({ ...prev, [`${asig.user_id}_${asig.empresa_id}`]: form }))
+            setModulosPorPar(prev => ({ ...prev, [key]: form }))
             setExpandedId(null)
         } catch (err: any) {
             alert('Error guardando módulos: ' + err.message)
@@ -346,7 +353,7 @@ export function AdminUserEmpresasPage() {
                             </tr>
                         )}
                         {asignaciones.map(a => (
-                            <Fragment key={a.id}>
+                            <Fragment key={pairKey(a)}>
                             <tr className="hover:bg-slate-50 transition-colors">
                                 <td className="px-4 py-3">
                                     <p className="font-semibold text-slate-800">{a.usuario_nombre}</p>
@@ -389,12 +396,12 @@ export function AdminUserEmpresasPage() {
                                                 </span>
                                             )
                                         })}
-                                        {expandedId === a.id ? <ChevronUp className="w-4 h-4 text-slate-400 ml-1" /> : <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />}
+                                        {expandedId === pairKey(a) ? <ChevronUp className="w-4 h-4 text-slate-400 ml-1" /> : <ChevronDown className="w-4 h-4 text-slate-400 ml-1" />}
                                     </button>
                                 </td>
                                 <td className="px-4 py-3 text-center">
                                     <button
-                                        onClick={() => handleEliminar(a.id)}
+                                        onClick={() => handleEliminar(a)}
                                         className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                         title="Eliminar asignación"
                                     >
@@ -402,7 +409,7 @@ export function AdminUserEmpresasPage() {
                                     </button>
                                 </td>
                             </tr>
-                            {expandedId === a.id && (
+                            {expandedId === pairKey(a) && (
                                 <tr className="bg-slate-50">
                                     <td colSpan={6} className="px-4 py-4">
                                         <div className="flex flex-wrap items-center gap-4">
@@ -410,8 +417,8 @@ export function AdminUserEmpresasPage() {
                                                 <label key={m.key} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                                                     <input
                                                         type="checkbox"
-                                                        checked={modulosForm[a.id]?.[m.key] ?? false}
-                                                        onChange={e => updateModulo(a.id, m.key, e.target.checked)}
+                                                        checked={modulosForm[pairKey(a)]?.[m.key] ?? false}
+                                                        onChange={e => updateModulo(pairKey(a), m.key, e.target.checked)}
                                                         className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                                                     />
                                                     {m.label}
@@ -419,10 +426,10 @@ export function AdminUserEmpresasPage() {
                                             ))}
                                             <button
                                                 onClick={() => guardarModulos(a)}
-                                                disabled={savingModulos === a.id}
+                                                disabled={savingModulos === pairKey(a)}
                                                 className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-60 ml-auto"
                                             >
-                                                {savingModulos === a.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                                {savingModulos === pairKey(a) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                                                 Guardar módulos
                                             </button>
                                         </div>
