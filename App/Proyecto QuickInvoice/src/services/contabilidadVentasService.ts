@@ -276,9 +276,10 @@ export const contabilidadVentasService = {
         valor: number
         metodoPago: string
         facturaSecuencial?: string
-    }): Promise<void> {
+        cuentaContableId?: string   // cuenta_contable_id de la cuenta bancaria seleccionada (transferencia)
+    }): Promise<string> {
         const db = supabaseContabilidad as any
-        const { empresaId, portalRuc, clienteNombre, fecha, valor, metodoPago, facturaSecuencial } = input
+        const { empresaId, portalRuc, clienteNombre, fecha, valor, metodoPago, facturaSecuencial, cuentaContableId } = input
 
         const mapeoMap = await contableConfigService.getMapeoAsMap(empresaId)
         const cuenta = (proceso: string, concepto: string): string | null =>
@@ -290,7 +291,7 @@ export const contabilidadVentasService = {
             .eq('activo', true)
 
         const lista: Array<{ empresa_id: string; empresa: { id: string; ruc?: string | null } }> = memberships ?? []
-        if (!lista.length) return
+        if (!lista.length) throw new Error('Sin empresa LP configurada. Verifica que tienes acceso a LedgerPro.')
 
         let lpEmpresaId = lista[0].empresa_id
         if (portalRuc) {
@@ -325,36 +326,63 @@ export const contabilidadVentasService = {
         })
 
         const metodo = metodoPago.toLowerCase()
-        const ctaDebe = metodo === 'transferencia' ? cuenta('COBROS', 'BANCO')
-            : metodo === 'cheque'                  ? cuenta('COBROS', 'CHEQUE')
-            : metodo === 'tarjeta'                 ? cuenta('COBROS', 'TARJETA')
-            :                                        cuenta('COBROS', 'EFECTIVO')
+        // Transferencia: prioridad → cuenta_contable_id de la cuenta bancaria seleccionada
+        //                fallback  → mapeo COBROS:BANCO (para cuentas sin enlace contable)
+        const ctaDebe =
+            metodo === 'transferencia' ? (cuentaContableId ?? cuenta('COBROS', 'BANCO'))
+            : metodo === 'cheque'       ? cuenta('COBROS', 'CHEQUE')
+            : metodo === 'tarjeta'      ? cuenta('COBROS', 'TARJETA')
+            :                             cuenta('COBROS', 'EFECTIVO')
 
-        const ctaHaber = cuenta('VENTAS', 'CARTERA_CLIENTES')
+        // Cuenta por Cobrar Clientes que se acredita al recibir el cobro.
+        // Es el campo "Crédito (Cartera CxC)" de Cobros — Cuentas por Forma de Pago
+        // (NO el mapeo VENTAS:CARTERA_CLIENTES, que es la cuenta que se debita al facturar a crédito).
+        const ctaHaber = cuenta('COBROS', 'CREDITO')
 
         if (!ctaDebe || !ctaHaber) {
-            const faltaDebe  = !ctaDebe  ? `COBROS → ${metodoPago.toUpperCase()} (método de pago)` : null
-            const faltaHaber = !ctaHaber ? 'VENTAS → CARTERA_CLIENTES' : null
-            const faltantes  = [faltaDebe, faltaHaber].filter(Boolean).join(' y ')
-            throw new Error(`Falta mapear: ${faltantes}. Ve a Configuración → Contabilidad → Mapeo de cuentas.`)
+            const debeMsg = !ctaDebe
+                ? metodo === 'transferencia'
+                    ? 'La cuenta bancaria seleccionada no tiene cuenta contable configurada. ' +
+                      'Agrégala en Tesorería → Cuentas Bancarias, o mapea COBROS → BANCO ' +
+                      '(fallback) en Configuración → Contabilidad → Mapeo.'
+                    : `Falta mapear COBROS → ${metodo === 'cheque' ? 'CHEQUE' : metodo === 'tarjeta' ? 'TARJETA' : 'EFECTIVO'} ` +
+                      'en Configuración → Contabilidad → Mapeo de cuentas.'
+                : null
+            const haberMsg = !ctaHaber
+                ? 'Falta mapear COBROS → CRÉDITO (CARTERA CXC) en Configuración → Contabilidad → Mapeo de cuentas.'
+                : null
+            throw new Error([debeMsg, haberMsg].filter(Boolean).join(' | '))
         }
 
         const r2 = (n: number) => Math.round(n * 100) / 100
         const glosa = `Cobro cartera — ${clienteNombre}${facturaSecuencial ? ' / Fac. ' + facturaSecuencial : ''}`
 
-        const { data: comp, error: errComp } = await db
-            .from('lp_comprobantes')
-            .insert({
-                empresa_id: lpEmpresaId, periodo_id: periodo.id,
-                tipo_comprobante_id: tipoId,
-                numero: numero || `COB-${Date.now()}`, secuencial: 1,
-                fecha, glosa, estado: 'confirmado',
-                total_debe: r2(valor), total_haber: r2(valor),
-                moneda_id: null, tipo_cambio: 1,
-                origen: 'quickinvoice', referencia_externa: null, created_by: null,
-            })
+        const comprobanteBase = {
+            empresa_id: lpEmpresaId, periodo_id: periodo.id,
+            tipo_comprobante_id: tipoId,
+            secuencial: 1,
+            fecha, glosa, estado: 'confirmado',
+            total_debe: r2(valor), total_haber: r2(valor),
+            moneda_id: null, tipo_cambio: 1,
+            origen: 'quickinvoice', referencia_externa: null, created_by: null,
+        }
+
+        // Intento 1: número generado por el RPC
+        let res = await db.from('lp_comprobantes')
+            .insert({ ...comprobanteBase, numero: numero || `COB-${Date.now()}` })
             .select('id').single()
 
+        // Si hay conflicto de número duplicado (error 23505 / HTTP 409), reintenta con número único
+        if (res.error?.code === '23505' || res.error?.status === 409 || (res.error as any)?.status === 409) {
+            const fallback = `COB-${tipoCodigo}-${Date.now()}`
+            console.warn(`[asientoCobro] Número duplicado, reintentando con ${fallback}`)
+            res = await db.from('lp_comprobantes')
+                .insert({ ...comprobanteBase, numero: fallback })
+                .select('id').single()
+        }
+
+        const comp = res.data
+        const errComp = res.error
         if (errComp || !comp) throw errComp ?? new Error('Error creando comprobante LP cobro')
 
         const { error: errLineas } = await db.from('lp_comprobante_lineas').insert([
@@ -365,5 +393,30 @@ export const contabilidadVentasService = {
 
         await db.rpc('lp_actualizar_saldos', { p_comprobante_id: comp.id, p_operacion: 'sumar' })
         console.log(`[asientoCobro] ✅ Asiento cobro creado`)
+        return comp.id
+    },
+
+    // ── Anular el asiento de un cobro (reversar pago de cartera) ──────────
+    async anularAsientoCobro(lpComprobanteId: string): Promise<void> {
+        const db = supabaseContabilidad as any
+
+        const { data: comp, error: errComp } = await db
+            .from('lp_comprobantes')
+            .select('id, estado')
+            .eq('id', lpComprobanteId)
+            .maybeSingle()
+
+        if (errComp) throw errComp
+        if (!comp || comp.estado === 'anulado') return
+
+        const { error: errUpdate } = await db
+            .from('lp_comprobantes')
+            .update({ estado: 'anulado', updated_at: new Date().toISOString() })
+            .eq('id', lpComprobanteId)
+        if (errUpdate) throw errUpdate
+
+        if (comp.estado === 'confirmado') {
+            await db.rpc('lp_actualizar_saldos', { p_comprobante_id: lpComprobanteId, p_operacion: 'restar' })
+        }
     },
 }

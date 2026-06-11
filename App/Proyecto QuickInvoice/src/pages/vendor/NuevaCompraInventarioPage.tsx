@@ -22,6 +22,12 @@ const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:r
 
 const HOY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guayaquil' })
 
+function fechaMasDias(dias: number) {
+    const d = new Date()
+    d.setDate(d.getDate() + dias)
+    return d.toLocaleDateString('en-CA', { timeZone: 'America/Guayaquil' })
+}
+
 interface LineaDetalle {
     producto_id: string
     nombre: string
@@ -49,8 +55,8 @@ export function NuevaCompraInventarioPage() {
     const [numeroFactura, setNumeroFactura] = useState('')
     const [claveAcceso, setClaveAcceso]     = useState('')
     const [tipoSustento, setTipoSustento]   = useState<'01'|'02'|'03'|'04'|'05'>('04')
-    const [formaPago, setFormaPago]         = useState<'CONTADO'|'CREDITO'>('CONTADO')
-    const [fechaVenc, setFechaVenc]         = useState('')
+    const [formaPago, setFormaPago]         = useState<'CONTADO'|'CREDITO'>('CREDITO')
+    const [fechaVenc, setFechaVenc]         = useState(fechaMasDias(30))
     const [observaciones, setObservaciones] = useState('')
 
     // Detalle

@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { cxpService } from '../../services/vendorService'
-import { contabilidadService } from '../../services/contabilidadService'
-import type { CuentasCompras } from '../../services/contabilidadService'
-import type { CuentaPorPagar, FormasPago } from '../../types/vendors'
-import { Wallet, AlertCircle, CheckCircle2, Clock, Loader2, X } from 'lucide-react'
+import type { CuentaPorPagar, PagoProveedor } from '../../types/vendors'
+import { Wallet, AlertCircle, CheckCircle2, Clock, Loader2, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 const HOY = new Date().toISOString().split('T')[0]
@@ -21,16 +20,12 @@ const ESTADO_BADGE: Record<string, string> = {
 }
 
 export function CxPPage() {
-    const { empresa, profile } = useAuth()
+    const { empresa } = useAuth()
     const [lista, setLista]           = useState<CuentaPorPagar[]>([])
     const [loading, setLoading]       = useState(true)
     const [filtro, setFiltro]         = useState<'pendientes'|'vencidas'|'todos'>('pendientes')
-    const [modalCxp, setModalCxp]     = useState<CuentaPorPagar | null>(null)
-    const [montoPago, setMontoPago]   = useState('')
-    const [formaPago, setFormaPago]   = useState<FormasPago>('TRANSFERENCIA')
-    const [referencia, setReferencia] = useState('')
-    const [guardando, setGuardando]   = useState(false)
-    const [refreshKey, setRefreshKey] = useState(0)
+    const [expandedId, setExpandedId] = useState<string | null>(null)
+    const [pagosDetalle, setPagosDetalle] = useState<Record<string, PagoProveedor[]>>({})
     const mountedRef = useRef(true)
     useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
@@ -52,47 +47,14 @@ export function CxPPage() {
             .catch(() => {})
             .finally(() => { if (!cancelled && mountedRef.current) setLoading(false) })
         return () => { cancelled = true }
-    }, [empresa?.id, filtro, refreshKey])
+    }, [empresa?.id, filtro])
 
-    async function handlePago() {
-        if (!modalCxp || !montoPago) return
-        const monto = parseFloat(montoPago)
-        if (isNaN(monto) || monto <= 0) { alert('Monto inválido'); return }
-        try {
-            setGuardando(true)
-            await cxpService.registrarPago({
-                empresa_id:       empresa!.id,
-                cxp_id:           modalCxp.id,
-                proveedor_id:     modalCxp.proveedor_id,
-                fecha_pago:       HOY,
-                monto,
-                forma_pago:       formaPago,
-                numero_referencia: referencia || undefined,
-            })
-
-            // Asiento contable de egreso (no-fatal)
-            if (empresa!.usar_contabilidad_compras && empresa!.config_cuentas_compras) {
-                const ctas = empresa!.config_cuentas_compras as unknown as CuentasCompras
-                if (ctas.cuentas_por_pagar && ctas.efectivo) {
-                    contabilidadService.crearAsientoPago({
-                        empresaId: empresa!.id, portalRuc: empresa?.ruc,
-                        fecha:      HOY,
-                        glosa:      `Pago proveedor ${formaPago}${referencia ? ' ' + referencia : ''}`,
-                        monto,
-                        cuentas:    ctas,
-                        referencia: referencia || undefined,
-                        creadoPor:  profile?.id,
-                    }).catch(err => console.warn('Asiento pago no creado:', err.message))
-                }
-            }
-
-            setModalCxp(null)
-            setMontoPago(''); setReferencia('')
-            setRefreshKey(k => k + 1)  // Trigger useEffect to reload list
-        } catch (e: any) {
-            alert('Error al registrar pago: ' + e.message)
-        } finally {
-            setGuardando(false)
+    async function toggleDetalle(id: string) {
+        if (expandedId === id) { setExpandedId(null); return }
+        setExpandedId(id)
+        if (!pagosDetalle[id]) {
+            const pagos = await cxpService.historialPagos(id)
+            setPagosDetalle(prev => ({ ...prev, [id]: pagos }))
         }
     }
 
@@ -103,9 +65,23 @@ export function CxPPage() {
 
     return (
         <div className="space-y-5">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Cuentas por Pagar</h1>
-                <p className="text-slate-500 text-sm">Seguimiento de obligaciones con proveedores</p>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Cuentas por Pagar</h1>
+                    <p className="text-slate-500 text-sm">Seguimiento de obligaciones con proveedores</p>
+                </div>
+                <Link to="/teso/egresos/nuevo" className="btn btn-primary gap-2 shrink-0">
+                    Registrar pago en Tesorería <ArrowRight className="w-4 h-4" />
+                </Link>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-900">
+                <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                <span>
+                    Los pagos a proveedores (efectivo, cheque, transferencia, T/C, N/C, etc.) se registran desde{' '}
+                    <Link to="/teso/egresos/nuevo" className="font-semibold underline">Tesorería → Nuevo Egreso</Link>,
+                    donde también se generan el movimiento bancario y el asiento contable correspondiente.
+                </span>
             </div>
 
             {/* Resumen */}
@@ -160,35 +136,92 @@ export function CxPPage() {
                             <tbody className="divide-y divide-slate-100">
                                 {lista.map(c => {
                                     const vencida = c.fecha_vencimiento < HOY && c.estado !== 'PAGADO'
+                                    const isExpanded = expandedId === c.id
                                     return (
-                                        <tr key={c.id} className={cn('hover:bg-slate-50', vencida && 'bg-red-50/40')}>
-                                            <td className="px-4 py-3 font-medium text-slate-800">
-                                                {(c.proveedor as any)?.nombre_empresa ?? '—'}
-                                            </td>
-                                            <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                                                {(c.compra as any)?.numero_factura ?? '—'}
-                                            </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtFecha(c.fecha_emision)}</td>
-                                            <td className={cn('px-4 py-3 whitespace-nowrap font-medium', vencida ? 'text-red-600' : 'text-slate-600')}>
-                                                {fmtFecha(c.fecha_vencimiento)}
-                                                {vencida && <span className="ml-1 text-xs">⚠</span>}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-mono">{fmt(c.monto_original)}</td>
-                                            <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">{fmt(c.saldo_pendiente)}</td>
-                                            <td className="px-4 py-3">
-                                                <span className={cn('text-xs px-2 py-0.5 rounded-full font-semibold', ESTADO_BADGE[c.estado])}>
-                                                    {c.estado.replace('_', ' ')}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {c.estado !== 'PAGADO' && c.estado !== 'ANULADO' && (
-                                                    <button onClick={() => { setModalCxp(c); setMontoPago(c.saldo_pendiente.toFixed(2)) }}
-                                                        className="text-xs btn btn-primary py-1 px-3">
-                                                        Registrar pago
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
+                                        <>
+                                            <tr key={c.id}
+                                                onClick={() => toggleDetalle(c.id)}
+                                                className={cn('hover:bg-slate-50 cursor-pointer', vencida && 'bg-red-50/40')}>
+                                                <td className="px-4 py-3 font-medium text-slate-800">
+                                                    {(c.proveedor as any)?.nombre_empresa ?? '—'}
+                                                </td>
+                                                <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                                                    {(c.compra as any)?.numero_factura ?? '—'}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtFecha(c.fecha_emision)}</td>
+                                                <td className={cn('px-4 py-3 whitespace-nowrap font-medium', vencida ? 'text-red-600' : 'text-slate-600')}>
+                                                    {fmtFecha(c.fecha_vencimiento)}
+                                                    {vencida && <span className="ml-1 text-xs">⚠</span>}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono">{fmt(c.monto_original)}</td>
+                                                <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">{fmt(c.saldo_pendiente)}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={cn('text-xs px-2 py-0.5 rounded-full font-semibold', ESTADO_BADGE[c.estado])}>
+                                                        {c.estado.replace('_', ' ')}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-end">
+                                                        <button onClick={() => toggleDetalle(c.id)} className="p-1.5 text-slate-400">
+                                                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            {isExpanded && (
+                                                <tr key={`${c.id}-detail`} className="bg-slate-50">
+                                                    <td colSpan={8} className="px-6 py-4">
+                                                        <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Historial de pagos</p>
+                                                        {(pagosDetalle[c.id] || []).length === 0 ? (
+                                                            <p className="text-sm text-slate-400">Sin pagos registrados</p>
+                                                        ) : (
+                                                            <table className="w-full text-sm">
+                                                                <thead>
+                                                                    <tr className="text-xs text-slate-500">
+                                                                        <th className="text-left pb-1">Fecha</th>
+                                                                        <th className="text-left pb-1">Forma</th>
+                                                                        <th className="text-left pb-1">Referencia</th>
+                                                                        <th className="text-right pb-1">Valor</th>
+                                                                        <th className="text-center pb-1">Asiento</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-200">
+                                                                    {pagosDetalle[c.id].map(p => (
+                                                                        <tr key={p.id}>
+                                                                            <td className="py-1 text-slate-600">{p.fecha_pago}</td>
+                                                                            <td className="py-1 text-slate-600 capitalize">{p.forma_pago.replace('_', ' ').toLowerCase()}</td>
+                                                                            <td className="py-1 text-slate-500">{p.numero_referencia || '—'}</td>
+                                                                            <td className={`py-1 text-right font-medium ${p.estado === 'reversado' ? 'text-slate-400 line-through' : 'text-green-700'}`}>
+                                                                                {fmt(p.monto)}
+                                                                            </td>
+                                                                            <td className="py-1 text-center">
+                                                                                {p.estado === 'reversado' ? (
+                                                                                    <span
+                                                                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600"
+                                                                                        title={[p.reversado_at && `Reversado: ${p.reversado_at}`, p.motivo_reversa].filter(Boolean).join(' — ')}
+                                                                                    >
+                                                                                        Reversado
+                                                                                    </span>
+                                                                                ) : p.lp_comprobante_id ? (
+                                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                                        Contabilizado
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                                                                        Sin asiento
+                                                                                    </span>
+                                                                                )}
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
                                     )
                                 })}
                             </tbody>
@@ -196,61 +229,6 @@ export function CxPPage() {
                     </div>
                 )}
             </div>
-
-            {/* Modal pago */}
-            {modalCxp && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-slate-900">Registrar Pago</h2>
-                            <button onClick={() => setModalCxp(null)} className="p-1 hover:bg-slate-100 rounded-lg">
-                                <X className="w-5 h-5 text-slate-400" />
-                            </button>
-                        </div>
-
-                        <div className="bg-slate-50 rounded-xl p-4 text-sm space-y-1">
-                            <p className="font-semibold">{(modalCxp.proveedor as any)?.nombre_empresa}</p>
-                            <p className="text-slate-500">Saldo pendiente: <span className="font-bold text-slate-800">{fmt(modalCxp.saldo_pendiente)}</span></p>
-                            <p className="text-slate-500">Vence: {fmtFecha(modalCxp.fecha_vencimiento)}</p>
-                        </div>
-
-                        <div className="space-y-3">
-                            <div>
-                                <label className="label">Monto a pagar <span className="text-red-500">*</span></label>
-                                <input type="number" step={0.01} min={0.01} max={modalCxp.saldo_pendiente}
-                                    className="input" value={montoPago}
-                                    onChange={e => setMontoPago(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="label">Forma de pago</label>
-                                <select className="input" value={formaPago}
-                                    onChange={e => setFormaPago(e.target.value as FormasPago)}>
-                                    <option value="TRANSFERENCIA">Transferencia</option>
-                                    <option value="EFECTIVO">Efectivo</option>
-                                    <option value="CHEQUE">Cheque</option>
-                                    <option value="NOTA_DEBITO">Nota de débito</option>
-                                    <option value="OTRO">Otro</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="label">Nº referencia / cheque (opcional)</label>
-                                <input className="input" value={referencia}
-                                    onChange={e => setReferencia(e.target.value)}
-                                    placeholder="Nº transferencia, cheque..." />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 pt-2">
-                            <button onClick={() => setModalCxp(null)} className="btn btn-secondary flex-1">Cancelar</button>
-                            <button onClick={handlePago} disabled={guardando}
-                                className="btn btn-primary flex-1 flex items-center justify-center gap-2">
-                                {guardando ? <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</> : 'Confirmar pago'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
-

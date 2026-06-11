@@ -23,6 +23,7 @@ export function NuevoEgresoPage() {
     const [error, setError]   = useState('')
     const [saving, setSaving] = useState(false)
     const [ok, setOk]         = useState(false)
+    const [avisoContable, setAvisoContable] = useState<string | null>(null)
 
     // Paso 1 — Proveedor
     const [proveedores, setProveedores]   = useState<Proveedor[]>([])
@@ -189,7 +190,11 @@ export function NuevoEgresoPage() {
 
             clearDraft()
             setOk(true)
-            setTimeout(() => navigate('/egresos'), 2000)
+            if (egreso.avisoContable) {
+                setAvisoContable(egreso.avisoContable)
+            } else {
+                setTimeout(() => navigate('/egresos'), 2000)
+            }
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message
                 : (e as any)?.message ?? (e as any)?.error_description ?? JSON.stringify(e)
@@ -201,10 +206,22 @@ export function NuevoEgresoPage() {
     if (ok) {
         return (
             <div className="flex items-center justify-center py-24">
-                <div className="text-center">
+                <div className="text-center max-w-md">
                     <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
                     <h2 className="text-xl font-bold text-slate-900">Egreso registrado correctamente</h2>
-                    <p className="text-slate-500 text-sm mt-1">Redirigiendo...</p>
+                    {avisoContable ? (
+                        <>
+                            <div className="mt-4 flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-xl text-sm text-amber-900 text-left">
+                                <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                                <span>El pago se registró, pero el asiento contable no se generó: {avisoContable}</span>
+                            </div>
+                            <button onClick={() => navigate('/egresos')} className="btn btn-primary mt-4">
+                                Ir a Egresos
+                            </button>
+                        </>
+                    ) : (
+                        <p className="text-slate-500 text-sm mt-1">Redirigiendo...</p>
+                    )}
                 </div>
             </div>
         )

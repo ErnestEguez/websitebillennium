@@ -1,3 +1,4 @@
+import { contabilidadVentasService } from './contabilidadVentasService'
 import { supabase } from '../lib/supabase'
 
 export interface CarteraCxc {
@@ -28,6 +29,12 @@ export interface CarteraCxcPago {
     referencia: string | null
     usuario_id: string | null
     created_at: string
+    // Reversa / trazabilidad contable
+    estado: 'activo' | 'reversado'
+    lp_comprobante_id: string | null
+    reversado_at: string | null
+    reversado_por: string | null
+    motivo_reversa: string | null
 }
 
 export const carteraCxcService = {
@@ -71,10 +78,10 @@ export const carteraCxcService = {
         valor: number,
         metodoPago: CarteraCxcPago['metodo_pago'],
         referencia?: string
-    ): Promise<void> {
+    ): Promise<CarteraCxcPago> {
         const { data: { user } } = await supabase.auth.getUser()
 
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('cartera_cxc_pagos')
             .insert({
                 cartera_id: carteraId,
@@ -85,9 +92,65 @@ export const carteraCxcService = {
                 referencia: referencia || null,
                 usuario_id: user?.id || null,
             })
+            .select()
+            .single()
 
         if (error) throw error
         // El trigger fn_actualizar_saldo_cxc actualiza el saldo y estado automáticamente
+        return data as CarteraCxcPago
+    },
+
+    /** Vincula el asiento contable (lp_comprobantes) generado para un pago. */
+    async actualizarComprobantePago(pagoId: string, lpComprobanteId: string): Promise<void> {
+        const { error } = await supabase
+            .from('cartera_cxc_pagos')
+            .update({ lp_comprobante_id: lpComprobanteId })
+            .eq('id', pagoId)
+        if (error) throw error
+    },
+
+    /**
+     * Reversa un pago sin borrarlo: anula el asiento contable vinculado
+     * (si no es compartido con otros pagos activos) y marca el pago como
+     * 'reversado'. El trigger recalcula el saldo de la cartera.
+     */
+    async reversarPago(pagoId: string, motivo?: string): Promise<void> {
+        const { data: pago, error: errPago } = await supabase
+            .from('cartera_cxc_pagos')
+            .select('id, estado, lp_comprobante_id')
+            .eq('id', pagoId)
+            .single()
+        if (errPago) throw errPago
+        if (pago.estado === 'reversado') throw new Error('Este pago ya fue reversado')
+
+        if (pago.lp_comprobante_id) {
+            const { count } = await supabase
+                .from('cartera_cxc_pagos')
+                .select('id', { count: 'exact', head: true })
+                .eq('lp_comprobante_id', pago.lp_comprobante_id)
+                .eq('estado', 'activo')
+                .neq('id', pagoId)
+
+            if (!count) {
+                await contabilidadVentasService.anularAsientoCobro(pago.lp_comprobante_id)
+            }
+        }
+
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: updated, error } = await supabase
+            .from('cartera_cxc_pagos')
+            .update({
+                estado: 'reversado',
+                reversado_at: new Date().toISOString(),
+                reversado_por: user?.id || null,
+                motivo_reversa: motivo || null,
+            })
+            .eq('id', pagoId)
+            .select('id')
+            .maybeSingle()
+        if (error) throw error
+        if (!updated) throw new Error('No se pudo reversar el pago: el registro no se actualizó (revisa permisos/RLS de cartera_cxc_pagos).')
+        // El trigger fn_actualizar_saldo_cxc recalcula saldo/estado de la cartera
     },
 
     async anularCartera(carteraId: string, observacion?: string): Promise<void> {
@@ -120,7 +183,7 @@ export const carteraCxcService = {
         empresaId: string,
         metodoPago: CarteraCxcPago['metodo_pago'],
         referencia?: string
-    ): Promise<void> {
+    ): Promise<CarteraCxcPago[]> {
         const { data: { user } } = await supabase.auth.getUser()
         const fecha = new Date().toISOString().split('T')[0]
         const pagos = distribuciones.map(d => ({
@@ -132,8 +195,9 @@ export const carteraCxcService = {
             referencia: referencia || null,
             usuario_id: user?.id || null,
         }))
-        const { error } = await supabase.from('cartera_cxc_pagos').insert(pagos)
+        const { data, error } = await supabase.from('cartera_cxc_pagos').insert(pagos).select()
         if (error) throw error
+        return (data || []) as CarteraCxcPago[]
     },
 
     async getEstadoCuentaCliente(empresaId: string, clienteId: string) {
@@ -154,6 +218,7 @@ export const carteraCxcService = {
                 .from('cartera_cxc_pagos')
                 .select('*')
                 .in('cartera_id', carteraIds)
+                .eq('estado', 'activo')
                 .order('fecha_pago', { ascending: true })
             if (errP) throw errP
             pagos = p || []

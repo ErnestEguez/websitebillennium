@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { BookOpen, Save, Loader2, AlertCircle, Check } from 'lucide-react'
 import { contableConfigService, type CuentaLP } from '../services/contableConfigService'
 import { useAuth } from '../contexts/AuthContext'
@@ -31,6 +31,13 @@ const COBROS_CONCEPTOS = [
     { key: 'BANCO',        label: 'Transferencia — cuenta sin enlace contable (fallback)' },
     { key: 'NC',           label: 'Nota de Crédito / Devoluciones' },
     { key: 'CREDITO',      label: 'Crédito (Cartera CxC)' },
+]
+
+const PAGOS_CONCEPTOS = [
+    { key: 'EFECTIVO',        label: 'Efectivo (pago en caja a proveedores)' },
+    { key: 'TARJETA_CREDITO', label: 'Tarjeta de Crédito (T/C)' },
+    { key: 'NOTA_CREDITO',    label: 'Nota de Crédito de proveedor (N/C)' },
+    { key: 'OTROS',           label: 'Otros / Cruce contable' },
 ]
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
@@ -210,6 +217,35 @@ export function ContabilidadConfigTab() {
                 onChange={setMapeo}
             />
 
+            {/* Pagos a proveedores (egresos) */}
+            <MapeoCard
+                titulo="Pagos a Proveedores — Cuentas por Forma de Pago"
+                descripcion="Cheque y Transferencia no se mapean aquí: usan la cuenta contable que ya configuraste por cada cuenta bancaria en Tesorería → Bancos → Cuentas Bancarias. Mapea aquí solo las formas de pago que no pasan por una cuenta bancaria."
+                proceso="PAGOS"
+                conceptos={PAGOS_CONCEPTOS}
+                cuentas={cuentas}
+                mapeos={mapeos}
+                onChange={setMapeo}
+                extra={
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <span className={`inline-block w-1.5 h-1.5 rounded-full ${mapeos['COMPRAS:PROVEEDORES_CXP']?.cuenta_id ? 'bg-green-400' : 'bg-slate-300'}`} />
+                                Proveedores / Cuentas por Pagar (pasivo)
+                            </p>
+                            <p className="text-sm text-slate-700 mt-0.5">
+                                {mapeos['COMPRAS:PROVEEDORES_CXP']?.cuenta_id
+                                    ? `${mapeos['COMPRAS:PROVEEDORES_CXP'].cuenta_codigo} — ${mapeos['COMPRAS:PROVEEDORES_CXP'].cuenta_nombre}`
+                                    : '— Sin mapear —'}
+                            </p>
+                        </div>
+                        <span className="text-xs text-slate-400 text-right shrink-0">
+                            Se usa para abonar/cancelar la deuda en cada egreso.<br />Se configura arriba, en "Compras a Proveedores".
+                        </span>
+                    </div>
+                }
+            />
+
             {/* Error */}
             {error && (
                 <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
@@ -238,9 +274,11 @@ export function ContabilidadConfigTab() {
 // ─── Sub-componente: tarjeta de mapeo por proceso ─────────────────────────────
 
 function MapeoCard({
-    titulo, proceso, conceptos, cuentas, mapeos, onChange,
+    titulo, descripcion, extra, proceso, conceptos, cuentas, mapeos, onChange,
 }: {
     titulo: string
+    descripcion?: string
+    extra?: ReactNode
     proceso: string
     conceptos: { key: string; label: string }[]
     cuentas: CuentaLP[]
@@ -249,7 +287,13 @@ function MapeoCard({
 }) {
     return (
         <div className="card p-6 space-y-4">
-            <h4 className="font-bold text-slate-900 text-sm border-b border-slate-100 pb-3">{titulo}</h4>
+            <div className="border-b border-slate-100 pb-3 space-y-1">
+                <h4 className="font-bold text-slate-900 text-sm">{titulo}</h4>
+                {descripcion && (
+                    <p className="text-xs text-slate-500 leading-relaxed">{descripcion}</p>
+                )}
+            </div>
+            {extra}
             <div className="space-y-3">
                 {conceptos.map(c => {
                     const val = mapeos[`${proceso}:${c.key}`]

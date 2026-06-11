@@ -214,6 +214,12 @@ export interface PagoProveedor {
     observaciones?: string
     created_by?: string
     created_at?: string
+    // Reversa / trazabilidad contable
+    estado: 'activo' | 'reversado'
+    lp_comprobante_id: string | null
+    reversado_at: string | null
+    reversado_por: string | null
+    motivo_reversa: string | null
 }
 
 // ── Órdenes de Compra ───────────────────────────────────────

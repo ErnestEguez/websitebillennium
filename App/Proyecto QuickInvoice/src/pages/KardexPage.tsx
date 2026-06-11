@@ -18,6 +18,7 @@ export function KardexPage() {
     const [productoSeleccionado, setProductoSeleccionado] = useState('')
     const [bodegaSeleccionada,   setBodegaSeleccionada]   = useState('')   // '' = todas
     const [movimientos,          setMovimientos]          = useState<KardexConProducto[]>([])
+    const [saldoInicial,         setSaldoInicial]         = useState(0)
     const [stockBodega,          setStockBodega]          = useState<{ cantidad: number; costo_promedio: number } | null>(null)
     const [fechaInicio, setFechaInicio] = useState(() => {
         const t = new Date()
@@ -66,6 +67,22 @@ export function KardexPage() {
             ])
             setMovimientos(movs)
 
+            // Saldo inicial: neto de movimientos previos al rango, para que el
+            // saldo mostrado en la tabla sea correcto y cronológico
+            if (fechaInicio) {
+                let qIni = supabase
+                    .from('kardex')
+                    .select('cantidad, tipo_movimiento')
+                    .eq('producto_id', productoSeleccionado)
+                    .lt('fecha', fechaInicio)
+                if (bodegaSeleccionada) qIni = qIni.eq('bodega_id', bodegaSeleccionada)
+                const { data: prevMovs } = await qIni
+                setSaldoInicial((prevMovs ?? []).reduce((s, m) =>
+                    s + (m.tipo_movimiento === 'ENTRADA' ? Number(m.cantidad) : -Number(m.cantidad)), 0))
+            } else {
+                setSaldoInicial(0)
+            }
+
             // Stock actual en la bodega seleccionada (o global si todas)
             if (bodegaSeleccionada) {
                 const { data } = await supabase
@@ -87,22 +104,13 @@ export function KardexPage() {
         }
     }
 
-    // ── Filas con saldo acumulado ──────────────────────────────
+    // ── Filas con saldo acumulado, recalculado en orden cronológico ──
     function buildRows() {
-        const allSaldosZero = movimientos.every(m => !m.saldo_cantidad)
-        let saldoAcum = 0
-        return movimientos.map((mov, idx) => {
-            let saldoMostrar: number
-            if (allSaldosZero) {
-                saldoAcum = idx === 0
-                    ? (mov.tipo_movimiento === 'ENTRADA' ? Number(mov.cantidad) : -Number(mov.cantidad))
-                    : saldoAcum + (mov.tipo_movimiento === 'ENTRADA' ? Number(mov.cantidad) : -Number(mov.cantidad))
-                saldoMostrar = saldoAcum
-            } else {
-                saldoMostrar = Number(mov.saldo_cantidad)
-            }
+        let saldoAcum = saldoInicial
+        return movimientos.map(mov => {
+            saldoAcum += mov.tipo_movimiento === 'ENTRADA' ? Number(mov.cantidad) : -Number(mov.cantidad)
             const costoMostrar = Number(mov.costo_unitario || mov.saldo_costo_promedio || 0)
-            return { ...mov, saldoMostrar, costoMostrar }
+            return { ...mov, saldoMostrar: saldoAcum, costoMostrar }
         })
     }
 
@@ -238,7 +246,7 @@ export function KardexPage() {
                             {' / '}
                             <span className="text-red-600">-{totalSalidas.toFixed(2)}</span>
                         </p>
-                        <p className="text-xs text-slate-400 mt-0.5">{rows.length} movimientos</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{rows.length} movimientos · saldo inicial: {saldoInicial.toFixed(2)}</p>
                     </div>
                 </div>
             )}

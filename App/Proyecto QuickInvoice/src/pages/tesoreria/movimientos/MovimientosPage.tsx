@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Plus, ArrowDownUp, Loader2, AlertCircle, X, Download } from 'lucide-react'
+import { Plus, ArrowDownUp, Loader2, AlertCircle, X, Download, Trash2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../../../contexts/AuthContext'
 import { movimientoService } from '../../../services/finance/movimientoService'
 import { cuentasBancariasService } from '../../../services/finance/bancosService'
+import { contableConfigService, type CuentaLP } from '../../../services/contableConfigService'
 import { cn, formatMoneda, formatFecha } from '../../../lib/utils'
 import { TIPO_MOVIMIENTO_LABELS } from '../../../types/finance'
-import type { MovimientoBancario, CuentaBancaria, TipoMovimiento, SentidoMovimiento } from '../../../types/finance'
+import type { MovimientoBancario, CuentaBancaria, TipoMovimiento, SentidoMovimiento, LineaDistribucionContable } from '../../../types/finance'
+
+const r2 = (n: number) => Math.round(n * 100) / 100
 
 type FormMov = {
     cuenta_bancaria_id: string; tipo: TipoMovimiento; fecha: string
@@ -25,6 +28,11 @@ export function MovimientosPage() {
     const [error, setError]       = useState('')
     const [modal, setModal]       = useState(false)
     const [saving, setSaving]     = useState(false)
+    const [avisoContable, setAvisoContable] = useState('')
+
+    const [contabilidadActiva, setContabilidadActiva] = useState(false)
+    const [cuentasContables, setCuentasContables]     = useState<CuentaLP[]>([])
+    const [lineas, setLineas]                         = useState<LineaDistribucionContable[]>([])
 
     const [cuentaFiltro, setCuentaFiltro] = useState('')
     const [tipoFiltro, setTipoFiltro]     = useState('')
@@ -40,6 +48,12 @@ export function MovimientosPage() {
         if (!empresa?.id) { setLoading(false); return }
         cuentasBancariasService.listar(empresa.id)
             .then(c => setCuentas(c.filter(x => x.estado === 'activa')))
+            .catch(() => {})
+        contableConfigService.getConfig(empresa.id)
+            .then(c => setContabilidadActiva(!!c?.contabilidad_en_linea))
+            .catch(() => {})
+        contableConfigService.getCuentas((empresa as any)?.ruc)
+            .then(setCuentasContables)
             .catch(() => {})
     }, [empresa?.id])
 
@@ -66,15 +80,52 @@ export function MovimientosPage() {
             cheque: 'debito', transferencia: 'debito', otro: 'credito',
         }
         setForm(f => ({ ...f, tipo, sentido: sentidoPorDefecto[tipo] }))
+        if (tipo === 'cheque' || tipo === 'transferencia') setLineas([])
+    }
+
+    const requiereDistribucion = contabilidadActiva && form.tipo !== 'cheque' && form.tipo !== 'transferencia'
+    const totalDistribuido = r2(lineas.reduce((s, l) => s + l.monto, 0))
+
+    function agregarLinea() {
+        const restante = r2(form.monto - totalDistribuido)
+        setLineas(ls => [...ls, { cuenta_id: '', cuenta_codigo: '', cuenta_nombre: '', monto: restante > 0 ? restante : 0 }])
+    }
+
+    function actualizarLinea(idx: number, patch: Partial<LineaDistribucionContable>) {
+        setLineas(ls => ls.map((l, i) => i === idx ? { ...l, ...patch } : l))
+    }
+
+    function seleccionarCuentaLinea(idx: number, cuentaId: string) {
+        const c = cuentasContables.find(c => c.id === cuentaId)
+        actualizarLinea(idx, { cuenta_id: cuentaId, cuenta_codigo: c?.codigo || '', cuenta_nombre: c?.nombre || '' })
+    }
+
+    function quitarLinea(idx: number) {
+        setLineas(ls => ls.filter((_, i) => i !== idx))
     }
 
     async function guardar() {
         if (!form.cuenta_bancaria_id) { setError('Selecciona una cuenta bancaria'); return }
         if (form.monto <= 0)          { setError('El monto debe ser mayor a 0'); return }
         if (!form.descripcion.trim()) { setError('La descripción es obligatoria'); return }
-        setSaving(true); setError('')
+
+        let lineasValidas: LineaDistribucionContable[] = []
+        if (requiereDistribucion) {
+            lineasValidas = lineas.filter(l => l.cuenta_id && l.monto > 0)
+            if (lineasValidas.length === 0) {
+                setError('Agrega al menos una cuenta contable para distribuir el movimiento.')
+                return
+            }
+            const sumaLineas = r2(lineasValidas.reduce((s, l) => s + l.monto, 0))
+            if (Math.abs(sumaLineas - r2(form.monto)) > 0.01) {
+                setError(`La distribución contable (${formatMoneda(sumaLineas)}) debe sumar igual al monto del movimiento (${formatMoneda(form.monto)}).`)
+                return
+            }
+        }
+
+        setSaving(true); setError(''); setAvisoContable('')
         try {
-            await movimientoService.crear({
+            const mov = await movimientoService.crear({
                 empresa_id:        empresa!.id,
                 cuenta_bancaria_id: form.cuenta_bancaria_id,
                 tipo:              form.tipo,
@@ -91,8 +142,9 @@ export function MovimientosPage() {
                 origen:            'manual',
                 origen_id:         null,
                 created_by:        user?.id || null,
-            })
+            }, lineasValidas)
             setModal(false)
+            if (mov.avisoContable) setAvisoContable(mov.avisoContable)
             await cargar()
         } catch (e: unknown) { setError(String(e)) }
         finally { setSaving(false) }
@@ -138,7 +190,7 @@ export function MovimientosPage() {
                     <button onClick={exportarExcel} disabled={lista.length === 0} className="btn btn-secondary gap-2">
                         <Download className="w-4 h-4" />Excel
                     </button>
-                    <button onClick={() => { setForm(f => ({ ...f, cuenta_bancaria_id: '', monto: 0, referencia: '', descripcion: '' })); setModal(true); setError('') }}
+                    <button onClick={() => { setForm(f => ({ ...f, cuenta_bancaria_id: '', monto: 0, referencia: '', descripcion: '' })); setLineas([]); setModal(true); setError('') }}
                         className="btn btn-primary gap-2">
                         <Plus className="w-4 h-4" />Nuevo movimiento
                     </button>
@@ -149,6 +201,14 @@ export function MovimientosPage() {
                 <div className="card px-4 py-3 bg-red-50 border-red-200 text-red-700 text-sm flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" /><span className="flex-1">{error}</span>
                     <button onClick={() => setError('')}><X className="w-4 h-4" /></button>
+                </div>
+            )}
+
+            {avisoContable && (
+                <div className="card px-4 py-3 bg-amber-50 border-amber-200 text-amber-800 text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span className="flex-1">El movimiento se registró, pero el asiento contable no se generó: {avisoContable}</span>
+                    <button onClick={() => setAvisoContable('')}><X className="w-4 h-4" /></button>
                 </div>
             )}
 
@@ -220,6 +280,7 @@ export function MovimientosPage() {
                                     <th className="py-2 px-4 text-right">Débito</th>
                                     <th className="py-2 px-4 text-right">Crédito</th>
                                     <th className="py-2 px-4 text-center">Concil.</th>
+                                    <th className="py-2 px-4 text-center">Asiento</th>
                                     <th className="py-2 px-4 text-center">Estado</th>
                                     <th className="py-2 px-4 text-center">Acc.</th>
                                 </tr>
@@ -249,6 +310,12 @@ export function MovimientosPage() {
                                             {m.conciliado
                                                 ? <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Sí</span>
                                                 : <span className="text-xs text-slate-400">No</span>
+                                            }
+                                        </td>
+                                        <td className="py-2.5 px-4 text-center">
+                                            {m.tiene_asiento
+                                                ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Sí</span>
+                                                : <span className="text-xs text-slate-400">—</span>
                                             }
                                         </td>
                                         <td className="py-2.5 px-4 text-center">
@@ -319,6 +386,49 @@ export function MovimientosPage() {
                                         onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} />
                                 </div>
                             </div>
+                            {requiereDistribucion && (
+                                <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50">
+                                    <div className="flex items-center justify-between">
+                                        <label className="label !mb-0">Distribución contable *</label>
+                                        <button type="button" onClick={agregarLinea}
+                                            className="text-xs font-bold text-primary-600 hover:underline flex items-center gap-1">
+                                            <Plus className="w-3.5 h-3.5" />Agregar cuenta
+                                        </button>
+                                    </div>
+                                    {lineas.length === 0 ? (
+                                        <p className="text-xs text-slate-400">
+                                            Agrega las cuentas contables que conforman la contrapartida de este movimiento.
+                                        </p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {lineas.map((l, i) => (
+                                                <div key={i} className="flex gap-2 items-center">
+                                                    <select className="input flex-1 text-sm" value={l.cuenta_id}
+                                                        onChange={e => seleccionarCuentaLinea(i, e.target.value)}>
+                                                        <option value="">Seleccionar cuenta...</option>
+                                                        {cuentasContables.map(c => (
+                                                            <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>
+                                                        ))}
+                                                    </select>
+                                                    <input className="input w-28 text-right text-sm" type="number" step="0.01"
+                                                        value={l.monto}
+                                                        onChange={e => actualizarLinea(i, { monto: parseFloat(e.target.value) || 0 })} />
+                                                    <button type="button" onClick={() => quitarLinea(i)} className="text-slate-400 hover:text-red-500">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {lineas.length > 0 && (
+                                        <p className={cn('text-xs font-semibold text-right',
+                                            Math.abs(totalDistribuido - r2(form.monto)) <= 0.01 ? 'text-green-600' : 'text-amber-600'
+                                        )}>
+                                            Distribuido: {formatMoneda(totalDistribuido)} / {formatMoneda(form.monto)}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                             <div>
                                 <label className="label">Descripción *</label>
                                 <input className="input" value={form.descripcion}

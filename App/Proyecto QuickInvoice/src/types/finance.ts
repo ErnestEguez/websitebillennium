@@ -45,7 +45,6 @@ export interface CuentaBancaria {
 export interface ConfiguracionEmpresa {
     id: string
     empresa_id: string
-    enlace_contable: boolean
     cuenta_banco_defecto_id: string | null
     cuenta_cxp_defecto_id: string | null
     cuenta_ret_fuente_id: string | null
@@ -60,6 +59,7 @@ export interface ConfiguracionEmpresa {
 
 // ── Comprobantes de Egreso ───────────────────────────────────
 export type FormasPagoEgreso =
+    | 'efectivo'
     | 'transferencia'
     | 'cheque'
     | 'cheque_postfechado'
@@ -92,6 +92,8 @@ export interface ComprobanteEgreso {
     proveedor?: { nombre_empresa: string; ruc: string }
     cuenta_bancaria?: Pick<CuentaBancaria, 'numero_cuenta' | 'tipo'> & { banco?: Pick<Banco, 'nombre'> }
     pagos_cxp?: EgresoPagoCxP[]
+    // aviso no-fatal: el egreso se guardó pero el asiento contable falló
+    avisoContable?: string | null
 }
 
 // ── Detalle egreso → Anticipo ────────────────────────────────
@@ -178,6 +180,15 @@ export type TipoMovimiento =
 export type SentidoMovimiento = 'debito' | 'credito'
 export type EstadoMovimiento  = 'activo' | 'anulado'
 
+// Línea de distribución contable (contrapartida) de un movimiento bancario.
+// La suma de monto de todas las líneas debe ser igual al monto del movimiento.
+export interface LineaDistribucionContable {
+    cuenta_id: string
+    cuenta_codigo: string
+    cuenta_nombre: string
+    monto: number
+}
+
 export interface MovimientoBancario {
     id: string
     empresa_id: string
@@ -200,6 +211,8 @@ export interface MovimientoBancario {
     updated_at: string
     // joins
     cuenta_bancaria?: Pick<CuentaBancaria, 'numero_cuenta' | 'tipo'> & { banco?: Pick<Banco, 'nombre'> }
+    // aviso no-fatal: el movimiento se guardó pero el asiento contable falló
+    avisoContable?: string | null
 }
 
 // ── Conciliaciones ───────────────────────────────────────────
@@ -286,6 +299,7 @@ export interface CuentaContable {
 
 // ── Helpers UI ───────────────────────────────────────────────
 export const FORMA_PAGO_LABELS: Record<FormasPagoEgreso, string> = {
+    efectivo:           'Efectivo',
     transferencia:      'Transferencia bancaria',
     cheque:             'Cheque al día',
     cheque_postfechado: 'Cheque post-fechado',

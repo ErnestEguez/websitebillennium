@@ -63,7 +63,7 @@ export function ConsultaCarteraClientesPage() {
                     id, fecha_emision, valor_original, saldo, estado,
                     clientes (nombre, identificacion),
                     comprobantes (secuencial, total, vendedor_id, vendedores (nombre)),
-                    cartera_cxc_pagos (valor, fecha_pago)
+                    cartera_cxc_pagos (valor, fecha_pago, estado)
                 `)
                 .eq('empresa_id', empresa!.id)
                 .in('estado', ['pendiente', 'parcial'])
@@ -81,7 +81,7 @@ export function ConsultaCarteraClientesPage() {
 
                 // Pagos hasta la fecha de corte
                 const pagosHastaCorte = (c.cartera_cxc_pagos as any[] || [])
-                    .filter((p: any) => p.fecha_pago <= fechaCorte)
+                    .filter((p: any) => p.fecha_pago <= fechaCorte && p.estado === 'activo')
                 const pagado = pagosHastaCorte.reduce((s: number, p: any) => s + Number(p.valor), 0)
                 const saldoCorte = Number(c.valor_original) - pagado
 

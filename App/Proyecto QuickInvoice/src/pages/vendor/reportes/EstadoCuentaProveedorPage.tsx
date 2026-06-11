@@ -154,7 +154,7 @@ export function EstadoCuentaProveedorPage() {
             const [comprasRes, pagosRes, retencionesRes] = await Promise.allSettled([
                 supabase
                     .from('ingresos_stock')
-                    .select('id, numero_factura, fecha_emision, fecha_ingreso, total, estado')
+                    .select('id, numero_factura, fecha_emision, fecha_ingreso, total, estado, forma_pago')
                     .eq('empresa_id', empresa.id)
                     .eq('proveedor_id', provId)
                     .gte('fecha_ingreso', desde)
@@ -195,8 +195,14 @@ export function EstadoCuentaProveedorPage() {
             for (const { fecha, item, tipo } of todos) {
                 if (tipo === 'FACTURA') {
                     if (item.estado === 'ANULADO') continue
+                    const factura = `Factura ${item.numero_factura ?? item.id.slice(0, 8)}`
+                    if (item.forma_pago === 'CONTADO') {
+                        // Compra al contado: no genera CxP ni afecta el saldo adeudado.
+                        movs.push({ fecha, tipo, descripcion: `${factura} (Contado)`, cargo: 0, abono: 0, saldo })
+                        continue
+                    }
                     saldo += item.total
-                    movs.push({ fecha, tipo, descripcion: `Factura ${item.numero_factura ?? item.id.slice(0, 8)}`, cargo: item.total, abono: 0, saldo })
+                    movs.push({ fecha, tipo, descripcion: factura, cargo: item.total, abono: 0, saldo })
                 } else if (tipo === 'PAGO') {
                     saldo -= item.monto
                     movs.push({ fecha, tipo, descripcion: `Pago ${item.forma_pago}${item.numero_referencia ? ' #' + item.numero_referencia : ''}`, cargo: 0, abono: item.monto, saldo })

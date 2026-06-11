@@ -40,6 +40,7 @@ export const kardexService = {
             .select('*, producto:productos(nombre), bodega:bodegas(nombre,codigo)')
             .eq('producto_id', productoId)
             .order('fecha', { ascending: true })
+            .order('created_at', { ascending: true })
 
         if (fechaInicio) query = query.gte('fecha', fechaInicio)
         if (fechaFin)    query = query.lte('fecha', `${fechaFin}T23:59:59.999Z`)

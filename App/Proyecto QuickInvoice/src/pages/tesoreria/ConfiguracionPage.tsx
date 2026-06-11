@@ -14,7 +14,6 @@ export function ConfiguracionPage() {
     const [ok, setOk]           = useState(false)
 
     const [form, setForm] = useState({
-        enlace_contable:         false,
         prefijo_egreso:          'EGR',
         tipo_secuencia_egreso:   'anual' as 'mensual' | 'anual',
         consideracion_cheques:   'emision' as 'emision' | 'cobro',
@@ -27,7 +26,6 @@ export function ConfiguracionPage() {
                 if (c) {
                     setConfig(c)
                     setForm({
-                        enlace_contable:       c.enlace_contable,
                         prefijo_egreso:        c.prefijo_egreso,
                         tipo_secuencia_egreso: c.tipo_secuencia_egreso ?? 'anual',
                         consideracion_cheques: c.consideracion_cheques ?? 'emision',
@@ -43,7 +41,6 @@ export function ConfiguracionPage() {
         setSaving(true); setError(''); setOk(false)
         try {
             const result = await configuracionService.upsert(empresa.id, {
-                enlace_contable:          form.enlace_contable,
                 cuenta_banco_defecto_id:  config?.cuenta_banco_defecto_id ?? null,
                 cuenta_cxp_defecto_id:    config?.cuenta_cxp_defecto_id ?? null,
                 cuenta_ret_fuente_id:     config?.cuenta_ret_fuente_id ?? null,
@@ -176,36 +173,6 @@ export function ConfiguracionPage() {
                     </div>
                 </div>
 
-                {/* Enlace contable */}
-                <div className="p-5">
-                    <h2 className="font-semibold text-slate-800 mb-1">Integración contable</h2>
-                    <p className="text-xs text-slate-500 mb-4">
-                        Activa el enlace con el módulo de contabilidad (LedgerPro) para generar asientos automáticos.
-                    </p>
-                    <label className="flex items-start gap-3 cursor-pointer group">
-                        <div className="relative mt-0.5">
-                            <input
-                                type="checkbox"
-                                className="sr-only peer"
-                                checked={form.enlace_contable}
-                                onChange={e => setForm(f => ({ ...f, enlace_contable: e.target.checked }))} />
-                            <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-primary-400 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                        </div>
-                        <div>
-                            <p className="font-medium text-slate-800 group-hover:text-primary-700">
-                                Enlace contable activo
-                            </p>
-                            <p className="text-xs text-slate-500">
-                                Al activar, cada pago de egreso generará automáticamente un comprobante contable en LedgerPro.
-                            </p>
-                        </div>
-                    </label>
-                    {form.enlace_contable && (
-                        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
-                            Asegúrate de tener configurado el plan de cuentas en LedgerPro antes de activar esta opción.
-                        </div>
-                    )}
-                </div>
             </div>
 
             <div className="flex justify-end">

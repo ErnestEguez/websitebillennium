@@ -312,21 +312,6 @@ export const cxpService = {
         return data as CuentaPorPagar[]
     },
 
-    async registrarPago(pago: Omit<PagoProveedor, 'id' | 'created_at'>): Promise<PagoProveedor> {
-        // Verificar que el monto no excede el saldo
-        const { data: cxp } = await supabase
-            .from('cuentas_por_pagar').select('saldo_pendiente').eq('id', pago.cxp_id).single()
-        if (!cxp) throw new Error('CxP no encontrada')
-        if (pago.monto > cxp.saldo_pendiente + 0.01)
-            throw new Error(`El monto ($${pago.monto}) supera el saldo ($${cxp.saldo_pendiente})`)
-
-        const { data, error } = await supabase
-            .from('pagos_proveedores').insert(pago).select().single()
-        if (error) throw error
-        // El trigger fn_actualizar_saldo_cxp actualiza automáticamente el saldo
-        return data as PagoProveedor
-    },
-
     async historialPagos(cxpId: string): Promise<PagoProveedor[]> {
         const { data, error } = await supabase
             .from('pagos_proveedores')

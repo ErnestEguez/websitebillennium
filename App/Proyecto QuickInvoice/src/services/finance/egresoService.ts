@@ -1,13 +1,28 @@
 import { supabase } from '../../lib/supabaseFinance'
 import { supabaseFacturacion } from '../../lib/supabase'
-import { cxpService } from './bancosService'
+import { cxpService, cuentasBancariasService } from './bancosService'
 import { anticipoService } from './anticipoService'
-import type { ComprobanteEgreso, EgresoPagoCxP } from '../../types/finance'
+import { contabilidadComprasService } from '../contabilidadComprasService'
+import { contableConfigService } from '../contableConfigService'
+import type { ComprobanteEgreso, EgresoPagoCxP, FormasPagoEgreso } from '../../types/finance'
+import type { FormasPago } from '../../types/vendors'
 
 const EGRESO_SELECT = `
     *,
     cuenta_bancaria:cuentas_bancarias(numero_cuenta, tipo, banco:bancos(nombre))
 `
+
+// Traduce la forma de pago de Tesorería a las formas que acepta
+// facturacion.pagos_proveedores (CHECK: EFECTIVO|TRANSFERENCIA|CHEQUE|NOTA_DEBITO|OTRO).
+const FORMA_PAGO_EGRESO_TO_CXP: Record<FormasPagoEgreso, FormasPago> = {
+    efectivo:           'EFECTIVO',
+    transferencia:      'TRANSFERENCIA',
+    cheque:             'CHEQUE',
+    cheque_postfechado: 'CHEQUE',
+    tarjeta_credito:    'OTRO',
+    nota_credito:       'NOTA_DEBITO',
+    cruce_contable:     'OTRO',
+}
 
 export const egresoService = {
     async listar(empresaId: string, filtros?: {
@@ -101,7 +116,7 @@ export const egresoService = {
                     proveedor_id:     params.proveedorId,
                     fecha_pago:       new Date().toISOString().slice(0, 10),
                     monto:            c.montoAplicado,
-                    forma_pago:       params.formaPago.toUpperCase(),
+                    forma_pago:       FORMA_PAGO_EGRESO_TO_CXP[params.formaPago],
                     numero_referencia: (egreso as ComprobanteEgreso).numero,
                 })
             }
@@ -130,7 +145,58 @@ export const egresoService = {
                 })
         }
 
-        return egreso as ComprobanteEgreso
+        // 6. Asiento contable LedgerPro (no-fatal: el egreso ya quedó registrado)
+        const eg = egreso as ComprobanteEgreso
+        let avisoContable: string | null = null
+        try {
+            const config = await contableConfigService.getConfig(params.empresaId)
+            if (config?.contabilidad_en_linea) {
+                const [{ data: empresaRow }, { data: proveedorRow }] = await Promise.all([
+                    supabaseFacturacion.from('empresas').select('ruc').eq('id', params.empresaId).maybeSingle(),
+                    supabaseFacturacion.from('proveedores').select('nombre_empresa').eq('id', params.proveedorId).maybeSingle(),
+                ])
+
+                let cuentaContableId: string | null = null
+                if (params.cuentaBancariaId) {
+                    const cuentaBancaria = await cuentasBancariasService.obtener(params.cuentaBancariaId)
+                    cuentaContableId = cuentaBancaria.cuenta_contable_id
+                }
+
+                const lpComprobanteId = await contabilidadComprasService.crearAsientoPagoProveedor({
+                    empresaId:        params.empresaId,
+                    portalRuc:        (empresaRow as any)?.ruc ?? '',
+                    fecha:            eg.fecha,
+                    proveedorNombre:  (proveedorRow as any)?.nombre_empresa ?? '',
+                    valor:            params.monto,
+                    formaPago:        params.formaPago,
+                    cuentaContableId,
+                    pagoId:           eg.id,
+                })
+
+                const { error: updErr } = await supabase
+                    .from('comprobantes_egreso')
+                    .update({ tiene_asiento: true, comprobante_contable_id: lpComprobanteId })
+                    .eq('id', eg.id)
+                if (updErr) throw updErr
+
+                // Vincular el asiento también en facturacion.pagos_proveedores (historial CxP)
+                if (params.cxpSeleccionados.length > 0) {
+                    await supabaseFacturacion
+                        .from('pagos_proveedores')
+                        .update({ lp_comprobante_id: lpComprobanteId })
+                        .eq('empresa_id', params.empresaId)
+                        .eq('numero_referencia', eg.numero)
+                }
+
+                eg.tiene_asiento = true
+                eg.comprobante_contable_id = lpComprobanteId
+            }
+        } catch (e: any) {
+            avisoContable = e?.message ?? 'Error desconocido al generar el asiento contable.'
+            console.warn('[egresoService.crear] Asiento contable omitido:', e)
+        }
+
+        return { ...eg, avisoContable }
     },
 
     async obtenerParaImprimir(id: string): Promise<{
@@ -188,12 +254,14 @@ export const egresoService = {
         // 1. Obtener el egreso con empresa_id y numero para reversión segura
         const { data: egreso, error: eErr } = await supabase
             .from('comprobantes_egreso')
-            .select('empresa_id, numero')
+            .select('empresa_id, numero, tiene_asiento, comprobante_contable_id')
             .eq('id', id)
             .single()
         if (eErr) throw eErr
 
-        const { empresa_id, numero } = egreso as { empresa_id: string; numero: string }
+        const { empresa_id, numero, tiene_asiento, comprobante_contable_id } = egreso as {
+            empresa_id: string; numero: string; tiene_asiento: boolean; comprobante_contable_id: string | null
+        }
         if (!numero) throw new Error('El egreso no tiene número — no se puede revertir')
 
         // 2. Marcar egreso como anulado
@@ -210,10 +278,15 @@ export const egresoService = {
             .eq('origen_id', id)
             .eq('origen', 'egreso')
 
-        // 4. Revertir pagos de CxP en facturación (filtrado por empresa)
+        // 4. Anular asiento contable LedgerPro vinculado (si lo hubo)
+        if (tiene_asiento && comprobante_contable_id) {
+            await contabilidadComprasService.anularAsientoPagoProveedor(comprobante_contable_id)
+        }
+
+        // 5. Revertir pagos de CxP en facturación (filtrado por empresa)
         await cxpService.revertirPagos(empresa_id, numero)
 
-        // 5. Revertir anticipos cruzados
+        // 6. Revertir anticipos cruzados
         const { data: anticiposUsados } = await supabase
             .from('egreso_anticipos')
             .select('anticipo_id, monto_aplicado')

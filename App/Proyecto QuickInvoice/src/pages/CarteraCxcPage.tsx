@@ -81,6 +81,7 @@ export function CarteraCxcPage() {
     const [savingMulti, setSavingMulti] = useState(false)
     const [loadingMultiFacturas, setLoadingMultiFacturas] = useState(false)
     const [avisoContable, setAvisoContable] = useState<string | null>(null)
+    const [accionandoPagoId, setAccionandoPagoId] = useState<string | null>(null)
 
     useEffect(() => {
         if (empresa?.id) loadCartera()
@@ -94,26 +95,35 @@ export function CarteraCxcPage() {
         }
     }, [empresa?.id])
 
-    async function crearAsientoCobroSeguro(valor: number, metodoPago: string, clienteNombre: string, facturaSecuencial?: string) {
+    async function crearAsientoCobroSeguro(
+        valor: number,
+        metodoPago: string,
+        clienteNombre: string,
+        facturaSecuencial?: string,
+        cuentaContableId?: string,   // cuenta_contable_id de la cuenta bancaria (transferencia)
+        fecha?: string,              // fecha del asiento (por defecto hoy; usar fecha_pago al reintentar)
+    ): Promise<string | null> {
         try {
             const config = await contableConfigService.getConfig(empresa!.id)
             if (!config?.contabilidad_en_linea) {
                 setAvisoContable('Contabilidad en línea está desactivada. Actívala en Configuración → Contabilidad para generar asientos automáticos.')
-                return
+                return null
             }
-            await contabilidadVentasService.crearAsientoCobro({
+            return await contabilidadVentasService.crearAsientoCobro({
                 empresaId:   empresa!.id,
                 portalRuc:   (empresa as any)?.ruc ?? '',
                 clienteNombre,
-                fecha:       new Date().toISOString().split('T')[0],
+                fecha:       fecha ?? new Date().toISOString().split('T')[0],
                 valor,
                 metodoPago,
                 facturaSecuencial,
+                cuentaContableId,
             })
         } catch (e: any) {
             const msg = e?.message ?? 'Error desconocido al generar asiento contable.'
             setAvisoContable(`Pago registrado, pero asiento contable no generado: ${msg}`)
             console.warn('[cobro] Asiento contable omitido:', e)
+            return null
         }
     }
 
@@ -139,6 +149,46 @@ export function CarteraCxcPage() {
         }
     }
 
+    async function refreshPagosDetalle(carteraId: string) {
+        const pagos = await carteraCxcService.getPagosDeCartera(carteraId)
+        setPagosDetalle(prev => ({ ...prev, [carteraId]: pagos }))
+    }
+
+    // Reintenta generar el asiento contable de un pago que quedó "Sin asiento"
+    async function handleGenerarAsiento(pago: CarteraCxcPago, c: CarteraCxc) {
+        setAccionandoPagoId(pago.id)
+        try {
+            const comprobanteId = await crearAsientoCobroSeguro(
+                Number(pago.valor), pago.metodo_pago, c.clientes?.nombre ?? '', c.comprobantes?.secuencial,
+                undefined, pago.fecha_pago,
+            )
+            if (comprobanteId) {
+                await carteraCxcService.actualizarComprobantePago(pago.id, comprobanteId)
+                await refreshPagosDetalle(c.id)
+            }
+        } finally {
+            setAccionandoPagoId(null)
+        }
+    }
+
+    // Reversa un pago: anula el asiento vinculado (si aplica) y restaura el saldo de la cartera
+    async function handleReversarPago(pago: CarteraCxcPago, c: CarteraCxc) {
+        const motivo = prompt('Motivo de la reversa de este pago:')
+        if (motivo === null) return
+        if (!confirm(`¿Reversar el pago de ${formatCurrency(pago.valor)} del ${pago.fecha_pago}? Se anulará el asiento contable vinculado (si existe) y se restaurará el saldo de la factura.`)) return
+
+        setAccionandoPagoId(pago.id)
+        try {
+            await carteraCxcService.reversarPago(pago.id, motivo || undefined)
+            await refreshPagosDetalle(c.id)
+            await loadCartera()
+        } catch (e: any) {
+            alert(`Error al reversar pago: ${e.message}`)
+        } finally {
+            setAccionandoPagoId(null)
+        }
+    }
+
     // ── Pago individual ──
     async function handleRegistrarPago() {
         if (!pagoModal) return
@@ -160,7 +210,7 @@ export function CarteraCxcPage() {
 
         try {
             setSavingPago(true)
-            await carteraCxcService.registrarPago(pagoModal.id, empresa!.id, valor, pagoMetodo, refFinal)
+            const pagoInsertado = await carteraCxcService.registrarPago(pagoModal.id, empresa!.id, valor, pagoMetodo, refFinal)
             const nuevoSaldo = Math.round((pagoModal.saldo - valor) * 100) / 100
 
             imprimirComprobante(
@@ -169,8 +219,12 @@ export function CarteraCxcPage() {
                 pagoMetodo === 'cheque' ? pagoBanco : ctaLabel
             )
 
-            // Asiento contable no-bloqueante
-            crearAsientoCobroSeguro(valor, pagoMetodo, pagoModal.clientes?.nombre ?? '', pagoModal.comprobantes?.secuencial)
+            // Asiento contable: si se genera, se vincula al pago para trazabilidad/reversa
+            const comprobanteId = await crearAsientoCobroSeguro(
+                valor, pagoMetodo, pagoModal.clientes?.nombre ?? '', pagoModal.comprobantes?.secuencial,
+                ctaSeleccionada?.cuenta_contable_id ?? undefined,
+            )
+            if (comprobanteId) await carteraCxcService.actualizarComprobantePago(pagoInsertado.id, comprobanteId)
 
             setPagoModal(null); setPagoValor(''); setPagoRef(''); setPagoBanco(''); setPagoCuentaId('')
             await loadCartera()
@@ -228,7 +282,7 @@ export function CarteraCxcPage() {
 
         try {
             setSavingMulti(true)
-            await carteraCxcService.registrarPagoMultiple(
+            const pagosInsertados = await carteraCxcService.registrarPagoMultiple(
                 dists.map(d => ({ carteraId: d.cartera.id, valor: d.aplicado })),
                 empresa!.id, multiMetodo, refFinal
             )
@@ -238,9 +292,15 @@ export function CarteraCxcPage() {
                 multiMetodo === 'cheque' ? multiBanco : ctaLabel
             )
 
-            // Asiento contable no-bloqueante
+            // Asiento contable consolidado del lote: se vincula a cada pago para trazabilidad/reversa
             const clienteNombre = dists[0]?.cartera.clientes?.nombre ?? ''
-            crearAsientoCobroSeguro(total, multiMetodo, clienteNombre)
+            const comprobanteId = await crearAsientoCobroSeguro(
+                total, multiMetodo, clienteNombre, undefined,
+                ctaSeleccionada?.cuenta_contable_id ?? undefined,
+            )
+            if (comprobanteId) {
+                await Promise.all(pagosInsertados.map(p => carteraCxcService.actualizarComprobantePago(p.id, comprobanteId)))
+            }
 
             cerrarMultiModal()
             await loadCartera()
@@ -752,6 +812,8 @@ export function CarteraCxcPage() {
                                                                 <th className="text-left pb-1">Método</th>
                                                                 <th className="text-left pb-1">Referencia</th>
                                                                 <th className="text-right pb-1">Valor</th>
+                                                                <th className="text-center pb-1">Asiento</th>
+                                                                <th className="text-right pb-1">Acciones</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-200">
@@ -760,7 +822,47 @@ export function CarteraCxcPage() {
                                                                     <td className="py-1 text-slate-600">{p.fecha_pago}</td>
                                                                     <td className="py-1 text-slate-600 capitalize">{p.metodo_pago.replace('_', ' ')}</td>
                                                                     <td className="py-1 text-slate-500">{p.referencia || '—'}</td>
-                                                                    <td className="py-1 text-right font-medium text-green-700">{formatCurrency(p.valor)}</td>
+                                                                    <td className={`py-1 text-right font-medium ${p.estado === 'reversado' ? 'text-slate-400 line-through' : 'text-green-700'}`}>
+                                                                        {formatCurrency(p.valor)}
+                                                                    </td>
+                                                                    <td className="py-1 text-center">
+                                                                        {p.estado === 'reversado' ? (
+                                                                            <span
+                                                                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600"
+                                                                                title={[p.reversado_at && `Reversado: ${p.reversado_at}`, p.motivo_reversa].filter(Boolean).join(' — ')}
+                                                                            >
+                                                                                Reversado
+                                                                            </span>
+                                                                        ) : p.lp_comprobante_id ? (
+                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                                                Contabilizado
+                                                                            </span>
+                                                                        ) : (
+                                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                                                                    Sin asiento
+                                                                                </span>
+                                                                                <button
+                                                                                    onClick={() => handleGenerarAsiento(p, c)}
+                                                                                    disabled={accionandoPagoId === p.id}
+                                                                                    className="text-xs text-primary-600 hover:underline disabled:opacity-50"
+                                                                                >
+                                                                                    Generar
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="py-1 text-right">
+                                                                        {p.estado === 'activo' && (
+                                                                            <button
+                                                                                onClick={() => handleReversarPago(p, c)}
+                                                                                disabled={accionandoPagoId === p.id}
+                                                                                className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                                                                            >
+                                                                                Reversar
+                                                                            </button>
+                                                                        )}
+                                                                    </td>
                                                                 </tr>
                                                             ))}
                                                         </tbody>

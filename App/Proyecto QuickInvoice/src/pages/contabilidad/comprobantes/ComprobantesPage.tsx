@@ -54,7 +54,7 @@ export function ComprobantesPage() {
 
     // Filtros
     const [busqueda, setBusqueda]     = useState('')
-    const [filtroEstado, setFiltroEstado] = useState<string>('todos')
+    const [filtroEstado, setFiltroEstado] = useState<string>('confirmado')
     const [filtroAño, setFiltroAño]   = useState<number | ''>(añoActual)
     const [filtroMes, setFiltroMes]   = useState<number | ''>(new Date().getMonth() + 1)
     const [filtroTipo, setFiltroTipo] = useState<string>('todos')

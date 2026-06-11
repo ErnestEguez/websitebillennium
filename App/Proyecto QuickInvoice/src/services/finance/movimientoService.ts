@@ -1,5 +1,9 @@
 import { supabase } from '../../lib/supabaseFinance'
-import type { MovimientoBancario } from '../../types/finance'
+import { supabaseFacturacion } from '../../lib/supabase'
+import { cuentasBancariasService } from './bancosService'
+import { contableConfigService } from '../contableConfigService'
+import { contabilidadTesoreriaService } from '../contabilidadTesoreriaService'
+import type { MovimientoBancario, LineaDistribucionContable } from '../../types/finance'
 
 const MOV_SELECT = `
     *,
@@ -30,19 +34,75 @@ export const movimientoService = {
         return data as MovimientoBancario[]
     },
 
-    async crear(mov: Omit<MovimientoBancario, 'id' | 'created_at' | 'updated_at' | 'cuenta_bancaria'>): Promise<MovimientoBancario> {
+    async crear(
+        mov: Omit<MovimientoBancario, 'id' | 'created_at' | 'updated_at' | 'cuenta_bancaria'>,
+        lineas: LineaDistribucionContable[] = []
+    ): Promise<MovimientoBancario> {
         const { data, error } = await supabase
             .from('movimientos_bancarios').insert(mov).select().single()
         if (error) throw error
-        return data as MovimientoBancario
+        const movimiento = data as MovimientoBancario
+
+        // Asiento contable LedgerPro (no-fatal: el movimiento ya quedó registrado)
+        let avisoContable: string | null = null
+        try {
+            const config = await contableConfigService.getConfig(mov.empresa_id)
+            if (config?.contabilidad_en_linea) {
+                const [cuentaBancaria, { data: empresaRow }] = await Promise.all([
+                    cuentasBancariasService.obtener(mov.cuenta_bancaria_id),
+                    supabaseFacturacion.from('empresas').select('ruc').eq('id', mov.empresa_id).maybeSingle(),
+                ])
+
+                const lpComprobanteId = await contabilidadTesoreriaService.crearAsientoMovimiento({
+                    empresaId:        mov.empresa_id,
+                    portalRuc:        (empresaRow as any)?.ruc ?? '',
+                    fecha:            mov.fecha,
+                    tipo:             mov.tipo,
+                    sentido:          mov.sentido,
+                    monto:            mov.monto,
+                    cuentaContableId: cuentaBancaria.cuenta_contable_id,
+                    descripcion:      mov.descripcion,
+                    movimientoId:     movimiento.id,
+                    lineas,
+                })
+
+                if (lpComprobanteId) {
+                    const { error: updErr } = await supabase
+                        .from('movimientos_bancarios')
+                        .update({ tiene_asiento: true, comprobante_contable_id: lpComprobanteId })
+                        .eq('id', movimiento.id)
+                    if (updErr) throw updErr
+
+                    movimiento.tiene_asiento = true
+                    movimiento.comprobante_contable_id = lpComprobanteId
+                }
+            }
+        } catch (e: any) {
+            avisoContable = e?.message ?? 'Error desconocido al generar el asiento contable.'
+            console.warn('[movimientoService.crear] Asiento contable omitido:', e)
+        }
+
+        return { ...movimiento, avisoContable }
     },
 
     async anular(id: string): Promise<void> {
+        const { data: mov, error: getErr } = await supabase
+            .from('movimientos_bancarios')
+            .select('tiene_asiento, comprobante_contable_id')
+            .eq('id', id)
+            .single()
+        if (getErr) throw getErr
+
         const { error } = await supabase
             .from('movimientos_bancarios')
             .update({ estado: 'anulado', updated_at: new Date().toISOString() })
             .eq('id', id)
         if (error) throw error
+
+        const { tiene_asiento, comprobante_contable_id } = mov as { tiene_asiento: boolean; comprobante_contable_id: string | null }
+        if (tiene_asiento && comprobante_contable_id) {
+            await contabilidadTesoreriaService.anularAsientoMovimiento(comprobante_contable_id)
+        }
     },
 
     async marcarConciliado(ids: string[], conciliacionId: string): Promise<void> {
