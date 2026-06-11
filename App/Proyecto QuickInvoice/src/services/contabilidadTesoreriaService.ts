@@ -37,7 +37,7 @@ export const contabilidadTesoreriaService = {
     /** Genera el asiento contable de un movimiento bancario manual. Devuelve null si el tipo no aplica (cheque/transferencia). */
     async crearAsientoMovimiento(input: AsientoMovimientoInput): Promise<string | null> {
         const db = supabaseContabilidad as any
-        const { empresaId, portalRuc, fecha, tipo, sentido, monto, cuentaContableId, descripcion, movimientoId, lineas } = input
+        const { portalRuc, fecha, tipo, sentido, monto, cuentaContableId, descripcion, movimientoId, lineas } = input
 
         if (TIPOS_SIN_ASIENTO.has(tipo)) return null
 
