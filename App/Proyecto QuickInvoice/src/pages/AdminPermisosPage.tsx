@@ -76,11 +76,22 @@ export function AdminPermisosPage() {
     async function cargar() {
         setLoading(true)
         try {
-            // 1. Todos los usuarios de esta empresa (facturacion.profiles)
-            const { data: profs } = await supabase
-                .from('profiles')
-                .select('id, nombre')
+            // 1. Todos los usuarios de esta empresa: legacy (profiles.empresa_id)
+            //    + multiempresa (usuario_empresas)
+            const { data: ueRows } = await supabase
+                .from('usuario_empresas')
+                .select('user_id')
                 .eq('empresa_id', empresa.id)
+                .eq('activo', true)
+
+            const ueUserIds = (ueRows ?? []).map(r => r.user_id)
+
+            let profsQuery = supabase.from('profiles').select('id, nombre')
+            profsQuery = ueUserIds.length
+                ? profsQuery.or(`empresa_id.eq.${empresa.id},id.in.(${ueUserIds.join(',')})`)
+                : profsQuery.eq('empresa_id', empresa.id)
+
+            const { data: profs } = await profsQuery
 
             if (!profs?.length) { setFilas([]); return }
             const userIds = profs.map(pr => pr.id)
