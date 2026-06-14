@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react'
 import { BookOpen, Save, Loader2, AlertCircle, Check } from 'lucide-react'
 import { contableConfigService, type CuentaLP } from '../services/contableConfigService'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
 // ─── Definición de conceptos por proceso ─────────────────────────────────────
 
@@ -52,8 +53,9 @@ type MapeoMap = Record<string, MapeoVal>  // key = "PROCESO:CONCEPTO"
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function ContabilidadConfigTab() {
-    const { empresa } = useAuth()
+    const { empresa, refreshEmpresa } = useAuth()
     const [enLinea, setEnLinea]     = useState(false)
+    const [ctaPorServicio, setCtaPorServicio] = useState(false)
     const [mapeos, setMapeos]       = useState<MapeoMap>({})
     const [cuentas, setCuentas]     = useState<CuentaLP[]>([])
     const [loading, setLoading]     = useState(true)
@@ -77,6 +79,7 @@ export function ContabilidadConfigTab() {
                 contableConfigService.getCuentas((empresa as any)?.ruc),
             ])
             setEnLinea(config?.contabilidad_en_linea ?? false)
+            setCtaPorServicio(!!empresa?.usar_contabilidad_compras)
 
             const map: MapeoMap = {}
             for (const m of mapaDB) {
@@ -115,6 +118,13 @@ export function ContabilidadConfigTab() {
         setError('')
         try {
             await contableConfigService.saveConfig(empresa.id, enLinea)
+
+            const { error: errEmpresa } = await supabase
+                .from('empresas')
+                .update({ usar_contabilidad_compras: ctaPorServicio })
+                .eq('id', empresa.id)
+            if (errEmpresa) throw errEmpresa
+            await refreshEmpresa()
 
             const rows = Object.entries(mapeos).map(([key, val]) => {
                 const [proceso, concepto] = key.split(':')
@@ -171,6 +181,28 @@ export function ContabilidadConfigTab() {
                         ⚡ Modo en línea activo — asegúrate de completar el mapeo de cuentas a continuación.
                     </p>
                 )}
+
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div>
+                        <p className="text-sm font-bold text-slate-800">Cuenta contable por ítem en Compra de Servicios</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            {ctaPorServicio
+                                ? 'Cada línea de "Compra de Servicios" permite elegir su propia cuenta de gasto. El asiento genera un débito por cada cuenta usada.'
+                                : 'Todas las líneas de "Compra de Servicios" se contabilizan con la cuenta "Gastos / Servicios" mapeada abajo, en Compras a Proveedores.'}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCtaPorServicio(v => !v)}
+                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors shrink-0 ${
+                            ctaPorServicio ? 'bg-purple-600' : 'bg-slate-300'
+                        }`}
+                    >
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                            ctaPorServicio ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
+                    </button>
+                </div>
             </div>
 
             {/* Aviso sin LedgerPro */}

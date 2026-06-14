@@ -70,6 +70,7 @@ interface AuthContextType {
     cajaSesion: any | null
     empresasDisponibles: EmpresaOption[]
     selectEmpresa: (empresaId: string) => Promise<void>
+    refreshEmpresa: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -129,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (!isMounted.current) return
                 if (session?.user) {
                     setUser(session.user)
-                    await fetchProfile(session.user.id)
+                    setTimeout(() => { if (isMounted.current) fetchProfile(session.user.id) }, 0)
                 } else {
                     const hasMagicLink =
                         window.location.hash.includes('access_token') ||
@@ -147,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (!isMounted.current) return
             if (_event === 'SIGNED_IN') {
                 setUser(session?.user ?? null)
-                if (session?.user) await fetchProfile(session.user.id)
+                if (session?.user) setTimeout(() => { if (isMounted.current) fetchProfile(session.user.id) }, 0)
             } else if (_event === 'SIGNED_OUT') {
                 setUser(null); setProfile(null); setEmpresa(null)
                 setCajaSesion(null); setCajaBloqueada(null)
@@ -242,6 +243,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         } catch {
             if (isMounted.current) setPermisos(DEFAULT_PERMISOS)
+        }
+    }
+
+    // Re-lee la empresa actual (ej. tras cambiar un flag en Ajustes) sin recargar módulos/permisos/caja.
+    async function refreshEmpresa() {
+        if (!empresa?.id) return
+        const { data, error } = await supabase
+            .from('empresas')
+            .select('*')
+            .eq('id', empresa.id)
+            .single()
+        if (!error && data && isMounted.current) {
+            setEmpresa(data)
+            offlineDb.setAppCache(`empresa:${data.id}`, data).catch(() => {})
         }
     }
 
@@ -494,7 +509,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <AuthContext.Provider value={{
             user, profile, empresa, modules, permisos, isAdmin,
             loading, signOut, cajaSesion,
-            empresasDisponibles, selectEmpresa,
+            empresasDisponibles, selectEmpresa, refreshEmpresa,
         } as any}>
             {children}
         </AuthContext.Provider>

@@ -99,7 +99,8 @@ export function AjustesPage() {
                 <div className="card p-5 flex items-start gap-3 text-slate-500 text-sm">
                     <Info className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                     La integración contable no está activada para esta empresa.
-                    El administrador debe activar el switch en la sección de Configuración.
+                    El administrador debe activar el switch "Cuenta contable por ítem en Compra de Servicios"
+                    en Ajustes ▸ Configuración ▸ Contabilidad.
                 </div>
             )}
 
