@@ -75,6 +75,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Recuerda la última empresa activa por usuario para no repetir el selector
+// multiempresa cada vez que el navegador descarta/recarga la pestaña.
+const EMPRESA_ACTUAL_KEY = 'qi_empresa_actual_'
+
+function getEmpresaGuardada(userId: string): string | null {
+    try { return localStorage.getItem(EMPRESA_ACTUAL_KEY + userId) } catch { return null }
+}
+
+function guardarEmpresaActual(userId: string, empresaId: string) {
+    try { localStorage.setItem(EMPRESA_ACTUAL_KEY + userId, empresaId) } catch {}
+}
+
 const DEFAULT_MODULES: Modules = { vendor: false, finance: false, ledgerpro: false }
 
 export const DEFAULT_PERMISOS: Permisos = {
@@ -190,6 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setEmpresa(empresaData)
             offlineDb.setAppCache(`empresa:${empresaData.id}`, empresaData).catch(() => {})
         }
+        guardarEmpresaActual(userId, empresaId)
 
         await validarCaja(userId, empresaId, userRol)
 
@@ -335,9 +348,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }))
 
                 if (options.length >= 2) {
-                    // Todo OK: mostrar selector
-                    if (isMounted.current) {
-                        setEmpresasDisponibles(options)
+                    if (isMounted.current) setEmpresasDisponibles(options)
+
+                    // Si ya había una empresa activa elegida antes (misma sesión /
+                    // pestaña recargada), reentrar directo sin repetir el selector.
+                    const empresaGuardada = getEmpresaGuardada(userId)
+                    const opcionGuardada = empresaGuardada
+                        ? options.find(o => o.id === empresaGuardada)
+                        : undefined
+
+                    if (opcionGuardada) {
+                        await loadEmpresaById(userId, opcionGuardada.id, opcionGuardada.rol)
+                    } else if (isMounted.current) {
                         setNeedsEmpresaSelection(true)
                     }
                     return // finally ejecuta setLoading(false)
