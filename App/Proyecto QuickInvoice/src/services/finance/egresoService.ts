@@ -44,7 +44,42 @@ export const egresoService = {
 
         const { data, error } = await q
         if (error) throw error
-        return data as ComprobanteEgreso[]
+        const lista = data as ComprobanteEgreso[]
+
+        // Números de factura aplicados por cada egreso (vía egreso_pagos_cxp → cuentas_por_pagar → ingresos_stock)
+        const ids = lista.map(e => e.id)
+        if (ids.length > 0) {
+            const { data: pagosCxp } = await supabase
+                .from('egreso_pagos_cxp')
+                .select('egreso_id, cxp_id')
+                .in('egreso_id', ids)
+
+            if (pagosCxp?.length) {
+                const cxpIds = [...new Set((pagosCxp as { egreso_id: string; cxp_id: string }[]).map(p => p.cxp_id))]
+                const { data: cxps } = await supabaseFacturacion
+                    .from('cuentas_por_pagar')
+                    .select('id, compra:ingresos_stock(numero_factura)')
+                    .in('id', cxpIds)
+
+                const facturaPorCxp = new Map<string, string>()
+                for (const c of (cxps ?? []) as any[]) {
+                    if (c.compra?.numero_factura) facturaPorCxp.set(c.id, c.compra.numero_factura)
+                }
+
+                const facturasPorEgreso = new Map<string, string[]>()
+                for (const p of pagosCxp as { egreso_id: string; cxp_id: string }[]) {
+                    const nf = facturaPorCxp.get(p.cxp_id)
+                    if (!nf) continue
+                    const arr = facturasPorEgreso.get(p.egreso_id) ?? []
+                    arr.push(nf)
+                    facturasPorEgreso.set(p.egreso_id, arr)
+                }
+
+                for (const e of lista) e.facturas = facturasPorEgreso.get(e.id) ?? []
+            }
+        }
+
+        return lista
     },
 
     async obtener(id: string): Promise<ComprobanteEgreso> {

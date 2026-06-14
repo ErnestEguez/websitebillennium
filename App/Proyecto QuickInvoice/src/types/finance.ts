@@ -92,6 +92,8 @@ export interface ComprobanteEgreso {
     proveedor?: { nombre_empresa: string; ruc: string }
     cuenta_bancaria?: Pick<CuentaBancaria, 'numero_cuenta' | 'tipo'> & { banco?: Pick<Banco, 'nombre'> }
     pagos_cxp?: EgresoPagoCxP[]
+    // números de factura de las CxP aplicadas (solo en listar(), vía egreso_pagos_cxp)
+    facturas?: string[]
     // aviso no-fatal: el egreso se guardó pero el asiento contable falló
     avisoContable?: string | null
 }

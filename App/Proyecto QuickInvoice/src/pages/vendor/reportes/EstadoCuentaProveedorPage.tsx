@@ -111,6 +111,7 @@ interface MovProveedor {
     fecha:       string
     tipo:        'FACTURA' | 'PAGO' | 'RETENCION'
     descripcion: string
+    factura?:    string
     cargo:       number
     abono:       number
     saldo:       number
@@ -183,6 +184,19 @@ export function EstadoCuentaProveedorPage() {
             const pagos       = pagosRes.status       === 'fulfilled' ? (pagosRes.value.data       ?? []) : []
             const retenciones = retencionesRes.status === 'fulfilled' ? (retencionesRes.value.data ?? []) : []
 
+            // Número de factura asociado a cada pago (vía CxP → compra)
+            const cxpIds = [...new Set(pagos.map(p => p.cxp_id).filter(Boolean) as string[])]
+            const facturaPorCxp = new Map<string, string>()
+            if (cxpIds.length > 0) {
+                const { data: cxps } = await supabase
+                    .from('cuentas_por_pagar')
+                    .select('id, compra:ingresos_stock(numero_factura)')
+                    .in('id', cxpIds)
+                for (const c of (cxps ?? []) as any[]) {
+                    if (c.compra?.numero_factura) facturaPorCxp.set(c.id, c.compra.numero_factura)
+                }
+            }
+
             const todos = [
                 ...compras.map(c     => ({ fecha: c.fecha_emision ?? c.fecha_ingreso, item: c, tipo: 'FACTURA'   as const })),
                 ...pagos.map(p       => ({ fecha: p.fecha_pago,                       item: p, tipo: 'PAGO'      as const })),
@@ -195,17 +209,18 @@ export function EstadoCuentaProveedorPage() {
             for (const { fecha, item, tipo } of todos) {
                 if (tipo === 'FACTURA') {
                     if (item.estado === 'ANULADO') continue
-                    const factura = `Factura ${item.numero_factura ?? item.id.slice(0, 8)}`
+                    const numFactura = item.numero_factura ?? item.id.slice(0, 8)
+                    const factura = `Factura ${numFactura}`
                     if (item.forma_pago === 'CONTADO') {
                         // Compra al contado: no genera CxP ni afecta el saldo adeudado.
-                        movs.push({ fecha, tipo, descripcion: `${factura} (Contado)`, cargo: 0, abono: 0, saldo })
+                        movs.push({ fecha, tipo, descripcion: `${factura} (Contado)`, factura: numFactura, cargo: 0, abono: 0, saldo })
                         continue
                     }
                     saldo += item.total
-                    movs.push({ fecha, tipo, descripcion: factura, cargo: item.total, abono: 0, saldo })
+                    movs.push({ fecha, tipo, descripcion: factura, factura: numFactura, cargo: item.total, abono: 0, saldo })
                 } else if (tipo === 'PAGO') {
                     saldo -= item.monto
-                    movs.push({ fecha, tipo, descripcion: `Pago ${item.forma_pago}${item.numero_referencia ? ' #' + item.numero_referencia : ''}`, cargo: 0, abono: item.monto, saldo })
+                    movs.push({ fecha, tipo, descripcion: `Pago ${item.forma_pago}${item.numero_referencia ? ' #' + item.numero_referencia : ''}`, factura: item.cxp_id ? facturaPorCxp.get(item.cxp_id) : undefined, cargo: 0, abono: item.monto, saldo })
                 } else {
                     saldo -= item.valor
                     movs.push({ fecha, tipo, descripcion: `Retención ${item.tipo} cód. ${item.codigo_retencion}`, cargo: 0, abono: item.valor, saldo })
@@ -226,6 +241,7 @@ export function EstadoCuentaProveedorPage() {
             'Fecha':        fmtF(m.fecha),
             'Tipo':         m.tipo as string,
             'Descripción':  m.descripcion,
+            'N° Factura':   m.factura ?? '',
             'Cargo (+)':    m.cargo   > 0 ? m.cargo   : '',
             'Abono (-)':    m.abono   > 0 ? m.abono   : '',
             'Saldo':        m.saldo,
@@ -234,6 +250,7 @@ export function EstadoCuentaProveedorPage() {
             'Fecha': '',
             'Tipo': 'TOTALES',
             'Descripción': `${movimientos.length} movimientos`,
+            'N° Factura': '',
             'Cargo (+)': totalCargos,
             'Abono (-)': totalAbonos,
             'Saldo':     saldoFinal,
@@ -356,6 +373,7 @@ export function EstadoCuentaProveedorPage() {
                                     <th className="px-4 py-3 text-left">Fecha</th>
                                     <th className="px-4 py-3 text-left">Tipo</th>
                                     <th className="px-4 py-3 text-left">Descripción</th>
+                                    <th className="px-4 py-3 text-left">N° Factura</th>
                                     <th className="px-4 py-3 text-right">Cargo (+)</th>
                                     <th className="px-4 py-3 text-right">Abono (-)</th>
                                     <th className="px-4 py-3 text-right">Saldo</th>
@@ -375,6 +393,7 @@ export function EstadoCuentaProveedorPage() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-2.5 text-slate-700">{m.descripcion}</td>
+                                        <td className="px-4 py-2.5 text-xs text-slate-500 font-mono whitespace-nowrap">{m.factura ?? '—'}</td>
                                         <td className="px-4 py-2.5 text-right font-mono font-semibold text-red-700">
                                             {m.cargo > 0 ? fmt(m.cargo) : <span className="text-slate-300">—</span>}
                                         </td>
@@ -390,7 +409,7 @@ export function EstadoCuentaProveedorPage() {
                             </tbody>
                             <tfoot className="bg-slate-800 text-white">
                                 <tr>
-                                    <td colSpan={3} className="px-4 py-3 text-xs font-semibold">{movimientos.length} movimientos</td>
+                                    <td colSpan={4} className="px-4 py-3 text-xs font-semibold">{movimientos.length} movimientos</td>
                                     <td className="px-4 py-3 text-right font-mono font-bold">{fmt(totalCargos)}</td>
                                     <td className="px-4 py-3 text-right font-mono font-bold">{fmt(totalAbonos)}</td>
                                     <td className={cn('px-4 py-3 text-right font-mono font-bold text-base',
@@ -502,6 +521,7 @@ export function EstadoCuentaProveedorPage() {
                                 <th style={{ textAlign: 'left',  width: '82px' }}>Fecha</th>
                                 <th style={{ textAlign: 'left',  width: '76px' }}>Tipo</th>
                                 <th style={{ textAlign: 'left'               }}>Descripción</th>
+                                <th style={{ textAlign: 'left',  width: '90px' }}>N° Factura</th>
                                 <th style={{ textAlign: 'right', width: '88px' }}>Cargo (+)</th>
                                 <th style={{ textAlign: 'right', width: '88px' }}>Abono (-)</th>
                                 <th style={{ textAlign: 'right', width: '88px' }}>Saldo</th>
@@ -519,6 +539,7 @@ export function EstadoCuentaProveedorPage() {
                                         </span>
                                     </td>
                                     <td>{m.descripcion}</td>
+                                    <td>{m.factura ?? '—'}</td>
                                     <td className={cn('r', m.cargo > 0 ? 'cargo' : '')} style={{ color: m.cargo === 0 ? '#ccc' : undefined }}>
                                         {m.cargo > 0 ? fmt(m.cargo) : '—'}
                                     </td>
@@ -533,7 +554,7 @@ export function EstadoCuentaProveedorPage() {
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colSpan={3} style={{ fontSize: '9px', color: '#ccd3e0' }}>
+                                <td colSpan={4} style={{ fontSize: '9px', color: '#ccd3e0' }}>
                                     {movimientos.length} movimiento{movimientos.length !== 1 ? 's' : ''} en el período
                                 </td>
                                 <td className="r">{fmt(totalCargos)}</td>

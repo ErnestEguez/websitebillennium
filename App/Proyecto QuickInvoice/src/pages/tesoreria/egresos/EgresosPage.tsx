@@ -74,12 +74,13 @@ export function EgresosPage() {
     function imprimir() {
         const html = generarTablaHtml(
             [
-                { label: 'Número',      key: 'numero',    width: '13%' },
-                { label: 'Fecha',       key: 'fecha',     width: '10%' },
-                { label: 'Forma Pago',  key: 'formaPago', width: '18%' },
-                { label: 'Cuenta',      key: 'cuenta',    width: '22%' },
-                { label: 'Referencia',  key: 'ref',       width: '14%' },
-                { label: 'Monto',       key: 'monto',     align: 'right', width: '11%' },
+                { label: 'Número',      key: 'numero',    width: '12%' },
+                { label: 'Fecha',       key: 'fecha',     width: '9%' },
+                { label: 'Forma Pago',  key: 'formaPago', width: '16%' },
+                { label: 'Cuenta',      key: 'cuenta',    width: '19%' },
+                { label: 'Referencia',  key: 'ref',       width: '12%' },
+                { label: 'N° Factura',  key: 'factura',   width: '12%' },
+                { label: 'Monto',       key: 'monto',     align: 'right', width: '10%' },
                 { label: 'Estado',      key: 'estado',    align: 'center', width: '10%' },
             ],
             filtrados.map(e => ({
@@ -88,6 +89,7 @@ export function EgresosPage() {
                 formaPago: FORMA_PAGO_LABELS[e.forma_pago],
                 cuenta:   e.cuenta_bancaria?.banco?.nombre ? `${e.cuenta_bancaria.banco.nombre} — ${e.cuenta_bancaria.numero_cuenta}` : '—',
                 ref:      e.referencia ?? '—',
+                factura:  e.facturas?.length ? e.facturas.join(', ') : '—',
                 monto:    formatMoneda(e.monto_total),
                 estado:   e.estado,
             })),
@@ -112,6 +114,7 @@ export function EgresosPage() {
                 { key: 'FormaPago',  label: 'Forma Pago',  width: 22 },
                 { key: 'Cuenta',     label: 'Cuenta',      width: 28 },
                 { key: 'Referencia', label: 'Referencia',  width: 20 },
+                { key: 'NFactura',   label: 'N° Factura',  width: 20 },
                 { key: 'Concepto',   label: 'Concepto',    width: 32 },
                 { key: 'Monto',      label: 'Monto',       width: 12 },
                 { key: 'Estado',     label: 'Estado',      width: 10 },
@@ -122,6 +125,7 @@ export function EgresosPage() {
                 FormaPago:  FORMA_PAGO_LABELS[e.forma_pago],
                 Cuenta:     e.cuenta_bancaria?.banco?.nombre ? `${e.cuenta_bancaria.banco.nombre} — ${e.cuenta_bancaria.numero_cuenta}` : '',
                 Referencia: e.referencia ?? '',
+                NFactura:   e.facturas?.length ? e.facturas.join(', ') : '',
                 Concepto:   e.concepto ?? '',
                 Monto:      e.monto_total,
                 Estado:     e.estado,
@@ -214,6 +218,7 @@ export function EgresosPage() {
                                     <th className="py-2 px-4 text-left">Forma de pago</th>
                                     <th className="py-2 px-4 text-left">Cuenta bancaria</th>
                                     <th className="py-2 px-4 text-left">Referencia</th>
+                                    <th className="py-2 px-4 text-left">N° Factura</th>
                                     <th className="py-2 px-4 text-right">Monto</th>
                                     <th className="py-2 px-4 text-center">Estado</th>
                                     <th className="py-2 px-4 text-center">Acciones</th>
@@ -233,6 +238,7 @@ export function EgresosPage() {
                                             {e.cuenta_bancaria?.banco?.nombre ? `${e.cuenta_bancaria.banco.nombre} — ${e.cuenta_bancaria.numero_cuenta}` : '—'}
                                         </td>
                                         <td className="py-2.5 px-4 text-xs text-slate-500">{e.referencia || '—'}</td>
+                                        <td className="py-2.5 px-4 text-xs text-slate-500 font-mono">{e.facturas?.length ? e.facturas.join(', ') : '—'}</td>
                                         <td className="py-2.5 px-4 text-right font-semibold">{formatMoneda(e.monto_total)}</td>
                                         <td className="py-2.5 px-4 text-center">
                                             <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium',
@@ -265,7 +271,7 @@ export function EgresosPage() {
                             </tbody>
                             <tfoot>
                                 <tr className="bg-slate-50 border-t-2 font-semibold">
-                                    <td colSpan={5} className="py-2.5 px-4 text-right text-xs text-slate-500 uppercase">Total emitidos</td>
+                                    <td colSpan={6} className="py-2.5 px-4 text-right text-xs text-slate-500 uppercase">Total emitidos</td>
                                     <td className="py-2.5 px-4 text-right">{formatMoneda(total)}</td>
                                     <td colSpan={2} />
                                 </tr>
