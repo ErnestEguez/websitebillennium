@@ -10,6 +10,7 @@ import { anticipoService } from '../../../services/finance/anticipoService'
 import { cn } from '../../../lib/utils'
 import { formatMoneda, formatFecha } from '../../../lib/utils'
 import { FORMA_PAGO_LABELS, ESTADO_CXP_BADGE } from '../../../types/finance'
+import { htmlComprobanteEgreso, abrirVentanaImpresion } from '../../../lib/comprobantesPrint'
 import type { Proveedor, CuentaBancaria, CuentaPorPagar, FormasPagoEgreso, AnticipoProveedor } from '../../../types/finance'
 
 type CxPSeleccion      = { cxp: CuentaPorPagar;      monto: number; seleccionado: boolean }
@@ -190,6 +191,13 @@ export function NuevoEgresoPage() {
 
             clearDraft()
             setOk(true)
+
+            // Imprimir comprobante de egreso automáticamente
+            try {
+                const { egreso: eg, proveedor, facturas } = await egresoService.obtenerParaImprimir(egreso.id)
+                abrirVentanaImpresion(htmlComprobanteEgreso({ empresa, eg, proveedor, facturas }))
+            } catch { /* la impresión es informativa, no bloquea el flujo */ }
+
             if (egreso.avisoContable) {
                 setAvisoContable(egreso.avisoContable)
             } else {

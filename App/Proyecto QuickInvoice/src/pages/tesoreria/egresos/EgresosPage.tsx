@@ -6,6 +6,7 @@ import { egresoService } from '../../../services/finance/egresoService'
 import { cn, formatMoneda, formatFecha } from '../../../lib/utils'
 import { exportarExcelProfesional } from '../../../lib/excelUtils'
 import { imprimirReporte, generarTablaHtml } from '../../../lib/printUtils'
+import { htmlComprobanteEgreso, abrirVentanaImpresion } from '../../../lib/comprobantesPrint'
 import { FORMA_PAGO_LABELS } from '../../../types/finance'
 import type { ComprobanteEgreso } from '../../../types/finance'
 
@@ -60,73 +61,8 @@ export function EgresosPage() {
         setImprimiendo(egreso.id)
         try {
             const { egreso: eg, proveedor, facturas } = await egresoService.obtenerParaImprimir(egreso.id)
-            const fecha = new Date().toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })
-            const filas = facturas.map(f =>
-                `<tr><td>${f.numero_factura}</td><td style="text-align:right">$${f.monto_aplicado.toFixed(2)}</td></tr>`
-            ).join('')
-
-            const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Comprobante de Egreso ${eg.numero}</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px 28px}
-  .hdr{border-bottom:3px solid #1e3a5f;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start}
-  .emp{font-size:15px;font-weight:bold;color:#1e3a5f}.ruc{font-size:10px;color:#555;margin-top:2px}
-  .doc-title{text-align:right}.doc-title h1{font-size:14px;font-weight:bold;text-transform:uppercase;color:#1e3a5f;letter-spacing:1px}
-  .doc-title .num{font-size:13px;font-weight:bold;color:#c00;margin-top:4px;font-family:monospace}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
-  .campo{margin-bottom:6px}.campo .lbl{font-size:9px;text-transform:uppercase;color:#888;letter-spacing:.5px}
-  .campo .val{font-size:11px;font-weight:600;color:#111;margin-top:1px;border-bottom:1px dotted #ccc;padding-bottom:1px}
-  table{width:100%;border-collapse:collapse;margin:10px 0}
-  thead tr{background:#1e3a5f;color:#fff}
-  thead th{padding:5px 8px;text-align:left;font-size:10px;text-transform:uppercase}
-  tbody tr:nth-child(even){background:#f4f6fb}
-  tbody td{padding:4px 8px;border-bottom:1px solid #e2e6ee}
-  .total-row{background:#1e3a5f!important;color:#fff;font-weight:bold}
-  .total-row td{padding:6px 8px}
-  .firmas{margin-top:40px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px}
-  .firma-box{border-top:1px solid #1e3a5f;padding-top:6px;text-align:center}
-  .firma-box .lbl{font-size:9px;text-transform:uppercase;color:#888;letter-spacing:.5px}
-  .nota{margin-top:16px;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:6px;text-align:center}
-  @media print{body{padding:10mm}@page{margin:12mm;size:A4 portrait}}
-</style></head><body>
-<div class="hdr">
-  <div><div class="emp">${empresa?.nombre ?? ''}</div><div class="ruc">RUC: ${empresa?.ruc ?? ''}</div></div>
-  <div class="doc-title"><h1>Comprobante de Egreso</h1><div class="num">${eg.numero}</div></div>
-</div>
-<div class="grid2">
-  <div>
-    <div class="campo"><div class="lbl">Proveedor</div><div class="val">${proveedor?.nombre_empresa ?? '—'}</div></div>
-    <div class="campo"><div class="lbl">RUC / Cédula</div><div class="val">${proveedor?.ruc ?? '—'}</div></div>
-    <div class="campo"><div class="lbl">Concepto</div><div class="val">${eg.concepto ?? 'Pago a proveedor'}</div></div>
-  </div>
-  <div>
-    <div class="campo"><div class="lbl">Fecha</div><div class="val">${new Date(eg.fecha + 'T12:00:00').toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'})}</div></div>
-    <div class="campo"><div class="lbl">Forma de pago</div><div class="val">${FORMA_PAGO_LABELS[eg.forma_pago]}</div></div>
-    <div class="campo"><div class="lbl">Cuenta bancaria</div><div class="val">${eg.cuenta_bancaria?.banco?.nombre ? eg.cuenta_bancaria.banco.nombre + ' — ' + eg.cuenta_bancaria.numero_cuenta : '—'}</div></div>
-    ${eg.referencia ? `<div class="campo"><div class="lbl">N° Referencia / Cheque</div><div class="val">${eg.referencia}</div></div>` : ''}
-  </div>
-</div>
-${facturas.length ? `
-<table>
-  <thead><tr><th>Factura aplicada</th><th style="text-align:right">Monto aplicado</th></tr></thead>
-  <tbody>${filas}</tbody>
-  <tfoot><tr class="total-row"><td>TOTAL PAGADO</td><td style="text-align:right">$${eg.monto_total.toFixed(2)}</td></tr></tfoot>
-</table>` : `<p style="margin:10px 0;color:#888;font-size:10px">Sin facturas registradas.</p>`}
-<div class="firmas">
-  <div class="firma-box"><div class="lbl">Elaborado por</div></div>
-  <div class="firma-box"><div class="lbl">Revisado por</div></div>
-  <div class="firma-box"><div class="lbl">Autorizado por</div></div>
-</div>
-<div class="nota">Finance Suite — Billennium System — ${fecha}</div>
-</body></html>`
-
-            const w = window.open('', '_blank', 'width=800,height=700')
-            if (!w) { alert('Activa las ventanas emergentes para imprimir'); return }
-            w.document.write(html)
-            w.document.close()
-            w.focus()
-            setTimeout(() => w.print(), 600)
+            const html = htmlComprobanteEgreso({ empresa, eg, proveedor, facturas })
+            abrirVentanaImpresion(html)
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : JSON.stringify(e)
             setError('Error al cargar comprobante: ' + msg)

@@ -8,6 +8,7 @@ import { contableConfigService, type CuentaLP } from '../../../services/contable
 import { cn, formatMoneda, formatFecha } from '../../../lib/utils'
 import { TIPO_MOVIMIENTO_LABELS } from '../../../types/finance'
 import type { MovimientoBancario, CuentaBancaria, TipoMovimiento, SentidoMovimiento, LineaDistribucionContable } from '../../../types/finance'
+import { htmlComprobanteIngreso, abrirVentanaImpresion } from '../../../lib/comprobantesPrint'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -145,6 +146,17 @@ export function MovimientosPage() {
             }, lineasValidas)
             setModal(false)
             if (mov.avisoContable) setAvisoContable(mov.avisoContable)
+
+            // Imprimir comprobante de ingreso automáticamente
+            const cuentaBancaria = cuentas.find(c => c.id === form.cuenta_bancaria_id)
+            const movConCuenta: MovimientoBancario = {
+                ...mov,
+                cuenta_bancaria: cuentaBancaria
+                    ? { numero_cuenta: cuentaBancaria.numero_cuenta, tipo: cuentaBancaria.tipo, banco: cuentaBancaria.banco }
+                    : undefined,
+            }
+            abrirVentanaImpresion(htmlComprobanteIngreso({ empresa, mov: movConCuenta, lineas: lineasValidas }))
+
             await cargar()
         } catch (e: unknown) { setError(String(e)) }
         finally { setSaving(false) }
