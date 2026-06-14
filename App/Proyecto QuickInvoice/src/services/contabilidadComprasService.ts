@@ -20,6 +20,8 @@ export interface AsientoCompraInput {
     retenciones:     RetLineContable[]   // líneas individuales con código SRI
     tipoCompra:      'INVENTARIO' | 'SERVICIO'
     compraId?:       string
+    /** Para SERVICIO: una línea de gasto por cada cuenta contable seleccionada (detalle_servicios.cuenta_contable_id) */
+    detallesServicio?: { descripcion?: string; subtotal: number; cuentaContableId?: string | null }[]
 }
 
 export interface AsientoPagoProveedorInput {
@@ -40,7 +42,7 @@ export const contabilidadComprasService = {
     async crearAsientoCompra(input: AsientoCompraInput): Promise<void> {
         const db = supabaseContabilidad as any
         const { empresaId, portalRuc, fecha, numeroFactura, proveedorNombre,
-                subtotal, valorIva, retenciones, tipoCompra, compraId } = input
+                subtotal, valorIva, retenciones, tipoCompra, compraId, detallesServicio } = input
 
         const r2 = (n: number) => Math.round(n * 100) / 100
 
@@ -142,12 +144,33 @@ export const contabilidadComprasService = {
         const debe:  Linea[] = []
         const haber: Linea[] = []
 
-        // DEBE: inventario o gasto
-        const ctaActivoClave = tipoCompra === 'INVENTARIO' ? 'INVENTARIO' : 'GASTO_SERVICIO'
-        const ctaActivo = cuentaMapeo('COMPRAS', ctaActivoClave)
-        if (!ctaActivo) throw new Error(`Cuenta COMPRAS:${ctaActivoClave} no mapeada. Ve a Ajustes → Contabilidad → sección Compras.`)
-        if (subtotal > 0.001)
-            debe.push({ cuenta_id: ctaActivo, monto: r2(subtotal), desc: tipoCompra === 'INVENTARIO' ? 'Inventario comprado' : 'Gasto/servicio' })
+        // DEBE: inventario o gasto(s)
+        if (tipoCompra === 'INVENTARIO') {
+            const ctaInventario = cuentaMapeo('COMPRAS', 'INVENTARIO')
+            if (!ctaInventario) throw new Error('Cuenta COMPRAS:INVENTARIO no mapeada. Ve a Ajustes → Contabilidad → sección Compras.')
+            if (subtotal > 0.001)
+                debe.push({ cuenta_id: ctaInventario, monto: r2(subtotal), desc: 'Inventario comprado' })
+        } else {
+            // SERVICIO: una línea de gasto por cada cuenta contable distinta seleccionada
+            // (detalle_servicios.cuenta_contable_id). Sin cuenta propia, usa el mapeo
+            // general COMPRAS:GASTO_SERVICIO.
+            const ctaGastoMapeo = cuentaMapeo('COMPRAS', 'GASTO_SERVICIO')
+            const items = detallesServicio?.length
+                ? detallesServicio
+                : [{ subtotal, cuentaContableId: null as string | null, descripcion: undefined as string | undefined }]
+
+            const porCuenta = new Map<string, { monto: number; desc: string }>()
+            for (const item of items) {
+                if (item.subtotal <= 0.001) continue
+                const ctaId = item.cuentaContableId || ctaGastoMapeo
+                if (!ctaId) throw new Error('Cuenta COMPRAS:GASTO_SERVICIO no mapeada. Ve a Ajustes → Contabilidad → sección Compras.')
+                const acc = porCuenta.get(ctaId)
+                if (acc) acc.monto = r2(acc.monto + item.subtotal)
+                else porCuenta.set(ctaId, { monto: r2(item.subtotal), desc: item.descripcion || 'Gasto/servicio' })
+            }
+            for (const [ctaId, { monto, desc }] of porCuenta)
+                debe.push({ cuenta_id: ctaId, monto, desc })
+        }
 
         // DEBE: IVA crédito fiscal
         if (valorIva > 0.001) {

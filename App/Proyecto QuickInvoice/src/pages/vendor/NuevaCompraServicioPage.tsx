@@ -243,6 +243,11 @@ export function NuevaCompraServicioPage() {
                         retenciones:     retsParaGuardar.map(r => ({ tipo: r.tipo, codigo: r.codigo_retencion, valor: r.valor })),
                         tipoCompra:      'SERVICIO',
                         compraId:        compraGuardada?.id,
+                        detallesServicio: validas.map(d => ({
+                            descripcion:      d.descripcion,
+                            subtotal:         d.subtotal,
+                            cuentaContableId: d.cuenta_contable_id ?? null,
+                        })),
                     })
                 }
             } catch (contabErr: any) {
