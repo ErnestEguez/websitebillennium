@@ -3,6 +3,7 @@ import { sriService } from './sriService'
 import { kardexService } from './kardexService'
 import { contableConfigService } from './contableConfigService'
 import { contabilidadVentasService } from './contabilidadVentasService'
+import { puntoEmisionService } from './puntoEmisionService'
 
 export interface DetalleFacturaDirecta {
     producto_id: string | null
@@ -85,26 +86,36 @@ export const facturaDirectaService = {
         const est = config.establecimiento || '001'
         const pto = config.punto_emision || '001'
 
-        // ✅ Secuencial: leer el MAX desde comprobantes para esta empresa+serie
-        // Esto garantiza que el número NUNCA retrocede aunque el config se haya perdido
-        const seriePrefix = `${est.padStart(3, '0')}-${pto.padStart(3, '0')}-`
-        const { data: lastComprobante } = await supabase
-            .from('comprobantes')
-            .select('secuencial')
-            .eq('empresa_id', empresa_id)
-            .like('secuencial', `${seriePrefix}%`)
-            .order('secuencial', { ascending: false })
-            .limit(1)
-            .maybeSingle()
+        // ✅ Secuencial: incremento atómico (FOR UPDATE) vía el punto de emisión principal,
+        // evita que dos cajas que facturan al mismo tiempo obtengan el mismo número.
+        const puntoEmisionPrincipal = await puntoEmisionService.getPrincipal(empresa_id)
 
         let nextSec: number
-        if (lastComprobante?.secuencial) {
-            // Extraer el número del último secuencial: "001-001-000001500" -> 1500
-            const lastNum = parseInt(lastComprobante.secuencial.split('-').pop() || '0', 10)
-            nextSec = lastNum + 1
+        let actualizarSecuencialInicio = false
+        if (puntoEmisionPrincipal) {
+            const { data: nextSecData, error: errorSec } = await supabase
+                .rpc('qi_next_secuencial_punto', { p_punto_emision_id: puntoEmisionPrincipal.id, p_tipo_comprobante: 'FACTURA' })
+            if (errorSec) throw errorSec
+            nextSec = nextSecData as number
         } else {
-            // Primera factura de esta serie
-            nextSec = config.secuencial_inicio || 1
+            // Fallback: empresa todavía sin punto de emisión migrado, usar MAX(secuencial)+1
+            const seriePrefix = `${est.padStart(3, '0')}-${pto.padStart(3, '0')}-`
+            const { data: lastComprobante } = await supabase
+                .from('comprobantes')
+                .select('secuencial')
+                .eq('empresa_id', empresa_id)
+                .like('secuencial', `${seriePrefix}%`)
+                .order('secuencial', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+
+            if (lastComprobante?.secuencial) {
+                const lastNum = parseInt(lastComprobante.secuencial.split('-').pop() || '0', 10)
+                nextSec = lastNum + 1
+            } else {
+                nextSec = config.secuencial_inicio || 1
+            }
+            actualizarSecuencialInicio = true
         }
 
         const secuencialFormateado = `${est.padStart(3, '0')}-${pto.padStart(3, '0')}-${nextSec.toString().padStart(9, '0')}`
@@ -217,16 +228,19 @@ export const facturaDirectaService = {
             }
         }
 
-        // 7. Actualizar secuencial en config_sri
-        await supabase
-            .from('empresas')
-            .update({
-                config_sri: {
-                    ...config,
-                    secuencial_inicio: nextSec + 1
-                }
-            })
-            .eq('id', empresa_id)
+        // 7. Actualizar secuencial en config_sri — solo en el fallback sin punto de emisión,
+        //    ya que con el punto de emisión el contador atómico vive en puntos_emision.secuenciales
+        if (actualizarSecuencialInicio) {
+            await supabase
+                .from('empresas')
+                .update({
+                    config_sri: {
+                        ...config,
+                        secuencial_inicio: nextSec + 1
+                    }
+                })
+                .eq('id', empresa_id)
+        }
 
         // 8. Salida de Kardex para productos con inventario
         // Si el detalle tiene factor_conversion (subproducto), la cantidad en Kardex

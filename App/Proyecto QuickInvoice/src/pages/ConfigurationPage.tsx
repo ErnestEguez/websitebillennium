@@ -25,16 +25,19 @@ import {
     Warehouse,
     Star,
     PowerOff,
+    Printer,
 } from 'lucide-react'
 import { ContabilidadConfigTab } from '../components/ContabilidadConfigTab'
 import { categoriaService, type Categoria } from '../services/categoriaService'
 import { bodegaService } from '../services/bodegaService'
+import { puntoEmisionService } from '../services/puntoEmisionService'
 import type { Bodega } from '../types/vendors'
+import type { PuntoEmision } from '../types/puntosEmision'
 import { cn } from '../lib/utils'
 
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
-    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'bodegas' | 'plataforma' | 'contabilidad'>('empresa')
+    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'bodegas' | 'puntos_emision' | 'plataforma' | 'contabilidad'>('empresa')
     const [platformSubTab, setPlatformSubTab] = useState<'empresas' | 'personal'>('empresas')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -68,6 +71,11 @@ export function ConfigurationPage() {
     const [bodegas, setBodegas] = useState<Bodega[]>([])
     const [isBodegaModalOpen, setIsBodegaModalOpen] = useState(false)
     const [editingBodega, setEditingBodega] = useState<Partial<Bodega> | null>(null)
+
+    // Puntos de Emisión State
+    const [puntosEmision, setPuntosEmision] = useState<PuntoEmision[]>([])
+    const [isPuntoEmisionModalOpen, setIsPuntoEmisionModalOpen] = useState(false)
+    const [editingPuntoEmision, setEditingPuntoEmision] = useState<Partial<PuntoEmision> | null>(null)
 
     // Plataforma State (Admin)
     const [allEmpresas, setAllEmpresas] = useState<any[]>([])
@@ -217,6 +225,15 @@ export function ConfigurationPage() {
                 } catch (e) {
                     console.error('Error cargando bodegas:', e)
                     setBodegas([])
+                }
+
+                // ── Cargar puntos de emisión ──
+                try {
+                    const puntosData = await puntoEmisionService.listarTodas(empresa!.id)
+                    setPuntosEmision(puntosData)
+                } catch (e) {
+                    console.error('Error cargando puntos de emisión:', e)
+                    setPuntosEmision([])
                 }
             }
         } catch (error) {
@@ -529,6 +546,76 @@ export function ConfigurationPage() {
         }
     }
 
+    async function handleSavePuntoEmision() {
+        try {
+            setSaving(true)
+            if (!editingPuntoEmision?.nombre?.trim()) {
+                alert('El nombre del punto de emisión es obligatorio')
+                return
+            }
+            const est = (editingPuntoEmision?.establecimiento || '').trim()
+            const pto = (editingPuntoEmision?.punto_emision || '').trim()
+            if (!/^\d{3}$/.test(est) || !/^\d{3}$/.test(pto)) {
+                alert('Establecimiento y Punto de Emisión deben ser códigos de 3 dígitos (ej: 001)')
+                return
+            }
+
+            if (editingPuntoEmision.id) {
+                // Si se marca como principal, desmarcar el anterior
+                if (editingPuntoEmision.es_principal) {
+                    await supabase
+                        .from('puntos_emision')
+                        .update({ es_principal: false })
+                        .eq('empresa_id', empresa!.id)
+                        .neq('id', editingPuntoEmision.id)
+                }
+                const { id, empresa_id, created_at, updated_at, secuenciales, ...updates } = editingPuntoEmision as any
+                await puntoEmisionService.actualizar(editingPuntoEmision.id, { ...updates, establecimiento: est, punto_emision: pto })
+            } else {
+                // Si el nuevo es principal, desmarcar el anterior
+                if (editingPuntoEmision.es_principal) {
+                    await supabase
+                        .from('puntos_emision')
+                        .update({ es_principal: false })
+                        .eq('empresa_id', empresa!.id)
+                }
+                await puntoEmisionService.crear({
+                    empresa_id: empresa!.id,
+                    establecimiento: est,
+                    punto_emision: pto,
+                    nombre: editingPuntoEmision.nombre!,
+                    direccion: editingPuntoEmision.direccion || undefined,
+                    descripcion: editingPuntoEmision.descripcion || undefined,
+                    bodega_id: editingPuntoEmision.bodega_id || undefined,
+                    es_principal: editingPuntoEmision.es_principal ?? false,
+                    activo: true,
+                })
+            }
+
+            setIsPuntoEmisionModalOpen(false)
+            setEditingPuntoEmision(null)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al guardar punto de emisión: ${error.message}`)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    async function handleBajaPuntoEmision(id: string, nombre: string, esPrincipal: boolean) {
+        if (esPrincipal) {
+            alert('No se puede dar de baja el punto de emisión principal. Primero asigna otro como principal.')
+            return
+        }
+        if (!confirm(`¿Está seguro de dar de baja el punto de emisión "${nombre}"? No se eliminará, quedará inactivo.`)) return
+        try {
+            await puntoEmisionService.desactivar(id)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al dar de baja: ${error.message}`)
+        }
+    }
+
     async function handleBajaCategoria(id: string, nombre: string) {
         if (!confirm(`¿Está seguro de dar de baja la categoría "${nombre}"? No se eliminará, quedará inactiva.`)) return
         try {
@@ -643,6 +730,16 @@ export function ConfigurationPage() {
                     >
                         <Warehouse className="w-4 h-4" />
                         Bodegas
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('puntos_emision')}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
+                            activeTab === 'puntos_emision' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                    >
+                        <Printer className="w-4 h-4" />
+                        Puntos de Emisión
                     </button>
                     <button
                         onClick={() => setActiveTab('contabilidad')}
@@ -1150,6 +1247,126 @@ export function ConfigurationPage() {
                     </div>
                     <p className="text-xs text-slate-400">
                         Las bodegas dadas de baja no aparecen en los formularios de compras y ventas, pero se conservan en el historial de movimientos.
+                    </p>
+                </div>
+            ) : activeTab === 'puntos_emision' ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900">Puntos de Emisión SRI</h2>
+                            <p className="text-sm text-slate-500">Establecimientos y puntos de emisión para la facturación electrónica</p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                setEditingPuntoEmision({ establecimiento: '001', punto_emision: '001', nombre: '', direccion: '', descripcion: '', bodega_id: null, es_principal: puntosEmision.length === 0, activo: true })
+                                setIsPuntoEmisionModalOpen(true)
+                            }}
+                            className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" /> Nuevo Punto de Emisión
+                        </button>
+                    </div>
+
+                    <div className="card overflow-hidden">
+                        {puntosEmision.length === 0 ? (
+                            <div className="py-16 text-center">
+                                <Printer className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                                <p className="text-slate-400 font-medium">No hay puntos de emisión registrados.</p>
+                                <p className="text-slate-300 text-sm mt-1">Crea el primero con el botón de arriba.</p>
+                            </div>
+                        ) : (
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-700 text-white">
+                                    <tr>
+                                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Serie</th>
+                                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Nombre</th>
+                                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Dirección</th>
+                                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Bodega</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Secuencial Factura</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Principal</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Estado</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {puntosEmision.map((pe, idx) => (
+                                        <tr key={pe.id} className={cn(
+                                            'hover:bg-slate-50 transition-colors',
+                                            !pe.activo && 'opacity-50',
+                                            idx % 2 === 0 ? '' : 'bg-slate-50/40',
+                                        )}>
+                                            <td className="py-3 px-4 font-mono font-semibold text-slate-900">
+                                                {pe.establecimiento}-{pe.punto_emision}
+                                            </td>
+                                            <td className="py-3 px-4 font-semibold text-slate-900">
+                                                {pe.nombre}
+                                                {pe.descripcion && (
+                                                    <p className="text-xs text-slate-400 font-normal mt-0.5">{pe.descripcion}</p>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-4 text-slate-500 text-xs">
+                                                {pe.direccion || <span className="text-slate-300">—</span>}
+                                            </td>
+                                            <td className="py-3 px-4 text-slate-500 text-xs">
+                                                {bodegas.find(b => b.id === pe.bodega_id)?.nombre || <span className="text-slate-300">—</span>}
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-mono text-slate-600">
+                                                {pe.secuenciales?.FACTURA ?? 0}
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                {pe.es_principal ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                                                        <Star className="w-3 h-3" /> Principal
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-300 text-xs">—</span>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                {pe.activo ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                                                        Activo
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-bold">
+                                                        Inactivo
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-4 text-center">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button
+                                                        title="Editar"
+                                                        onClick={() => { setEditingPuntoEmision({ ...pe }); setIsPuntoEmisionModalOpen(true) }}
+                                                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" />
+                                                    </button>
+                                                    {pe.activo && !pe.es_principal && (
+                                                        <button
+                                                            title="Dar de baja"
+                                                            onClick={() => handleBajaPuntoEmision(pe.id, pe.nombre, pe.es_principal)}
+                                                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <PowerOff className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {pe.es_principal && (
+                                                        <span title="El punto de emisión principal no puede darse de baja" className="p-1.5 text-slate-200 cursor-not-allowed">
+                                                            <PowerOff className="w-4 h-4" />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                    <p className="text-xs text-slate-400">
+                        El punto de emisión "Principal" es el que usa hoy la facturación. Vincular un punto de emisión a una bodega permite
+                        que, en el futuro, cada local físico facture con su propia serie SRI.
                     </p>
                 </div>
             ) : activeTab === 'contabilidad' ? (
@@ -1998,6 +2215,182 @@ export function ConfigurationPage() {
                     </div>
                 </div>
             )}
+
+            {/* ── Modal Punto de Emisión ───────────────────────────── */}
+            {isPuntoEmisionModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 space-y-5 animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                                    <Printer className="w-5 h-5" />
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-900">
+                                    {editingPuntoEmision?.id ? 'Editar Punto de Emisión' : 'Nuevo Punto de Emisión'}
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => { setIsPuntoEmisionModalOpen(false); setEditingPuntoEmision(null) }}
+                                className="p-2 hover:bg-slate-100 rounded-full text-slate-400"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Campos */}
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Establecimiento *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="001"
+                                        maxLength={3}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-400 font-mono font-bold text-slate-900"
+                                        value={editingPuntoEmision?.establecimiento || ''}
+                                        onChange={e => setEditingPuntoEmision({ ...editingPuntoEmision, establecimiento: e.target.value.replace(/\D/g, '') })}
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Punto de Emisión *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="001"
+                                        maxLength={3}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-400 font-mono font-bold text-slate-900"
+                                        value={editingPuntoEmision?.punto_emision || ''}
+                                        onChange={e => setEditingPuntoEmision({ ...editingPuntoEmision, punto_emision: e.target.value.replace(/\D/g, '') })}
+                                    />
+                                </div>
+                                <div className="col-span-2 space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Nombre *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Principal, Sucursal Norte..."
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-slate-900"
+                                        value={editingPuntoEmision?.nombre || ''}
+                                        onChange={e => setEditingPuntoEmision({ ...editingPuntoEmision, nombre: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-span-2 space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Dirección <span className="normal-case font-normal text-slate-300">(opcional)</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Dirección física del punto de emisión..."
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-400 text-slate-900"
+                                        value={editingPuntoEmision?.direccion || ''}
+                                        onChange={e => setEditingPuntoEmision({ ...editingPuntoEmision, direccion: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-span-2 space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Descripción <span className="normal-case font-normal text-slate-300">(opcional)</span>
+                                    </label>
+                                    <textarea
+                                        rows={2}
+                                        placeholder="Notas sobre este punto de emisión..."
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-400 text-sm resize-none"
+                                        value={editingPuntoEmision?.descripcion || ''}
+                                        onChange={e => setEditingPuntoEmision({ ...editingPuntoEmision, descripcion: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-span-2 space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Bodega vinculada <span className="normal-case font-normal text-slate-300">(opcional)</span>
+                                    </label>
+                                    <select
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-400 text-slate-900"
+                                        value={editingPuntoEmision?.bodega_id || ''}
+                                        onChange={e => setEditingPuntoEmision({ ...editingPuntoEmision, bodega_id: e.target.value || null })}
+                                    >
+                                        <option value="">Ninguna</option>
+                                        {bodegas.map(b => (
+                                            <option key={b.id} value={b.id}>{b.nombre}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Punto de emisión principal */}
+                            <div className={cn(
+                                'flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors',
+                                editingPuntoEmision?.es_principal
+                                    ? 'bg-amber-50 border-amber-200'
+                                    : 'bg-slate-50 border-slate-200 hover:border-amber-200'
+                            )}
+                                onClick={() => setEditingPuntoEmision({ ...editingPuntoEmision, es_principal: !editingPuntoEmision?.es_principal })}
+                            >
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        'relative inline-flex h-6 w-10 items-center rounded-full transition-colors shrink-0',
+                                        editingPuntoEmision?.es_principal ? 'bg-amber-500' : 'bg-slate-300'
+                                    )}
+                                >
+                                    <span className={cn(
+                                        'inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform',
+                                        editingPuntoEmision?.es_principal ? 'translate-x-5' : 'translate-x-1'
+                                    )} />
+                                </button>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                                        <Star className="w-3.5 h-3.5 text-amber-500" />
+                                        Punto de emisión principal
+                                    </p>
+                                    <p className="text-xs text-slate-400">Es el que usa hoy la facturación electrónica de esta empresa</p>
+                                </div>
+                            </div>
+
+                            {/* Info de solo lectura — solo al editar */}
+                            {editingPuntoEmision?.id && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border bg-slate-50 text-slate-600 border-slate-200">
+                                        Secuencial actual (Factura): {editingPuntoEmision.secuenciales?.FACTURA ?? 0}
+                                    </div>
+                                    <div className={cn(
+                                        'flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border',
+                                        editingPuntoEmision.activo === false
+                                            ? 'bg-red-50 text-red-600 border-red-100'
+                                            : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                    )}>
+                                        <span className={cn('w-2 h-2 rounded-full', editingPuntoEmision.activo === false ? 'bg-red-400' : 'bg-emerald-400')} />
+                                        Estado: {editingPuntoEmision.activo === false ? 'Inactivo (dado de baja)' : 'Activo'}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Botones */}
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => { setIsPuntoEmisionModalOpen(false); setEditingPuntoEmision(null) }}
+                                className="flex-1 py-3 font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSavePuntoEmision}
+                                disabled={saving || !editingPuntoEmision?.nombre?.trim()}
+                                className="flex-1 py-3 font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── Modal Categoría ──────────────────────────────────── */}
             {
                 isCategoriaModalOpen && (
