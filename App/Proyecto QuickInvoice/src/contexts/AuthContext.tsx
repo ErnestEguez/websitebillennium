@@ -58,6 +58,7 @@ export interface Permisos {
     perm_reportes_cont:      boolean
     perm_tributario:         boolean
     perm_th_estructura:        boolean
+    perm_th_empleados:         boolean
     perm_th_nomina_parametros: boolean
 }
 
@@ -118,6 +119,7 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_reportes_cont:      true,
     perm_tributario:         true,
     perm_th_estructura:        true,
+    perm_th_empleados:         true,
     perm_th_nomina_parametros: true,
 }
 
@@ -258,6 +260,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_reportes_cont:      permData.perm_reportes_cont      ?? true,
                     perm_tributario:         permData.perm_tributario         ?? true,
                     perm_th_estructura:        permData.perm_th_estructura        ?? true,
+                    perm_th_empleados:         permData.perm_th_empleados         ?? true,
                     perm_th_nomina_parametros: permData.perm_th_nomina_parametros ?? true,
                 } : DEFAULT_PERMISOS)
             }

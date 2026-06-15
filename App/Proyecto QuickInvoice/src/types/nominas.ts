@@ -30,3 +30,53 @@ export interface ParametrosNomina {
     fondo_reserva_pct: number
     updated_at?: string
 }
+
+export type TipoJornada = 'completa' | 'parcial'
+export type TipoNomina = 'quincenal' | 'mensual' | 'quincenal_y_mensual' | 'por_hora' | 'destajo'
+export type ModoDecimo = 'mensualizado' | 'acumulado'
+export type ModoFondoReserva = 'mensual' | 'acumulado_iess' | 'no_aplica'
+
+export interface Empleado {
+    id: string
+    empresa_id: string
+
+    // Datos personales
+    nombres: string
+    apellidos: string
+    cedula: string
+    fecha_nacimiento?: string | null
+    telefono?: string | null
+    email?: string | null
+    direccion?: string | null
+
+    // Datos laborales
+    seccion_id?: string | null
+    cargo_id?: string | null
+    jefe_inmediato_id?: string | null
+    fecha_ingreso: string
+    fecha_salida?: string | null
+    tipo_jornada: TipoJornada
+    tipo_nomina: TipoNomina
+    sueldo_base: number
+    afiliado_iess: boolean
+
+    // Parámetros de nómina por empleado
+    decimo_tercero_modo: ModoDecimo
+    decimo_cuarto_modo: ModoDecimo
+    fondo_reserva_modo: ModoFondoReserva
+    cargas_familiares: number
+
+    // Datos bancarios
+    banco?: string | null
+    tipo_cuenta?: string | null
+    numero_cuenta?: string | null
+
+    activo: boolean
+    created_at?: string
+    updated_at?: string
+
+    // Joins opcionales
+    seccion?: { nombre: string } | null
+    cargo?: { nombre: string } | null
+    jefe?: { nombres: string; apellidos: string } | null
+}

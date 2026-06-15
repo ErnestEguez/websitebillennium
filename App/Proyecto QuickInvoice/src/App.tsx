@@ -77,6 +77,7 @@ import { Formulario104Page }                      from './pages/contabilidad/tri
 import { ConfiguracionPage as ContaConfig }       from './pages/contabilidad/ConfiguracionPage'
 import { Formulario104DetallePage }               from './pages/contabilidad/tributario/Formulario104DetallePage'
 // ── Módulo Talento Humano y Nóminas ──────────────────────────
+import { EmpleadosPage }                          from './pages/talento/EmpleadosPage'
 import { EstructuraOrganizativaPage }             from './pages/talento/EstructuraOrganizativaPage'
 import { ParametrosNominaPage }                   from './pages/nominas/ParametrosNominaPage'
 // ── Módulo Tesorería (Finance Suite) ─────────────────────────
@@ -532,8 +533,9 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <Routes>
+                      <Route path="empleados"  element={<EmpleadosPage />} />
                       <Route path="estructura" element={<EstructuraOrganizativaPage />} />
-                      <Route path="*"          element={<Navigate to="/talento/estructura" replace />} />
+                      <Route path="*"          element={<Navigate to="/talento/empleados" replace />} />
                     </Routes>
                   </Layout>
                 </RoleProtectedRoute>

@@ -136,6 +136,7 @@ const PERM_RUTAS: [string, string][] = [
     ['/conta/cierre',                  'perm_asientos'],
     ['/conta/integracion',             'perm_asientos'],
     ['/conta/tributario',              'perm_tributario'],
+    ['/talento/empleados',             'perm_th_empleados'],
     ['/talento/',                      'perm_th_estructura'],
     ['/nominas/',                      'perm_th_nomina_parametros'],
 ]
@@ -475,6 +476,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={location.pathname.startsWith('/talento/')}
                         >
+                            <SidebarItem to="/talento/empleados" icon={Users} label="Empleados" active={location.pathname === '/talento/empleados'} sub disabled={!p.perm_th_empleados} />
                             <SidebarItem to="/talento/estructura" icon={Users} label="Estructura Organizativa" active={location.pathname === '/talento/estructura'} sub disabled={!p.perm_th_estructura} />
                         </ModuleSection>}
 
