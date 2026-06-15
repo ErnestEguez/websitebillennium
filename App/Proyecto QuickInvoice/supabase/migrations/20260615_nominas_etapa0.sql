@@ -73,3 +73,13 @@ CREATE POLICY "nominas_parametros_empresa" ON nominas.parametros
         UNION
         SELECT empresa_id FROM facturacion.usuario_empresas WHERE user_id = auth.uid() AND activo = true
     ));
+
+-- 6. Permisos de esquema — mismo patrón que crear_schema_facturacion.sql.
+--    Un esquema nuevo no es accesible por PostgREST hasta otorgar estos GRANT,
+--    sin importar que tenga RLS (que sigue aplicando sobre estos permisos).
+GRANT USAGE ON SCHEMA nominas TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES    IN SCHEMA nominas TO authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA nominas TO authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA nominas TO authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA nominas GRANT ALL ON TABLES    TO authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA nominas GRANT ALL ON SEQUENCES TO authenticated, service_role;
