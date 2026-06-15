@@ -31,6 +31,27 @@ export interface ParametrosNomina {
     updated_at?: string
 }
 
+export type TipoConcepto = 'ingreso' | 'descuento'
+export type FormulaConcepto = 'calculado' | 'fijo' | 'porcentaje_sueldo' | 'porcentaje_sbu'
+
+export interface ConceptoNomina {
+    id: string
+    empresa_id: string
+    codigo: string
+    nombre: string
+    tipo: TipoConcepto
+    formula: FormulaConcepto
+    valor_predeterminado?: number | null
+    afecta_iess: boolean
+    afecta_renta: boolean
+    es_legal: boolean
+    aplica_siempre: boolean
+    orden: number
+    activo: boolean
+    created_at?: string
+    updated_at?: string
+}
+
 export type TipoJornada = 'completa' | 'parcial'
 export type TipoNomina = 'quincenal' | 'mensual' | 'quincenal_y_mensual' | 'por_hora' | 'destajo'
 export type ModoDecimo = 'mensualizado' | 'acumulado'
