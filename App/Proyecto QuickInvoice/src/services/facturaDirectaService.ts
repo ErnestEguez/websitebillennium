@@ -83,22 +83,27 @@ export const facturaDirectaService = {
         const config = empData.config_sri || {}
         const rucEmpresa = empData.ruc || '1790000000001'
 
-        const est = config.establecimiento || '001'
-        const pto = config.punto_emision || '001'
+        // ✅ Punto de emisión: el asignado a este dispositivo (Configuración → Puntos de
+        // Emisión), o el "Principal" de la empresa si el dispositivo no tiene asignación.
+        // El secuencial se incrementa de forma atómica (FOR UPDATE) en ese punto de emisión,
+        // evitando que dos cajas que facturan al mismo tiempo obtengan el mismo número.
+        const puntoEmision = await puntoEmisionService.resolverParaDispositivo(empresa_id)
 
-        // ✅ Secuencial: incremento atómico (FOR UPDATE) vía el punto de emisión principal,
-        // evita que dos cajas que facturan al mismo tiempo obtengan el mismo número.
-        const puntoEmisionPrincipal = await puntoEmisionService.getPrincipal(empresa_id)
-
+        let est: string
+        let pto: string
         let nextSec: number
         let actualizarSecuencialInicio = false
-        if (puntoEmisionPrincipal) {
+        if (puntoEmision) {
+            est = puntoEmision.establecimiento
+            pto = puntoEmision.punto_emision
             const { data: nextSecData, error: errorSec } = await supabase
-                .rpc('qi_next_secuencial_punto', { p_punto_emision_id: puntoEmisionPrincipal.id, p_tipo_comprobante: 'FACTURA' })
+                .rpc('qi_next_secuencial_punto', { p_punto_emision_id: puntoEmision.id, p_tipo_comprobante: 'FACTURA' })
             if (errorSec) throw errorSec
             nextSec = nextSecData as number
         } else {
             // Fallback: empresa todavía sin punto de emisión migrado, usar MAX(secuencial)+1
+            est = config.establecimiento || '001'
+            pto = config.punto_emision || '001'
             const seriePrefix = `${est.padStart(3, '0')}-${pto.padStart(3, '0')}-`
             const { data: lastComprobante } = await supabase
                 .from('comprobantes')

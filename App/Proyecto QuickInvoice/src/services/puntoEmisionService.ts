@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import type { PuntoEmision } from '../types/puntosEmision'
+import { getPuntoEmisionDispositivo } from '../lib/dispositivoPuntoEmision'
 
 export const puntoEmisionService = {
 
@@ -47,6 +48,24 @@ export const puntoEmisionService = {
             .eq('activo', true)
             .maybeSingle()
         return (data as PuntoEmision) ?? null
+    },
+
+    // Punto de emisión con el que factura ESTE dispositivo (asignación guardada
+    // en localStorage desde Configuración). Si no hay asignación, o el punto
+    // guardado ya no es válido/activo, usa el "Principal" de la empresa.
+    async resolverParaDispositivo(empresaId: string): Promise<PuntoEmision | null> {
+        const idDispositivo = getPuntoEmisionDispositivo(empresaId)
+        if (idDispositivo) {
+            const { data } = await supabase
+                .from('puntos_emision')
+                .select('*')
+                .eq('id', idDispositivo)
+                .eq('empresa_id', empresaId)
+                .eq('activo', true)
+                .maybeSingle()
+            if (data) return data as PuntoEmision
+        }
+        return this.getPrincipal(empresaId)
     },
 
     async crear(puntoEmision: Omit<PuntoEmision, 'id' | 'created_at' | 'updated_at' | 'secuenciales'>): Promise<PuntoEmision> {

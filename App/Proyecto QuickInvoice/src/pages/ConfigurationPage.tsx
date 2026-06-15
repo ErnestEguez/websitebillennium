@@ -34,6 +34,7 @@ import { puntoEmisionService } from '../services/puntoEmisionService'
 import type { Bodega } from '../types/vendors'
 import type { PuntoEmision } from '../types/puntosEmision'
 import { cn } from '../lib/utils'
+import { getPuntoEmisionDispositivo, setPuntoEmisionDispositivo } from '../lib/dispositivoPuntoEmision'
 
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
@@ -76,6 +77,7 @@ export function ConfigurationPage() {
     const [puntosEmision, setPuntosEmision] = useState<PuntoEmision[]>([])
     const [isPuntoEmisionModalOpen, setIsPuntoEmisionModalOpen] = useState(false)
     const [editingPuntoEmision, setEditingPuntoEmision] = useState<Partial<PuntoEmision> | null>(null)
+    const [dispositivoPeId, setDispositivoPeId] = useState<string | null>(null)
 
     // Plataforma State (Admin)
     const [allEmpresas, setAllEmpresas] = useState<any[]>([])
@@ -97,6 +99,12 @@ export function ConfigurationPage() {
             loadData()
         }
     }, [profile?.id, empresa?.id])
+
+    useEffect(() => {
+        if (empresa?.id) {
+            setDispositivoPeId(getPuntoEmisionDispositivo(empresa.id))
+        }
+    }, [empresa?.id])
 
     async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0]
@@ -1265,6 +1273,38 @@ export function ConfigurationPage() {
                         >
                             <Plus className="w-4 h-4" /> Nuevo Punto de Emisión
                         </button>
+                    </div>
+
+                    <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-5 flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <p className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+                                <Printer className="w-4 h-4" /> Punto de emisión de este dispositivo
+                            </p>
+                            <p className="text-xs text-indigo-500 mt-0.5">
+                                Define con qué serie SRI factura ESTA máquina (Factura Directa y Notas de Crédito). Solo afecta a este navegador.
+                            </p>
+                        </div>
+                        <select
+                            className="px-4 py-2.5 rounded-xl border border-indigo-200 bg-white text-sm font-bold text-indigo-900 outline-none focus:ring-2 focus:ring-indigo-400"
+                            value={dispositivoPeId ?? ''}
+                            onChange={e => {
+                                const val = e.target.value || null
+                                setDispositivoPeId(val)
+                                setPuntoEmisionDispositivo(empresa!.id, val)
+                            }}
+                        >
+                            <option value="">
+                                Usar el Principal {(() => {
+                                    const principal = puntosEmision.find(p => p.es_principal)
+                                    return principal ? `(${principal.establecimiento}-${principal.punto_emision})` : ''
+                                })()}
+                            </option>
+                            {puntosEmision.filter(pe => pe.activo && !pe.es_principal).map(pe => (
+                                <option key={pe.id} value={pe.id}>
+                                    {pe.establecimiento}-{pe.punto_emision} · {pe.nombre}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="card overflow-hidden">

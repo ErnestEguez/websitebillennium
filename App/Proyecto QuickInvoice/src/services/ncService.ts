@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
+import { puntoEmisionService } from './puntoEmisionService'
 
 // ─── Interfaces ───────────────────────────────────────────
 
@@ -184,9 +185,31 @@ export const ncService = {
         if (eErr) throw eErr
 
         const configSri = empresa.config_sri || {}
-        const secActual = Number(configSri.secuencial_nc_actual || 0) + 1
-        const est = (params.establecimiento || '001').padStart(3, '0').slice(-3)
-        const pto = (params.puntoEmision || '001').padStart(3, '0').slice(-3)
+
+        // ✅ Punto de emisión: el asignado a este dispositivo (Configuración → Puntos de
+        // Emisión), o el "Principal" de la empresa si el dispositivo no tiene asignación.
+        // El secuencial de NOTA_CREDITO se incrementa de forma atómica (FOR UPDATE) en
+        // ese punto de emisión, independiente del de FACTURA.
+        const puntoEmision = await puntoEmisionService.resolverParaDispositivo(params.empresaId)
+
+        let est: string
+        let pto: string
+        let secActual: number
+        let actualizarSecuencialNc = false
+        if (puntoEmision) {
+            est = puntoEmision.establecimiento.padStart(3, '0').slice(-3)
+            pto = puntoEmision.punto_emision.padStart(3, '0').slice(-3)
+            const { data: nextSecData, error: errorSec } = await supabase
+                .rpc('qi_next_secuencial_punto', { p_punto_emision_id: puntoEmision.id, p_tipo_comprobante: 'NOTA_CREDITO' })
+            if (errorSec) throw errorSec
+            secActual = nextSecData as number
+        } else {
+            // Fallback: empresa todavía sin punto de emisión migrado, usar config_sri
+            est = (params.establecimiento || '001').padStart(3, '0').slice(-3)
+            pto = (params.puntoEmision || '001').padStart(3, '0').slice(-3)
+            secActual = Number(configSri.secuencial_nc_actual || 0) + 1
+            actualizarSecuencialNc = true
+        }
         const secStr = secActual.toString().padStart(9, '0')
         const secuencial = `${est}-${pto}-${secStr}`
 
@@ -200,8 +223,8 @@ export const ncService = {
             new Date(),
             params.empresaRuc,
             params.empresaAmbiente,
-            params.establecimiento,
-            params.puntoEmision,
+            est,
+            pto,
             secuencial
         )
 
@@ -245,11 +268,15 @@ export const ncService = {
         const { error: detErr } = await supabase.from('notas_credito_detalle').insert(detallesInsert)
         if (detErr) throw detErr
 
-        // 6. Actualizar secuencial NC en config_sri
-        await supabase
-            .from('empresas')
-            .update({ config_sri: { ...configSri, secuencial_nc_actual: secActual } })
-            .eq('id', params.empresaId)
+        // 6. Actualizar secuencial NC en config_sri — solo en el fallback sin punto de
+        //    emisión, ya que con el punto de emisión el contador atómico vive en
+        //    puntos_emision.secuenciales
+        if (actualizarSecuencialNc) {
+            await supabase
+                .from('empresas')
+                .update({ config_sri: { ...configSri, secuencial_nc_actual: secActual } })
+                .eq('id', params.empresaId)
+        }
 
         return nc as NotaCredito
     },
