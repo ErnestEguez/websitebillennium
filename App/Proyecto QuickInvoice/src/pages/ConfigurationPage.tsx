@@ -28,6 +28,7 @@ import {
     Printer,
 } from 'lucide-react'
 import { ContabilidadConfigTab } from '../components/ContabilidadConfigTab'
+import { TalentoNominasConfigTab } from '../components/TalentoNominasConfigTab'
 import { categoriaService, type Categoria } from '../services/categoriaService'
 import { bodegaService } from '../services/bodegaService'
 import { puntoEmisionService } from '../services/puntoEmisionService'
@@ -38,7 +39,7 @@ import { getPuntoEmisionDispositivo, setPuntoEmisionDispositivo } from '../lib/d
 
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
-    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'bodegas' | 'puntos_emision' | 'plataforma' | 'contabilidad'>('empresa')
+    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'bodegas' | 'puntos_emision' | 'plataforma' | 'contabilidad' | 'talento_nominas'>('empresa')
     const [platformSubTab, setPlatformSubTab] = useState<'empresas' | 'personal'>('empresas')
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -759,6 +760,16 @@ export function ConfigurationPage() {
                         <BookOpen className="w-4 h-4" />
                         Contabilidad
                     </button>
+                    <button
+                        onClick={() => setActiveTab('talento_nominas')}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
+                            activeTab === 'talento_nominas' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                    >
+                        <Users className="w-4 h-4" />
+                        Talento / Nóminas
+                    </button>
                 </div>
             )}
 
@@ -1411,6 +1422,8 @@ export function ConfigurationPage() {
                 </div>
             ) : activeTab === 'contabilidad' ? (
                 <ContabilidadConfigTab />
+            ) : activeTab === 'talento_nominas' ? (
+                <TalentoNominasConfigTab />
             ) : (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                     {/* Sub-tabs for Platform Admin */}

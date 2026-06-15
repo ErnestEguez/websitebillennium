@@ -76,6 +76,9 @@ import { AtsPage }                                from './pages/contabilidad/tri
 import { Formulario104Page }                      from './pages/contabilidad/tributario/Formulario104Page'
 import { ConfiguracionPage as ContaConfig }       from './pages/contabilidad/ConfiguracionPage'
 import { Formulario104DetallePage }               from './pages/contabilidad/tributario/Formulario104DetallePage'
+// ── Módulo Talento Humano y Nóminas ──────────────────────────
+import { EstructuraOrganizativaPage }             from './pages/talento/EstructuraOrganizativaPage'
+import { ParametrosNominaPage }                   from './pages/nominas/ParametrosNominaPage'
 // ── Módulo Tesorería (Finance Suite) ─────────────────────────
 
 import { CuentasBancariasPage }                   from './pages/tesoreria/bancos/CuentasBancariasPage'
@@ -519,6 +522,34 @@ function App() {
                       </Routes>
                     </Layout>
                   </ContabilidadProvider>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            {/* ── Módulo Talento Humano ── */}
+            <Route path="/talento/*" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <Routes>
+                      <Route path="estructura" element={<EstructuraOrganizativaPage />} />
+                      <Route path="*"          element={<Navigate to="/talento/estructura" replace />} />
+                    </Routes>
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            {/* ── Módulo Liquidación de Nóminas ── */}
+            <Route path="/nominas/*" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <Routes>
+                      <Route path="parametros" element={<ParametrosNominaPage />} />
+                      <Route path="*"          element={<Navigate to="/nominas/parametros" replace />} />
+                    </Routes>
+                  </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>
             } />

@@ -136,6 +136,8 @@ const PERM_RUTAS: [string, string][] = [
     ['/conta/cierre',                  'perm_asientos'],
     ['/conta/integracion',             'perm_asientos'],
     ['/conta/tributario',              'perm_tributario'],
+    ['/talento/',                      'perm_th_estructura'],
+    ['/nominas/',                      'perm_th_nomina_parametros'],
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -461,6 +463,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             </div>
 
                             <SidebarItem to="/conta/configuracion" icon={Settings} label="Configuración" active={location.pathname === '/conta/configuracion'} sub />
+                        </ModuleSection>}
+
+                        {/* ── MÓDULO 5: Talento Humano ────────────────────── */}
+                        {esOficina && empresa?.usar_talento_humano && <ModuleSection
+                            label="Talento Humano"
+                            icon={Users}
+                            colorClass="text-indigo-600"
+                            isOpen={openGroups.includes('talento')}
+                            onToggle={() => toggleGroup('talento')}
+                            isSidebarOpen={isSidebarOpen}
+                            anyActive={location.pathname.startsWith('/talento/')}
+                        >
+                            <SidebarItem to="/talento/estructura" icon={Users} label="Estructura Organizativa" active={location.pathname === '/talento/estructura'} sub disabled={!p.perm_th_estructura} />
+                        </ModuleSection>}
+
+                        {/* ── MÓDULO 6: Liquidación de Nóminas ────────────── */}
+                        {esOficina && empresa?.usar_talento_humano && <ModuleSection
+                            label="Liquidación de Nóminas"
+                            icon={Wallet}
+                            colorClass="text-cyan-600"
+                            isOpen={openGroups.includes('nominas')}
+                            onToggle={() => toggleGroup('nominas')}
+                            isSidebarOpen={isSidebarOpen}
+                            anyActive={location.pathname.startsWith('/nominas/')}
+                        >
+                            <SidebarItem to="/nominas/parametros" icon={Settings} label="Parámetros de Nómina" active={location.pathname === '/nominas/parametros'} sub disabled={!p.perm_th_nomina_parametros} />
                         </ModuleSection>}
 
                     </nav>

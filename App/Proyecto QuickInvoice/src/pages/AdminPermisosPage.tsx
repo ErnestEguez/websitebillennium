@@ -62,6 +62,13 @@ const MODULOS = [
             { field: 'perm_tributario',     label: 'Tributario' },
         ],
     },
+    {
+        key: 'talento', label: 'Talento Humano y Nóminas',
+        items: [
+            { field: 'perm_th_estructura',        label: 'Estructura Organizativa' },
+            { field: 'perm_th_nomina_parametros', label: 'Parámetros de Nómina' },
+        ],
+    },
 ]
 
 export function AdminPermisosPage() {
@@ -131,6 +138,8 @@ export function AdminPermisosPage() {
                     perm_asientos:           r.perm_asientos           ?? def.perm_asientos,
                     perm_reportes_cont:      r.perm_reportes_cont      ?? def.perm_reportes_cont,
                     perm_tributario:         r.perm_tributario         ?? def.perm_tributario,
+                    perm_th_estructura:        r.perm_th_estructura        ?? def.perm_th_estructura,
+                    perm_th_nomina_parametros: r.perm_th_nomina_parametros ?? def.perm_th_nomina_parametros,
                 }
             })
 

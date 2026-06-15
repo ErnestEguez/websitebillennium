@@ -23,6 +23,7 @@ interface Empresa {
     usar_vendor_management?: boolean
     usar_contabilidad_compras?: boolean
     config_cuentas_compras?: Record<string, unknown> | null
+    usar_talento_humano?: boolean
 }
 
 export interface Modules {
@@ -56,6 +57,8 @@ export interface Permisos {
     perm_asientos:           boolean
     perm_reportes_cont:      boolean
     perm_tributario:         boolean
+    perm_th_estructura:        boolean
+    perm_th_nomina_parametros: boolean
 }
 
 interface AuthContextType {
@@ -114,6 +117,8 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_asientos:           true,
     perm_reportes_cont:      true,
     perm_tributario:         true,
+    perm_th_estructura:        true,
+    perm_th_nomina_parametros: true,
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -252,6 +257,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_asientos:           permData.perm_asientos           ?? true,
                     perm_reportes_cont:      permData.perm_reportes_cont      ?? true,
                     perm_tributario:         permData.perm_tributario         ?? true,
+                    perm_th_estructura:        permData.perm_th_estructura        ?? true,
+                    perm_th_nomina_parametros: permData.perm_th_nomina_parametros ?? true,
                 } : DEFAULT_PERMISOS)
             }
         } catch {
