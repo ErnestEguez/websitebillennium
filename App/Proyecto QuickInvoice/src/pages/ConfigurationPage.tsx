@@ -2259,9 +2259,9 @@ export function ConfigurationPage() {
             {/* ── Modal Punto de Emisión ───────────────────────────── */}
             {isPuntoEmisionModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 space-y-5 animate-in zoom-in-95 duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                         {/* Header */}
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between p-8 pb-4 border-b border-slate-100">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                                     <Printer className="w-5 h-5" />
@@ -2279,7 +2279,7 @@ export function ConfigurationPage() {
                         </div>
 
                         {/* Campos */}
-                        <div className="space-y-4">
+                        <div className="space-y-4 overflow-y-auto flex-1 px-8 py-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
@@ -2411,7 +2411,7 @@ export function ConfigurationPage() {
                         </div>
 
                         {/* Botones */}
-                        <div className="flex gap-3 pt-2">
+                        <div className="flex gap-3 p-8 pt-4 border-t border-slate-100">
                             <button
                                 onClick={() => { setIsPuntoEmisionModalOpen(false); setEditingPuntoEmision(null) }}
                                 className="flex-1 py-3 font-bold border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600"

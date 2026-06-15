@@ -22,6 +22,8 @@ import {
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { bodegaService } from '../services/bodegaService'
 import type { Bodega } from '../types/vendors'
+import { puntoEmisionService } from '../services/puntoEmisionService'
+import type { PuntoEmision } from '../types/puntosEmision'
 import { cuentasBancariasService } from '../services/finance/bancosService'
 import type { CuentaBancaria } from '../types/finance'
 import { precioVolumenService } from '../services/precioVolumenService'
@@ -77,6 +79,9 @@ export function FacturaDirectaPage() {
     // Estado: bodegas
     const [bodegas, setBodegas] = useState<Bodega[]>([])
     const [selectedBodegaId, setSelectedBodegaId] = useState<string>('')
+
+    // Estado: punto de emisión activo en este dispositivo (serie SRI con la que se factura)
+    const [puntoEmisionActivo, setPuntoEmisionActivo] = useState<PuntoEmision | null>(null)
 
     // Estado: secciones colapsables
     const [clienteCollapsed, setClienteCollapsed] = useState(false)
@@ -137,18 +142,20 @@ export function FacturaDirectaPage() {
     async function loadData() {
         try {
             // Use catalog cache (stale-while-revalidate, works offline)
-            const [clientsList, prodList, vendedoresList, cuentasBanc, bodsList] = await Promise.all([
+            const [clientsList, prodList, vendedoresList, cuentasBanc, bodsList, puntoEmision] = await Promise.all([
                 catalogCacheService.getClientes(empresa!.id),
                 catalogCacheService.getProductos(empresa!.id),
                 isOnline ? vendedorService.getVendedoresActivos(empresa!.id).catch(() => []) : [],
                 isOnline ? cuentasBancariasService.listar(empresa!.id).catch(() => []) : [],
                 isOnline ? bodegaService.listar(empresa!.id).catch(() => []) : [],
+                isOnline ? puntoEmisionService.resolverParaDispositivo(empresa!.id).catch(() => null) : null,
             ])
             setClientes(clientsList)
             setProductos(prodList)
             setVendedores(vendedoresList)
             setCuentasBancarias(cuentasBanc.filter((c: CuentaBancaria) => c.estado === 'activa'))
             setBodegas(bodsList)
+            setPuntoEmisionActivo(puntoEmision)
             if (vendedoresList.length === 1) setSelectedVendedorId(vendedoresList[0].id)
             if (bodsList.length > 0 && !selectedBodegaId) {
                 const principal = bodsList.find((b: Bodega) => b.es_principal) ?? bodsList[0]
@@ -449,12 +456,21 @@ export function FacturaDirectaPage() {
                     </h1>
                     <p className="text-slate-500 text-sm">Facturación electrónica directa de artículos y servicios</p>
                 </div>
-                {cajaSesion && (
-                    <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-100">
-                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                        Caja abierta · {profile?.nombre}
-                    </span>
-                )}
+                <div className="flex flex-col items-start md:items-end gap-2">
+                    {cajaSesion && (
+                        <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-100">
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                            Caja abierta · {profile?.nombre}
+                        </span>
+                    )}
+                    {puntoEmisionActivo && (
+                        <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold border border-indigo-100"
+                            title={puntoEmisionActivo.nombre}>
+                            <Printer className="w-3.5 h-3.5" />
+                            Serie {puntoEmisionActivo.establecimiento}-{puntoEmisionActivo.punto_emision}
+                        </span>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
