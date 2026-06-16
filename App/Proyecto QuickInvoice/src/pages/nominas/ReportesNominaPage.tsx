@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Printer, Loader2, FileSpreadsheet } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { periodoNominaService } from '../../services/nominas/periodoNominaService'
+import { useAuth } from '../../contexts/AuthContext'
 import type { PeriodoNomina } from '../../types/nominas'
 import { cn } from '../../lib/utils'
 import * as XLSX from 'xlsx'
@@ -48,13 +49,32 @@ type Vista = 'completo' | 'resumido' | 'descuentos'
 
 export function ReportesNominaPage() {
     const { periodoId } = useParams<{ periodoId: string }>()
-    const navigate = useNavigate()
+    const { empresa }   = useAuth() as any
+    const navigate      = useNavigate()
 
     const [periodo, setPeriodo] = useState<PeriodoNomina | null>(null)
     const [cabs, setCabs]       = useState<CabeceraConLineas[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError]     = useState<string | null>(null)
     const [vista, setVista]     = useState<Vista>('completo')
+
+    // Título del documento antes de imprimir → muestra nombre de empresa en cabecera del browser
+    const originalTitle = useRef(document.title)
+    useEffect(() => {
+        const nombreEmp = empresa?.nombre ?? ''
+        const onBefore = () => {
+            document.title = nombreEmp
+                ? `${nombreEmp} — ${periodo?.nombre ?? ''}`
+                : document.title
+        }
+        const onAfter = () => { document.title = originalTitle.current }
+        window.addEventListener('beforeprint', onBefore)
+        window.addEventListener('afterprint',  onAfter)
+        return () => {
+            window.removeEventListener('beforeprint', onBefore)
+            window.removeEventListener('afterprint',  onAfter)
+        }
+    }, [empresa?.nombre, periodo?.nombre])
 
     useEffect(() => {
         if (periodoId) cargar()
@@ -310,13 +330,18 @@ export function ReportesNominaPage() {
                     </div>
                 </div>
 
-                {/* Encabezado impreso */}
-                <div className="page-header text-center hidden print:block">
-                    <p className="font-bold text-base">Rol de Pagos — {periodo.nombre}</p>
-                    <p className="text-xs">{fmtFecha(periodo.fecha_inicio)} – {fmtFecha(periodo.fecha_fin)}</p>
-                    <p className="text-xs font-semibold mt-1">
-                        {vista === 'completo' ? 'Detalle Completo' : vista === 'resumido' ? 'Resumen' : 'Auxiliar de Descuentos'}
+                {/* Encabezado impreso — visible solo al imprimir */}
+                <div className="page-header text-center hidden print:block mb-4">
+                    <p className="font-bold text-lg uppercase tracking-wide">
+                        {empresa?.nombre ?? ''}
                     </p>
+                    <p className="text-sm font-semibold mt-0.5">ROL DE PAGOS</p>
+                    <p className="text-xs mt-0.5">{periodo.nombre}</p>
+                    <p className="text-xs">{fmtFecha(periodo.fecha_inicio)} – {fmtFecha(periodo.fecha_fin)}</p>
+                    <p className="text-xs font-semibold mt-0.5">
+                        {vista === 'completo' ? 'Detalle Completo por Concepto' : vista === 'resumido' ? 'Resumen' : 'Auxiliar de Descuentos'}
+                    </p>
+                    <hr className="mt-2 border-slate-400" />
                 </div>
 
                 {/* ── ROL COMPLETO (pivot) ────────────────────────────── */}
