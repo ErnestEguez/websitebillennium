@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader2, Play, Lock, Plus, X, AlertCircle, Clock, RefreshCw, Calendar, FileText } from 'lucide-react'
+import { ArrowLeft, Loader2, Play, Lock, Plus, X, AlertCircle, Clock, RefreshCw, Calendar, FileText, Banknote } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { periodoNominaService } from '../../services/nominas/periodoNominaService'
 import { rolNominaService } from '../../services/nominas/rolNominaService'
@@ -253,7 +253,14 @@ export function RolNominaPage() {
                         {periodo.tipo_nomina === 'mensual' ? 'Mensual' : 'Quincenal'}
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                    <button
+                        onClick={() => navigate(`/nominas/anticipo/${periodoId}`)}
+                        className="flex items-center gap-2 border border-violet-300 text-violet-700 hover:bg-violet-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                    >
+                        <Banknote className="w-4 h-4" />
+                        Anticipo
+                    </button>
                     {cabeceras.length > 0 && (
                         <button
                             onClick={() => navigate(`/nominas/reportes/${periodoId}`)}

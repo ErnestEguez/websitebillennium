@@ -154,6 +154,7 @@ export interface RolLinea {
     orden: number
     horas?: number | null
     novedad_id?: string | null
+    anticipo_linea_id?: string | null
     concepto?: { afecta_iess: boolean } | null
 }
 
@@ -180,6 +181,38 @@ export interface NovedadNomina {
     updated_at?: string
     empleado?: { nombres: string; apellidos: string } | null
     concepto?: { nombre: string } | null
+}
+
+// ── Etapa 3d: Anticipo de Quincena ────────────────────────────────────────────
+
+export type EstadoAnticipo = 'borrador' | 'liquidado'
+
+export interface AnticipoNomina {
+    id: string
+    empresa_id: string
+    periodo_id: string
+    nombre: string
+    estado: EstadoAnticipo
+    created_at?: string
+    updated_at?: string
+}
+
+export interface AnticipoLinea {
+    id: string
+    anticipo_id: string
+    empresa_id: string
+    empleado_id: string
+    tipo_calculo: 'porcentaje' | 'fijo'
+    porcentaje: number
+    monto_anticipo: number
+    desc1_nombre: string | null
+    desc1_monto: number
+    desc2_nombre: string | null
+    desc2_monto: number
+    neto: number
+    created_at?: string
+    updated_at?: string
+    empleado?: { nombres: string; apellidos: string; sueldo_base: number } | null
 }
 
 // ── Etapa 3c: Configuración contable de nómina ────────────────────────────────

@@ -42,18 +42,19 @@ export const rolNominaService = {
     ): Promise<void> {
         // 1. Upsert de todas las líneas (incluyendo horas y novedad_id)
         const rows = lineas.map(l => ({
-            id:           l.id,
-            cabecera_id:  l.cabecera_id,
-            empresa_id:   l.empresa_id,
-            concepto_id:  l.concepto_id ?? null,
-            codigo:       l.codigo,
-            nombre:       l.nombre,
-            tipo:         l.tipo,
-            monto:        l.monto,
-            es_calculado: l.es_calculado,
-            orden:        l.orden,
-            horas:        l.horas ?? null,
-            novedad_id:   l.novedad_id ?? null,
+            id:                l.id,
+            cabecera_id:       l.cabecera_id,
+            empresa_id:        l.empresa_id,
+            concepto_id:       l.concepto_id ?? null,
+            codigo:            l.codigo,
+            nombre:            l.nombre,
+            tipo:              l.tipo,
+            monto:             l.monto,
+            es_calculado:      l.es_calculado,
+            orden:             l.orden,
+            horas:             l.horas ?? null,
+            novedad_id:        l.novedad_id ?? null,
+            anticipo_linea_id: l.anticipo_linea_id ?? null,
         }))
         const { error: lineasError } = await nominas().from('rol_lineas').upsert(rows)
         if (lineasError) throw lineasError
@@ -112,6 +113,13 @@ export const rolNominaService = {
     },
 
     async liquidarPeriodo(periodoId: string): Promise<void> {
+        // Verificar que el anticipo de quincena está liquidado (si existe)
+        const { data: antCheck } = await nominas()
+            .from('anticipos').select('nombre, estado').eq('periodo_id', periodoId).maybeSingle()
+        if (antCheck && antCheck.estado !== 'liquidado') {
+            throw new Error(`El anticipo "${antCheck.nombre}" no está liquidado definitivamente. Finaliza el anticipo antes de liquidar el rol.`)
+        }
+
         // 1. Marcar el período como liquidado
         const { error } = await nominas()
             .from('periodos')
@@ -246,13 +254,28 @@ export const rolNominaService = {
             novedadesMap.set(nov.empleado_id, list)
         }
 
+        // Anticipo de quincena liquidado para este período (descuento prioritario)
+        const { data: anticipo } = await nominas()
+            .from('anticipos').select('id')
+            .eq('empresa_id', empresaId).eq('periodo_id', periodoId).eq('estado', 'liquidado')
+            .maybeSingle()
+        const anticipoLineasMap = new Map<string, { id: string; monto_anticipo: number }>()
+        if (anticipo) {
+            const { data: antLineas } = await nominas()
+                .from('anticipo_lineas').select('id, empleado_id, monto_anticipo')
+                .eq('anticipo_id', anticipo.id)
+            for (const al of (antLineas ?? [])) {
+                if ((al.monto_anticipo ?? 0) > 0) anticipoLineasMap.set(al.empleado_id, al)
+            }
+        }
+
         const ESPECIALES = new Set(['SUELDO', 'IESS_PERS', 'DEC3_MENS', 'DEC4_MENS', 'FONDO_RES'])
         const hoy = new Date()
 
         type LinRow = {
             codigo: string; nombre: string; tipo: string; monto: number
             es_calculado: boolean; orden: number; concepto_id: string | null
-            horas: number | null; novedad_id: string | null
+            horas: number | null; novedad_id: string | null; anticipo_linea_id?: string | null
         }
         type CabRow = {
             periodo_id: string; empleado_id: string; empresa_id: string; sueldo_base: number
@@ -341,6 +364,17 @@ export const rolNominaService = {
                     concepto_id:  nov.concepto_id ?? null,
                     horas:        null,
                     novedad_id:   nov.id,
+                })
+            }
+
+            // Anticipo de quincena: descuento prioritario, orden 21 (después de IESS_PERS)
+            const antLinea = anticipoLineasMap.get(emp.id)
+            if (antLinea) {
+                lineas.push({
+                    codigo: 'ANTICIPO', nombre: 'Anticipo de Quincena', tipo: 'descuento',
+                    monto: antLinea.monto_anticipo, es_calculado: true, orden: 21,
+                    concepto_id: null, horas: null, novedad_id: null,
+                    anticipo_linea_id: antLinea.id,
                 })
             }
 

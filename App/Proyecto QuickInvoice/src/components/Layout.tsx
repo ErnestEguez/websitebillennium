@@ -142,6 +142,8 @@ const PERM_RUTAS: [string, string][] = [
     ['/nominas/periodos',              'perm_th_rol_nomina'],
     ['/nominas/rol/',                  'perm_th_rol_nomina'],
     ['/nominas/reportes/',             'perm_th_rol_nomina'],
+    ['/nominas/anticipo/',             'perm_th_rol_nomina'],
+    ['/nominas/anticipo-reporte/',     'perm_th_rol_nomina'],
     ['/nominas/novedades',             'perm_th_rol_nomina'],
     ['/nominas/cuentas-nomina',        'perm_th_nomina_parametros'],
     ['/nominas/conceptos',             'perm_th_conceptos_nomina'],
