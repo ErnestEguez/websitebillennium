@@ -54,13 +54,13 @@ export const anticipoService = {
     },
 
     async generarLineas(
-        anticipoId:  string,
-        empresaId:   string,
-        porcentaje = 40
+        anticipoId:        string,
+        empresaId:         string,
+        defaultPorcentaje = 40
     ): Promise<AnticipoLinea[]> {
-        // Load active employees directly from the master
+        // Load active employees with their personal anticipo settings from the master
         const { data: emps } = await nominas()
-            .from('empleados').select('id, sueldo_base')
+            .from('empleados').select('id, sueldo_base, anticipo_tipo, anticipo_valor')
             .eq('empresa_id', empresaId).eq('activo', true)
         if (!emps?.length) return []
 
@@ -68,12 +68,27 @@ export const anticipoService = {
         await nominas().from('anticipo_lineas').delete().eq('anticipo_id', anticipoId)
 
         const lineas = emps.map(emp => {
-            const monto = round2(emp.sueldo_base * porcentaje / 100)
+            let tipo_calculo: 'porcentaje' | 'fijo'
+            let porcentaje: number
+            let monto: number
+
+            if (emp.anticipo_tipo === 'fijo' && emp.anticipo_valor != null) {
+                tipo_calculo = 'fijo'
+                porcentaje   = 0
+                monto        = round2(emp.anticipo_valor)
+            } else {
+                tipo_calculo = 'porcentaje'
+                porcentaje   = (emp.anticipo_tipo === 'porcentaje' && emp.anticipo_valor != null)
+                    ? emp.anticipo_valor
+                    : defaultPorcentaje
+                monto = round2(emp.sueldo_base * porcentaje / 100)
+            }
+
             return {
                 anticipo_id:    anticipoId,
                 empresa_id:     empresaId,
                 empleado_id:    emp.id,
-                tipo_calculo:   'porcentaje' as const,
+                tipo_calculo,
                 porcentaje,
                 monto_anticipo: monto,
                 desc1_nombre:   null,

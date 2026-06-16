@@ -88,6 +88,7 @@ import { CuentasNominaPage }                      from './pages/nominas/CuentasN
 import { ReportesNominaPage }                     from './pages/nominas/ReportesNominaPage'
 import { AnticipoNominaPage }                     from './pages/nominas/AnticipoNominaPage'
 import { ReporteAnticipoPage }                    from './pages/nominas/ReporteAnticipoPage'
+import { CapacidadPagoPage }                      from './pages/nominas/CapacidadPagoPage'
 // ── Módulo Tesorería (Finance Suite) ─────────────────────────
 
 import { CuentasBancariasPage }                   from './pages/tesoreria/bancos/CuentasBancariasPage'
@@ -562,6 +563,7 @@ function App() {
                       <Route path="anticipo/:periodoId"         element={<AnticipoNominaPage />} />
                       <Route path="anticipo-reporte/:anticipoId" element={<ReporteAnticipoPage />} />
                       <Route path="novedades"                   element={<NovedadesNominaPage />} />
+                      <Route path="capacidad-pago"              element={<CapacidadPagoPage />} />
                       <Route path="conceptos"            element={<ConceptosNominaPage />} />
                       <Route path="cuentas-nomina"       element={<CuentasNominaPage />} />
                       <Route path="parametros"           element={<ParametrosNominaPage />} />

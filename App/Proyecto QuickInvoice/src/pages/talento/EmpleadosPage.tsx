@@ -32,6 +32,8 @@ const EMPTY: Omit<Empleado, 'id' | 'empresa_id' | 'created_at' | 'updated_at' | 
     banco: null,
     tipo_cuenta: null,
     numero_cuenta: null,
+    anticipo_tipo: null,
+    anticipo_valor: null,
 }
 
 export function EmpleadosPage() {
@@ -101,6 +103,8 @@ export function EmpleadosPage() {
             banco: emp.banco ?? null,
             tipo_cuenta: emp.tipo_cuenta ?? null,
             numero_cuenta: emp.numero_cuenta ?? null,
+            anticipo_tipo: emp.anticipo_tipo ?? null,
+            anticipo_valor: emp.anticipo_valor ?? null,
         })
         setTab('personal')
         setModalOpen(true)
@@ -149,6 +153,8 @@ export function EmpleadosPage() {
                 banco: editando.banco || null,
                 tipo_cuenta: editando.tipo_cuenta || null,
                 numero_cuenta: editando.numero_cuenta || null,
+                anticipo_tipo: editando.anticipo_tipo || null,
+                anticipo_valor: editando.anticipo_valor != null ? Number(editando.anticipo_valor) || null : null,
             }
             if (editando.id) {
                 await empleadosService.actualizarEmpleado(editando.id, payload)
@@ -489,6 +495,51 @@ export function EmpleadosPage() {
                                             value={editando.cargas_familiares}
                                             onChange={e => setEditando(v => ({ ...v, cargas_familiares: parseInt(e.target.value) || 0 }))} />
                                         <p className="text-xs text-slate-400 mt-1">Número de cargas familiares reconocidas para la tabla de impuesto a la renta.</p>
+                                    </div>
+
+                                    {/* Anticipo de Quincena */}
+                                    <div className="border-t border-slate-100 pt-4">
+                                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Anticipo de Quincena</p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-600 mb-1">Tipo de anticipo</label>
+                                                <select className="input w-full"
+                                                    value={editando.anticipo_tipo ?? ''}
+                                                    onChange={e => setEditando(v => ({
+                                                        ...v,
+                                                        anticipo_tipo: (e.target.value as 'porcentaje' | 'fijo') || null,
+                                                        anticipo_valor: null,
+                                                    }))}>
+                                                    <option value="">— Sin configurar (usa default 40%) —</option>
+                                                    <option value="porcentaje">Porcentaje del sueldo</option>
+                                                    <option value="fijo">Valor fijo</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                                    {editando.anticipo_tipo === 'fijo' ? 'Valor fijo ($)' : editando.anticipo_tipo === 'porcentaje' ? 'Porcentaje (%)' : 'Valor / %'}
+                                                </label>
+                                                <input
+                                                    type="number" min="0"
+                                                    step={editando.anticipo_tipo === 'porcentaje' ? '1' : '0.01'}
+                                                    className="input w-full"
+                                                    value={editando.anticipo_valor ?? ''}
+                                                    onChange={e => setEditando(v => ({ ...v, anticipo_valor: parseFloat(e.target.value) || null }))}
+                                                    placeholder={editando.anticipo_tipo === 'porcentaje' ? 'Ej: 40' : editando.anticipo_tipo === 'fijo' ? 'Ej: 200.00' : '—'}
+                                                    disabled={!editando.anticipo_tipo}
+                                                />
+                                            </div>
+                                        </div>
+                                        {editando.anticipo_tipo && editando.anticipo_valor ? (
+                                            <p className="text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mt-2">
+                                                {editando.anticipo_tipo === 'porcentaje'
+                                                    ? `Anticipo: ${editando.anticipo_valor}% del sueldo = $${(Math.round((editando.sueldo_base * editando.anticipo_valor / 100) * 100) / 100).toFixed(2)}`
+                                                    : `Anticipo fijo: $${(editando.anticipo_valor ?? 0).toFixed(2)}`
+                                                }
+                                            </p>
+                                        ) : (
+                                            <p className="text-xs text-slate-400 mt-2">Sin configurar: se usará el default de la empresa al generar el anticipo.</p>
+                                        )}
                                     </div>
                                 </>
                             )}

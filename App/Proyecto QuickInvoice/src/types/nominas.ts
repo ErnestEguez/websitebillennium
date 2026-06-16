@@ -93,6 +93,10 @@ export interface Empleado {
     tipo_cuenta?: string | null
     numero_cuenta?: string | null
 
+    // Anticipo personal
+    anticipo_tipo?: 'porcentaje' | 'fijo' | null
+    anticipo_valor?: number | null
+
     activo: boolean
     created_at?: string
     updated_at?: string

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Printer, Loader2 } from 'lucide-react'
+import { ArrowLeft, Printer, Loader2, FileSpreadsheet } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { periodoNominaService } from '../../services/nominas/periodoNominaService'
 import type { PeriodoNomina } from '../../types/nominas'
 import { cn } from '../../lib/utils'
+import * as XLSX from 'xlsx'
 
 const nominas = () => supabase.schema('nominas')
 
@@ -22,6 +23,7 @@ interface Linea {
     tipo: 'ingreso' | 'descuento'
     monto: number
     orden: number
+    horas?: number | null
 }
 
 interface CabeceraConLineas {
@@ -66,7 +68,7 @@ export function ReportesNominaPage() {
                 periodoNominaService.obtener(periodoId!),
                 nominas()
                     .from('rol_cabecera')
-                    .select('id, empleado_id, sueldo_base, total_ingresos, total_descuentos, neto, empleado:empleados(nombres, apellidos, cargo:cargos(nombre)), lineas:rol_lineas(codigo, nombre, tipo, monto, orden)')
+                    .select('id, empleado_id, sueldo_base, total_ingresos, total_descuentos, neto, empleado:empleados(nombres, apellidos, cargo:cargos(nombre)), lineas:rol_lineas(codigo, nombre, tipo, monto, orden, horas)')
                     .eq('periodo_id', periodoId!)
                     .order('created_at'),
             ])
@@ -83,6 +85,13 @@ export function ReportesNominaPage() {
         } finally {
             setLoading(false)
         }
+    }
+
+    // Días trabajados: base (30 o 15) menos días de falta (campo horas de DIAS_FALTA)
+    function getDias(cab: CabeceraConLineas): number {
+        const base = periodo?.tipo_nomina === 'mensual' ? 30 : 15
+        const falta = cab.lineas.find(l => l.codigo === 'DIAS_FALTA')
+        return Math.max(0, base - (falta?.horas ?? 0))
     }
 
     // Construir columnas únicas ordenadas
@@ -105,6 +114,106 @@ export function ReportesNominaPage() {
         return cab.lineas.find(l => l.codigo === codigo)?.monto ?? 0
     }
 
+    // ── Excel export ────────────────────────────────────────────────────────────
+
+    function exportarExcel() {
+        if (vista === 'resumido')   exportResumido()
+        else if (vista === 'completo') exportCompleto()
+        else exportDescuentos()
+    }
+
+    function exportResumido() {
+        const nombre = periodo!.nombre.replace(/\s+/g, '_')
+        const encabezado = [
+            [`Rol de Pagos — Resumen — ${periodo!.nombre}`],
+            [`${fmtFecha(periodo!.fecha_inicio)} – ${fmtFecha(periodo!.fecha_fin)}`],
+            [],
+        ]
+        const cols = ['Empleado', 'Cargo', 'Días Trabajados', 'Sueldo Base', 'Total Ingresos', 'Total Descuentos', 'Neto a Recibir']
+        const filas = cabs.map(cab => [
+            `${cab.empleado?.apellidos ?? ''}, ${cab.empleado?.nombres ?? ''}`,
+            cab.empleado?.cargo?.nombre ?? '',
+            getDias(cab),
+            cab.sueldo_base,
+            cab.total_ingresos,
+            cab.total_descuentos,
+            cab.neto,
+        ])
+        const totales = ['TOTALES', '', '',
+            cabs.reduce((s, c) => s + c.sueldo_base, 0),
+            cabs.reduce((s, c) => s + c.total_ingresos, 0),
+            cabs.reduce((s, c) => s + c.total_descuentos, 0),
+            cabs.reduce((s, c) => s + c.neto, 0),
+        ]
+        const ws = XLSX.utils.aoa_to_sheet([...encabezado, cols, ...filas, totales])
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Rol Resumido')
+        XLSX.writeFile(wb, `rol_resumido_${nombre}.xlsx`)
+    }
+
+    function exportCompleto() {
+        const nombre = periodo!.nombre.replace(/\s+/g, '_')
+        const encabezado = [
+            [`Rol de Pagos — Completo — ${periodo!.nombre}`],
+            [`${fmtFecha(periodo!.fecha_inicio)} – ${fmtFecha(periodo!.fecha_fin)}`],
+            [],
+        ]
+        const cols = [
+            'Empleado', 'Cargo', 'Días',
+            ...colsIngreso.map(c => c.nombre), 'Total Ingresos',
+            ...colsDescuento.map(c => c.nombre), 'Total Descuentos',
+            'Neto',
+        ]
+        const filas = cabs.map(cab => [
+            `${cab.empleado?.apellidos ?? ''}, ${cab.empleado?.nombres ?? ''}`,
+            cab.empleado?.cargo?.nombre ?? '',
+            getDias(cab),
+            ...colsIngreso.map(c => getMonto(cab, c.codigo) || ''),
+            cab.total_ingresos,
+            ...colsDescuento.map(c => getMonto(cab, c.codigo) || ''),
+            cab.total_descuentos,
+            cab.neto,
+        ])
+        const totales = [
+            'TOTALES', '', '',
+            ...colsIngreso.map(c => cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0)),
+            cabs.reduce((s, c) => s + c.total_ingresos, 0),
+            ...colsDescuento.map(c => cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0)),
+            cabs.reduce((s, c) => s + c.total_descuentos, 0),
+            cabs.reduce((s, c) => s + c.neto, 0),
+        ]
+        const ws = XLSX.utils.aoa_to_sheet([...encabezado, cols, ...filas, totales])
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Rol Completo')
+        XLSX.writeFile(wb, `rol_completo_${nombre}.xlsx`)
+    }
+
+    function exportDescuentos() {
+        const nombre = periodo!.nombre.replace(/\s+/g, '_')
+        const encabezado = [
+            [`Auxiliar de Descuentos — ${periodo!.nombre}`],
+            [`${fmtFecha(periodo!.fecha_inicio)} – ${fmtFecha(periodo!.fecha_fin)}`],
+            [],
+        ]
+        const cols = ['Empleado', ...colsDescuento.map(c => c.nombre), 'Total Descuentos']
+        const filas = cabs.map(cab => [
+            `${cab.empleado?.apellidos ?? ''}, ${cab.empleado?.nombres ?? ''}`,
+            ...colsDescuento.map(c => getMonto(cab, c.codigo) || ''),
+            cab.total_descuentos,
+        ])
+        const totales = [
+            'TOTALES',
+            ...colsDescuento.map(c => cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0)),
+            cabs.reduce((s, c) => s + c.total_descuentos, 0),
+        ]
+        const ws = XLSX.utils.aoa_to_sheet([...encabezado, cols, ...filas, totales])
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Aux Descuentos')
+        XLSX.writeFile(wb, `auxiliar_descuentos_${nombre}.xlsx`)
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+
     if (loading) return (
         <div className="flex justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
@@ -114,6 +223,12 @@ export function ReportesNominaPage() {
     if (!periodo) return (
         <div className="text-center py-20 text-slate-400">Período no encontrado.</div>
     )
+
+    const VISTA_LABELS: Record<Vista, string> = {
+        completo: 'Rol Completo',
+        resumido: 'Rol Resumido',
+        descuentos: 'Auxiliar Descuentos',
+    }
 
     return (
         <>
@@ -145,13 +260,6 @@ export function ReportesNominaPage() {
                             {fmtFecha(periodo.fecha_inicio)} – {fmtFecha(periodo.fecha_fin)}
                         </p>
                     </div>
-                    <button
-                        onClick={() => window.print()}
-                        className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-                    >
-                        <Printer className="w-4 h-4" />
-                        Imprimir
-                    </button>
                 </div>
 
                 {error && (
@@ -160,26 +268,46 @@ export function ReportesNominaPage() {
                     </div>
                 )}
 
-                {/* Tabs */}
-                <div className="no-print flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-                    {([
-                        ['completo',   'Rol Completo'],
-                        ['resumido',   'Rol Resumido'],
-                        ['descuentos', 'Auxiliar Descuentos'],
-                    ] as [Vista, string][]).map(([v, label]) => (
+                {/* Tabs + botones de acción */}
+                <div className="no-print flex flex-wrap items-center gap-3">
+                    <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+                        {([
+                            ['completo',   'Rol Completo'],
+                            ['resumido',   'Rol Resumido'],
+                            ['descuentos', 'Auxiliar Descuentos'],
+                        ] as [Vista, string][]).map(([v, label]) => (
+                            <button
+                                key={v}
+                                onClick={() => setVista(v)}
+                                className={cn(
+                                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                    vista === v
+                                        ? 'bg-white shadow-sm text-primary-700'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                )}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Botones imprimir + excel */}
+                    <div className="flex items-center gap-2 ml-auto">
                         <button
-                            key={v}
-                            onClick={() => setVista(v)}
-                            className={cn(
-                                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                                vista === v
-                                    ? 'bg-white shadow-sm text-primary-700'
-                                    : 'text-slate-500 hover:text-slate-700'
-                            )}
+                            onClick={() => window.print()}
+                            className="flex items-center gap-2 border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                         >
-                            {label}
+                            <Printer className="w-4 h-4" />
+                            Imprimir {VISTA_LABELS[vista]}
                         </button>
-                    ))}
+                        <button
+                            onClick={exportarExcel}
+                            className="flex items-center gap-2 border border-emerald-400 text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                        >
+                            <FileSpreadsheet className="w-4 h-4" />
+                            Excel
+                        </button>
+                    </div>
                 </div>
 
                 {/* Encabezado impreso */}
@@ -194,18 +322,12 @@ export function ReportesNominaPage() {
                 {/* ── ROL COMPLETO (pivot) ────────────────────────────── */}
                 {vista === 'completo' && (
                     <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200">
-                        <div className="no-print flex justify-between items-center px-4 py-2 border-b border-slate-100 bg-slate-50">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Rol Completo — Detalle por Concepto</span>
-                            <button onClick={() => window.print()}
-                                className="flex items-center gap-1.5 text-primary-600 hover:text-primary-800 text-xs font-medium transition-colors">
-                                <Printer className="w-3.5 h-3.5" />Imprimir
-                            </button>
-                        </div>
                         <table className="w-full text-xs whitespace-nowrap">
                             <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
                                     <th className="text-left px-3 py-2.5 font-semibold text-slate-600 sticky left-0 bg-slate-50 z-10 min-w-[180px]">Empleado</th>
                                     <th className="text-left px-3 py-2.5 font-semibold text-slate-500 min-w-[120px]">Cargo</th>
+                                    <th className="text-center px-3 py-2.5 font-semibold text-slate-500 min-w-[60px]">Días</th>
                                     {/* Ingresos */}
                                     {colsIngreso.map(c => (
                                         <th key={c.codigo} className="text-right px-3 py-2.5 font-semibold text-emerald-700 min-w-[90px]">
@@ -232,6 +354,7 @@ export function ReportesNominaPage() {
                                             {cab.empleado?.apellidos}, {cab.empleado?.nombres}
                                         </td>
                                         <td className="px-3 py-2 text-slate-500">{cab.empleado?.cargo?.nombre ?? '—'}</td>
+                                        <td className="px-3 py-2 text-center font-medium text-slate-700">{getDias(cab)}</td>
                                         {colsIngreso.map(c => (
                                             <td key={c.codigo} className="px-3 py-2 text-right text-emerald-700">
                                                 {getMonto(cab, c.codigo) !== 0 ? fmt(getMonto(cab, c.codigo)) : <span className="text-slate-300">—</span>}
@@ -256,7 +379,7 @@ export function ReportesNominaPage() {
                             </tbody>
                             <tfoot className="bg-slate-50 border-t-2 border-slate-300">
                                 <tr>
-                                    <td colSpan={2} className="px-3 py-2.5 font-bold text-slate-800 sticky left-0 bg-slate-50">TOTALES</td>
+                                    <td colSpan={3} className="px-3 py-2.5 font-bold text-slate-800 sticky left-0 bg-slate-50">TOTALES</td>
                                     {colsIngreso.map(c => (
                                         <td key={c.codigo} className="px-3 py-2.5 text-right font-bold text-emerald-800">
                                             {fmt(cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}
@@ -290,6 +413,7 @@ export function ReportesNominaPage() {
                                 <tr>
                                     <th className="text-left px-5 py-3 font-semibold text-slate-600">Empleado</th>
                                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Cargo</th>
+                                    <th className="text-center px-4 py-3 font-semibold text-slate-600">Días</th>
                                     <th className="text-right px-4 py-3 font-semibold text-slate-600">Sueldo Base</th>
                                     <th className="text-right px-4 py-3 font-semibold text-emerald-700">Total Ingresos</th>
                                     <th className="text-right px-4 py-3 font-semibold text-red-600">Total Descuentos</th>
@@ -303,6 +427,7 @@ export function ReportesNominaPage() {
                                             {cab.empleado?.apellidos}, {cab.empleado?.nombres}
                                         </td>
                                         <td className="px-4 py-3 text-slate-500 text-sm">{cab.empleado?.cargo?.nombre ?? '—'}</td>
+                                        <td className="px-4 py-3 text-center font-medium text-slate-700">{getDias(cab)}</td>
                                         <td className="px-4 py-3 text-right text-slate-700">${fmt(cab.sueldo_base)}</td>
                                         <td className="px-4 py-3 text-right text-emerald-700 font-medium">${fmt(cab.total_ingresos)}</td>
                                         <td className="px-4 py-3 text-right text-red-600 font-medium">${fmt(cab.total_descuentos)}</td>
@@ -312,7 +437,7 @@ export function ReportesNominaPage() {
                             </tbody>
                             <tfoot className="bg-slate-50 border-t-2 border-slate-300">
                                 <tr>
-                                    <td colSpan={3} className="px-5 py-3 font-bold text-slate-800">TOTALES</td>
+                                    <td colSpan={4} className="px-5 py-3 font-bold text-slate-800">TOTALES</td>
                                     <td className="px-4 py-3 text-right font-bold text-emerald-800">
                                         ${fmt(cabs.reduce((s, c) => s + c.total_ingresos, 0))}
                                     </td>
@@ -331,13 +456,6 @@ export function ReportesNominaPage() {
                 {/* ── AUXILIAR DE DESCUENTOS ───────────────────────────── */}
                 {vista === 'descuentos' && (
                     <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200">
-                        <div className="no-print flex justify-between items-center px-4 py-2 border-b border-slate-100 bg-slate-50">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Auxiliar de Descuentos</span>
-                            <button onClick={() => window.print()}
-                                className="flex items-center gap-1.5 text-primary-600 hover:text-primary-800 text-xs font-medium transition-colors">
-                                <Printer className="w-3.5 h-3.5" />Imprimir
-                            </button>
-                        </div>
                         {colsDescuento.length === 0 ? (
                             <div className="py-16 text-center text-slate-400 text-sm">No hay descuentos en este período.</div>
                         ) : (
