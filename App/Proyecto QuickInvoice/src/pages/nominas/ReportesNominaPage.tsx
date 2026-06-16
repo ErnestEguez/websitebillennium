@@ -194,6 +194,13 @@ export function ReportesNominaPage() {
                 {/* ── ROL COMPLETO (pivot) ────────────────────────────── */}
                 {vista === 'completo' && (
                     <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200">
+                        <div className="no-print flex justify-between items-center px-4 py-2 border-b border-slate-100 bg-slate-50">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Rol Completo — Detalle por Concepto</span>
+                            <button onClick={() => window.print()}
+                                className="flex items-center gap-1.5 text-primary-600 hover:text-primary-800 text-xs font-medium transition-colors">
+                                <Printer className="w-3.5 h-3.5" />Imprimir
+                            </button>
+                        </div>
                         <table className="w-full text-xs whitespace-nowrap">
                             <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
@@ -324,6 +331,13 @@ export function ReportesNominaPage() {
                 {/* ── AUXILIAR DE DESCUENTOS ───────────────────────────── */}
                 {vista === 'descuentos' && (
                     <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200">
+                        <div className="no-print flex justify-between items-center px-4 py-2 border-b border-slate-100 bg-slate-50">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Auxiliar de Descuentos</span>
+                            <button onClick={() => window.print()}
+                                className="flex items-center gap-1.5 text-primary-600 hover:text-primary-800 text-xs font-medium transition-colors">
+                                <Printer className="w-3.5 h-3.5" />Imprimir
+                            </button>
+                        </div>
                         {colsDescuento.length === 0 ? (
                             <div className="py-16 text-center text-slate-400 text-sm">No hay descuentos en este período.</div>
                         ) : (

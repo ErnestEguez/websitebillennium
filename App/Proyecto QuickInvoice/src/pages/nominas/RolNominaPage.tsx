@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader2, Play, Lock, Plus, X, AlertCircle, Clock, RefreshCw, Calendar, FileText, Banknote } from 'lucide-react'
+import { ArrowLeft, Loader2, Play, Lock, Unlock, Plus, X, AlertCircle, Clock, RefreshCw, Calendar, FileText, Banknote, ListChecks } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { periodoNominaService } from '../../services/nominas/periodoNominaService'
 import { rolNominaService } from '../../services/nominas/rolNominaService'
@@ -49,8 +49,10 @@ export function RolNominaPage() {
     const [catalogo, setCatalogo]       = useState<ConceptoNomina[]>([])
     const [showAdd, setShowAdd]         = useState(false)
 
-    // Confirmación cierre
-    const [confirmCierre, setConfirmCierre] = useState(false)
+    // Confirmación cierre / deshacer
+    const [confirmCierre,   setConfirmCierre]   = useState(false)
+    const [confirmDeshacer, setConfirmDeshacer] = useState(false)
+    const [deshaciendo, setDeshaciendo]         = useState(false)
 
     const cargar = useCallback(async () => {
         if (!periodoId || !empresa?.id) return
@@ -117,6 +119,20 @@ export function RolNominaPage() {
         } finally {
             setCerrando(false)
             setConfirmCierre(false)
+        }
+    }
+
+    async function handleDeshacer() {
+        if (!periodoId) return
+        setDeshaciendo(true)
+        try {
+            await rolNominaService.deshacerLiquidacion(periodoId)
+            await cargar()
+        } catch (e: any) {
+            setError(e.message)
+        } finally {
+            setDeshaciendo(false)
+            setConfirmDeshacer(false)
         }
     }
 
@@ -289,6 +305,25 @@ export function RolNominaPage() {
                             >
                                 <Lock className="w-4 h-4" />
                                 Liquidación Definitiva
+                            </button>
+                        </>
+                    )}
+                    {periodo.estado === 'liquidado' && (
+                        <>
+                            <button
+                                onClick={() => navigate('/nominas/novedades')}
+                                className="flex items-center gap-2 border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                                title="Ver estado de préstamos y novedades"
+                            >
+                                <ListChecks className="w-4 h-4" />
+                                Ver Novedades
+                            </button>
+                            <button
+                                onClick={() => setConfirmDeshacer(true)}
+                                className="flex items-center gap-2 border border-orange-300 text-orange-700 hover:bg-orange-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                            >
+                                <Unlock className="w-4 h-4" />
+                                Deshacer Liquidación
                             </button>
                         </>
                     )}
@@ -519,6 +554,39 @@ export function RolNominaPage() {
                             >
                                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                                 Guardar cambios
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirmación deshacer liquidación */}
+            {confirmDeshacer && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
+                        <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto">
+                            <Unlock className="w-6 h-6 text-orange-600" />
+                        </div>
+                        <p className="font-semibold text-slate-800">¿Deshacer la Liquidación?</p>
+                        <p className="text-sm text-slate-500">
+                            El período volverá a estado <strong>Borrador</strong> para que puedas revisarlo.{' '}
+                            <span className="text-orange-700 font-medium">
+                                Atención: los saldos de préstamos ya descontados NO se revierten.
+                            </span>{' '}
+                            Si vuelves a liquidar, los préstamos se descontarán nuevamente.
+                        </p>
+                        <div className="flex gap-3">
+                            <button onClick={() => setConfirmDeshacer(false)}
+                                className="flex-1 border border-slate-300 rounded-xl py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleDeshacer}
+                                disabled={deshaciendo}
+                                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-2 text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                            >
+                                {deshaciendo && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                Sí, deshacer
                             </button>
                         </div>
                     </div>

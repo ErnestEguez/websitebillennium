@@ -143,10 +143,8 @@ export function ReporteAnticipoPage() {
                                     <td className="py-2.5 px-3 text-right font-bold font-mono text-emerald-700 border-b border-slate-200">
                                         {fmt(linea.neto)}
                                     </td>
-                                    {/* Firma */}
-                                    <td className="py-2.5 px-3 border-b border-slate-200">
-                                        <div className="mx-auto w-36 border-b-2 border-slate-400 mt-4 mb-1" />
-                                        <p className="text-center text-xs text-slate-400">Firma</p>
+                                    <td className="py-2.5 px-3 border-b border-slate-200 text-center">
+                                        <span className="text-slate-500 tracking-widest text-base">__________________________</span>
                                     </td>
                                 </tr>
                             )

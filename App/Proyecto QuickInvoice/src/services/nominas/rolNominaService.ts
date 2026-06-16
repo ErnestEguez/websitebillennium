@@ -419,6 +419,14 @@ export const rolNominaService = {
         if (perUpdError) throw perUpdError
     },
 
+    async deshacerLiquidacion(periodoId: string): Promise<void> {
+        const { error } = await nominas()
+            .from('periodos')
+            .update({ estado: 'borrador', updated_at: new Date().toISOString() })
+            .eq('id', periodoId)
+        if (error) throw error
+    },
+
     // Actualiza líneas desde el maestro de empleados y agrega novedades nuevas.
     // Retorna { novedades: N nuevas líneas, actualizados: N empleados recalculados }.
     async sincronizarNovedades(
