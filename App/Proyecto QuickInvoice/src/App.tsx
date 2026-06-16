@@ -83,6 +83,7 @@ import { ConceptosNominaPage }                    from './pages/nominas/Concepto
 import { ParametrosNominaPage }                   from './pages/nominas/ParametrosNominaPage'
 import { PeriodosNominaPage }                     from './pages/nominas/PeriodosNominaPage'
 import { RolNominaPage }                          from './pages/nominas/RolNominaPage'
+import { NovedadesNominaPage }                    from './pages/nominas/NovedadesNominaPage'
 // ── Módulo Tesorería (Finance Suite) ─────────────────────────
 
 import { CuentasBancariasPage }                   from './pages/tesoreria/bancos/CuentasBancariasPage'
@@ -553,6 +554,7 @@ function App() {
                     <Routes>
                       <Route path="periodos"        element={<PeriodosNominaPage />} />
                       <Route path="rol/:periodoId"  element={<RolNominaPage />} />
+                      <Route path="novedades"       element={<NovedadesNominaPage />} />
                       <Route path="conceptos"       element={<ConceptosNominaPage />} />
                       <Route path="parametros"      element={<ParametrosNominaPage />} />
                       <Route path="*"               element={<Navigate to="/nominas/periodos" replace />} />

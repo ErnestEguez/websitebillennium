@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader2, Play, Lock, Plus, X, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Loader2, Play, Lock, Plus, X, AlertCircle, Clock } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { periodoNominaService } from '../../services/nominas/periodoNominaService'
 import { rolNominaService } from '../../services/nominas/rolNominaService'
@@ -15,6 +15,13 @@ const fmt = (n: number) =>
 const fmtFecha = (s: string) => {
     const [y, m, d] = s.split('-')
     return `${d}/${m}/${y}`
+}
+
+// Conceptos que se ingresan por horas (no por monto directo)
+const HORAS_FACTOR: Record<string, number> = {
+    HRS_EXTRA_50:  1.5,
+    HRS_EXTRA_100: 2.0,
+    HRS_NOCT_25:   0.25,
 }
 
 export function RolNominaPage() {
@@ -135,6 +142,20 @@ export function RolNominaPage() {
         const monto = parseFloat(valor) || 0
         setEditLineas(prev => {
             const updated = prev.map(l => l.id === lineaId ? { ...l, monto } : l)
+            return recalcularIess(updated)
+        })
+    }
+
+    function handleHorasChange(lineaId: string, horasStr: string) {
+        const horas = parseFloat(horasStr) || 0
+        setEditLineas(prev => {
+            const updated = prev.map(l => {
+                if (l.id !== lineaId) return l
+                const factor = HORAS_FACTOR[l.codigo] ?? 1
+                const sueldo = editCab?.sueldo_base ?? 0
+                const monto  = Math.round((sueldo / 240) * factor * horas * 100) / 100
+                return { ...l, horas, monto }
+            })
             return recalcularIess(updated)
         })
     }
@@ -353,6 +374,7 @@ export function RolNominaPage() {
                                                         key={linea.id}
                                                         linea={linea}
                                                         onChange={handleMontoChange}
+                                                        onHorasChange={handleHorasChange}
                                                     />
                                                 ))}
                                         </div>
@@ -369,6 +391,7 @@ export function RolNominaPage() {
                                                         key={linea.id}
                                                         linea={linea}
                                                         onChange={handleMontoChange}
+                                                        onHorasChange={handleHorasChange}
                                                     />
                                                 ))}
                                         </div>
@@ -456,7 +479,9 @@ export function RolNominaPage() {
                             <Lock className="w-6 h-6 text-amber-600" />
                         </div>
                         <p className="font-semibold text-slate-800">¿Cerrar el período?</p>
-                        <p className="text-sm text-slate-500">El rol quedará bloqueado y no podrá editarse.</p>
+                        <p className="text-sm text-slate-500">
+                            El rol quedará bloqueado y los saldos de préstamos se actualizarán automáticamente.
+                        </p>
                         <div className="flex gap-3">
                             <button onClick={() => setConfirmCierre(false)}
                                 className="flex-1 border border-slate-300 rounded-xl py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
@@ -479,22 +504,59 @@ export function RolNominaPage() {
 }
 
 // Fila de una línea editable
-function LineaRow({ linea, onChange }: { linea: RolLinea; onChange: (id: string, v: string) => void }) {
+function LineaRow({
+    linea,
+    onChange,
+    onHorasChange,
+}: {
+    linea: RolLinea
+    onChange: (id: string, v: string) => void
+    onHorasChange: (id: string, v: string) => void
+}) {
+    const isHorasConcept = linea.codigo in HORAS_FACTOR
+
     return (
         <div className="flex items-center px-4 py-2.5 border-b border-slate-50 last:border-0 gap-3">
             <div className="flex-1 min-w-0">
                 <span className="text-xs font-mono text-slate-400 mr-2">{linea.codigo}</span>
                 <span className="text-sm text-slate-700">{linea.nombre}</span>
+                {linea.novedad_id && (
+                    <span className="ml-2 text-[10px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-full font-semibold">novedad</span>
+                )}
             </div>
-            {linea.es_calculado ? (
-                <div className="flex items-center gap-1">
+
+            {isHorasConcept ? (
+                // Concepto por horas: input de horas → monto calculado
+                <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={linea.horas == null || linea.horas === 0 ? '' : linea.horas}
+                            placeholder="0"
+                            onChange={e => onHorasChange(linea.id, e.target.value)}
+                            className="w-16 text-right border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                        />
+                        <span className="text-xs text-slate-400">h</span>
+                    </div>
+                    <span className="text-xs text-slate-400">=</span>
+                    <span className="text-sm font-semibold text-slate-700 min-w-[72px] text-right">
+                        ${linea.monto.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                </div>
+            ) : linea.es_calculado ? (
+                // Calculado automáticamente
+                <div className="flex items-center gap-1 shrink-0">
                     <span className="text-sm font-semibold text-slate-700 min-w-[80px] text-right">
-                        ${(linea.monto).toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${linea.monto.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className="text-xs text-slate-300 ml-1" title="Calculado automáticamente">🔒</span>
                 </div>
             ) : (
-                <div className="flex items-center gap-1">
+                // Monto editable manualmente
+                <div className="flex items-center gap-1 shrink-0">
                     <span className="text-slate-400 text-sm">$</span>
                     <input
                         type="number"

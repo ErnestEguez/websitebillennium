@@ -151,5 +151,32 @@ export interface RolLinea {
     monto: number
     es_calculado: boolean
     orden: number
+    horas?: number | null
+    novedad_id?: string | null
     concepto?: { afecta_iess: boolean } | null
+}
+
+// ── Etapa 3b: Novedades (descuentos recurrentes y préstamos) ──────────────────
+
+export type TipoNovedad = 'descuento_variable' | 'descuento_fijo' | 'prestamo_cuota' | 'prestamo_plazo'
+
+export interface NovedadNomina {
+    id: string
+    empresa_id: string
+    empleado_id: string
+    concepto_id?: string | null
+    codigo: string
+    nombre: string
+    tipo_novedad: TipoNovedad
+    monto_fijo?: number | null
+    saldo_inicial?: number | null
+    saldo_pendiente?: number | null
+    n_meses?: number | null
+    n_cuotas_pagadas: number
+    fecha_inicio: string
+    activo: boolean
+    created_at?: string
+    updated_at?: string
+    empleado?: { nombres: string; apellidos: string } | null
+    concepto?: { nombre: string } | null
 }
