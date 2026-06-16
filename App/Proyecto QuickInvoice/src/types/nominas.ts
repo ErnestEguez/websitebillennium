@@ -101,3 +101,55 @@ export interface Empleado {
     cargo?: { nombre: string } | null
     jefe?: { nombres: string; apellidos: string } | null
 }
+
+// ── Etapa 3: Períodos y Rol de Pagos ──────────────────────────────────────────
+
+export type EstadoPeriodo = 'borrador' | 'cerrado'
+export type TipoPeriodo   = 'quincenal' | 'mensual'
+
+export interface PeriodoNomina {
+    id: string
+    empresa_id: string
+    nombre: string
+    tipo_nomina: TipoPeriodo
+    fecha_inicio: string
+    fecha_fin: string
+    estado: EstadoPeriodo
+    total_ingresos: number
+    total_descuentos: number
+    total_neto: number
+    created_at?: string
+    updated_at?: string
+}
+
+export interface RolCabecera {
+    id: string
+    periodo_id: string
+    empleado_id: string
+    empresa_id: string
+    sueldo_base: number
+    total_ingresos: number
+    total_descuentos: number
+    neto: number
+    created_at?: string
+    updated_at?: string
+    empleado?: {
+        nombres: string
+        apellidos: string
+        cargo?: { nombre: string } | null
+    } | null
+}
+
+export interface RolLinea {
+    id: string
+    cabecera_id: string
+    empresa_id: string
+    concepto_id?: string | null
+    codigo: string
+    nombre: string
+    tipo: TipoConcepto
+    monto: number
+    es_calculado: boolean
+    orden: number
+    concepto?: { afecta_iess: boolean } | null
+}

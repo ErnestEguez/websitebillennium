@@ -61,6 +61,7 @@ export interface Permisos {
     perm_th_empleados:          boolean
     perm_th_nomina_parametros:  boolean
     perm_th_conceptos_nomina:   boolean
+    perm_th_rol_nomina:         boolean
 }
 
 interface AuthContextType {
@@ -123,6 +124,7 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_th_empleados:          true,
     perm_th_nomina_parametros:  true,
     perm_th_conceptos_nomina:   true,
+    perm_th_rol_nomina:         true,
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -265,6 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_th_empleados:          permData.perm_th_empleados          ?? true,
                     perm_th_nomina_parametros:  permData.perm_th_nomina_parametros  ?? true,
                     perm_th_conceptos_nomina:   permData.perm_th_conceptos_nomina   ?? true,
+                    perm_th_rol_nomina:         permData.perm_th_rol_nomina         ?? true,
                 } : DEFAULT_PERMISOS)
             }
         } catch {

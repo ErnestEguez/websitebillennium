@@ -138,6 +138,8 @@ const PERM_RUTAS: [string, string][] = [
     ['/conta/tributario',              'perm_tributario'],
     ['/talento/empleados',             'perm_th_empleados'],
     ['/talento/',                      'perm_th_estructura'],
+    ['/nominas/periodos',              'perm_th_rol_nomina'],
+    ['/nominas/rol/',                  'perm_th_rol_nomina'],
     ['/nominas/conceptos',             'perm_th_conceptos_nomina'],
     ['/nominas/',                      'perm_th_nomina_parametros'],
 ]
@@ -491,6 +493,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={location.pathname.startsWith('/nominas/')}
                         >
+                            <SidebarItem to="/nominas/periodos"   icon={BookOpen} label="Períodos / Rol de Pagos" active={location.pathname.startsWith('/nominas/periodos') || location.pathname.startsWith('/nominas/rol/')} sub disabled={!p.perm_th_rol_nomina} />
                             <SidebarItem to="/nominas/conceptos"  icon={BookOpen} label="Conceptos de Nómina"  active={location.pathname === '/nominas/conceptos'}  sub disabled={!p.perm_th_conceptos_nomina} />
                             <SidebarItem to="/nominas/parametros" icon={Settings} label="Parámetros de Nómina" active={location.pathname === '/nominas/parametros'} sub disabled={!p.perm_th_nomina_parametros} />
                         </ModuleSection>}

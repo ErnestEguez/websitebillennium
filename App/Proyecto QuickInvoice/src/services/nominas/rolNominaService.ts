@@ -1,0 +1,247 @@
+import { supabase } from '../../lib/supabase'
+import type { RolCabecera, RolLinea, Empleado, ConceptoNomina } from '../../types/nominas'
+import { parametrosNominaService } from './parametrosNominaService'
+
+const nominas = () => supabase.schema('nominas')
+
+function round2(n: number): number {
+    return Math.round(n * 100) / 100
+}
+
+function diffMeses(fechaIngreso: string, hasta: Date): number {
+    const d = new Date(fechaIngreso)
+    return (hasta.getFullYear() - d.getFullYear()) * 12 + (hasta.getMonth() - d.getMonth())
+}
+
+export const rolNominaService = {
+
+    async listarCabeceras(periodoId: string): Promise<RolCabecera[]> {
+        const { data, error } = await nominas()
+            .from('rol_cabecera')
+            .select('*, empleado:empleados(nombres, apellidos, cargo:cargos(nombre))')
+            .eq('periodo_id', periodoId)
+            .order('created_at')
+        if (error) throw error
+        return data as unknown as RolCabecera[]
+    },
+
+    async listarLineas(cabeceraId: string): Promise<RolLinea[]> {
+        const { data, error } = await nominas()
+            .from('rol_lineas')
+            .select('*, concepto:conceptos(afecta_iess)')
+            .eq('cabecera_id', cabeceraId)
+            .order('orden')
+        if (error) throw error
+        return data as unknown as RolLinea[]
+    },
+
+    async actualizarLineas(
+        cabecera: RolCabecera,
+        lineas: RolLinea[],
+        periodoId: string
+    ): Promise<void> {
+        // 1. Upsert de todas las líneas
+        const rows = lineas.map(l => ({
+            id: l.id,
+            cabecera_id: l.cabecera_id,
+            empresa_id: l.empresa_id,
+            concepto_id: l.concepto_id ?? null,
+            codigo: l.codigo,
+            nombre: l.nombre,
+            tipo: l.tipo,
+            monto: l.monto,
+            es_calculado: l.es_calculado,
+            orden: l.orden,
+        }))
+        const { error: lineasError } = await nominas().from('rol_lineas').upsert(rows)
+        if (lineasError) throw lineasError
+
+        // 2. Recalcular totales de la cabecera
+        const total_ingresos   = round2(lineas.filter(l => l.tipo === 'ingreso').reduce((s, l) => s + l.monto, 0))
+        const total_descuentos = round2(lineas.filter(l => l.tipo === 'descuento').reduce((s, l) => s + l.monto, 0))
+        const neto = round2(total_ingresos - total_descuentos)
+        const { error: cabError } = await nominas()
+            .from('rol_cabecera')
+            .update({ total_ingresos, total_descuentos, neto, updated_at: new Date().toISOString() })
+            .eq('id', cabecera.id)
+        if (cabError) throw cabError
+
+        // 3. Recalcular totales del período sumando todas las cabeceras
+        const { data: cabs, error: cabsError } = await nominas()
+            .from('rol_cabecera')
+            .select('total_ingresos, total_descuentos, neto')
+            .eq('periodo_id', periodoId)
+        if (cabsError) throw cabsError
+        const ptI = round2((cabs ?? []).reduce((s, c) => s + (c.total_ingresos   ?? 0), 0))
+        const ptD = round2((cabs ?? []).reduce((s, c) => s + (c.total_descuentos ?? 0), 0))
+        const ptN = round2((cabs ?? []).reduce((s, c) => s + (c.neto             ?? 0), 0))
+        const { error: perError } = await nominas()
+            .from('periodos')
+            .update({ total_ingresos: ptI, total_descuentos: ptD, total_neto: ptN, updated_at: new Date().toISOString() })
+            .eq('id', periodoId)
+        if (perError) throw perError
+    },
+
+    async agregarLinea(cabeceraId: string, empresaId: string, concepto: ConceptoNomina): Promise<RolLinea> {
+        const { data, error } = await nominas()
+            .from('rol_lineas')
+            .insert({
+                cabecera_id: cabeceraId,
+                empresa_id: empresaId,
+                concepto_id: concepto.id,
+                codigo: concepto.codigo,
+                nombre: concepto.nombre,
+                tipo: concepto.tipo,
+                monto: 0,
+                es_calculado: false,
+                orden: concepto.orden,
+            })
+            .select('*, concepto:conceptos(afecta_iess)')
+            .single()
+        if (error) throw error
+        return data as unknown as RolLinea
+    },
+
+    async eliminarLinea(lineaId: string): Promise<void> {
+        const { error } = await nominas().from('rol_lineas').delete().eq('id', lineaId)
+        if (error) throw error
+    },
+
+    async cerrarPeriodo(periodoId: string): Promise<void> {
+        const { error } = await nominas()
+            .from('periodos')
+            .update({ estado: 'cerrado', updated_at: new Date().toISOString() })
+            .eq('id', periodoId)
+        if (error) throw error
+    },
+
+    async generarRol(periodoId: string, empresaId: string): Promise<void> {
+        // Verificar que no existe rol previo
+        const { count } = await nominas()
+            .from('rol_cabecera')
+            .select('id', { count: 'exact', head: true })
+            .eq('periodo_id', periodoId)
+        if ((count ?? 0) > 0) {
+            throw new Error('Este período ya tiene un rol generado. Edita las líneas individuales para ajustar valores.')
+        }
+
+        // Cargar período
+        const { data: periodo, error: perError } = await nominas()
+            .from('periodos').select('*').eq('id', periodoId).single()
+        if (perError || !periodo) throw perError ?? new Error('Período no encontrado')
+        const factor = periodo.tipo_nomina === 'quincenal' ? 0.5 : 1.0
+
+        // Cargar parámetros (defaults de Ecuador si no existen)
+        const params = await parametrosNominaService.obtener(empresaId)
+        const sbu           = params?.sbu                      ?? 460
+        const iess_pct      = params?.aporte_personal_iess_pct ?? 9.45
+        const fondo_res_pct = params?.fondo_reserva_pct        ?? 8.33
+
+        // Cargar empleados activos
+        const { data: empleados, error: empError } = await nominas()
+            .from('empleados').select('*').eq('empresa_id', empresaId).eq('activo', true)
+        if (empError) throw empError
+        if (!empleados?.length) throw new Error('No hay empleados activos para generar el rol.')
+
+        // Cargar conceptos activos
+        const { data: conceptos, error: conError } = await nominas()
+            .from('conceptos').select('*').eq('empresa_id', empresaId).eq('activo', true).order('orden')
+        if (conError) throw conError
+        const conceptoMap = new Map<string, ConceptoNomina>()
+        ;(conceptos ?? []).forEach(c => conceptoMap.set(c.codigo, c as ConceptoNomina))
+
+        const ESPECIALES = new Set(['SUELDO', 'IESS_PERS', 'DEC3_MENS', 'DEC4_MENS', 'FONDO_RES'])
+        const hoy = new Date()
+
+        // Calcular por empleado
+        type CabRow = { periodo_id: string; empleado_id: string; empresa_id: string; sueldo_base: number; total_ingresos: number; total_descuentos: number; neto: number }
+        type LinRow = { codigo: string; nombre: string; tipo: string; monto: number; es_calculado: boolean; orden: number; concepto_id: string | null }
+
+        const cabRows: CabRow[] = []
+        const linPorEmp: LinRow[][] = []
+
+        for (const emp of (empleados as unknown as Empleado[])) {
+            const sueldo_periodo = round2(emp.sueldo_base * factor)
+            const lineas: LinRow[] = []
+
+            // SUELDO
+            const sueldoC = conceptoMap.get('SUELDO')
+            lineas.push({ codigo: 'SUELDO', nombre: sueldoC?.nombre ?? 'Sueldo Base', tipo: 'ingreso', monto: sueldo_periodo, es_calculado: true, orden: sueldoC?.orden ?? 1, concepto_id: sueldoC?.id ?? null })
+
+            // DEC3_MENS
+            if (emp.decimo_tercero_modo === 'mensualizado') {
+                const c = conceptoMap.get('DEC3_MENS')
+                if (c) lineas.push({ codigo: c.codigo, nombre: c.nombre, tipo: 'ingreso', monto: round2(emp.sueldo_base / 12 * factor), es_calculado: true, orden: c.orden, concepto_id: c.id })
+            }
+
+            // DEC4_MENS
+            if (emp.decimo_cuarto_modo === 'mensualizado') {
+                const c = conceptoMap.get('DEC4_MENS')
+                if (c) lineas.push({ codigo: c.codigo, nombre: c.nombre, tipo: 'ingreso', monto: round2(sbu / 12 * factor), es_calculado: true, orden: c.orden, concepto_id: c.id })
+            }
+
+            // FONDO_RES — solo si antigüedad >= 13 meses
+            if (emp.fondo_reserva_modo === 'mensual' && diffMeses(emp.fecha_ingreso, hoy) >= 13) {
+                const c = conceptoMap.get('FONDO_RES')
+                if (c) lineas.push({ codigo: c.codigo, nombre: c.nombre, tipo: 'ingreso', monto: round2(sueldo_periodo * fondo_res_pct / 100), es_calculado: true, orden: c.orden, concepto_id: c.id })
+            }
+
+            // Otros aplica_siempre=true (no especiales)
+            for (const c of (conceptos ?? []) as ConceptoNomina[]) {
+                if (c.aplica_siempre && !ESPECIALES.has(c.codigo)) {
+                    lineas.push({ codigo: c.codigo, nombre: c.nombre, tipo: c.tipo, monto: 0, es_calculado: false, orden: c.orden, concepto_id: c.id })
+                }
+            }
+
+            // Base IESS = suma ingresos afecta_iess
+            const baseIess = lineas
+                .filter(l => l.tipo === 'ingreso')
+                .reduce((s, l) => s + ((conceptoMap.get(l.codigo)?.afecta_iess ?? false) ? l.monto : 0), 0)
+
+            // IESS_PERS
+            if (emp.afiliado_iess) {
+                const c = conceptoMap.get('IESS_PERS')
+                lineas.push({ codigo: 'IESS_PERS', nombre: c?.nombre ?? 'Aporte Personal IESS', tipo: 'descuento', monto: round2(baseIess * iess_pct / 100), es_calculado: true, orden: c?.orden ?? 50, concepto_id: c?.id ?? null })
+            }
+
+            lineas.sort((a, b) => a.orden - b.orden)
+
+            const total_ingresos   = round2(lineas.filter(l => l.tipo === 'ingreso').reduce((s, l) => s + l.monto, 0))
+            const total_descuentos = round2(lineas.filter(l => l.tipo === 'descuento').reduce((s, l) => s + l.monto, 0))
+            const neto = round2(total_ingresos - total_descuentos)
+
+            cabRows.push({ periodo_id: periodoId, empleado_id: emp.id, empresa_id: empresaId, sueldo_base: emp.sueldo_base, total_ingresos, total_descuentos, neto })
+            linPorEmp.push(lineas)
+        }
+
+        // Insertar cabeceras y obtener IDs
+        const { data: cabsIns, error: cabInsError } = await nominas()
+            .from('rol_cabecera').insert(cabRows).select('id, empleado_id')
+        if (cabInsError) throw cabInsError
+
+        const cabMap = new Map<string, string>()
+        ;(cabsIns ?? []).forEach(c => cabMap.set(c.empleado_id, c.id))
+
+        // Insertar todas las líneas
+        const todasLineas: any[] = []
+        for (let i = 0; i < (empleados as unknown as Empleado[]).length; i++) {
+            const emp = empleados[i] as unknown as Empleado
+            const cabeceraId = cabMap.get(emp.id)
+            for (const l of linPorEmp[i]) {
+                todasLineas.push({ ...l, cabecera_id: cabeceraId, empresa_id: empresaId })
+            }
+        }
+        const { error: linInsError } = await nominas().from('rol_lineas').insert(todasLineas)
+        if (linInsError) throw linInsError
+
+        // Actualizar totales del período
+        const ptI = round2(cabRows.reduce((s, c) => s + c.total_ingresos,   0))
+        const ptD = round2(cabRows.reduce((s, c) => s + c.total_descuentos, 0))
+        const ptN = round2(cabRows.reduce((s, c) => s + c.neto,             0))
+        const { error: perUpdError } = await nominas()
+            .from('periodos')
+            .update({ total_ingresos: ptI, total_descuentos: ptD, total_neto: ptN, updated_at: new Date().toISOString() })
+            .eq('id', periodoId)
+        if (perUpdError) throw perUpdError
+    },
+}

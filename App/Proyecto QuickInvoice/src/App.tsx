@@ -81,6 +81,8 @@ import { EmpleadosPage }                          from './pages/talento/Empleado
 import { EstructuraOrganizativaPage }             from './pages/talento/EstructuraOrganizativaPage'
 import { ConceptosNominaPage }                    from './pages/nominas/ConceptosNominaPage'
 import { ParametrosNominaPage }                   from './pages/nominas/ParametrosNominaPage'
+import { PeriodosNominaPage }                     from './pages/nominas/PeriodosNominaPage'
+import { RolNominaPage }                          from './pages/nominas/RolNominaPage'
 // ── Módulo Tesorería (Finance Suite) ─────────────────────────
 
 import { CuentasBancariasPage }                   from './pages/tesoreria/bancos/CuentasBancariasPage'
@@ -549,9 +551,11 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <Routes>
-                      <Route path="conceptos"  element={<ConceptosNominaPage />} />
-                      <Route path="parametros" element={<ParametrosNominaPage />} />
-                      <Route path="*"          element={<Navigate to="/nominas/conceptos" replace />} />
+                      <Route path="periodos"        element={<PeriodosNominaPage />} />
+                      <Route path="rol/:periodoId"  element={<RolNominaPage />} />
+                      <Route path="conceptos"       element={<ConceptosNominaPage />} />
+                      <Route path="parametros"      element={<ParametrosNominaPage />} />
+                      <Route path="*"               element={<Navigate to="/nominas/periodos" replace />} />
                     </Routes>
                   </Layout>
                 </RoleProtectedRoute>
