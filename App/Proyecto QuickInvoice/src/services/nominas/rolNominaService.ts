@@ -385,17 +385,109 @@ export const rolNominaService = {
         if (perUpdError) throw perUpdError
     },
 
-    // Agrega las novedades activas que aún no están en un rol ya generado.
-    // Retorna el número de líneas nuevas insertadas.
-    async sincronizarNovedades(periodoId: string, empresaId: string): Promise<number> {
+    // Actualiza líneas desde el maestro de empleados y agrega novedades nuevas.
+    // Retorna { novedades: N nuevas líneas, actualizados: N empleados recalculados }.
+    async sincronizarNovedades(
+        periodoId: string, empresaId: string
+    ): Promise<{ novedades: number; actualizados: number }> {
         const { data: periodo } = await nominas()
-            .from('periodos').select('fecha_fin').eq('id', periodoId).single()
-        if (!periodo) return 0
+            .from('periodos').select('fecha_fin, tipo_nomina').eq('id', periodoId).single()
+        if (!periodo) return { novedades: 0, actualizados: 0 }
 
         const { data: cabs } = await nominas()
-            .from('rol_cabecera').select('id, empleado_id').eq('periodo_id', periodoId)
-        if (!cabs?.length) return 0
+            .from('rol_cabecera').select('id, empleado_id, sueldo_base').eq('periodo_id', periodoId)
+        if (!cabs?.length) return { novedades: 0, actualizados: 0 }
 
+        const cabIds = cabs.map(c => c.id)
+
+        // ── Parte 1: Recalcular líneas base desde el maestro de empleados ─────
+        const factor       = periodo.tipo_nomina === 'quincenal' ? 0.5 : 1.0
+        const params       = await parametrosNominaService.obtener(empresaId)
+        const iess_pct     = params?.aporte_personal_iess_pct ?? 9.45
+        const fondoResPct  = params?.fondo_reserva_pct        ?? 8.33
+        const sbu          = params?.sbu                      ?? 460
+        const hoy          = new Date()
+
+        const empIds = cabs.map(c => c.empleado_id)
+        const { data: empleadosRaw } = await nominas()
+            .from('empleados')
+            .select('id, sueldo_base, afiliado_iess, decimo_tercero_modo, decimo_cuarto_modo, fondo_reserva_modo, fecha_ingreso')
+            .in('id', empIds)
+        const empMap = new Map<string, any>()
+        for (const e of (empleadosRaw ?? [])) empMap.set(e.id, e)
+
+        const { data: todasLineas } = await nominas()
+            .from('rol_lineas')
+            .select('id, cabecera_id, codigo, tipo, monto, es_calculado, novedad_id')
+            .in('cabecera_id', cabIds)
+
+        const { data: conceptosRaw } = await nominas()
+            .from('conceptos').select('id, codigo, afecta_iess, orden').eq('empresa_id', empresaId).eq('activo', true)
+        const conceptoIessMap = new Map<string, boolean>()
+        const conceptoOrden   = new Map<string, number>()
+        for (const c of (conceptosRaw ?? [])) {
+            conceptoIessMap.set(c.codigo, c.afecta_iess)
+            conceptoOrden.set(c.id, c.orden)
+        }
+
+        const cabsModificadas = new Set<string>()
+        let actualizados = 0
+
+        for (const cab of cabs) {
+            const emp = empMap.get(cab.empleado_id)
+            if (!emp) continue
+
+            const cabLineas = (todasLineas ?? []).filter(l => l.cabecera_id === cab.id)
+            const sueldoPeriodo = round2(emp.sueldo_base * factor)
+
+            const nuevosMontosBase: Record<string, number | null> = {
+                SUELDO:    sueldoPeriodo,
+                DEC3_MENS: emp.decimo_tercero_modo === 'mensualizado' ? round2(emp.sueldo_base / 12 * factor) : null,
+                DEC4_MENS: emp.decimo_cuarto_modo  === 'mensualizado' ? round2(sbu / 12 * factor) : null,
+                FONDO_RES: (emp.fondo_reserva_modo === 'mensual' && diffMeses(emp.fecha_ingreso, hoy) >= 13)
+                               ? round2(sueldoPeriodo * fondoResPct / 100) : null,
+            }
+
+            const montosActuales = new Map<string, number>()
+            for (const l of cabLineas) montosActuales.set(l.id, l.monto)
+
+            let huboChange = false
+            for (const linea of cabLineas) {
+                if (!linea.es_calculado || linea.novedad_id) continue
+                const nuevoMonto = nuevosMontosBase[linea.codigo]
+                if (nuevoMonto == null) continue
+                if (Math.abs(nuevoMonto - linea.monto) > 0.001) {
+                    await nominas().from('rol_lineas').update({ monto: nuevoMonto }).eq('id', linea.id)
+                    montosActuales.set(linea.id, nuevoMonto)
+                    huboChange = true
+                }
+            }
+
+            const sueldoCambio = Math.abs(emp.sueldo_base - cab.sueldo_base) > 0.001
+            if (huboChange || sueldoCambio) {
+                // Recalcular IESS con los nuevos montos base
+                const baseIess = cabLineas
+                    .filter(l => l.tipo === 'ingreso' && (conceptoIessMap.get(l.codigo) ?? false))
+                    .reduce((s, l) => s + (montosActuales.get(l.id) ?? l.monto), 0)
+                const iessLinea = cabLineas.find(l => l.codigo === 'IESS_PERS' && l.es_calculado)
+                if (iessLinea && emp.afiliado_iess) {
+                    const nuevoIess = round2(baseIess * iess_pct / 100)
+                    if (Math.abs(nuevoIess - iessLinea.monto) > 0.001) {
+                        await nominas().from('rol_lineas').update({ monto: nuevoIess }).eq('id', iessLinea.id)
+                        huboChange = true
+                    }
+                }
+                if (sueldoCambio) {
+                    await nominas().from('rol_cabecera').update({ sueldo_base: emp.sueldo_base }).eq('id', cab.id)
+                }
+                if (huboChange || sueldoCambio) {
+                    cabsModificadas.add(cab.id)
+                    actualizados++
+                }
+            }
+        }
+
+        // ── Parte 2: Agregar novedades nuevas ─────────────────────────────────
         const { data: novedades } = await nominas()
             .from('novedades').select('*')
             .eq('empresa_id', empresaId).eq('activo', true).lte('fecha_inicio', periodo.fecha_fin)
@@ -407,32 +499,20 @@ export const rolNominaService = {
             novedadesMap.set(nov.empleado_id, list)
         }
 
-        // Novedades ya vinculadas en este rol
-        const cabIds = cabs.map(c => c.id)
         const { data: lineasExist } = await nominas()
             .from('rol_lineas').select('cabecera_id, novedad_id')
             .in('cabecera_id', cabIds).not('novedad_id', 'is', null)
-
         const aplicadas = new Set<string>()
         for (const l of (lineasExist ?? [])) {
             if (l.novedad_id) aplicadas.add(`${l.cabecera_id}:${l.novedad_id}`)
         }
-
-        // Orden de conceptos
-        const { data: conceptos } = await nominas()
-            .from('conceptos').select('id, orden').eq('empresa_id', empresaId).eq('activo', true)
-        const conceptoOrden = new Map<string, number>()
-        for (const c of (conceptos ?? [])) conceptoOrden.set(c.id, c.orden)
 
         const nuevasLineas: any[] = []
         for (const cab of cabs) {
             const novsEmp = novedadesMap.get(cab.empleado_id) ?? []
             for (const nov of novsEmp) {
                 if (aplicadas.has(`${cab.id}:${nov.id}`)) continue
-
-                let monto = 0
-                let es_calc = false
-
+                let monto = 0, es_calc = false
                 if (nov.tipo_novedad === 'descuento_fijo') {
                     monto = nov.monto_fijo ?? 0; es_calc = true
                 } else if (nov.tipo_novedad === 'descuento_variable') {
@@ -445,31 +525,25 @@ export const rolNominaService = {
                     const cuota = round2((nov.saldo_inicial ?? 0) / Math.max(nov.n_meses ?? 1, 1))
                     monto = round2(Math.min(cuota, nov.saldo_pendiente ?? cuota)); es_calc = true
                 }
-
                 nuevasLineas.push({
-                    cabecera_id:  cab.id,
-                    empresa_id:   empresaId,
-                    concepto_id:  nov.concepto_id ?? null,
-                    codigo:       nov.codigo,
-                    nombre:       nov.nombre,
-                    tipo:         'descuento',
-                    monto:        round2(monto),
-                    es_calculado: es_calc,
-                    orden:        nov.concepto_id ? (conceptoOrden.get(nov.concepto_id) ?? 80) : 80,
-                    horas:        null,
-                    novedad_id:   nov.id,
+                    cabecera_id: cab.id, empresa_id: empresaId,
+                    concepto_id: nov.concepto_id ?? null,
+                    codigo: nov.codigo, nombre: nov.nombre, tipo: 'descuento',
+                    monto: round2(monto), es_calculado: es_calc,
+                    orden: nov.concepto_id ? (conceptoOrden.get(nov.concepto_id) ?? 80) : 80,
+                    horas: null, novedad_id: nov.id,
                 })
+                cabsModificadas.add(cab.id)
             }
         }
 
-        if (!nuevasLineas.length) return 0
+        if (nuevasLineas.length > 0) {
+            const { error: insErr } = await nominas().from('rol_lineas').insert(nuevasLineas)
+            if (insErr) throw insErr
+        }
 
-        const { error: insErr } = await nominas().from('rol_lineas').insert(nuevasLineas)
-        if (insErr) throw insErr
-
-        // Recalcular totales de cabeceras afectadas
-        const cabsAfectadas = [...new Set(nuevasLineas.map(l => l.cabecera_id))]
-        for (const cabId of cabsAfectadas) {
+        // ── Recalcular totales de todas las cabeceras modificadas ─────────────
+        for (const cabId of cabsModificadas) {
             const { data: lineas } = await nominas()
                 .from('rol_lineas').select('tipo, monto').eq('cabecera_id', cabId)
             const ti = round2((lineas ?? []).filter(l => l.tipo === 'ingreso').reduce((s, l) => s + l.monto, 0))
@@ -479,16 +553,17 @@ export const rolNominaService = {
                 .eq('id', cabId)
         }
 
-        // Recalcular totales del período
-        const { data: allCabs } = await nominas()
-            .from('rol_cabecera').select('total_ingresos, total_descuentos, neto').eq('periodo_id', periodoId)
-        const ptI = round2((allCabs ?? []).reduce((s, c) => s + (c.total_ingresos ?? 0), 0))
-        const ptD = round2((allCabs ?? []).reduce((s, c) => s + (c.total_descuentos ?? 0), 0))
-        const ptN = round2((allCabs ?? []).reduce((s, c) => s + (c.neto ?? 0), 0))
-        await nominas().from('periodos')
-            .update({ total_ingresos: ptI, total_descuentos: ptD, total_neto: ptN, updated_at: new Date().toISOString() })
-            .eq('id', periodoId)
+        if (cabsModificadas.size > 0) {
+            const { data: allCabs } = await nominas()
+                .from('rol_cabecera').select('total_ingresos, total_descuentos, neto').eq('periodo_id', periodoId)
+            const ptI = round2((allCabs ?? []).reduce((s, c) => s + (c.total_ingresos ?? 0), 0))
+            const ptD = round2((allCabs ?? []).reduce((s, c) => s + (c.total_descuentos ?? 0), 0))
+            const ptN = round2((allCabs ?? []).reduce((s, c) => s + (c.neto ?? 0), 0))
+            await nominas().from('periodos')
+                .update({ total_ingresos: ptI, total_descuentos: ptD, total_neto: ptN, updated_at: new Date().toISOString() })
+                .eq('id', periodoId)
+        }
 
-        return nuevasLineas.length
+        return { novedades: nuevasLineas.length, actualizados }
     },
 }

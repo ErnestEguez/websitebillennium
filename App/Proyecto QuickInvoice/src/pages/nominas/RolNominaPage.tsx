@@ -93,9 +93,9 @@ export function RolNominaPage() {
         setSincronizando(true)
         setError(null)
         try {
-            const n = await rolNominaService.sincronizarNovedades(periodoId, empresa.id)
-            if (n === 0) {
-                setError('No hay novedades pendientes por aplicar.')
+            const result = await rolNominaService.sincronizarNovedades(periodoId, empresa.id)
+            if (result.novedades === 0 && result.actualizados === 0) {
+                setError('No hay novedades pendientes ni cambios en empleados.')
             } else {
                 await cargar()
             }
