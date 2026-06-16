@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader2, Play, Lock, Plus, X, AlertCircle, Clock, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Loader2, Play, Lock, Plus, X, AlertCircle, Clock, RefreshCw, Calendar, FileText } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { periodoNominaService } from '../../services/nominas/periodoNominaService'
 import { rolNominaService } from '../../services/nominas/rolNominaService'
@@ -17,11 +17,12 @@ const fmtFecha = (s: string) => {
     return `${d}/${m}/${y}`
 }
 
-// Conceptos que se ingresan por horas (no por monto directo)
-const HORAS_FACTOR: Record<string, number> = {
-    HRS_EXTRA_50:  1.5,
-    HRS_EXTRA_100: 2.0,
-    HRS_NOCT_25:   0.25,
+// Conceptos que se ingresan por tiempo (horas o días); el monto se calcula automáticamente
+const TIEMPO_CONCEPTO: Record<string, { divisor: number; factor: number; unidad: 'h' | 'd' }> = {
+    HRS_EXTRA_50:  { divisor: 240, factor: 1.5,  unidad: 'h' },
+    HRS_EXTRA_100: { divisor: 240, factor: 2.0,  unidad: 'h' },
+    HRS_NOCT_25:   { divisor: 240, factor: 0.25, unidad: 'h' },
+    DIAS_FALTA:    { divisor: 30,  factor: 1.0,  unidad: 'd' },
 }
 
 export function RolNominaPage() {
@@ -105,11 +106,11 @@ export function RolNominaPage() {
         }
     }
 
-    async function handleCerrar() {
+    async function handleLiquidar() {
         if (!periodoId) return
         setCerrando(true)
         try {
-            await rolNominaService.cerrarPeriodo(periodoId)
+            await rolNominaService.liquidarPeriodo(periodoId)
             await cargar()
         } catch (e: any) {
             setError(e.message)
@@ -165,15 +166,16 @@ export function RolNominaPage() {
         })
     }
 
-    function handleHorasChange(lineaId: string, horasStr: string) {
-        const horas = parseFloat(horasStr) || 0
+    function handleTiempoChange(lineaId: string, valorStr: string) {
+        const cantidad = parseFloat(valorStr) || 0
         setEditLineas(prev => {
             const updated = prev.map(l => {
                 if (l.id !== lineaId) return l
-                const factor = HORAS_FACTOR[l.codigo] ?? 1
+                const tc = TIEMPO_CONCEPTO[l.codigo]
+                if (!tc) return l
                 const sueldo = editCab?.sueldo_base ?? 0
-                const monto  = Math.round((sueldo / 240) * factor * horas * 100) / 100
-                return { ...l, horas, monto }
+                const monto  = Math.round((sueldo / tc.divisor) * tc.factor * cantidad * 100) / 100
+                return { ...l, horas: cantidad, monto }
             })
             return recalcularIess(updated)
         })
@@ -237,11 +239,13 @@ export function RolNominaPage() {
                         <h1 className="text-2xl font-bold text-slate-900">{periodo.nombre}</h1>
                         <span className={cn(
                             'px-2.5 py-0.5 rounded-full text-xs font-semibold',
-                            periodo.estado === 'cerrado'
-                                ? 'bg-slate-100 text-slate-500'
-                                : 'bg-amber-50 text-amber-700'
+                            periodo.estado === 'liquidado'
+                                ? 'bg-green-100 text-green-700'
+                                : periodo.estado === 'cerrado'
+                                    ? 'bg-slate-100 text-slate-500'
+                                    : 'bg-amber-50 text-amber-700'
                         )}>
-                            {periodo.estado === 'cerrado' ? 'Cerrado' : 'Borrador'}
+                            {periodo.estado === 'liquidado' ? 'Liquidado' : periodo.estado === 'cerrado' ? 'Cerrado' : 'Borrador'}
                         </span>
                     </div>
                     <p className="text-sm text-slate-500 mt-0.5">
@@ -249,28 +253,39 @@ export function RolNominaPage() {
                         {periodo.tipo_nomina === 'mensual' ? 'Mensual' : 'Quincenal'}
                     </p>
                 </div>
-                {periodo.estado === 'borrador' && cabeceras.length > 0 && (
-                    <div className="flex gap-2">
+                <div className="flex gap-2">
+                    {cabeceras.length > 0 && (
                         <button
-                            onClick={handleSincronizar}
-                            disabled={sincronizando}
-                            className="flex items-center gap-2 border border-cyan-300 text-cyan-700 hover:bg-cyan-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-60"
-                            title="Agrega al rol las novedades creadas después de generar el rol"
+                            onClick={() => navigate(`/nominas/reportes/${periodoId}`)}
+                            className="flex items-center gap-2 border border-indigo-300 text-indigo-700 hover:bg-indigo-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
                         >
-                            {sincronizando
-                                ? <Loader2 className="w-4 h-4 animate-spin" />
-                                : <RefreshCw className="w-4 h-4" />}
-                            Aplicar Novedades
+                            <FileText className="w-4 h-4" />
+                            Reportes
                         </button>
-                        <button
-                            onClick={() => setConfirmCierre(true)}
-                            className="flex items-center gap-2 border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-                        >
-                            <Lock className="w-4 h-4" />
-                            Cerrar Período
-                        </button>
-                    </div>
-                )}
+                    )}
+                    {periodo.estado === 'borrador' && cabeceras.length > 0 && (
+                        <>
+                            <button
+                                onClick={handleSincronizar}
+                                disabled={sincronizando}
+                                className="flex items-center gap-2 border border-cyan-300 text-cyan-700 hover:bg-cyan-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-60"
+                                title="Agrega al rol las novedades creadas después de generar el rol"
+                            >
+                                {sincronizando
+                                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                                    : <RefreshCw className="w-4 h-4" />}
+                                Aplicar Novedades
+                            </button>
+                            <button
+                                onClick={() => setConfirmCierre(true)}
+                                className="flex items-center gap-2 border border-emerald-400 text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                            >
+                                <Lock className="w-4 h-4" />
+                                Liquidación Definitiva
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
 
             {/* Resumen de totales */}
@@ -406,7 +421,7 @@ export function RolNominaPage() {
                                                         key={linea.id}
                                                         linea={linea}
                                                         onChange={handleMontoChange}
-                                                        onHorasChange={handleHorasChange}
+                                                        onTiempoChange={handleTiempoChange}
                                                     />
                                                 ))}
                                         </div>
@@ -423,7 +438,7 @@ export function RolNominaPage() {
                                                         key={linea.id}
                                                         linea={linea}
                                                         onChange={handleMontoChange}
-                                                        onHorasChange={handleHorasChange}
+                                                        onTiempoChange={handleTiempoChange}
                                                     />
                                                 ))}
                                         </div>
@@ -507,12 +522,13 @@ export function RolNominaPage() {
             {confirmCierre && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4">
-                        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
-                            <Lock className="w-6 h-6 text-amber-600" />
+                        <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                            <Lock className="w-6 h-6 text-emerald-600" />
                         </div>
-                        <p className="font-semibold text-slate-800">¿Cerrar el período?</p>
+                        <p className="font-semibold text-slate-800">¿Liquidación Definitiva del Período?</p>
                         <p className="text-sm text-slate-500">
-                            El rol quedará bloqueado y los saldos de préstamos se actualizarán automáticamente.
+                            Se actualizarán los saldos de préstamos, se borrarán los montos de descuentos variables
+                            y el rol quedará bloqueado. Esta acción no se puede deshacer.
                         </p>
                         <div className="flex gap-3">
                             <button onClick={() => setConfirmCierre(false)}
@@ -520,12 +536,12 @@ export function RolNominaPage() {
                                 Cancelar
                             </button>
                             <button
-                                onClick={handleCerrar}
+                                onClick={handleLiquidar}
                                 disabled={cerrando}
-                                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white rounded-xl py-2 text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-2 text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                             >
                                 {cerrando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                                Sí, cerrar
+                                Sí, liquidar
                             </button>
                         </div>
                     </div>
@@ -539,13 +555,13 @@ export function RolNominaPage() {
 function LineaRow({
     linea,
     onChange,
-    onHorasChange,
+    onTiempoChange,
 }: {
     linea: RolLinea
     onChange: (id: string, v: string) => void
-    onHorasChange: (id: string, v: string) => void
+    onTiempoChange: (id: string, v: string) => void
 }) {
-    const isHorasConcept = linea.codigo in HORAS_FACTOR
+    const tc = TIEMPO_CONCEPTO[linea.codigo] ?? null
 
     return (
         <div className="flex items-center px-4 py-2.5 border-b border-slate-50 last:border-0 gap-3">
@@ -557,21 +573,23 @@ function LineaRow({
                 )}
             </div>
 
-            {isHorasConcept ? (
-                // Concepto por horas: input de horas → monto calculado
+            {tc ? (
+                // Concepto por tiempo (horas o días) → monto calculado automáticamente
                 <div className="flex items-center gap-2 shrink-0">
                     <div className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        {tc.unidad === 'h'
+                            ? <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            : <Calendar className="w-3.5 h-3.5 text-slate-400" />}
                         <input
                             type="number"
                             min="0"
-                            step="0.5"
+                            step={tc.unidad === 'h' ? '0.5' : '1'}
                             value={linea.horas == null || linea.horas === 0 ? '' : linea.horas}
                             placeholder="0"
-                            onChange={e => onHorasChange(linea.id, e.target.value)}
+                            onChange={e => onTiempoChange(linea.id, e.target.value)}
                             className="w-16 text-right border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
                         />
-                        <span className="text-xs text-slate-400">h</span>
+                        <span className="text-xs text-slate-400">{tc.unidad}</span>
                     </div>
                     <span className="text-xs text-slate-400">=</span>
                     <span className="text-sm font-semibold text-slate-700 min-w-[72px] text-right">

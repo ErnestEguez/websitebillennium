@@ -141,7 +141,9 @@ const PERM_RUTAS: [string, string][] = [
     ['/talento/',                      'perm_th_estructura'],
     ['/nominas/periodos',              'perm_th_rol_nomina'],
     ['/nominas/rol/',                  'perm_th_rol_nomina'],
+    ['/nominas/reportes/',             'perm_th_rol_nomina'],
     ['/nominas/novedades',             'perm_th_rol_nomina'],
+    ['/nominas/cuentas-nomina',        'perm_th_nomina_parametros'],
     ['/nominas/conceptos',             'perm_th_conceptos_nomina'],
     ['/nominas/',                      'perm_th_nomina_parametros'],
 ]
@@ -495,10 +497,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={location.pathname.startsWith('/nominas/')}
                         >
-                            <SidebarItem to="/nominas/periodos"   icon={BookOpen}       label="Períodos / Rol de Pagos"   active={location.pathname.startsWith('/nominas/periodos') || location.pathname.startsWith('/nominas/rol/')} sub disabled={!p.perm_th_rol_nomina} />
-                            <SidebarItem to="/nominas/novedades"  icon={ClipboardList}  label="Novedades / Descuentos"    active={location.pathname === '/nominas/novedades'} sub disabled={!p.perm_th_rol_nomina} />
-                            <SidebarItem to="/nominas/conceptos"  icon={BookOpen}       label="Conceptos de Nómina"       active={location.pathname === '/nominas/conceptos'}  sub disabled={!p.perm_th_conceptos_nomina} />
-                            <SidebarItem to="/nominas/parametros" icon={Settings} label="Parámetros de Nómina" active={location.pathname === '/nominas/parametros'} sub disabled={!p.perm_th_nomina_parametros} />
+                            <SidebarItem to="/nominas/periodos"      icon={BookOpen}       label="Períodos / Rol de Pagos"   active={location.pathname.startsWith('/nominas/periodos') || location.pathname.startsWith('/nominas/rol/') || location.pathname.startsWith('/nominas/reportes/')} sub disabled={!p.perm_th_rol_nomina} />
+                            <SidebarItem to="/nominas/novedades"     icon={ClipboardList}  label="Novedades / Descuentos"    active={location.pathname === '/nominas/novedades'} sub disabled={!p.perm_th_rol_nomina} />
+                            <SidebarItem to="/nominas/conceptos"     icon={BookOpen}       label="Conceptos de Nómina"       active={location.pathname === '/nominas/conceptos'}  sub disabled={!p.perm_th_conceptos_nomina} />
+                            <SidebarItem to="/nominas/cuentas-nomina" icon={CreditCard}   label="Cuentas Contables"         active={location.pathname === '/nominas/cuentas-nomina'} sub disabled={!p.perm_th_nomina_parametros} />
+                            <SidebarItem to="/nominas/parametros"    icon={Settings}       label="Parámetros de Nómina"      active={location.pathname === '/nominas/parametros'} sub disabled={!p.perm_th_nomina_parametros} />
                         </ModuleSection>}
 
                     </nav>

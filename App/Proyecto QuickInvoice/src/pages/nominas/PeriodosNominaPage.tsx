@@ -188,11 +188,13 @@ export function PeriodosNominaPage() {
                                     <td className="px-4 py-3.5 text-center">
                                         <span className={cn(
                                             'px-2.5 py-0.5 rounded-full text-xs font-semibold',
-                                            p.estado === 'cerrado'
-                                                ? 'bg-slate-100 text-slate-500'
-                                                : 'bg-amber-50 text-amber-700'
+                                            p.estado === 'liquidado'
+                                                ? 'bg-green-100 text-green-700'
+                                                : p.estado === 'cerrado'
+                                                    ? 'bg-slate-100 text-slate-500'
+                                                    : 'bg-amber-50 text-amber-700'
                                         )}>
-                                            {p.estado === 'cerrado' ? 'Cerrado' : 'Borrador'}
+                                            {p.estado === 'liquidado' ? 'Liquidado' : p.estado === 'cerrado' ? 'Cerrado' : 'Borrador'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3.5">

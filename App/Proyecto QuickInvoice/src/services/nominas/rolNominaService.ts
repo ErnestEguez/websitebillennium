@@ -111,11 +111,11 @@ export const rolNominaService = {
         if (error) throw error
     },
 
-    async cerrarPeriodo(periodoId: string): Promise<void> {
-        // 1. Marcar el período como cerrado
+    async liquidarPeriodo(periodoId: string): Promise<void> {
+        // 1. Marcar el período como liquidado
         const { error } = await nominas()
             .from('periodos')
-            .update({ estado: 'cerrado', updated_at: new Date().toISOString() })
+            .update({ estado: 'liquidado', updated_at: new Date().toISOString() })
             .eq('id', periodoId)
         if (error) throw error
 
@@ -135,7 +135,7 @@ export const rolNominaService = {
             .not('novedad_id', 'is', null)
             .gt('monto', 0)
 
-        // 4. Actualizar saldo de préstamos por cada línea aplicada
+        // 4. Actualizar saldos de préstamos y resetear descuentos variables
         for (const linea of (lineasNov ?? [])) {
             if (!linea.novedad_id) continue
 
@@ -146,19 +146,25 @@ export const rolNominaService = {
                 .single()
             if (!nov) continue
 
-            if (nov.tipo_novedad !== 'prestamo_cuota' && nov.tipo_novedad !== 'prestamo_plazo') continue
-
-            const nuevoSaldo  = Math.max(0, (nov.saldo_pendiente ?? 0) - linea.monto)
-            const nuevasCuotas = (nov.n_cuotas_pagadas ?? 0) + 1
-            await nominas()
-                .from('novedades')
-                .update({
-                    saldo_pendiente:  round2(nuevoSaldo),
-                    n_cuotas_pagadas: nuevasCuotas,
-                    activo:           nuevoSaldo > 0.01,
-                    updated_at:       new Date().toISOString(),
-                })
-                .eq('id', linea.novedad_id)
+            if (nov.tipo_novedad === 'prestamo_cuota' || nov.tipo_novedad === 'prestamo_plazo') {
+                const nuevoSaldo   = Math.max(0, (nov.saldo_pendiente ?? 0) - linea.monto)
+                const nuevasCuotas = (nov.n_cuotas_pagadas ?? 0) + 1
+                await nominas()
+                    .from('novedades')
+                    .update({
+                        saldo_pendiente:  round2(nuevoSaldo),
+                        n_cuotas_pagadas: nuevasCuotas,
+                        activo:           nuevoSaldo > 0.01,
+                        updated_at:       new Date().toISOString(),
+                    })
+                    .eq('id', linea.novedad_id)
+            } else if (nov.tipo_novedad === 'descuento_variable') {
+                // Borrar el monto para que el siguiente mes se vuelva a ingresar
+                await nominas()
+                    .from('novedades')
+                    .update({ monto_fijo: null, updated_at: new Date().toISOString() })
+                    .eq('id', linea.novedad_id)
+            }
         }
     },
 
@@ -177,6 +183,28 @@ export const rolNominaService = {
             .from('periodos').select('*').eq('id', periodoId).single()
         if (perError || !periodo) throw perError ?? new Error('Período no encontrado')
         const factor = periodo.tipo_nomina === 'quincenal' ? 0.5 : 1.0
+
+        // Verificar que no hay períodos anteriores con rol generado sin liquidar
+        const { data: perPrevios } = await nominas()
+            .from('periodos')
+            .select('id, nombre, estado')
+            .eq('empresa_id', empresaId)
+            .neq('id', periodoId)
+            .lt('fecha_fin', periodo.fecha_fin)
+            .in('estado', ['borrador', 'cerrado'])
+            .order('fecha_fin', { ascending: false })
+            .limit(5)
+        for (const prev of (perPrevios ?? [])) {
+            const { count: cntPrev } = await nominas()
+                .from('rol_cabecera')
+                .select('id', { count: 'exact', head: true })
+                .eq('periodo_id', prev.id)
+            if ((cntPrev ?? 0) > 0) {
+                throw new Error(
+                    `El período "${prev.nombre}" tiene un rol generado sin liquidar. Realiza la Liquidación Definitiva antes de generar el siguiente rol.`
+                )
+            }
+        }
 
         // Cargar parámetros
         const params = await parametrosNominaService.obtener(empresaId)

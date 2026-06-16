@@ -16,6 +16,7 @@ const CONCEPTOS_ESTANDAR: Omit<ConceptoNomina, 'id' | 'empresa_id' | 'created_at
     { codigo: 'PRESTAMO_FORANEO',    nombre: 'Préstamo Foráneo / Comisariato',      tipo: 'descuento', formula: 'fijo',              valor_predeterminado: null,  afecta_iess: false, afecta_renta: false, es_legal: false, aplica_siempre: false, orden: 61, activo: true },
     { codigo: 'PRESTAMO_IESS_QUIRO', nombre: 'Préstamo IESS Quirografario',         tipo: 'descuento', formula: 'fijo',              valor_predeterminado: null,  afecta_iess: false, afecta_renta: false, es_legal: false, aplica_siempre: false, orden: 62, activo: true },
     { codigo: 'PRESTAMO_IESS_HIPO',  nombre: 'Préstamo IESS Hipotecario',           tipo: 'descuento', formula: 'fijo',              valor_predeterminado: null,  afecta_iess: false, afecta_renta: false, es_legal: false, aplica_siempre: false, orden: 63, activo: true },
+    { codigo: 'DIAS_FALTA',          nombre: 'Días de Falta',                       tipo: 'descuento', formula: 'calculado',         valor_predeterminado: null,  afecta_iess: false, afecta_renta: false, es_legal: false, aplica_siempre: false, orden: 55, activo: true },
     { codigo: 'DESCUENTO_VAR',       nombre: 'Descuento / Multa Variable',          tipo: 'descuento', formula: 'fijo',              valor_predeterminado: null,  afecta_iess: false, afecta_renta: false, es_legal: false, aplica_siempre: false, orden: 70, activo: true },
 ]
 

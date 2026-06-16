@@ -48,6 +48,7 @@ export interface ConceptoNomina {
     aplica_siempre: boolean
     orden: number
     activo: boolean
+    cuenta_contable?: string | null
     created_at?: string
     updated_at?: string
 }
@@ -104,7 +105,7 @@ export interface Empleado {
 
 // ── Etapa 3: Períodos y Rol de Pagos ──────────────────────────────────────────
 
-export type EstadoPeriodo = 'borrador' | 'cerrado'
+export type EstadoPeriodo = 'borrador' | 'cerrado' | 'liquidado'
 export type TipoPeriodo   = 'quincenal' | 'mensual'
 
 export interface PeriodoNomina {
@@ -179,4 +180,28 @@ export interface NovedadNomina {
     updated_at?: string
     empleado?: { nombres: string; apellidos: string } | null
     concepto?: { nombre: string } | null
+}
+
+// ── Etapa 3c: Configuración contable de nómina ────────────────────────────────
+
+export interface CuentasNomina {
+    empresa_id: string
+    // Gastos (Débito)
+    cta_sueldos?: string | null
+    cta_horas_extra?: string | null
+    cta_dec_tercero?: string | null
+    cta_dec_cuarto?: string | null
+    cta_fondo_reserva?: string | null
+    cta_iess_patronal?: string | null
+    cta_vacaciones?: string | null
+    // Pasivos (Crédito)
+    cta_sueldos_pagar?: string | null
+    cta_iess_pagar?: string | null
+    cta_prov_dec_tercero?: string | null
+    cta_prov_dec_cuarto?: string | null
+    cta_prov_fondo_reserva?: string | null
+    cta_prov_vacaciones?: string | null
+    // Activo
+    cta_anticipos_empleados?: string | null
+    updated_at?: string
 }

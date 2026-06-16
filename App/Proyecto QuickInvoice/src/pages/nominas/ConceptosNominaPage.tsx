@@ -15,6 +15,7 @@ const EMPTY: Omit<ConceptoNomina, 'id' | 'empresa_id' | 'created_at' | 'updated_
     afecta_renta: false,
     aplica_siempre: false,
     orden: 99,
+    cuenta_contable: null,
 }
 
 const LABELS_FORMULA: Record<FormulaConcepto, string> = {
@@ -81,6 +82,7 @@ export function ConceptosNominaPage() {
             afecta_renta: c.afecta_renta,
             aplica_siempre: c.aplica_siempre,
             orden: c.orden,
+            cuenta_contable: c.cuenta_contable ?? null,
         })
         setModalOpen(true)
     }
@@ -103,6 +105,7 @@ export function ConceptosNominaPage() {
                 afecta_renta: editando.afecta_renta,
                 aplica_siempre: editando.aplica_siempre,
                 orden: Number(editando.orden) || 99,
+                cuenta_contable: editando.cuenta_contable?.trim() || null,
             }
             if (editando.id) {
                 await conceptosNominaService.actualizarConcepto(editando.id, payload)
@@ -318,11 +321,20 @@ export function ConceptosNominaPage() {
                                 </label>
                             </div>
 
-                            <div className="max-w-[40%]">
-                                <label className="block text-xs font-semibold text-slate-600 mb-1">Orden en papeleta</label>
-                                <input type="number" min="1" step="1" className="input w-full"
-                                    value={editando.orden}
-                                    onChange={e => setEditando(v => ({ ...v, orden: parseInt(e.target.value) || 99 }))} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Orden en papeleta</label>
+                                    <input type="number" min="1" step="1" className="input w-full"
+                                        value={editando.orden}
+                                        onChange={e => setEditando(v => ({ ...v, orden: parseInt(e.target.value) || 99 }))} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Cuenta contable</label>
+                                    <input type="text" className="input w-full font-mono"
+                                        value={editando.cuenta_contable ?? ''}
+                                        onChange={e => setEditando(v => ({ ...v, cuenta_contable: e.target.value || null }))}
+                                        placeholder="ej: 6101.01" />
+                                </div>
                             </div>
                         </div>
 
