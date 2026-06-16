@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader2, Play, Lock, Plus, X, AlertCircle, Clock } from 'lucide-react'
+import { ArrowLeft, Loader2, Play, Lock, Plus, X, AlertCircle, Clock, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { periodoNominaService } from '../../services/nominas/periodoNominaService'
 import { rolNominaService } from '../../services/nominas/rolNominaService'
@@ -35,6 +35,7 @@ export function RolNominaPage() {
     const [loading, setLoading]         = useState(true)
     const [generando, setGenerando]     = useState(false)
     const [cerrando, setCerrando]       = useState(false)
+    const [sincronizando, setSincronizando] = useState(false)
     const [error, setError]             = useState<string | null>(null)
 
     // Modal de edición de líneas
@@ -83,6 +84,24 @@ export function RolNominaPage() {
             setError(e.message)
         } finally {
             setGenerando(false)
+        }
+    }
+
+    async function handleSincronizar() {
+        if (!periodoId || !empresa?.id) return
+        setSincronizando(true)
+        setError(null)
+        try {
+            const n = await rolNominaService.sincronizarNovedades(periodoId, empresa.id)
+            if (n === 0) {
+                setError('No hay novedades pendientes por aplicar.')
+            } else {
+                await cargar()
+            }
+        } catch (e: any) {
+            setError(e.message)
+        } finally {
+            setSincronizando(false)
         }
     }
 
@@ -231,13 +250,26 @@ export function RolNominaPage() {
                     </p>
                 </div>
                 {periodo.estado === 'borrador' && cabeceras.length > 0 && (
-                    <button
-                        onClick={() => setConfirmCierre(true)}
-                        className="flex items-center gap-2 border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-                    >
-                        <Lock className="w-4 h-4" />
-                        Cerrar Período
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleSincronizar}
+                            disabled={sincronizando}
+                            className="flex items-center gap-2 border border-cyan-300 text-cyan-700 hover:bg-cyan-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-60"
+                            title="Agrega al rol las novedades creadas después de generar el rol"
+                        >
+                            {sincronizando
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <RefreshCw className="w-4 h-4" />}
+                            Aplicar Novedades
+                        </button>
+                        <button
+                            onClick={() => setConfirmCierre(true)}
+                            className="flex items-center gap-2 border border-slate-300 text-slate-700 hover:bg-slate-50 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+                        >
+                            <Lock className="w-4 h-4" />
+                            Cerrar Período
+                        </button>
+                    </div>
                 )}
             </div>
 

@@ -296,8 +296,11 @@ export const rolNominaService = {
                     const cuota = round2((nov.saldo_inicial ?? 0) / Math.max(nov.n_meses ?? 1, 1))
                     monto   = round2(Math.min(cuota, nov.saldo_pendiente ?? cuota))
                     es_calc = true
+                } else {
+                    // descuento_variable: usar el monto guardado en la novedad (usuario lo actualiza cada mes)
+                    monto   = round2(nov.monto_fijo ?? 0)
+                    es_calc = false
                 }
-                // descuento_variable: monto=0, es_calc=false
 
                 const cOrden = nov.concepto_id ? (conceptoIdMap.get(nov.concepto_id)?.orden ?? 80) : 80
                 lineas.push({
@@ -352,5 +355,112 @@ export const rolNominaService = {
             .update({ total_ingresos: ptI, total_descuentos: ptD, total_neto: ptN, updated_at: new Date().toISOString() })
             .eq('id', periodoId)
         if (perUpdError) throw perUpdError
+    },
+
+    // Agrega las novedades activas que aún no están en un rol ya generado.
+    // Retorna el número de líneas nuevas insertadas.
+    async sincronizarNovedades(periodoId: string, empresaId: string): Promise<number> {
+        const { data: periodo } = await nominas()
+            .from('periodos').select('fecha_fin').eq('id', periodoId).single()
+        if (!periodo) return 0
+
+        const { data: cabs } = await nominas()
+            .from('rol_cabecera').select('id, empleado_id').eq('periodo_id', periodoId)
+        if (!cabs?.length) return 0
+
+        const { data: novedades } = await nominas()
+            .from('novedades').select('*')
+            .eq('empresa_id', empresaId).eq('activo', true).lte('fecha_inicio', periodo.fecha_fin)
+
+        const novedadesMap = new Map<string, any[]>()
+        for (const nov of (novedades ?? [])) {
+            const list = novedadesMap.get(nov.empleado_id) ?? []
+            list.push(nov)
+            novedadesMap.set(nov.empleado_id, list)
+        }
+
+        // Novedades ya vinculadas en este rol
+        const cabIds = cabs.map(c => c.id)
+        const { data: lineasExist } = await nominas()
+            .from('rol_lineas').select('cabecera_id, novedad_id')
+            .in('cabecera_id', cabIds).not('novedad_id', 'is', null)
+
+        const aplicadas = new Set<string>()
+        for (const l of (lineasExist ?? [])) {
+            if (l.novedad_id) aplicadas.add(`${l.cabecera_id}:${l.novedad_id}`)
+        }
+
+        // Orden de conceptos
+        const { data: conceptos } = await nominas()
+            .from('conceptos').select('id, orden').eq('empresa_id', empresaId).eq('activo', true)
+        const conceptoOrden = new Map<string, number>()
+        for (const c of (conceptos ?? [])) conceptoOrden.set(c.id, c.orden)
+
+        const nuevasLineas: any[] = []
+        for (const cab of cabs) {
+            const novsEmp = novedadesMap.get(cab.empleado_id) ?? []
+            for (const nov of novsEmp) {
+                if (aplicadas.has(`${cab.id}:${nov.id}`)) continue
+
+                let monto = 0
+                let es_calc = false
+
+                if (nov.tipo_novedad === 'descuento_fijo') {
+                    monto = nov.monto_fijo ?? 0; es_calc = true
+                } else if (nov.tipo_novedad === 'descuento_variable') {
+                    monto = round2(nov.monto_fijo ?? 0); es_calc = false
+                } else if (nov.tipo_novedad === 'prestamo_cuota') {
+                    if ((nov.saldo_pendiente ?? 0) <= 0.01) continue
+                    monto = round2(Math.min(nov.monto_fijo ?? 0, nov.saldo_pendiente ?? 0)); es_calc = true
+                } else if (nov.tipo_novedad === 'prestamo_plazo') {
+                    if ((nov.n_cuotas_pagadas ?? 0) >= (nov.n_meses ?? 0)) continue
+                    const cuota = round2((nov.saldo_inicial ?? 0) / Math.max(nov.n_meses ?? 1, 1))
+                    monto = round2(Math.min(cuota, nov.saldo_pendiente ?? cuota)); es_calc = true
+                }
+
+                nuevasLineas.push({
+                    cabecera_id:  cab.id,
+                    empresa_id:   empresaId,
+                    concepto_id:  nov.concepto_id ?? null,
+                    codigo:       nov.codigo,
+                    nombre:       nov.nombre,
+                    tipo:         'descuento',
+                    monto:        round2(monto),
+                    es_calculado: es_calc,
+                    orden:        nov.concepto_id ? (conceptoOrden.get(nov.concepto_id) ?? 80) : 80,
+                    horas:        null,
+                    novedad_id:   nov.id,
+                })
+            }
+        }
+
+        if (!nuevasLineas.length) return 0
+
+        const { error: insErr } = await nominas().from('rol_lineas').insert(nuevasLineas)
+        if (insErr) throw insErr
+
+        // Recalcular totales de cabeceras afectadas
+        const cabsAfectadas = [...new Set(nuevasLineas.map(l => l.cabecera_id))]
+        for (const cabId of cabsAfectadas) {
+            const { data: lineas } = await nominas()
+                .from('rol_lineas').select('tipo, monto').eq('cabecera_id', cabId)
+            const ti = round2((lineas ?? []).filter(l => l.tipo === 'ingreso').reduce((s, l) => s + l.monto, 0))
+            const td = round2((lineas ?? []).filter(l => l.tipo === 'descuento').reduce((s, l) => s + l.monto, 0))
+            await nominas().from('rol_cabecera')
+                .update({ total_ingresos: ti, total_descuentos: td, neto: round2(ti - td), updated_at: new Date().toISOString() })
+                .eq('id', cabId)
+        }
+
+        // Recalcular totales del período
+        const { data: allCabs } = await nominas()
+            .from('rol_cabecera').select('total_ingresos, total_descuentos, neto').eq('periodo_id', periodoId)
+        const ptI = round2((allCabs ?? []).reduce((s, c) => s + (c.total_ingresos ?? 0), 0))
+        const ptD = round2((allCabs ?? []).reduce((s, c) => s + (c.total_descuentos ?? 0), 0))
+        const ptN = round2((allCabs ?? []).reduce((s, c) => s + (c.neto ?? 0), 0))
+        await nominas().from('periodos')
+            .update({ total_ingresos: ptI, total_descuentos: ptD, total_neto: ptN, updated_at: new Date().toISOString() })
+            .eq('id', periodoId)
+
+        return nuevasLineas.length
     },
 }

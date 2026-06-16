@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Loader2, Plus, X, AlertCircle, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react'
+import { Loader2, Plus, X, AlertCircle, ToggleLeft, ToggleRight, ChevronDown, Pencil, Check } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { novedadesNominaService } from '../../services/nominas/novedadesNominaService'
 import { conceptosNominaService } from '../../services/nominas/conceptosNominaService'
@@ -66,6 +66,11 @@ export function NovedadesNominaPage() {
     // Confirm desactivar
     const [confirmId, setConfirmId]     = useState<string | null>(null)
     const [desactivando, setDesactivando] = useState(false)
+
+    // Edición inline de monto para descuento_variable
+    const [editMontoId, setEditMontoId]   = useState<string | null>(null)
+    const [editMontoVal, setEditMontoVal] = useState('')
+    const [savingMonto, setSavingMonto]   = useState(false)
 
     const cargar = useCallback(async () => {
         if (!empresa?.id) return
@@ -156,7 +161,7 @@ export function NovedadesNominaPage() {
                 nombre:       form.nombre,
                 tipo_novedad: form.tipo_novedad,
                 fecha_inicio: form.fecha_inicio,
-                monto_fijo:   ['descuento_fijo','prestamo_cuota'].includes(form.tipo_novedad)
+                monto_fijo:   ['descuento_fijo','prestamo_cuota','descuento_variable'].includes(form.tipo_novedad)
                                 ? parseFloat(form.monto_fijo) || null
                                 : null,
                 saldo_inicial:   ['prestamo_cuota','prestamo_plazo'].includes(form.tipo_novedad)
@@ -176,6 +181,19 @@ export function NovedadesNominaPage() {
             setFormError(e.message)
         } finally {
             setSaving(false)
+        }
+    }
+
+    async function handleSaveMonto(novId: string) {
+        setSavingMonto(true)
+        try {
+            await novedadesNominaService.actualizar(novId, { monto_fijo: parseFloat(editMontoVal) || 0 })
+            setEditMontoId(null)
+            await cargar()
+        } catch (e: any) {
+            setError(e.message)
+        } finally {
+            setSavingMonto(false)
         }
     }
 
@@ -293,8 +311,39 @@ export function NovedadesNominaPage() {
                                                 {tipo.label}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3.5 text-right text-sm text-slate-700">
-                                            {nov.monto_fijo != null ? `$${fmt(nov.monto_fijo)}` : '—'}
+                                        <td className="px-4 py-3.5 text-right text-sm">
+                                            {nov.tipo_novedad === 'descuento_variable' ? (
+                                                editMontoId === nov.id ? (
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <span className="text-slate-400 text-xs">$</span>
+                                                        <input
+                                                            type="number" min="0" step="0.01"
+                                                            value={editMontoVal}
+                                                            onChange={e => setEditMontoVal(e.target.value)}
+                                                            onKeyDown={e => { if (e.key === 'Enter') handleSaveMonto(nov.id); if (e.key === 'Escape') setEditMontoId(null) }}
+                                                            autoFocus
+                                                            className="w-24 text-right border border-primary-300 rounded-lg px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                                                        />
+                                                        <button onClick={() => handleSaveMonto(nov.id)} disabled={savingMonto} className="text-emerald-600 hover:text-emerald-800 disabled:opacity-40">
+                                                            {savingMonto ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                                                        </button>
+                                                        <button onClick={() => setEditMontoId(null)} className="text-slate-400 hover:text-slate-600">
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => { setEditMontoId(nov.id); setEditMontoVal(String(nov.monto_fijo ?? '')) }}
+                                                        className="flex items-center justify-end gap-1.5 w-full group text-slate-700 hover:text-primary-700 transition-colors"
+                                                        title="Clic para actualizar el monto de este período"
+                                                    >
+                                                        <span>{nov.monto_fijo != null && nov.monto_fijo > 0 ? `$${fmt(nov.monto_fijo)}` : <span className="text-slate-400 italic text-xs">sin monto</span>}</span>
+                                                        <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
+                                                    </button>
+                                                )
+                                            ) : (
+                                                <span className="text-slate-700">{nov.monto_fijo != null ? `$${fmt(nov.monto_fijo)}` : '—'}</span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3.5 text-right">
                                             {esPrestamo ? (
@@ -524,8 +573,25 @@ export function NovedadesNominaPage() {
                             )}
 
                             {form.tipo_novedad === 'descuento_variable' && (
-                                <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-3 text-sm text-orange-700">
-                                    El monto se ingresa manualmente en cada período al editar el detalle del empleado.
+                                <div className="space-y-2">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                                            Monto para este período
+                                        </label>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-slate-400 text-sm pl-1">$</span>
+                                            <input
+                                                type="number" min="0" step="0.01"
+                                                value={form.monto_fijo}
+                                                onChange={e => setField('monto_fijo', e.target.value)}
+                                                placeholder="0.00"
+                                                className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-orange-600 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+                                        Puedes actualizar este monto cada mes desde la tabla de novedades antes de generar el rol.
+                                    </p>
                                 </div>
                             )}
                         </div>
