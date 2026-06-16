@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Loader2, Plus, X, AlertCircle, ToggleLeft, ToggleRight, ChevronDown, Pencil, Check } from 'lucide-react'
+import { Loader2, Plus, X, AlertCircle, ToggleLeft, ToggleRight, ChevronDown, Pencil, Check, SlidersHorizontal } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { novedadesNominaService } from '../../services/nominas/novedadesNominaService'
 import { conceptosNominaService } from '../../services/nominas/conceptosNominaService'
@@ -63,9 +63,19 @@ export function NovedadesNominaPage() {
     const [saving, setSaving]           = useState(false)
     const [formError, setFormError]     = useState<string | null>(null)
 
+    // Filtro por tipo
+    const [filtroTipo, setFiltroTipo]    = useState<'todos' | 'prestamos' | 'descuentos'>('todos')
+
     // Confirm desactivar
     const [confirmId, setConfirmId]     = useState<string | null>(null)
     const [desactivando, setDesactivando] = useState(false)
+
+    // Modal corregir saldo de préstamo
+    const [editSaldoNov, setEditSaldoNov]   = useState<NovedadNomina | null>(null)
+    const [editSaldoVal, setEditSaldoVal]   = useState('')
+    const [editCuotasVal, setEditCuotasVal] = useState('')
+    const [savingSaldo, setSavingSaldo]     = useState(false)
+    const [editSaldoError, setEditSaldoError] = useState<string | null>(null)
 
     // Edición inline de monto para descuento_variable
     const [editMontoId, setEditMontoId]   = useState<string | null>(null)
@@ -211,9 +221,42 @@ export function NovedadesNominaPage() {
         }
     }
 
-    const listaFiltrada = novedades.filter(n =>
-        !filtroEmp || n.empleado_id === filtroEmp
-    )
+    function abrirEditSaldo(nov: NovedadNomina) {
+        setEditSaldoNov(nov)
+        setEditSaldoVal(String(nov.saldo_pendiente ?? ''))
+        setEditCuotasVal(String(nov.n_cuotas_pagadas ?? 0))
+        setEditSaldoError(null)
+    }
+
+    async function handleGuardarSaldo() {
+        if (!editSaldoNov) return
+        const saldo = parseFloat(editSaldoVal)
+        if (isNaN(saldo) || saldo < 0) { setEditSaldoError('Saldo inválido'); return }
+        setSavingSaldo(true)
+        setEditSaldoError(null)
+        try {
+            const patch: Record<string, unknown> = { saldo_pendiente: saldo }
+            if (editSaldoNov.tipo_novedad === 'prestamo_plazo') {
+                const cuotas = parseInt(editCuotasVal)
+                if (!isNaN(cuotas) && cuotas >= 0) patch.n_cuotas_pagadas = cuotas
+            }
+            if (saldo === 0) patch.activo = false
+            await novedadesNominaService.actualizar(editSaldoNov.id, patch)
+            setEditSaldoNov(null)
+            await cargar()
+        } catch (e: any) {
+            setEditSaldoError(e.message)
+        } finally {
+            setSavingSaldo(false)
+        }
+    }
+
+    const listaFiltrada = novedades.filter(n => {
+        if (filtroEmp && n.empleado_id !== filtroEmp) return false
+        if (filtroTipo === 'prestamos' && n.tipo_novedad !== 'prestamo_cuota' && n.tipo_novedad !== 'prestamo_plazo') return false
+        if (filtroTipo === 'descuentos' && n.tipo_novedad !== 'descuento_fijo' && n.tipo_novedad !== 'descuento_variable') return false
+        return true
+    })
 
     if (loading) return (
         <div className="flex justify-center py-20">
@@ -245,13 +288,37 @@ export function NovedadesNominaPage() {
                 </div>
             )}
 
-            {/* Filtro por empleado */}
-            <div className="flex items-center gap-3">
-                <div className="relative w-64">
+            {/* Filtros */}
+            <div className="flex flex-wrap items-center gap-3">
+                {/* Tabs tipo */}
+                <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
+                    {([
+                        { key: 'todos',      label: 'Todos' },
+                        { key: 'prestamos',  label: 'Préstamos' },
+                        { key: 'descuentos', label: 'Descuentos' },
+                    ] as const).map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setFiltroTipo(tab.key)}
+                            className={cn(
+                                'px-3 py-1.5 text-xs font-semibold rounded-lg transition-all',
+                                filtroTipo === tab.key
+                                    ? 'bg-white text-slate-800 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                            )}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Filtro por empleado */}
+                <div className="relative">
+                    <SlidersHorizontal className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                     <select
                         value={filtroEmp}
                         onChange={e => setFiltroEmp(e.target.value)}
-                        className="w-full appearance-none border border-slate-200 rounded-xl px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 bg-white"
+                        className="appearance-none border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 bg-white"
                     >
                         <option value="">Todos los empleados</option>
                         {empleados.map(e => (
@@ -260,7 +327,8 @@ export function NovedadesNominaPage() {
                     </select>
                     <ChevronDown className="absolute right-2.5 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
-                <span className="text-sm text-slate-400">{listaFiltrada.length} registro{listaFiltrada.length !== 1 ? 's' : ''}</span>
+
+                <span className="text-sm text-slate-400 ml-1">{listaFiltrada.length} registro{listaFiltrada.length !== 1 ? 's' : ''}</span>
             </div>
 
             {/* Tabla */}
@@ -347,17 +415,33 @@ export function NovedadesNominaPage() {
                                         </td>
                                         <td className="px-4 py-3.5 text-right">
                                             {esPrestamo ? (
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <span className="text-sm font-medium text-slate-700">
+                                                <div className="flex flex-col items-end gap-0.5">
+                                                    <span className="text-sm font-semibold text-slate-800">
                                                         ${fmt(nov.saldo_pendiente ?? 0)}
                                                     </span>
+                                                    <span className="text-xs text-slate-400">
+                                                        de ${fmt(nov.saldo_inicial ?? 0)}
+                                                    </span>
                                                     {pct !== null && (
-                                                        <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-primary-400 rounded-full"
-                                                                style={{ width: `${pct}%` }}
-                                                            />
-                                                        </div>
+                                                        <>
+                                                            <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
+                                                                <div
+                                                                    className="h-full bg-primary-400 rounded-full transition-all"
+                                                                    style={{ width: `${pct}%` }}
+                                                                />
+                                                            </div>
+                                                            <span className="text-xs text-slate-400">{pct}% pagado</span>
+                                                        </>
+                                                    )}
+                                                    {nov.tipo_novedad === 'prestamo_plazo' && nov.n_meses != null && (
+                                                        <span className="text-xs font-semibold text-indigo-600 mt-0.5">
+                                                            {nov.n_cuotas_pagadas} de {nov.n_meses} cuotas
+                                                        </span>
+                                                    )}
+                                                    {nov.tipo_novedad === 'prestamo_cuota' && nov.saldo_inicial != null && (
+                                                        <span className="text-xs text-emerald-600 mt-0.5">
+                                                            pagado ${fmt((nov.saldo_inicial ?? 0) - (nov.saldo_pendiente ?? 0))}
+                                                        </span>
                                                     )}
                                                 </div>
                                             ) : (
@@ -374,15 +458,26 @@ export function NovedadesNominaPage() {
                                             }
                                         </td>
                                         <td className="px-4 py-3.5 text-right">
-                                            {nov.activo && (
-                                                <button
-                                                    onClick={() => setConfirmId(nov.id)}
-                                                    className="text-xs text-slate-400 hover:text-red-600 transition-colors"
-                                                    title="Desactivar novedad"
-                                                >
-                                                    <ToggleRight className="w-4 h-4" />
-                                                </button>
-                                            )}
+                                            <div className="flex items-center justify-end gap-2">
+                                                {nov.activo && esPrestamo && (
+                                                    <button
+                                                        onClick={() => abrirEditSaldo(nov)}
+                                                        className="text-xs text-slate-400 hover:text-indigo-600 transition-colors"
+                                                        title="Corregir saldo pendiente"
+                                                    >
+                                                        <Pencil className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                                {nov.activo && (
+                                                    <button
+                                                        onClick={() => setConfirmId(nov.id)}
+                                                        className="text-xs text-slate-400 hover:text-red-600 transition-colors"
+                                                        title="Desactivar novedad"
+                                                    >
+                                                        <ToggleRight className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 )
@@ -608,6 +703,94 @@ export function NovedadesNominaPage() {
                             >
                                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                                 Guardar Novedad
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal corregir saldo */}
+            {editSaldoNov && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-base font-bold text-slate-900">Corregir saldo de préstamo</h2>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {editSaldoNov.empleado?.apellidos}, {editSaldoNov.empleado?.nombres}
+                                    {' — '}{editSaldoNov.nombre}
+                                </p>
+                            </div>
+                            <button onClick={() => setEditSaldoNov(null)} className="text-slate-400 hover:text-slate-600">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            {editSaldoError && (
+                                <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl px-4 py-2.5 text-sm flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 shrink-0" />{editSaldoError}
+                                </div>
+                            )}
+
+                            {/* Info actual */}
+                            <div className="bg-slate-50 rounded-xl px-4 py-3 text-sm space-y-1">
+                                <div className="flex justify-between text-slate-600">
+                                    <span>Saldo inicial</span>
+                                    <span className="font-mono font-medium">${fmt(editSaldoNov.saldo_inicial ?? 0)}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-600">
+                                    <span>Saldo actual</span>
+                                    <span className="font-mono font-medium text-slate-800">${fmt(editSaldoNov.saldo_pendiente ?? 0)}</span>
+                                </div>
+                                {editSaldoNov.tipo_novedad === 'prestamo_plazo' && editSaldoNov.n_meses && (
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>Cuotas pagadas</span>
+                                        <span className="font-medium text-indigo-700">{editSaldoNov.n_cuotas_pagadas} de {editSaldoNov.n_meses}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Nuevo saldo pendiente</label>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-slate-400 text-sm pl-1">$</span>
+                                    <input
+                                        type="number" min="0" step="0.01"
+                                        value={editSaldoVal}
+                                        onChange={e => setEditSaldoVal(e.target.value)}
+                                        className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                                        autoFocus
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-400 mt-1">Ingresa 0 para cerrar el préstamo automáticamente.</p>
+                            </div>
+
+                            {editSaldoNov.tipo_novedad === 'prestamo_plazo' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Cuotas pagadas</label>
+                                    <input
+                                        type="number" min="0" step="1"
+                                        value={editCuotasVal}
+                                        onChange={e => setEditCuotasVal(e.target.value)}
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="px-6 pb-5 flex gap-3">
+                            <button onClick={() => setEditSaldoNov(null)}
+                                className="flex-1 border border-slate-300 text-slate-700 rounded-xl py-2.5 text-sm font-medium hover:bg-slate-50 transition-colors">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleGuardarSaldo}
+                                disabled={savingSaldo}
+                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                            >
+                                {savingSaldo && <Loader2 className="w-4 h-4 animate-spin" />}
+                                Guardar corrección
                             </button>
                         </div>
                     </div>
