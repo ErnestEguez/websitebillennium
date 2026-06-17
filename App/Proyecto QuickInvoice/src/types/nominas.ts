@@ -273,3 +273,66 @@ export interface CuentasNomina {
     cta_anticipos_empleados?: string | null
     updated_at?: string
 }
+
+// ── Etapa 2B: Reclutamiento y Selección ──────────────────────────────────────
+
+export type EstadoVacante   = 'abierta' | 'en_proceso' | 'cerrada' | 'cancelada'
+export type FuenteCandidato = 'directo' | 'referido' | 'portal' | 'linkedin' | 'bolsa_trabajo' | 'otro'
+export type EtapaCandidato  =
+    | 'postulacion' | 'revision_cv' | 'entrevista_inicial' | 'entrevista_tecnica'
+    | 'evaluacion' | 'oferta' | 'contratado' | 'rechazado' | 'retirado'
+export type TipoEvento      = 'entrevista' | 'evaluacion' | 'prueba_tecnica' | 'llamada' | 'otro'
+export type ResultadoEvento = 'aprobado' | 'reprobado' | 'pendiente'
+
+export interface Vacante {
+    id: string
+    empresa_id: string
+    cargo_id?: string | null
+    seccion_id?: string | null
+    titulo: string
+    descripcion?: string | null
+    sueldo_referencial?: number | null
+    tipo_contrato?: TipoContrato | null
+    estado: EstadoVacante
+    fecha_apertura: string
+    fecha_cierre?: string | null
+    created_at?: string
+    updated_at?: string
+    // Joins
+    cargo?: { nombre: string } | null
+    seccion?: { nombre: string } | null
+    candidatos_count?: number
+}
+
+export interface Candidato {
+    id: string
+    empresa_id: string
+    vacante_id: string
+    nombres: string
+    apellidos: string
+    cedula?: string | null
+    email?: string | null
+    telefono?: string | null
+    fuente: FuenteCandidato
+    referido_por?: string | null
+    cv_url?: string | null
+    etapa: EtapaCandidato
+    notas?: string | null
+    created_at?: string
+    updated_at?: string
+    // Joins
+    eventos?: CandidatoEvento[]
+}
+
+export interface CandidatoEvento {
+    id: string
+    empresa_id: string
+    candidato_id: string
+    tipo: TipoEvento
+    fecha: string
+    responsable?: string | null
+    calificacion?: number | null
+    comentarios?: string | null
+    resultado?: ResultadoEvento | null
+    created_at?: string
+}
