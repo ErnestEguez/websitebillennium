@@ -225,12 +225,29 @@ export const liquidacionVacacionesService = {
         const periodoIds  = (periodos ?? []).map(p => p.id)
         const tipoByPer   = new Map((periodos ?? []).map(p => [p.id, p.tipo_nomina as string]))
 
+        // Sin períodos cerrados → devolver resultado con ceros (el caller muestra aviso)
+        if (!periodoIds.length) {
+            const { anios, meses, dias_base, dias_extra, dias_vac } = calcAntiguedad(emp.fecha_ingreso, fechaFin)
+            const dias_pendientes  = Math.max(0, dias_vac - diasGozados)
+            return {
+                empleado_id: emp.id, nombres: emp.nombres, apellidos: emp.apellidos,
+                cedula: emp.cedula, cargo: (emp.cargo as any)?.nombre ?? null,
+                seccion: (emp.seccion as any)?.nombre ?? null,
+                fecha_ingreso: emp.fecha_ingreso, fecha_salida: emp.fecha_salida ?? null,
+                anios_trabajados: anios, meses_adicionales: meses,
+                dias_base, dias_extra, dias_generados: dias_vac,
+                total_percibido: 0, valor_1_24: 0, valor_por_dia: 0,
+                periodos_count: 0, periodos_dias_nominales: 0,
+                dias_gozados: diasGozados, dias_pendientes, valor_vacaciones: 0,
+            }
+        }
+
         // Cabeceras del empleado en esos períodos
         const { data: cabeceras, error: ec } = await nominas()
             .from('rol_cabecera')
             .select('id, periodo_id')
             .eq('empleado_id', empleadoId)
-            .in('periodo_id', periodoIds.length ? periodoIds : ['__none__'])
+            .in('periodo_id', periodoIds)
         if (ec) throw ec
 
         const cabIds = (cabeceras ?? []).map(c => c.id)
