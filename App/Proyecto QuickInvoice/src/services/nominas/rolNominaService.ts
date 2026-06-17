@@ -337,6 +337,9 @@ export const rolNominaService = {
                 let es_calc = false
 
                 if (nov.codigo === 'DIAS_FALTA') {
+                    // Eliminar la línea vacía que aplica_siempre agrega — la novedad la reemplaza
+                    const idx = lineas.findIndex(l => l.codigo === 'DIAS_FALTA')
+                    if (idx >= 0) lineas.splice(idx, 1)
                     // monto_fijo almacena los días de falta; monto = (sueldo/30) * días
                     const dias = nov.monto_fijo ?? 0
                     horas   = dias
