@@ -12,8 +12,9 @@ import type {
 import {
     Briefcase, Plus, Edit2, X, Save, Loader2, Users, UserPlus,
     Star, Calendar, ChevronRight, Trash2, Phone, Mail, FileText,
-    CheckCircle, XCircle, Clock, ArrowRight,
+    CheckCircle, XCircle, Clock, ArrowRight, Upload, ExternalLink,
 } from 'lucide-react'
+import { storageService } from '../../services/storageService'
 import { cn } from '../../lib/utils'
 
 // ─── Helpers de etiqueta/color ────────────────────────────────────────────────
@@ -155,6 +156,8 @@ export function VacantesPage() {
     const [saving, setSaving] = useState(false)
     const [loadingCands, setLoadingCands] = useState(false)
     const [loadingEvts, setLoadingEvts] = useState(false)
+    const [cvFile, setCvFile] = useState<File | null>(null)
+    const [cvUploading, setCvUploading] = useState(false)
 
     useEffect(() => {
         if (empresa?.id) loadData()
@@ -257,8 +260,23 @@ export function VacantesPage() {
 
     // ── Candidato CRUD ────────────────────────────────────────────────────────
 
+    async function verCV(cvUrl: string) {
+        if (!cvUrl) return
+        try {
+            if (storageService.isStoragePath(cvUrl)) {
+                const url = await storageService.getSignedUrl(cvUrl)
+                window.open(url, '_blank')
+            } else {
+                window.open(cvUrl, '_blank')
+            }
+        } catch (e: any) {
+            alert(`No se pudo abrir el CV: ${e.message}`)
+        }
+    }
+
     function abrirNuevoCandidato() {
         setFormCand({ ...EMPTY_CAND })
+        setCvFile(null)
         setTabCand('datos')
         setModalCand(true)
     }
@@ -277,6 +295,7 @@ export function VacantesPage() {
             notas: c.notas ?? '',
             etapa: c.etapa,
         })
+        setCvFile(null)
         setTabCand('datos')
         setEventos([])
         loadEventos(c)
@@ -302,13 +321,31 @@ export function VacantesPage() {
                 notas: formCand.notas || null,
                 etapa: formCand.etapa,
             }
+            let candidatoId: string
             if (formCand.id) {
                 await candidatosService.actualizar(formCand.id, payload)
+                candidatoId = formCand.id
             } else {
-                await candidatosService.crear(payload)
+                const created = await candidatosService.crear(payload)
+                candidatoId = created.id
             }
+
+            // Subir CV si el usuario seleccionó un archivo
+            if (cvFile) {
+                setCvUploading(true)
+                try {
+                    const path = await storageService.uploadCV(empresa!.id, candidatoId, cvFile)
+                    await candidatosService.actualizar(candidatoId, { cv_url: path })
+                } catch (e: any) {
+                    alert(`Candidato guardado, pero error al subir CV: ${e.message}`)
+                } finally {
+                    setCvUploading(false)
+                }
+            }
+
             setModalCand(false)
             setCandidatoActivo(null)
+            setCvFile(null)
             const c = await candidatosService.listarPorVacante(vacanteActiva.id)
             setCandidatos(c)
         } catch (e: any) { alert(`Error: ${e.message}`) }
@@ -575,11 +612,11 @@ export function VacantesPage() {
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-1 justify-end">
                                                         {c.cv_url && (
-                                                            <a href={c.cv_url} target="_blank" rel="noreferrer"
+                                                            <button onClick={() => verCV(c.cv_url!)}
                                                                 className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
                                                                 title="Ver CV">
                                                                 <FileText className="w-4 h-4" />
-                                                            </a>
+                                                            </button>
                                                         )}
                                                         <button onClick={() => abrirNuevoEvento(c)}
                                                             title="Registrar evento"
@@ -790,11 +827,75 @@ export function VacantesPage() {
                                                 placeholder="Nombre del referente" disabled={formCand.fuente !== 'referido'} />
                                         </div>
                                     </div>
+                                    {/* ── CV / Hoja de vida ── */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-600 mb-1">URL del CV</label>
-                                        <input className="input w-full" value={formCand.cv_url}
-                                            onChange={e => setFormCand(v => ({ ...v, cv_url: e.target.value }))}
-                                            placeholder="https://..." />
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">CV / Hoja de vida</label>
+
+                                        {/* Archivo ya guardado en storage */}
+                                        {formCand.cv_url && !cvFile && (
+                                            <div className="flex items-center gap-2 p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg">
+                                                <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
+                                                <span className="text-sm text-indigo-700 flex-1 truncate">
+                                                    {storageService.isStoragePath(formCand.cv_url)
+                                                        ? 'CV guardado en storage'
+                                                        : formCand.cv_url}
+                                                </span>
+                                                <button type="button" onClick={() => verCV(formCand.cv_url)}
+                                                    className="p-1 text-indigo-500 hover:text-indigo-700 transition-colors" title="Abrir CV">
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button type="button" onClick={() => setFormCand(v => ({ ...v, cv_url: '' }))}
+                                                    className="p-1 text-slate-400 hover:text-red-400 transition-colors" title="Eliminar CV">
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Archivo seleccionado pero aún no guardado */}
+                                        {cvFile && (
+                                            <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                                                <FileText className="w-4 h-4 text-amber-500 shrink-0" />
+                                                <span className="text-sm text-amber-700 flex-1 truncate">{cvFile.name}</span>
+                                                <span className="text-xs text-amber-500">
+                                                    {(cvFile.size / 1024 / 1024).toFixed(1)} MB
+                                                </span>
+                                                <button type="button" onClick={() => setCvFile(null)}
+                                                    className="p-1 text-slate-400 hover:text-red-400 transition-colors">
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Botón de selección */}
+                                        {!cvFile && (
+                                            <label className={cn(
+                                                'mt-1.5 flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed cursor-pointer transition-colors text-sm',
+                                                formCand.cv_url
+                                                    ? 'border-slate-200 text-slate-400 hover:border-indigo-300 hover:text-indigo-500'
+                                                    : 'border-indigo-200 text-indigo-500 hover:border-indigo-400 hover:bg-indigo-50'
+                                            )}>
+                                                <Upload className="w-4 h-4 shrink-0" />
+                                                {formCand.cv_url ? 'Reemplazar archivo' : 'Seleccionar CV (PDF / Word, máx. 10 MB)'}
+                                                <input type="file" className="hidden"
+                                                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                                    onChange={e => {
+                                                        const f = e.target.files?.[0]
+                                                        if (f) {
+                                                            if (f.size > 10 * 1024 * 1024) {
+                                                                alert('El archivo supera el límite de 10 MB')
+                                                                return
+                                                            }
+                                                            setCvFile(f)
+                                                        }
+                                                        e.target.value = ''
+                                                    }} />
+                                            </label>
+                                        )}
+                                        {cvUploading && (
+                                            <p className="text-xs text-indigo-500 flex items-center gap-1 mt-1">
+                                                <Loader2 className="w-3 h-3 animate-spin" /> Subiendo archivo...
+                                            </p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-xs font-semibold text-slate-600 mb-1">Notas</label>
