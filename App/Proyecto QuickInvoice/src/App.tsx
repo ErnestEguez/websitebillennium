@@ -81,6 +81,10 @@ import { EmpleadosPage }                          from './pages/talento/Empleado
 import { VacantesPage }                           from './pages/talento/VacantesPage'
 import { PlantillasChecklistPage }               from './pages/talento/PlantillasChecklistPage'
 import { ChecklistsPage }                        from './pages/talento/ChecklistsPage'
+import { EvaluacionDesempenoPage }               from './pages/talento/EvaluacionDesempenoPage'
+import { CapacitacionPage }                      from './pages/talento/CapacitacionPage'
+import { ClimaPage }                             from './pages/talento/ClimaPage'
+import { DashboardTalentoPage }                  from './pages/talento/DashboardTalentoPage'
 import { EstructuraOrganizativaPage }             from './pages/talento/EstructuraOrganizativaPage'
 import { ConceptosNominaPage }                    from './pages/nominas/ConceptosNominaPage'
 import { ParametrosNominaPage }                   from './pages/nominas/ParametrosNominaPage'
@@ -551,6 +555,10 @@ function App() {
                       <Route path="empleados"             element={<EmpleadosPage />} />
                       <Route path="plantillas-checklist"  element={<PlantillasChecklistPage />} />
                       <Route path="checklists"            element={<ChecklistsPage />} />
+                      <Route path="desempeno"             element={<EvaluacionDesempenoPage />} />
+                      <Route path="capacitacion"          element={<CapacitacionPage />} />
+                      <Route path="clima"                 element={<ClimaPage />} />
+                      <Route path="dashboard"             element={<DashboardTalentoPage />} />
                       <Route path="estructura"            element={<EstructuraOrganizativaPage />} />
                       <Route path="*"          element={<Navigate to="/talento/empleados" replace />} />
                     </Routes>

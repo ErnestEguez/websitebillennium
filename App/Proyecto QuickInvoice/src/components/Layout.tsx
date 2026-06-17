@@ -33,6 +33,9 @@ import {
     ClipboardList,
     CalendarDays,
     ListChecks,
+    Star,
+    GraduationCap,
+    Smile,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -143,6 +146,10 @@ const PERM_RUTAS: [string, string][] = [
     ['/talento/empleados',             'perm_th_empleados'],
     ['/talento/plantillas-checklist',  'perm_th_empleados'],
     ['/talento/checklists',            'perm_th_empleados'],
+    ['/talento/desempeno',             'perm_th_empleados'],
+    ['/talento/capacitacion',          'perm_th_empleados'],
+    ['/talento/clima',                 'perm_th_empleados'],
+    ['/talento/dashboard',             'perm_th_empleados'],
     ['/talento/',                      'perm_th_estructura'],
     ['/nominas/periodos',              'perm_th_rol_nomina'],
     ['/nominas/rol/',                  'perm_th_rol_nomina'],
@@ -493,11 +500,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={location.pathname.startsWith('/talento/')}
                         >
-                            <SidebarItem to="/talento/vacantes"             icon={UserCheck}   label="Reclutamiento"          active={location.pathname.startsWith('/talento/vacantes')} sub disabled={!p.perm_th_empleados} />
-                            <SidebarItem to="/talento/empleados"            icon={Users}       label="Empleados"               active={location.pathname === '/talento/empleados'} sub disabled={!p.perm_th_empleados} />
-                            <SidebarItem to="/talento/plantillas-checklist" icon={ListChecks}  label="Plantillas Checklist"    active={location.pathname === '/talento/plantillas-checklist'} sub disabled={!p.perm_th_empleados} />
-                            <SidebarItem to="/talento/checklists"           icon={ClipboardList} label="Onboarding/Offboarding" active={location.pathname === '/talento/checklists'} sub disabled={!p.perm_th_empleados} />
-                            <SidebarItem to="/talento/estructura"           icon={Users}       label="Estructura Organizativa" active={location.pathname === '/talento/estructura'} sub disabled={!p.perm_th_estructura} />
+                            <SidebarItem to="/talento/vacantes"             icon={UserCheck}     label="Reclutamiento"          active={location.pathname.startsWith('/talento/vacantes')} sub disabled={!p.perm_th_empleados} />
+                            <SidebarItem to="/talento/empleados"            icon={Users}         label="Empleados"               active={location.pathname === '/talento/empleados'} sub disabled={!p.perm_th_empleados} />
+                            <SidebarItem to="/talento/plantillas-checklist" icon={ListChecks}    label="Plantillas Checklist"    active={location.pathname === '/talento/plantillas-checklist'} sub disabled={!p.perm_th_empleados} />
+                            <SidebarItem to="/talento/checklists"           icon={ClipboardList} label="Onboarding/Offboarding"  active={location.pathname === '/talento/checklists'} sub disabled={!p.perm_th_empleados} />
+                            <SidebarItem to="/talento/desempeno"            icon={Star}          label="Evaluación Desempeño"    active={location.pathname === '/talento/desempeno'} sub disabled={!p.perm_th_empleados} />
+                            <SidebarItem to="/talento/capacitacion"         icon={GraduationCap} label="Capacitación"            active={location.pathname === '/talento/capacitacion'} sub disabled={!p.perm_th_empleados} />
+                            <SidebarItem to="/talento/clima"                icon={Smile}         label="Clima Organizacional"    active={location.pathname === '/talento/clima'} sub disabled={!p.perm_th_empleados} />
+                            <SidebarItem to="/talento/dashboard"            icon={BarChart3}     label="Dashboard Talento"       active={location.pathname === '/talento/dashboard'} sub disabled={!p.perm_th_empleados} />
+                            <SidebarItem to="/talento/estructura"           icon={Users}         label="Estructura Organizativa" active={location.pathname === '/talento/estructura'} sub disabled={!p.perm_th_estructura} />
                         </ModuleSection>}
 
                         {/* ── MÓDULO 6: Liquidación de Nóminas ────────────── */}

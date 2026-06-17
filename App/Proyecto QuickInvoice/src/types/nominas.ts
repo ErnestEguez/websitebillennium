@@ -115,6 +115,9 @@ export interface Empleado {
     // Observaciones
     observaciones?: string | null
 
+    // Motivo de salida (§8)
+    motivo_salida?: MotivoSalida | null
+
     activo: boolean
     created_at?: string
     updated_at?: string
@@ -388,6 +391,129 @@ export interface ChecklistEmpleado {
     items_count?: number
     items_completados?: number
 }
+
+// ── Etapa 2E: Evaluación de Desempeño ─────────────────────────────────────────
+
+export type FrecuenciaEvaluacion = 'trimestral' | 'semestral' | 'anual' | 'libre'
+export type EstadoPeriodoEval    = 'borrador' | 'abierto' | 'cerrado'
+export type TipoEvaluacion       = 'jefe' | 'auto' | '360'
+export type EstadoEvaluacion     = 'pendiente' | 'completado'
+export type MotivoSalida         = 'renuncia_voluntaria' | 'despido' | 'fin_contrato' | 'mutuo_acuerdo' | 'jubilacion' | 'otro'
+
+export interface CriterioEvaluacion {
+    nombre: string
+    calificacion: number   // 1–5
+    comentario?: string
+}
+
+export interface PeriodoEvaluacion {
+    id: string
+    empresa_id: string
+    nombre: string
+    frecuencia: FrecuenciaEvaluacion
+    fecha_inicio: string
+    fecha_fin: string
+    estado: EstadoPeriodoEval
+    created_at?: string
+    updated_at?: string
+    evaluaciones_count?: number
+}
+
+export interface Evaluacion {
+    id: string
+    empresa_id: string
+    periodo_id: string
+    empleado_id: string
+    tipo: TipoEvaluacion
+    estado: EstadoEvaluacion
+    criterios: CriterioEvaluacion[]
+    calificacion_final?: number | null
+    comentarios?: string | null
+    created_at?: string
+    updated_at?: string
+    empleado?: { nombres: string; apellidos: string; cargo?: { nombre: string } | null } | null
+}
+
+// ── Etapa 2E: Capacitación ────────────────────────────────────────────────────
+
+export type TipoCurso         = 'interno' | 'externo'
+export type EstadoInscripcion = 'inscrito' | 'asistio' | 'aprobado' | 'no_asistio'
+
+export interface Curso {
+    id: string
+    empresa_id: string
+    nombre: string
+    tipo: TipoCurso
+    proveedor?: string | null
+    descripcion?: string | null
+    horas: number
+    costo_total?: number | null
+    fecha_inicio?: string | null
+    fecha_fin?: string | null
+    activo: boolean
+    created_at?: string
+    updated_at?: string
+    inscripciones_count?: number
+}
+
+export interface InscripcionCurso {
+    id: string
+    empresa_id: string
+    curso_id: string
+    empleado_id: string
+    estado: EstadoInscripcion
+    costo_empleado?: number | null
+    certificado_url?: string | null
+    notas?: string | null
+    created_at?: string
+    updated_at?: string
+    empleado?: { nombres: string; apellidos: string; cargo?: { nombre: string } | null } | null
+    curso?: { nombre: string; horas: number } | null
+}
+
+// ── Etapa 2E: Clima Organizacional ────────────────────────────────────────────
+
+export type EstadoEncuesta = 'activa' | 'cerrada'
+
+export interface EncuestaClima {
+    id: string
+    empresa_id: string
+    nombre: string
+    descripcion?: string | null
+    fecha: string
+    estado: EstadoEncuesta
+    created_at?: string
+    updated_at?: string
+    respuestas_count?: number
+    promedio_general?: number | null
+}
+
+export interface RespuestaClima {
+    id: string
+    empresa_id: string
+    encuesta_id: string
+    empleado_id?: string | null
+    satisfaccion_general?: number | null
+    ambiente_trabajo?: number | null
+    liderazgo?: number | null
+    crecimiento?: number | null
+    comunicacion?: number | null
+    comentarios?: string | null
+    anonima: boolean
+    created_at?: string
+    empleado?: { nombres: string; apellidos: string } | null
+}
+
+export interface PromediosClima {
+    satisfaccion_general: number
+    ambiente_trabajo: number
+    liderazgo: number
+    crecimiento: number
+    comunicacion: number
+    total_respuestas: number
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 
 export interface ChecklistItemEmpleado {
     id: string
