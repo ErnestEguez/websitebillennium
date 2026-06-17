@@ -101,6 +101,10 @@ tr:nth-child(even) td { background: #f8fafc; }
     background: #e2e8f0 !important;
     border-top: 2.5px solid #475569;
 }
+.tfoot-ing-row td  { font-weight: 800; font-size: 8pt; background: #d1fae5 !important; color: #065f46; border-top: 2px solid #6ee7b7; }
+.tfoot-desc-row td { font-weight: 800; font-size: 8pt; background: #fee2e2 !important; color: #7f1d1d; border-top: 2px solid #fca5a5; }
+.tfoot-neto-row td { font-weight: 900; font-size: 10pt; background: #dbeafe !important; color: #1e3a8a; border-top: 3px solid #1e40af; }
+.blank-td { color: #e2e8f0 !important; background: white !important; }
 
 /* ── Papeletas ── */
 .papeleta {
@@ -325,13 +329,25 @@ ${htmlEncabezado('Rol Completo — Detalle por Concepto')}
 ${rows}
 </tbody>
 <tfoot>
-    <tr class="tfoot-row">
-        <td class="left" colspan="3"><strong>TOTALES</strong></td>
+    <tr class="tfoot-ing-row">
+        <td class="left" colspan="3">▶ Sub-Total INGRESOS</td>
         ${colsIngreso.map(c => `<td>${fmt(cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}</td>`).join('')}
-        <td class="col-ing">${fmt(totalIngresos)}</td>
+        <td style="background:#a7f3d0!important;font-weight:900">${fmt(totalIngresos)}</td>
+        ${colsDescuento.map(() => `<td class="blank-td">—</td>`).join('')}
+        <td class="blank-td">—</td>
+        <td class="blank-td">—</td>
+    </tr>
+    <tr class="tfoot-desc-row">
+        <td class="left" colspan="3">▶ Sub-Total DESCUENTOS</td>
+        ${colsIngreso.map(() => `<td class="blank-td">—</td>`).join('')}
+        <td class="blank-td">—</td>
         ${colsDescuento.map(c => `<td>${fmt(cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}</td>`).join('')}
-        <td class="col-desc">${fmt(totalDescuentos)}</td>
-        <td class="col-neto">${fmt(totalNeto)}</td>
+        <td style="background:#fca5a5!important;font-weight:900">${fmt(totalDescuentos)}</td>
+        <td class="blank-td">—</td>
+    </tr>
+    <tr class="tfoot-neto-row">
+        <td class="left" colspan="${3 + colsIngreso.length + 1 + colsDescuento.length + 1}">NETO TOTAL A PAGAR</td>
+        <td>${fmt(totalNeto)}</td>
     </tr>
 </tfoot>
 </table>`
@@ -373,11 +389,21 @@ ${htmlEncabezado('Rol Resumido')}
 ${rows}
 </tbody>
 <tfoot>
-    <tr class="tfoot-row">
-        <td class="left" colspan="4"><strong>TOTALES</strong></td>
-        <td class="col-ing">${fmt(totalIngresos)}</td>
-        <td class="col-desc">${fmt(totalDescuentos)}</td>
-        <td class="col-neto">${fmt(totalNeto)}</td>
+    <tr class="tfoot-ing-row">
+        <td class="left" colspan="4">▶ Sub-Total INGRESOS</td>
+        <td>${fmt(totalIngresos)}</td>
+        <td class="blank-td">—</td>
+        <td class="blank-td">—</td>
+    </tr>
+    <tr class="tfoot-desc-row">
+        <td class="left" colspan="4">▶ Sub-Total DESCUENTOS</td>
+        <td class="blank-td">—</td>
+        <td>${fmt(totalDescuentos)}</td>
+        <td class="blank-td">—</td>
+    </tr>
+    <tr class="tfoot-neto-row">
+        <td class="left" colspan="6">NETO TOTAL A PAGAR</td>
+        <td>${fmt(totalNeto)}</td>
     </tr>
 </tfoot>
 </table>`
@@ -414,10 +440,10 @@ ${htmlEncabezado('Auxiliar de Descuentos')}
 ${rows}
 </tbody>
 <tfoot>
-    <tr class="tfoot-row">
-        <td class="left"><strong>TOTALES</strong></td>
+    <tr class="tfoot-desc-row">
+        <td class="left">▶ TOTAL DESCUENTOS</td>
         ${colsDescuento.map(c => `<td>${fmt(cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}</td>`).join('')}
-        <td class="col-desc">${fmt(totalDescuentos)}</td>
+        <td style="background:#fca5a5!important;font-weight:900">${fmt(totalDescuentos)}</td>
     </tr>
 </tfoot>
 </table>`
@@ -802,22 +828,38 @@ ${rows}
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot className="bg-slate-100 border-t-2 border-slate-400">
-                            <tr>
-                                <td colSpan={3} className="px-3 py-2.5 font-bold text-slate-800 sticky left-0 bg-slate-100">TOTALES</td>
+                        <tfoot>
+                            <tr className="bg-emerald-50 border-t-2 border-emerald-300">
+                                <td colSpan={3} className="px-3 py-2 font-bold text-emerald-800 sticky left-0 bg-emerald-50">▶ Sub-Total INGRESOS</td>
                                 {colsIngreso.map(c => (
-                                    <td key={c.codigo} className="px-3 py-2.5 text-right font-bold text-emerald-800">
+                                    <td key={c.codigo} className="px-3 py-2 text-right font-bold text-emerald-700">
                                         {fmt(cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}
                                     </td>
                                 ))}
-                                <td className="px-3 py-2.5 text-right font-bold text-emerald-900 bg-emerald-100">{fmt(totalIngresos)}</td>
+                                <td className="px-3 py-2 text-right font-bold text-emerald-900 bg-emerald-100">{fmt(totalIngresos)}</td>
                                 {colsDescuento.map(c => (
-                                    <td key={c.codigo} className="px-3 py-2.5 text-right font-bold text-red-700">
+                                    <td key={c.codigo} className="px-3 py-2 text-center text-slate-300">—</td>
+                                ))}
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                            </tr>
+                            <tr className="bg-red-50 border-t border-red-200">
+                                <td colSpan={3} className="px-3 py-2 font-bold text-red-800 sticky left-0 bg-red-50">▶ Sub-Total DESCUENTOS</td>
+                                {colsIngreso.map(c => (
+                                    <td key={c.codigo} className="px-3 py-2 text-center text-slate-300">—</td>
+                                ))}
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                                {colsDescuento.map(c => (
+                                    <td key={c.codigo} className="px-3 py-2 text-right font-bold text-red-600">
                                         {fmt(cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}
                                     </td>
                                 ))}
-                                <td className="px-3 py-2.5 text-right font-bold text-red-800 bg-red-100">{fmt(totalDescuentos)}</td>
-                                <td className="px-3 py-2.5 text-right font-bold text-primary-800 bg-primary-100">{fmt(totalNeto)}</td>
+                                <td className="px-3 py-2 text-right font-bold text-red-800 bg-red-100">{fmt(totalDescuentos)}</td>
+                                <td className="px-3 py-2 text-center text-slate-300">—</td>
+                            </tr>
+                            <tr className="bg-primary-50 border-t-2 border-primary-400">
+                                <td colSpan={3 + colsIngreso.length + 1 + colsDescuento.length + 1} className="px-3 py-2.5 font-bold text-primary-800 sticky left-0 bg-primary-50">NETO TOTAL A PAGAR</td>
+                                <td className="px-3 py-2.5 text-right font-black text-primary-900 bg-primary-100">{fmt(totalNeto)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -858,12 +900,22 @@ ${rows}
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot className="bg-slate-100 border-t-2 border-slate-400">
-                            <tr>
-                                <td colSpan={4} className="px-5 py-3 font-bold text-slate-800">TOTALES</td>
-                                <td className="px-4 py-3 text-right font-bold text-emerald-900 bg-emerald-100">${fmt(totalIngresos)}</td>
-                                <td className="px-4 py-3 text-right font-bold text-red-800 bg-red-100">${fmt(totalDescuentos)}</td>
-                                <td className="px-4 py-3 text-right font-bold text-primary-800 bg-primary-100">${fmt(totalNeto)}</td>
+                        <tfoot>
+                            <tr className="bg-emerald-50 border-t-2 border-emerald-300">
+                                <td colSpan={4} className="px-5 py-2 font-bold text-emerald-800">▶ Sub-Total INGRESOS</td>
+                                <td className="px-4 py-2 text-right font-bold text-emerald-900 bg-emerald-100">${fmt(totalIngresos)}</td>
+                                <td className="px-4 py-2 text-center text-slate-300">—</td>
+                                <td className="px-4 py-2 text-center text-slate-300">—</td>
+                            </tr>
+                            <tr className="bg-red-50 border-t border-red-200">
+                                <td colSpan={4} className="px-5 py-2 font-bold text-red-800">▶ Sub-Total DESCUENTOS</td>
+                                <td className="px-4 py-2 text-center text-slate-300">—</td>
+                                <td className="px-4 py-2 text-right font-bold text-red-800 bg-red-100">${fmt(totalDescuentos)}</td>
+                                <td className="px-4 py-2 text-center text-slate-300">—</td>
+                            </tr>
+                            <tr className="bg-primary-50 border-t-2 border-primary-400">
+                                <td colSpan={6} className="px-5 py-2.5 font-bold text-primary-800">NETO TOTAL A PAGAR</td>
+                                <td className="px-4 py-2.5 text-right font-black text-primary-900 bg-primary-100">${fmt(totalNeto)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -913,9 +965,9 @@ ${rows}
                                     </tr>
                                 ))}
                             </tbody>
-                            <tfoot className="bg-slate-100 border-t-2 border-slate-400">
-                                <tr>
-                                    <td className="px-4 py-2.5 font-bold text-slate-800 sticky left-0 bg-slate-100">TOTALES</td>
+                            <tfoot>
+                                <tr className="bg-red-50 border-t-2 border-red-300">
+                                    <td className="px-4 py-2.5 font-bold text-red-800 sticky left-0 bg-red-50">▶ TOTAL DESCUENTOS</td>
                                     {colsDescuento.map(c => (
                                         <td key={c.codigo} className="px-3 py-2.5 text-right font-bold text-red-700">
                                             {fmt(cabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}
