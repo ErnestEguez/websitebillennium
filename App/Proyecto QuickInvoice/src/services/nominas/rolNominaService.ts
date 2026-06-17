@@ -565,7 +565,17 @@ export const rolNominaService = {
             for (const nov of novsEmp) {
                 if (aplicadas.has(`${cab.id}:${nov.id}`)) continue
                 let monto = 0, es_calc = false
-                if (nov.tipo_novedad === 'descuento_fijo') {
+                let horas: number | null = null
+
+                if (nov.codigo === 'DIAS_FALTA') {
+                    // monto_fijo = días de falta; eliminar línea aplica_siempre vacía si existe
+                    const dias = nov.monto_fijo ?? 0
+                    horas   = dias
+                    monto   = round2((cab.sueldo_base / 30) * dias)
+                    es_calc = true
+                    await nominas().from('rol_lineas').delete()
+                        .eq('cabecera_id', cab.id).eq('codigo', 'DIAS_FALTA').is('novedad_id', null)
+                } else if (nov.tipo_novedad === 'descuento_fijo') {
                     monto = nov.monto_fijo ?? 0; es_calc = true
                 } else if (nov.tipo_novedad === 'descuento_variable') {
                     monto = round2(nov.monto_fijo ?? 0); es_calc = false
@@ -583,7 +593,7 @@ export const rolNominaService = {
                     codigo: nov.codigo, nombre: nov.nombre, tipo: 'descuento',
                     monto: round2(monto), es_calculado: es_calc,
                     orden: nov.concepto_id ? (conceptoOrden.get(nov.concepto_id) ?? 80) : 80,
-                    horas: null, novedad_id: nov.id,
+                    horas, novedad_id: nov.id,
                 })
                 cabsModificadas.add(cab.id)
             }
