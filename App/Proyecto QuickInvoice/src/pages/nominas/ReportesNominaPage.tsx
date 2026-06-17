@@ -37,7 +37,7 @@ interface CabeceraConLineas {
     total_ingresos: number
     total_descuentos: number
     neto: number
-    empleado: { nombres: string; apellidos: string; cargo?: { nombre: string } | null } | null
+    empleado: { nombres: string; apellidos: string; seccion?: { nombre: string } | null; cargo?: { nombre: string } | null } | null
     lineas: Linea[]
 }
 
@@ -105,6 +105,15 @@ tr:nth-child(even) td { background: #f8fafc; }
 .tfoot-desc-row td { font-weight: 800; font-size: 8pt; background: #fee2e2 !important; color: #7f1d1d; border-top: 2px solid #fca5a5; }
 .tfoot-neto-row td { font-weight: 900; font-size: 10pt; background: #dbeafe !important; color: #1e3a8a; border-top: 3px solid #1e40af; }
 .blank-td { color: #e2e8f0 !important; background: white !important; }
+/* ── Agrupamiento por sección ── */
+.sec-header-row td {
+    background: #1e293b !important; color: white; font-weight: 900;
+    font-size: 9pt; letter-spacing: 0.06em; padding: 6px 10px;
+    border: 1px solid #334155;
+}
+.sec-sub-ing td  { font-weight: 700; font-size: 7.5pt; background: #ecfdf5 !important; color: #065f46; border-top: 1px solid #6ee7b7; }
+.sec-sub-desc td { font-weight: 700; font-size: 7.5pt; background: #fef2f2 !important; color: #7f1d1d; border-top: 1px solid #fca5a5; }
+.sec-sub-neto td { font-weight: 800; font-size: 8pt;   background: #f0f9ff !important; color: #0369a1; border-bottom: 2px solid #0ea5e9; }
 
 /* ── Papeletas ── */
 .papeleta {
@@ -220,7 +229,7 @@ export function ReportesNominaPage() {
                 periodoNominaService.obtener(periodoId!),
                 nominas()
                     .from('rol_cabecera')
-                    .select('id, empleado_id, sueldo_base, total_ingresos, total_descuentos, neto, empleado:empleados(nombres, apellidos, cargo:cargos(nombre)), lineas:rol_lineas(codigo, nombre, tipo, monto, orden, horas)')
+                    .select('id, empleado_id, sueldo_base, total_ingresos, total_descuentos, neto, empleado:empleados(nombres, apellidos, seccion:secciones(nombre), cargo:cargos(nombre)), lineas:rol_lineas(codigo, nombre, tipo, monto, orden, horas)')
                     .eq('periodo_id', periodoId!)
                     .order('created_at'),
             ])
@@ -259,6 +268,16 @@ export function ReportesNominaPage() {
     const colsIngreso   = allConceptos.filter(c => c.tipo === 'ingreso')
     const colsDescuento = allConceptos.filter(c => c.tipo === 'descuento')
 
+    const cabecerasPorSeccion: [string, CabeceraConLineas[]][] = (() => {
+        const map = new Map<string, CabeceraConLineas[]>()
+        for (const c of cabs) {
+            const sec = c.empleado?.seccion?.nombre ?? 'Sin Sección'
+            if (!map.has(sec)) map.set(sec, [])
+            map.get(sec)!.push(c)
+        }
+        return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
+    })()
+
     function getMonto(cab: CabeceraConLineas, codigo: string) {
         return cab.lineas.find(l => l.codigo === codigo)?.monto ?? 0
     }
@@ -286,23 +305,49 @@ export function ReportesNominaPage() {
     }
 
     function htmlCompleto(): string {
-        const rows = cabs.map(cab => `
+        const totalCols = 3 + colsIngreso.length + 1 + colsDescuento.length + 1 + 1
+
+        function empRow(cab: CabeceraConLineas) {
+            return `
 <tr>
     <td class="left">${esc(`${cab.empleado?.apellidos ?? ''}, ${cab.empleado?.nombres ?? ''}`)}</td>
     <td class="left">${esc(cab.empleado?.cargo?.nombre ?? '—')}</td>
     <td class="center">${getDias(cab)}</td>
-    ${colsIngreso.map(c => {
-        const m = getMonto(cab, c.codigo)
-        return `<td>${m !== 0 ? fmt(m) : '<span style="color:#cbd5e1">—</span>'}</td>`
-    }).join('')}
+    ${colsIngreso.map(c => { const m = getMonto(cab, c.codigo); return `<td>${m !== 0 ? fmt(m) : '<span style="color:#cbd5e1">—</span>'}</td>` }).join('')}
     <td class="col-ing">${fmt(cab.total_ingresos)}</td>
-    ${colsDescuento.map(c => {
-        const m = getMonto(cab, c.codigo)
-        return `<td>${m !== 0 ? fmt(m) : '<span style="color:#cbd5e1">—</span>'}</td>`
-    }).join('')}
+    ${colsDescuento.map(c => { const m = getMonto(cab, c.codigo); return `<td>${m !== 0 ? fmt(m) : '<span style="color:#cbd5e1">—</span>'}</td>` }).join('')}
     <td class="col-desc">${fmt(cab.total_descuentos)}</td>
     <td class="col-neto">${fmt(cab.neto)}</td>
-</tr>`).join('')
+</tr>`
+        }
+
+        const bodyRows = cabecerasPorSeccion.map(([secNombre, secCabs]) => {
+            const sI = secCabs.reduce((s, c) => s + c.total_ingresos,   0)
+            const sD = secCabs.reduce((s, c) => s + c.total_descuentos, 0)
+            const sN = secCabs.reduce((s, c) => s + c.neto,             0)
+            return `
+<tr class="sec-header-row"><td colspan="${totalCols}">▐  ${esc(secNombre.toUpperCase())}</td></tr>
+${secCabs.map(empRow).join('')}
+<tr class="sec-sub-ing">
+    <td class="left" colspan="3">Sub-Total Ingresos &mdash; ${esc(secNombre)}</td>
+    ${colsIngreso.map(c => `<td>${fmt(secCabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}</td>`).join('')}
+    <td style="background:#a7f3d0!important;font-weight:900">${fmt(sI)}</td>
+    ${colsDescuento.map(() => `<td class="blank-td">—</td>`).join('')}
+    <td class="blank-td">—</td><td class="blank-td">—</td>
+</tr>
+<tr class="sec-sub-desc">
+    <td class="left" colspan="3">Sub-Total Descuentos &mdash; ${esc(secNombre)}</td>
+    ${colsIngreso.map(() => `<td class="blank-td">—</td>`).join('')}
+    <td class="blank-td">—</td>
+    ${colsDescuento.map(c => `<td>${fmt(secCabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}</td>`).join('')}
+    <td style="background:#fca5a5!important;font-weight:900">${fmt(sD)}</td>
+    <td class="blank-td">—</td>
+</tr>
+<tr class="sec-sub-neto">
+    <td class="left" colspan="${3 + colsIngreso.length + 1 + colsDescuento.length + 1}">Neto &mdash; ${esc(secNombre)}</td>
+    <td>${fmt(sN)}</td>
+</tr>`
+        }).join('\n')
 
         return `
 ${htmlEncabezado('Rol Completo — Detalle por Concepto')}
@@ -326,7 +371,7 @@ ${htmlEncabezado('Rol Completo — Detalle por Concepto')}
     </tr>
 </thead>
 <tbody>
-${rows}
+${bodyRows}
 </tbody>
 <tfoot>
     <tr class="tfoot-ing-row">
@@ -354,7 +399,11 @@ ${rows}
     }
 
     function htmlResumido(): string {
-        const rows = cabs.map(cab => `
+        const bodyRows = cabecerasPorSeccion.map(([secNombre, secCabs]) => {
+            const sI = secCabs.reduce((s, c) => s + c.total_ingresos,   0)
+            const sD = secCabs.reduce((s, c) => s + c.total_descuentos, 0)
+            const sN = secCabs.reduce((s, c) => s + c.neto,             0)
+            const empRows = secCabs.map(cab => `
 <tr>
     <td class="left">${esc(`${cab.empleado?.apellidos ?? ''}, ${cab.empleado?.nombres ?? ''}`)}</td>
     <td class="left">${esc(cab.empleado?.cargo?.nombre ?? '—')}</td>
@@ -364,6 +413,22 @@ ${rows}
     <td class="col-desc">${fmt(cab.total_descuentos)}</td>
     <td class="col-neto">${fmt(cab.neto)}</td>
 </tr>`).join('')
+            return `
+<tr class="sec-header-row"><td colspan="7">▐  ${esc(secNombre.toUpperCase())}</td></tr>
+${empRows}
+<tr class="sec-sub-ing">
+    <td class="left" colspan="4">Sub-Total Ingresos &mdash; ${esc(secNombre)}</td>
+    <td>${fmt(sI)}</td><td class="blank-td">—</td><td class="blank-td">—</td>
+</tr>
+<tr class="sec-sub-desc">
+    <td class="left" colspan="4">Sub-Total Descuentos &mdash; ${esc(secNombre)}</td>
+    <td class="blank-td">—</td><td>${fmt(sD)}</td><td class="blank-td">—</td>
+</tr>
+<tr class="sec-sub-neto">
+    <td class="left" colspan="6">Neto &mdash; ${esc(secNombre)}</td>
+    <td>${fmt(sN)}</td>
+</tr>`
+        }).join('\n')
 
         return `
 ${htmlEncabezado('Rol Resumido')}
@@ -386,7 +451,7 @@ ${htmlEncabezado('Rol Resumido')}
     </tr>
 </thead>
 <tbody>
-${rows}
+${bodyRows}
 </tbody>
 <tfoot>
     <tr class="tfoot-ing-row">
@@ -412,15 +477,24 @@ ${rows}
     function htmlDescuentos(): string {
         if (colsDescuento.length === 0) return `${htmlEncabezado('Auxiliar de Descuentos')}<p style="text-align:center;margin-top:20px;color:#64748b">No hay descuentos en este período.</p>`
 
-        const rows = cabs.map(cab => `
+        const totalCols = 1 + colsDescuento.length + 1
+        const bodyRows = cabecerasPorSeccion.map(([secNombre, secCabs]) => {
+            const sD = secCabs.reduce((s, c) => s + c.total_descuentos, 0)
+            const empRows = secCabs.map(cab => `
 <tr>
     <td class="left">${esc(`${cab.empleado?.apellidos ?? ''}, ${cab.empleado?.nombres ?? ''}`)}</td>
-    ${colsDescuento.map(c => {
-        const m = getMonto(cab, c.codigo)
-        return `<td>${m !== 0 ? fmt(m) : '<span style="color:#cbd5e1">—</span>'}</td>`
-    }).join('')}
+    ${colsDescuento.map(c => { const m = getMonto(cab, c.codigo); return `<td>${m !== 0 ? fmt(m) : '<span style="color:#cbd5e1">—</span>'}</td>` }).join('')}
     <td class="col-desc">${fmt(cab.total_descuentos)}</td>
 </tr>`).join('')
+            return `
+<tr class="sec-header-row"><td colspan="${totalCols}">▐  ${esc(secNombre.toUpperCase())}</td></tr>
+${empRows}
+<tr class="sec-sub-desc">
+    <td class="left">Sub-Total Descuentos &mdash; ${esc(secNombre)}</td>
+    ${colsDescuento.map(c => `<td>${fmt(secCabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}</td>`).join('')}
+    <td style="background:#fca5a5!important;font-weight:900">${fmt(sD)}</td>
+</tr>`
+        }).join('\n')
 
         return `
 ${htmlEncabezado('Auxiliar de Descuentos')}
@@ -437,7 +511,7 @@ ${htmlEncabezado('Auxiliar de Descuentos')}
     </tr>
 </thead>
 <tbody>
-${rows}
+${bodyRows}
 </tbody>
 <tfoot>
     <tr class="tfoot-desc-row">
@@ -798,35 +872,58 @@ ${rows}
                                 <th className="text-right px-3 py-2.5 font-bold text-primary-700 min-w-[90px] bg-primary-50">Neto</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {cabs.map(cab => (
-                                <tr key={cab.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-3 py-2 font-medium text-slate-800 sticky left-0 bg-white">
-                                        {cab.empleado?.apellidos}, {cab.empleado?.nombres}
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-500">{cab.empleado?.cargo?.nombre ?? '—'}</td>
-                                    <td className="px-3 py-2 text-center font-medium text-slate-700">{getDias(cab)}</td>
-                                    {colsIngreso.map(c => (
-                                        <td key={c.codigo} className="px-3 py-2 text-right text-emerald-700">
-                                            {getMonto(cab, c.codigo) !== 0 ? fmt(getMonto(cab, c.codigo)) : <span className="text-slate-300">—</span>}
-                                        </td>
-                                    ))}
-                                    <td className="px-3 py-2 text-right font-semibold text-emerald-800 bg-emerald-50">
-                                        {fmt(cab.total_ingresos)}
-                                    </td>
-                                    {colsDescuento.map(c => (
-                                        <td key={c.codigo} className="px-3 py-2 text-right text-red-600">
-                                            {getMonto(cab, c.codigo) !== 0 ? fmt(getMonto(cab, c.codigo)) : <span className="text-slate-300">—</span>}
-                                        </td>
-                                    ))}
-                                    <td className="px-3 py-2 text-right font-semibold text-red-700 bg-red-50">
-                                        {fmt(cab.total_descuentos)}
-                                    </td>
-                                    <td className="px-3 py-2 text-right font-bold text-primary-700 bg-primary-50">
-                                        {fmt(cab.neto)}
-                                    </td>
-                                </tr>
-                            ))}
+                        <tbody>
+                            {cabecerasPorSeccion.flatMap(([secNombre, secCabs]) => {
+                                const sI = secCabs.reduce((s, c) => s + c.total_ingresos,   0)
+                                const sD = secCabs.reduce((s, c) => s + c.total_descuentos, 0)
+                                const sN = secCabs.reduce((s, c) => s + c.neto,             0)
+                                const nc = 3 + colsIngreso.length + 1 + colsDescuento.length + 1 + 1
+                                return [
+                                    <tr key={`sec-${secNombre}`} className="bg-slate-800">
+                                        <td colSpan={nc} className="px-3 py-1.5 font-bold text-white text-xs uppercase tracking-widest sticky left-0 bg-slate-800">▐ {secNombre}</td>
+                                    </tr>,
+                                    ...secCabs.map(cab => (
+                                        <tr key={cab.id} className="hover:bg-slate-50 transition-colors border-t border-slate-100">
+                                            <td className="px-3 py-2 font-medium text-slate-800 sticky left-0 bg-white">{cab.empleado?.apellidos}, {cab.empleado?.nombres}</td>
+                                            <td className="px-3 py-2 text-slate-500">{cab.empleado?.cargo?.nombre ?? '—'}</td>
+                                            <td className="px-3 py-2 text-center font-medium text-slate-700">{getDias(cab)}</td>
+                                            {colsIngreso.map(c => (
+                                                <td key={c.codigo} className="px-3 py-2 text-right text-emerald-700">
+                                                    {getMonto(cab, c.codigo) !== 0 ? fmt(getMonto(cab, c.codigo)) : <span className="text-slate-300">—</span>}
+                                                </td>
+                                            ))}
+                                            <td className="px-3 py-2 text-right font-semibold text-emerald-800 bg-emerald-50">{fmt(cab.total_ingresos)}</td>
+                                            {colsDescuento.map(c => (
+                                                <td key={c.codigo} className="px-3 py-2 text-right text-red-600">
+                                                    {getMonto(cab, c.codigo) !== 0 ? fmt(getMonto(cab, c.codigo)) : <span className="text-slate-300">—</span>}
+                                                </td>
+                                            ))}
+                                            <td className="px-3 py-2 text-right font-semibold text-red-700 bg-red-50">{fmt(cab.total_descuentos)}</td>
+                                            <td className="px-3 py-2 text-right font-bold text-primary-700 bg-primary-50">{fmt(cab.neto)}</td>
+                                        </tr>
+                                    )),
+                                    <tr key={`sec-ing-${secNombre}`} className="bg-emerald-50 border-t border-emerald-200 text-xs">
+                                        <td colSpan={3} className="px-3 py-1 font-bold text-emerald-700 sticky left-0 bg-emerald-50">Sub-Total INGRESOS — {secNombre}</td>
+                                        {colsIngreso.map(c => <td key={c.codigo} className="px-3 py-1 text-right font-semibold text-emerald-600">{fmt(secCabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}</td>)}
+                                        <td className="px-3 py-1 text-right font-bold text-emerald-900 bg-emerald-100">{fmt(sI)}</td>
+                                        {colsDescuento.map(c => <td key={c.codigo} className="px-3 py-1 text-center text-slate-300">—</td>)}
+                                        <td className="px-3 py-1 text-center text-slate-300">—</td>
+                                        <td className="px-3 py-1 text-center text-slate-300">—</td>
+                                    </tr>,
+                                    <tr key={`sec-desc-${secNombre}`} className="bg-red-50 border-t border-red-100 text-xs">
+                                        <td colSpan={3} className="px-3 py-1 font-bold text-red-700 sticky left-0 bg-red-50">Sub-Total DESCUENTOS — {secNombre}</td>
+                                        {colsIngreso.map(c => <td key={c.codigo} className="px-3 py-1 text-center text-slate-300">—</td>)}
+                                        <td className="px-3 py-1 text-center text-slate-300">—</td>
+                                        {colsDescuento.map(c => <td key={c.codigo} className="px-3 py-1 text-right font-semibold text-red-600">{fmt(secCabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}</td>)}
+                                        <td className="px-3 py-1 text-right font-bold text-red-800 bg-red-100">{fmt(sD)}</td>
+                                        <td className="px-3 py-1 text-center text-slate-300">—</td>
+                                    </tr>,
+                                    <tr key={`sec-neto-${secNombre}`} className="bg-primary-50 border-t border-primary-200 border-b-2 border-b-slate-300 text-xs">
+                                        <td colSpan={3 + colsIngreso.length + 1 + colsDescuento.length + 1} className="px-3 py-1 font-bold text-primary-700 sticky left-0 bg-primary-50">Neto — {secNombre}</td>
+                                        <td className="px-3 py-1 text-right font-black text-primary-900 bg-primary-100">{fmt(sN)}</td>
+                                    </tr>,
+                                ]
+                            })}
                         </tbody>
                         <tfoot>
                             <tr className="bg-emerald-50 border-t-2 border-emerald-300">
@@ -887,18 +984,44 @@ ${rows}
                                 <th className="text-right px-4 py-3 font-semibold text-primary-700 bg-primary-50">Neto a Recibir</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {cabs.map(cab => (
-                                <tr key={cab.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-5 py-3 font-medium text-slate-800">{cab.empleado?.apellidos}, {cab.empleado?.nombres}</td>
-                                    <td className="px-4 py-3 text-slate-500 text-sm">{cab.empleado?.cargo?.nombre ?? '—'}</td>
-                                    <td className="px-3 py-3 text-center font-medium text-slate-700">{getDias(cab)}</td>
-                                    <td className="px-4 py-3 text-right text-slate-700">${fmt(cab.sueldo_base)}</td>
-                                    <td className="px-4 py-3 text-right text-emerald-700 font-medium bg-emerald-50">${fmt(cab.total_ingresos)}</td>
-                                    <td className="px-4 py-3 text-right text-red-600 font-medium bg-red-50">${fmt(cab.total_descuentos)}</td>
-                                    <td className="px-4 py-3 text-right text-primary-700 font-bold bg-primary-50">${fmt(cab.neto)}</td>
-                                </tr>
-                            ))}
+                        <tbody>
+                            {cabecerasPorSeccion.flatMap(([secNombre, secCabs]) => {
+                                const sI = secCabs.reduce((s, c) => s + c.total_ingresos,   0)
+                                const sD = secCabs.reduce((s, c) => s + c.total_descuentos, 0)
+                                const sN = secCabs.reduce((s, c) => s + c.neto,             0)
+                                return [
+                                    <tr key={`sec-${secNombre}`} className="bg-slate-800">
+                                        <td colSpan={7} className="px-4 py-1.5 font-bold text-white text-xs uppercase tracking-widest">▐ {secNombre}</td>
+                                    </tr>,
+                                    ...secCabs.map(cab => (
+                                        <tr key={cab.id} className="hover:bg-slate-50 transition-colors border-t border-slate-100">
+                                            <td className="px-5 py-3 font-medium text-slate-800">{cab.empleado?.apellidos}, {cab.empleado?.nombres}</td>
+                                            <td className="px-4 py-3 text-slate-500 text-sm">{cab.empleado?.cargo?.nombre ?? '—'}</td>
+                                            <td className="px-3 py-3 text-center font-medium text-slate-700">{getDias(cab)}</td>
+                                            <td className="px-4 py-3 text-right text-slate-700">${fmt(cab.sueldo_base)}</td>
+                                            <td className="px-4 py-3 text-right text-emerald-700 font-medium bg-emerald-50">${fmt(cab.total_ingresos)}</td>
+                                            <td className="px-4 py-3 text-right text-red-600 font-medium bg-red-50">${fmt(cab.total_descuentos)}</td>
+                                            <td className="px-4 py-3 text-right text-primary-700 font-bold bg-primary-50">${fmt(cab.neto)}</td>
+                                        </tr>
+                                    )),
+                                    <tr key={`sec-ing-${secNombre}`} className="bg-emerald-50 border-t border-emerald-200 text-xs">
+                                        <td colSpan={4} className="px-5 py-1 font-bold text-emerald-700">Sub-Total INGRESOS — {secNombre}</td>
+                                        <td className="px-4 py-1 text-right font-bold text-emerald-900 bg-emerald-100">${fmt(sI)}</td>
+                                        <td className="px-4 py-1 text-center text-slate-300">—</td>
+                                        <td className="px-4 py-1 text-center text-slate-300">—</td>
+                                    </tr>,
+                                    <tr key={`sec-desc-${secNombre}`} className="bg-red-50 border-t border-red-100 text-xs">
+                                        <td colSpan={4} className="px-5 py-1 font-bold text-red-700">Sub-Total DESCUENTOS — {secNombre}</td>
+                                        <td className="px-4 py-1 text-center text-slate-300">—</td>
+                                        <td className="px-4 py-1 text-right font-bold text-red-800 bg-red-100">${fmt(sD)}</td>
+                                        <td className="px-4 py-1 text-center text-slate-300">—</td>
+                                    </tr>,
+                                    <tr key={`sec-neto-${secNombre}`} className="bg-primary-50 border-t border-primary-200 border-b-2 border-b-slate-300 text-xs">
+                                        <td colSpan={6} className="px-5 py-1 font-bold text-primary-700">Neto — {secNombre}</td>
+                                        <td className="px-4 py-1 text-right font-black text-primary-900 bg-primary-100">${fmt(sN)}</td>
+                                    </tr>,
+                                ]
+                            })}
                         </tbody>
                         <tfoot>
                             <tr className="bg-emerald-50 border-t-2 border-emerald-300">
@@ -948,22 +1071,32 @@ ${rows}
                                     <th className="text-right px-3 py-2.5 font-bold text-red-800 min-w-[90px] bg-red-50">Total</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {cabs.map(cab => (
-                                    <tr key={cab.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-2 font-medium text-slate-800 sticky left-0 bg-white">
-                                            {cab.empleado?.apellidos}, {cab.empleado?.nombres}
-                                        </td>
-                                        {colsDescuento.map(c => (
-                                            <td key={c.codigo} className="px-3 py-2 text-right text-red-600">
-                                                {getMonto(cab, c.codigo) !== 0 ? fmt(getMonto(cab, c.codigo)) : <span className="text-slate-300">—</span>}
-                                            </td>
-                                        ))}
-                                        <td className="px-3 py-2 text-right font-bold text-red-700 bg-red-50">
-                                            {fmt(cab.total_descuentos)}
-                                        </td>
-                                    </tr>
-                                ))}
+                            <tbody>
+                                {cabecerasPorSeccion.flatMap(([secNombre, secCabs]) => {
+                                    const sD = secCabs.reduce((s, c) => s + c.total_descuentos, 0)
+                                    const nc = 1 + colsDescuento.length + 1
+                                    return [
+                                        <tr key={`sec-${secNombre}`} className="bg-slate-800">
+                                            <td colSpan={nc} className="px-4 py-1.5 font-bold text-white text-xs uppercase tracking-widest sticky left-0 bg-slate-800">▐ {secNombre}</td>
+                                        </tr>,
+                                        ...secCabs.map(cab => (
+                                            <tr key={cab.id} className="hover:bg-slate-50 transition-colors border-t border-slate-100">
+                                                <td className="px-4 py-2 font-medium text-slate-800 sticky left-0 bg-white">{cab.empleado?.apellidos}, {cab.empleado?.nombres}</td>
+                                                {colsDescuento.map(c => (
+                                                    <td key={c.codigo} className="px-3 py-2 text-right text-red-600">
+                                                        {getMonto(cab, c.codigo) !== 0 ? fmt(getMonto(cab, c.codigo)) : <span className="text-slate-300">—</span>}
+                                                    </td>
+                                                ))}
+                                                <td className="px-3 py-2 text-right font-bold text-red-700 bg-red-50">{fmt(cab.total_descuentos)}</td>
+                                            </tr>
+                                        )),
+                                        <tr key={`sec-desc-${secNombre}`} className="bg-red-50 border-t border-red-200 border-b-2 border-b-slate-300 text-xs">
+                                            <td className="px-4 py-1 font-bold text-red-700 sticky left-0 bg-red-50">Sub-Total — {secNombre}</td>
+                                            {colsDescuento.map(c => <td key={c.codigo} className="px-3 py-1 text-right font-semibold text-red-600">{fmt(secCabs.reduce((s, cab) => s + getMonto(cab, c.codigo), 0))}</td>)}
+                                            <td className="px-3 py-1 text-right font-bold text-red-800 bg-red-100">${fmt(sD)}</td>
+                                        </tr>,
+                                    ]
+                                })}
                             </tbody>
                             <tfoot>
                                 <tr className="bg-red-50 border-t-2 border-red-300">

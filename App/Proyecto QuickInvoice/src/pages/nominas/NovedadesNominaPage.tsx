@@ -586,19 +586,38 @@ export function NovedadesNominaPage() {
                             {/* Campos condicionales según tipo */}
                             {form.tipo_novedad === 'descuento_fijo' && (
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Monto fijo a descontar</label>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-slate-400 text-sm pl-1">$</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={form.monto_fijo}
-                                            onChange={e => setField('monto_fijo', e.target.value)}
-                                            placeholder="0.00"
-                                            className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                                        />
-                                    </div>
+                                    {form.codigo === 'DIAS_FALTA' ? (
+                                        <>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Días de falta</label>
+                                            <p className="text-xs text-slate-400 mb-1">El monto se calculará automáticamente al generar el rol (sueldo / 30 × días)</p>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="30"
+                                                step="1"
+                                                value={form.monto_fijo}
+                                                onChange={e => setField('monto_fijo', e.target.value)}
+                                                placeholder="ej: 2"
+                                                className="w-full border border-amber-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                                            />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Monto fijo a descontar</label>
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-slate-400 text-sm pl-1">$</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={form.monto_fijo}
+                                                    onChange={e => setField('monto_fijo', e.target.value)}
+                                                    placeholder="0.00"
+                                                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
 

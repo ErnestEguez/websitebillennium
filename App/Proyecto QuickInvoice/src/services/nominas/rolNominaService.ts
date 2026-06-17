@@ -333,9 +333,16 @@ export const rolNominaService = {
             const novsEmp = novedadesMap.get(emp.id) ?? []
             for (const nov of novsEmp) {
                 let monto = 0
+                let horas: number | null = null
                 let es_calc = false
 
-                if (nov.tipo_novedad === 'descuento_fijo') {
+                if (nov.codigo === 'DIAS_FALTA') {
+                    // monto_fijo almacena los días de falta; monto = (sueldo/30) * días
+                    const dias = nov.monto_fijo ?? 0
+                    horas   = dias
+                    monto   = round2((emp.sueldo_base / 30) * dias)
+                    es_calc = true
+                } else if (nov.tipo_novedad === 'descuento_fijo') {
                     monto   = nov.monto_fijo ?? 0
                     es_calc = true
                 } else if (nov.tipo_novedad === 'prestamo_cuota') {
@@ -362,7 +369,7 @@ export const rolNominaService = {
                     es_calculado: es_calc,
                     orden:        cOrden,
                     concepto_id:  nov.concepto_id ?? null,
-                    horas:        null,
+                    horas,
                     novedad_id:   nov.id,
                 })
             }
