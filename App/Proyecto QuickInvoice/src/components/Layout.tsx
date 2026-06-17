@@ -31,6 +31,7 @@ import {
     SlidersHorizontal,
     ArrowLeftRight,
     ClipboardList,
+    CalendarDays,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -147,6 +148,7 @@ const PERM_RUTAS: [string, string][] = [
     ['/nominas/novedades',             'perm_th_rol_nomina'],
     ['/nominas/capacidad-pago',        'perm_th_rol_nomina'],
     ['/nominas/decimos',               'perm_th_rol_nomina'],
+    ['/nominas/vacaciones',            'perm_th_rol_nomina'],
     ['/nominas/cuentas-nomina',        'perm_th_nomina_parametros'],
     ['/nominas/conceptos',             'perm_th_conceptos_nomina'],
     ['/nominas/',                      'perm_th_nomina_parametros'],
@@ -505,6 +507,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/nominas/novedades"     icon={ClipboardList}  label="Novedades / Descuentos"    active={location.pathname === '/nominas/novedades'} sub disabled={!p.perm_th_rol_nomina} />
                             <SidebarItem to="/nominas/capacidad-pago" icon={Wallet}        label="Estado Económico"          active={location.pathname === '/nominas/capacidad-pago'} sub disabled={!p.perm_th_rol_nomina} />
                             <SidebarItem to="/nominas/decimos"       icon={FileText}       label="Liquidación Décimos 13/14" active={location.pathname === '/nominas/decimos'} sub disabled={!p.perm_th_rol_nomina} />
+                            <SidebarItem to="/nominas/vacaciones"    icon={CalendarDays}   label="Liquidación Vacaciones"    active={location.pathname === '/nominas/vacaciones'} sub disabled={!p.perm_th_rol_nomina} />
                             <SidebarItem to="/nominas/conceptos"     icon={BookOpen}       label="Conceptos de Nómina"       active={location.pathname === '/nominas/conceptos'}  sub disabled={!p.perm_th_conceptos_nomina} />
                             <SidebarItem to="/nominas/cuentas-nomina" icon={CreditCard}   label="Cuentas Contables"         active={location.pathname === '/nominas/cuentas-nomina'} sub disabled={!p.perm_th_nomina_parametros} />
                             <SidebarItem to="/nominas/parametros"    icon={Settings}       label="Parámetros de Nómina"      active={location.pathname === '/nominas/parametros'} sub disabled={!p.perm_th_nomina_parametros} />

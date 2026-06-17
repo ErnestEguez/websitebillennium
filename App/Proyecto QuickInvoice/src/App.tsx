@@ -90,6 +90,7 @@ import { AnticipoNominaPage }                     from './pages/nominas/Anticipo
 import { ReporteAnticipoPage }                    from './pages/nominas/ReporteAnticipoPage'
 import { CapacidadPagoPage }                      from './pages/nominas/CapacidadPagoPage'
 import { LiquidacionDecimosPage }                 from './pages/nominas/LiquidacionDecimosPage'
+import { LiquidacionVacacionesPage }             from './pages/nominas/LiquidacionVacacionesPage'
 // ── Módulo Tesorería (Finance Suite) ─────────────────────────
 
 import { CuentasBancariasPage }                   from './pages/tesoreria/bancos/CuentasBancariasPage'
@@ -566,6 +567,7 @@ function App() {
                       <Route path="novedades"                   element={<NovedadesNominaPage />} />
                       <Route path="capacidad-pago"              element={<CapacidadPagoPage />} />
                       <Route path="decimos"                     element={<LiquidacionDecimosPage />} />
+                      <Route path="vacaciones"                  element={<LiquidacionVacacionesPage />} />
                       <Route path="conceptos"            element={<ConceptosNominaPage />} />
                       <Route path="cuentas-nomina"       element={<CuentasNominaPage />} />
                       <Route path="parametros"           element={<ParametrosNominaPage />} />
