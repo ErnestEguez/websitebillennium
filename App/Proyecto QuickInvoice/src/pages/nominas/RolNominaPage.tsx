@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Loader2, Play, Lock, Unlock, Plus, X, AlertCircle, Clock, RefreshCw, Calendar, FileText, Banknote, ListChecks } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 import { periodoNominaService } from '../../services/nominas/periodoNominaService'
 import { rolNominaService } from '../../services/nominas/rolNominaService'
 import { parametrosNominaService } from '../../services/nominas/parametrosNominaService'
@@ -33,6 +34,7 @@ export function RolNominaPage() {
     const [periodo, setPeriodo]         = useState<PeriodoNomina | null>(null)
     const [cabeceras, setCabeceras]     = useState<RolCabecera[]>([])
     const [params, setParams]           = useState<ParametrosNomina | null>(null)
+    const [diasMap, setDiasMap]         = useState<Map<string, number>>(new Map())
     const [loading, setLoading]         = useState(true)
     const [generando, setGenerando]     = useState(false)
     const [cerrando, setCerrando]       = useState(false)
@@ -67,6 +69,19 @@ export function RolNominaPage() {
             setPeriodo(per)
             setCabeceras(cabs)
             setParams(par)
+
+            // Cargar horas de DIAS_FALTA para mostrar días trabajados en la tabla
+            if (cabs.length > 0) {
+                const cabIds = cabs.map(c => c.id)
+                const { data: faltas } = await supabase.schema('nominas')
+                    .from('rol_lineas')
+                    .select('cabecera_id, horas')
+                    .in('cabecera_id', cabIds)
+                    .eq('codigo', 'DIAS_FALTA')
+                const m = new Map<string, number>()
+                for (const f of (faltas ?? [])) m.set(f.cabecera_id, f.horas ?? 0)
+                setDiasMap(m)
+            }
         } catch (e: any) {
             setError(e.message)
         } finally {
@@ -221,6 +236,17 @@ export function RolNominaPage() {
             setSaving(false)
         }
     }
+
+    // Días trabajados desde la tabla principal (usa diasMap cargado en cargar())
+    function getDiasTrabajados(cab: RolCabecera): number {
+        const base = periodo?.tipo_nomina === 'mensual' ? 30 : 15
+        return Math.max(0, base - (diasMap.get(cab.id) ?? 0))
+    }
+
+    // Días trabajados en el modal (usa editLineas en tiempo real)
+    const diasFaltaModal = editLineas.find(l => l.codigo === 'DIAS_FALTA')?.horas ?? 0
+    const baseModal      = periodo?.tipo_nomina === 'mensual' ? 30 : 15
+    const diasTrabajadosModal = Math.max(0, baseModal - diasFaltaModal)
 
     // Conceptos del catálogo no presentes aún en el rol del empleado
     const codigosEnRol = new Set(editLineas.map(l => l.codigo))
@@ -382,6 +408,7 @@ export function RolNominaPage() {
                             <tr>
                                 <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Empleado</th>
                                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Cargo</th>
+                                <th className="text-center px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Días</th>
                                 <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Sueldo Base</th>
                                 <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Ingresos</th>
                                 <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Descuentos</th>
@@ -397,6 +424,9 @@ export function RolNominaPage() {
                                     </td>
                                     <td className="px-4 py-3.5 text-sm text-slate-500">
                                         {cab.empleado?.cargo?.nombre ?? '—'}
+                                    </td>
+                                    <td className="px-3 py-3.5 text-center text-sm font-semibold text-slate-700">
+                                        {getDiasTrabajados(cab)}
                                     </td>
                                     <td className="px-4 py-3.5 text-right text-sm text-slate-700">
                                         ${fmt(cab.sueldo_base)}
@@ -439,9 +469,21 @@ export function RolNominaPage() {
                                 </h2>
                                 <p className="text-sm text-slate-500">{editCab.empleado?.cargo?.nombre ?? ''}</p>
                             </div>
-                            <button onClick={cerrarModal} className="text-slate-400 hover:text-slate-600">
-                                <X className="w-5 h-5" />
-                            </button>
+                            <div className="flex items-center gap-4">
+                                <div className="text-center">
+                                    <p className="text-xs text-slate-400 uppercase tracking-wide">Días Trabajados</p>
+                                    <p className={cn(
+                                        'text-2xl font-bold',
+                                        diasTrabajadosModal < baseModal ? 'text-amber-600' : 'text-emerald-600'
+                                    )}>
+                                        {diasTrabajadosModal}
+                                        <span className="text-sm font-normal text-slate-400"> / {baseModal}</span>
+                                    </p>
+                                </div>
+                                <button onClick={cerrarModal} className="text-slate-400 hover:text-slate-600">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Body modal */}
