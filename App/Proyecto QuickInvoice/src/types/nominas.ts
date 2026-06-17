@@ -58,6 +58,9 @@ export type TipoNomina = 'quincenal' | 'mensual' | 'quincenal_y_mensual' | 'por_
 export type ModoDecimo = 'mensualizado' | 'acumulado'
 export type ModoFondoReserva = 'mensual' | 'acumulado_iess' | 'no_aplica'
 
+export type TipoContrato = 'indefinido' | 'plazo_fijo' | 'prueba' | 'honorarios' | 'servicios'
+export type EstadoCivil  = 'soltero' | 'casado' | 'union_libre' | 'divorciado' | 'viudo'
+
 export interface Empleado {
     id: string
     empresa_id: string
@@ -71,6 +74,12 @@ export interface Empleado {
     email?: string | null
     direccion?: string | null
 
+    // Datos personales adicionales (Etapa 2A)
+    foto_url?: string | null
+    estado_civil?: EstadoCivil | null
+    nacionalidad?: string | null
+    ciudad?: string | null
+
     // Datos laborales
     seccion_id?: string | null
     cargo_id?: string | null
@@ -79,6 +88,7 @@ export interface Empleado {
     fecha_salida?: string | null
     tipo_jornada: TipoJornada
     tipo_nomina: TipoNomina
+    tipo_contrato?: TipoContrato | null
     sueldo_base: number
     afiliado_iess: boolean
 
@@ -97,6 +107,14 @@ export interface Empleado {
     anticipo_tipo?: 'porcentaje' | 'fijo' | null
     anticipo_valor?: number | null
 
+    // Contacto de emergencia (Etapa 2A)
+    contacto_emergencia_nombre?: string | null
+    contacto_emergencia_relacion?: string | null
+    contacto_emergencia_telefono?: string | null
+
+    // Observaciones
+    observaciones?: string | null
+
     activo: boolean
     created_at?: string
     updated_at?: string
@@ -105,6 +123,19 @@ export interface Empleado {
     seccion?: { nombre: string } | null
     cargo?: { nombre: string } | null
     jefe?: { nombres: string; apellidos: string } | null
+}
+
+// ── Etapa 2A: Historial de cambios salariales ────────────────────────────────
+
+export interface HistorialSalario {
+    id: string
+    empresa_id: string
+    empleado_id: string
+    fecha: string
+    sueldo_anterior: number
+    sueldo_nuevo: number
+    motivo?: string | null
+    created_at?: string
 }
 
 // ── Etapa 3: Períodos y Rol de Pagos ──────────────────────────────────────────

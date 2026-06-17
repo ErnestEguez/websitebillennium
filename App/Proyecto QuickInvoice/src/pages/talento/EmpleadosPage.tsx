@@ -1,12 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { empleadosService } from '../../services/nominas/empleadosService'
 import { estructuraOrganizativaService } from '../../services/nominas/estructuraOrganizativaService'
-import type { Empleado, SeccionNomina, CargoNomina, TipoJornada, TipoNomina, ModoDecimo, ModoFondoReserva } from '../../types/nominas'
-import { Users, Plus, Edit2, Save, X, UserX, RotateCcw, Loader2, Briefcase, CreditCard } from 'lucide-react'
+import { historialSalariosService } from '../../services/nominas/historialSalariosService'
+import type {
+    Empleado, SeccionNomina, CargoNomina,
+    TipoJornada, TipoNomina, ModoDecimo, ModoFondoReserva,
+    TipoContrato, EstadoCivil, HistorialSalario,
+} from '../../types/nominas'
+import {
+    Users, Plus, Edit2, Save, X, UserX, RotateCcw, Loader2,
+    Briefcase, CreditCard, ShieldAlert, History, Trash2,
+} from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-type TabForm = 'personal' | 'laboral' | 'nomina'
+type TabForm = 'personal' | 'laboral' | 'nomina' | 'adicional'
 
 const EMPTY: Omit<Empleado, 'id' | 'empresa_id' | 'created_at' | 'updated_at' | 'activo' | 'seccion' | 'cargo' | 'jefe'> = {
     nombres: '',
@@ -16,6 +24,10 @@ const EMPTY: Omit<Empleado, 'id' | 'empresa_id' | 'created_at' | 'updated_at' | 
     telefono: null,
     email: null,
     direccion: null,
+    foto_url: null,
+    estado_civil: null,
+    nacionalidad: null,
+    ciudad: null,
     seccion_id: null,
     cargo_id: null,
     jefe_inmediato_id: null,
@@ -23,6 +35,7 @@ const EMPTY: Omit<Empleado, 'id' | 'empresa_id' | 'created_at' | 'updated_at' | 
     fecha_salida: null,
     tipo_jornada: 'completa',
     tipo_nomina: 'mensual',
+    tipo_contrato: null,
     sueldo_base: 0,
     afiliado_iess: true,
     decimo_tercero_modo: 'mensualizado',
@@ -34,10 +47,14 @@ const EMPTY: Omit<Empleado, 'id' | 'empresa_id' | 'created_at' | 'updated_at' | 
     numero_cuenta: null,
     anticipo_tipo: null,
     anticipo_valor: null,
+    contacto_emergencia_nombre: null,
+    contacto_emergencia_relacion: null,
+    contacto_emergencia_telefono: null,
+    observaciones: null,
 }
 
 export function EmpleadosPage() {
-    const { empresa } = useAuth()
+    const { empresa } = useAuth() as any
     const [empleados, setEmpleados] = useState<Empleado[]>([])
     const [secciones, setSecciones] = useState<SeccionNomina[]>([])
     const [cargos, setCargos] = useState<CargoNomina[]>([])
@@ -47,6 +64,12 @@ export function EmpleadosPage() {
     const [editando, setEditando] = useState<(typeof EMPTY) & { id?: string }>({ ...EMPTY })
     const [saving, setSaving] = useState(false)
     const [tab, setTab] = useState<TabForm>('personal')
+
+    // Historial salarial
+    const [historial, setHistorial] = useState<HistorialSalario[]>([])
+    const [historialLoading, setHistorialLoading] = useState(false)
+    const sueldoOriginalRef = useRef<number>(0)
+    const [motivoCambio, setMotivoCambio] = useState('')
 
     useEffect(() => {
         if (empresa?.id) loadData()
@@ -73,7 +96,10 @@ export function EmpleadosPage() {
 
     function abrirNuevo() {
         setEditando({ ...EMPTY })
+        setHistorial([])
+        setMotivoCambio('')
         setTab('personal')
+        sueldoOriginalRef.current = 0
         setModalOpen(true)
     }
 
@@ -87,6 +113,10 @@ export function EmpleadosPage() {
             telefono: emp.telefono ?? null,
             email: emp.email ?? null,
             direccion: emp.direccion ?? null,
+            foto_url: emp.foto_url ?? null,
+            estado_civil: emp.estado_civil ?? null,
+            nacionalidad: emp.nacionalidad ?? null,
+            ciudad: emp.ciudad ?? null,
             seccion_id: emp.seccion_id ?? null,
             cargo_id: emp.cargo_id ?? null,
             jefe_inmediato_id: emp.jefe_inmediato_id ?? null,
@@ -94,6 +124,7 @@ export function EmpleadosPage() {
             fecha_salida: emp.fecha_salida ?? null,
             tipo_jornada: emp.tipo_jornada,
             tipo_nomina: emp.tipo_nomina,
+            tipo_contrato: emp.tipo_contrato ?? null,
             sueldo_base: emp.sueldo_base,
             afiliado_iess: emp.afiliado_iess,
             decimo_tercero_modo: emp.decimo_tercero_modo,
@@ -105,9 +136,22 @@ export function EmpleadosPage() {
             numero_cuenta: emp.numero_cuenta ?? null,
             anticipo_tipo: emp.anticipo_tipo ?? null,
             anticipo_valor: emp.anticipo_valor ?? null,
+            contacto_emergencia_nombre: emp.contacto_emergencia_nombre ?? null,
+            contacto_emergencia_relacion: emp.contacto_emergencia_relacion ?? null,
+            contacto_emergencia_telefono: emp.contacto_emergencia_telefono ?? null,
+            observaciones: emp.observaciones ?? null,
         })
+        sueldoOriginalRef.current = emp.sueldo_base
+        setMotivoCambio('')
         setTab('personal')
         setModalOpen(true)
+        // Cargar historial salarial en paralelo
+        setHistorial([])
+        setHistorialLoading(true)
+        historialSalariosService.listar(emp.id)
+            .then(h => setHistorial(h))
+            .catch(console.error)
+            .finally(() => setHistorialLoading(false))
     }
 
     async function handleSave() {
@@ -128,6 +172,7 @@ export function EmpleadosPage() {
         }
         try {
             setSaving(true)
+            const sueldoNuevo = Number(editando.sueldo_base) || 0
             const payload = {
                 empresa_id: empresa!.id,
                 nombres: editando.nombres.trim(),
@@ -137,6 +182,10 @@ export function EmpleadosPage() {
                 telefono: editando.telefono || null,
                 email: editando.email || null,
                 direccion: editando.direccion || null,
+                foto_url: editando.foto_url || null,
+                estado_civil: editando.estado_civil || null,
+                nacionalidad: editando.nacionalidad || null,
+                ciudad: editando.ciudad || null,
                 seccion_id: editando.seccion_id || null,
                 cargo_id: editando.cargo_id || null,
                 jefe_inmediato_id: editando.jefe_inmediato_id || null,
@@ -144,7 +193,8 @@ export function EmpleadosPage() {
                 fecha_salida: editando.fecha_salida || null,
                 tipo_jornada: editando.tipo_jornada,
                 tipo_nomina: editando.tipo_nomina,
-                sueldo_base: Number(editando.sueldo_base) || 0,
+                tipo_contrato: editando.tipo_contrato || null,
+                sueldo_base: sueldoNuevo,
                 afiliado_iess: editando.afiliado_iess,
                 decimo_tercero_modo: editando.decimo_tercero_modo,
                 decimo_cuarto_modo: editando.decimo_cuarto_modo,
@@ -155,9 +205,24 @@ export function EmpleadosPage() {
                 numero_cuenta: editando.numero_cuenta || null,
                 anticipo_tipo: editando.anticipo_tipo || null,
                 anticipo_valor: editando.anticipo_valor != null ? Number(editando.anticipo_valor) || null : null,
+                contacto_emergencia_nombre: editando.contacto_emergencia_nombre || null,
+                contacto_emergencia_relacion: editando.contacto_emergencia_relacion || null,
+                contacto_emergencia_telefono: editando.contacto_emergencia_telefono || null,
+                observaciones: editando.observaciones || null,
             }
             if (editando.id) {
                 await empleadosService.actualizarEmpleado(editando.id, payload)
+                // Registrar cambio salarial si el sueldo fue modificado
+                if (sueldoNuevo !== sueldoOriginalRef.current) {
+                    await historialSalariosService.crear({
+                        empresa_id: empresa!.id,
+                        empleado_id: editando.id,
+                        fecha: new Date().toISOString().slice(0, 10),
+                        sueldo_anterior: sueldoOriginalRef.current,
+                        sueldo_nuevo: sueldoNuevo,
+                        motivo: motivoCambio.trim() || null,
+                    })
+                }
             } else {
                 await empleadosService.crearEmpleado(payload)
             }
@@ -183,9 +248,19 @@ export function EmpleadosPage() {
         }
     }
 
-    const nombresCompletos = (e: Empleado) => `${e.apellidos} ${e.nombres}`
+    async function handleEliminarHistorial(id: string) {
+        if (!confirm('¿Eliminar este registro del historial?')) return
+        try {
+            await historialSalariosService.eliminar(id)
+            setHistorial(h => h.filter(x => x.id !== id))
+        } catch (e: any) {
+            alert(`Error: ${e.message}`)
+        }
+    }
 
-    // Solo empleados activos como opciones de jefe (excluyendo el que se está editando)
+    const nombresCompletos = (e: Empleado) => `${e.apellidos} ${e.nombres}`
+    const sueldoCambio = editando.id && Number(editando.sueldo_base) !== sueldoOriginalRef.current
+
     const opcionesJefe = empleados.filter(e => e.activo && e.id !== editando.id)
 
     if (loading) {
@@ -195,6 +270,13 @@ export function EmpleadosPage() {
             </div>
         )
     }
+
+    const TABS: { key: TabForm; label: string; icon: any }[] = [
+        { key: 'personal',  label: 'Personal',  icon: Users },
+        { key: 'laboral',   label: 'Laboral',   icon: Briefcase },
+        { key: 'nomina',    label: 'Nómina',    icon: CreditCard },
+        { key: 'adicional', label: '+ Info',    icon: ShieldAlert },
+    ]
 
     return (
         <div className="space-y-6">
@@ -281,13 +363,9 @@ export function EmpleadosPage() {
 
                         {/* Tabs */}
                         <div className="flex border-b border-slate-200 px-6 pt-2 gap-1">
-                            {([
-                                { key: 'personal', label: 'Datos Personales', icon: Users },
-                                { key: 'laboral',  label: 'Datos Laborales',  icon: Briefcase },
-                                { key: 'nomina',   label: 'Parámetros Nómina', icon: CreditCard },
-                            ] as { key: TabForm; label: string; icon: any }[]).map(t => (
+                            {TABS.map(t => (
                                 <button key={t.key} onClick={() => setTab(t.key)}
-                                    className={cn('flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors',
+                                    className={cn('flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors',
                                         tab === t.key
                                             ? 'border-indigo-600 text-indigo-600'
                                             : 'border-transparent text-slate-500 hover:text-slate-700')}>
@@ -300,6 +378,7 @@ export function EmpleadosPage() {
                         {/* Body */}
                         <div className="overflow-y-auto px-6 py-5 space-y-4 flex-1">
 
+                            {/* ── Tab: PERSONAL ── */}
                             {tab === 'personal' && (
                                 <>
                                     <div className="grid grid-cols-2 gap-4">
@@ -331,6 +410,26 @@ export function EmpleadosPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Estado civil</label>
+                                            <select className="input w-full" value={editando.estado_civil ?? ''}
+                                                onChange={e => setEditando(v => ({ ...v, estado_civil: (e.target.value as EstadoCivil) || null }))}>
+                                                <option value="">—</option>
+                                                <option value="soltero">Soltero/a</option>
+                                                <option value="casado">Casado/a</option>
+                                                <option value="union_libre">Unión libre</option>
+                                                <option value="divorciado">Divorciado/a</option>
+                                                <option value="viudo">Viudo/a</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Nacionalidad</label>
+                                            <input className="input w-full" value={editando.nacionalidad ?? ''}
+                                                onChange={e => setEditando(v => ({ ...v, nacionalidad: e.target.value || null }))}
+                                                placeholder="Ecuatoriana" />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
                                             <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono</label>
                                             <input className="input w-full" value={editando.telefono ?? ''}
                                                 onChange={e => setEditando(v => ({ ...v, telefono: e.target.value || null }))}
@@ -343,15 +442,35 @@ export function EmpleadosPage() {
                                                 placeholder="empleado@empresa.com" />
                                         </div>
                                     </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Ciudad</label>
+                                            <input className="input w-full" value={editando.ciudad ?? ''}
+                                                onChange={e => setEditando(v => ({ ...v, ciudad: e.target.value || null }))}
+                                                placeholder="Quito" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Dirección</label>
+                                            <input className="input w-full" value={editando.direccion ?? ''}
+                                                onChange={e => setEditando(v => ({ ...v, direccion: e.target.value || null }))}
+                                                placeholder="Calle y número" />
+                                        </div>
+                                    </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Dirección</label>
-                                        <input className="input w-full" value={editando.direccion ?? ''}
-                                            onChange={e => setEditando(v => ({ ...v, direccion: e.target.value || null }))}
-                                            placeholder="Calle, número, ciudad" />
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">URL de foto (opcional)</label>
+                                        <input className="input w-full" value={editando.foto_url ?? ''}
+                                            onChange={e => setEditando(v => ({ ...v, foto_url: e.target.value || null }))}
+                                            placeholder="https://..." />
+                                        {editando.foto_url && (
+                                            <img src={editando.foto_url} alt="Foto empleado"
+                                                className="mt-2 w-16 h-16 rounded-full object-cover border border-slate-200"
+                                                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                        )}
                                     </div>
                                 </>
                             )}
 
+                            {/* ── Tab: LABORAL ── */}
                             {tab === 'laboral' && (
                                 <>
                                     <div className="grid grid-cols-2 gap-4">
@@ -384,6 +503,28 @@ export function EmpleadosPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Tipo de contrato</label>
+                                            <select className="input w-full" value={editando.tipo_contrato ?? ''}
+                                                onChange={e => setEditando(v => ({ ...v, tipo_contrato: (e.target.value as TipoContrato) || null }))}>
+                                                <option value="">—</option>
+                                                <option value="indefinido">Indefinido</option>
+                                                <option value="plazo_fijo">Plazo fijo</option>
+                                                <option value="prueba">A prueba</option>
+                                                <option value="honorarios">Honorarios profesionales</option>
+                                                <option value="servicios">Servicios ocasionales</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Tipo de jornada</label>
+                                            <select className="input w-full" value={editando.tipo_jornada}
+                                                onChange={e => setEditando(v => ({ ...v, tipo_jornada: e.target.value as TipoJornada }))}>
+                                                <option value="completa">Tiempo completo</option>
+                                                <option value="parcial">Tiempo parcial</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
                                             <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha de ingreso *</label>
                                             <input type="date" className="input w-full" value={editando.fecha_ingreso}
                                                 onChange={e => setEditando(v => ({ ...v, fecha_ingreso: e.target.value }))} />
@@ -396,14 +537,6 @@ export function EmpleadosPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Tipo de jornada</label>
-                                            <select className="input w-full" value={editando.tipo_jornada}
-                                                onChange={e => setEditando(v => ({ ...v, tipo_jornada: e.target.value as TipoJornada }))}>
-                                                <option value="completa">Tiempo completo</option>
-                                                <option value="parcial">Tiempo parcial</option>
-                                            </select>
-                                        </div>
-                                        <div>
                                             <label className="block text-xs font-semibold text-slate-600 mb-1">Tipo de nómina</label>
                                             <select className="input w-full" value={editando.tipo_nomina}
                                                 onChange={e => setEditando(v => ({ ...v, tipo_nomina: e.target.value as TipoNomina }))}>
@@ -414,23 +547,39 @@ export function EmpleadosPage() {
                                                 <option value="destajo">Por destajo</option>
                                             </select>
                                         </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-semibold text-slate-600 mb-1">Sueldo base (USD)</label>
                                             <input type="number" step="0.01" min="0" className="input w-full"
                                                 value={editando.sueldo_base}
                                                 onChange={e => setEditando(v => ({ ...v, sueldo_base: parseFloat(e.target.value) || 0 }))} />
                                         </div>
-                                        <div className="flex items-end pb-1">
-                                            <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                <input type="checkbox" className="w-4 h-4 rounded accent-indigo-600"
-                                                    checked={editando.afiliado_iess}
-                                                    onChange={e => setEditando(v => ({ ...v, afiliado_iess: e.target.checked }))} />
-                                                <span className="text-sm font-medium text-slate-700">Afiliado al IESS</span>
-                                            </label>
-                                        </div>
                                     </div>
+
+                                    {/* Indicador de cambio salarial + motivo */}
+                                    {sueldoCambio && (
+                                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                                            <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
+                                                <History className="w-3.5 h-3.5" />
+                                                Cambio de sueldo detectado: ${sueldoOriginalRef.current.toFixed(2)} → ${(Number(editando.sueldo_base) || 0).toFixed(2)}
+                                            </p>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-amber-700 mb-1">Motivo del cambio (opcional)</label>
+                                                <input className="input w-full text-sm" value={motivoCambio}
+                                                    onChange={e => setMotivoCambio(e.target.value)}
+                                                    placeholder="Ej: Aumento anual, Cambio de cargo, etc." />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center pt-1">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input type="checkbox" className="w-4 h-4 rounded accent-indigo-600"
+                                                checked={editando.afiliado_iess}
+                                                onChange={e => setEditando(v => ({ ...v, afiliado_iess: e.target.checked }))} />
+                                            <span className="text-sm font-medium text-slate-700">Afiliado al IESS</span>
+                                        </label>
+                                    </div>
+
                                     <div className="border-t border-slate-100 pt-4">
                                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Datos bancarios</p>
                                         <div className="grid grid-cols-3 gap-3">
@@ -460,6 +609,7 @@ export function EmpleadosPage() {
                                 </>
                             )}
 
+                            {/* ── Tab: NÓMINA ── */}
                             {tab === 'nomina' && (
                                 <>
                                     <div className="grid grid-cols-2 gap-4">
@@ -543,14 +693,100 @@ export function EmpleadosPage() {
                                     </div>
                                 </>
                             )}
+
+                            {/* ── Tab: ADICIONAL ── */}
+                            {tab === 'adicional' && (
+                                <>
+                                    {/* Contacto de emergencia */}
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Contacto de emergencia</p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre completo</label>
+                                                <input className="input w-full" value={editando.contacto_emergencia_nombre ?? ''}
+                                                    onChange={e => setEditando(v => ({ ...v, contacto_emergencia_nombre: e.target.value || null }))}
+                                                    placeholder="Ej: María López" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-600 mb-1">Relación</label>
+                                                <input className="input w-full" value={editando.contacto_emergencia_relacion ?? ''}
+                                                    onChange={e => setEditando(v => ({ ...v, contacto_emergencia_relacion: e.target.value || null }))}
+                                                    placeholder="Ej: Cónyuge, Madre, Hermano" />
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 max-w-[50%]">
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono de contacto</label>
+                                            <input className="input w-full" value={editando.contacto_emergencia_telefono ?? ''}
+                                                onChange={e => setEditando(v => ({ ...v, contacto_emergencia_telefono: e.target.value || null }))}
+                                                placeholder="0991234567" />
+                                        </div>
+                                    </div>
+
+                                    {/* Observaciones */}
+                                    <div className="border-t border-slate-100 pt-4">
+                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Observaciones generales</label>
+                                        <textarea className="input w-full resize-none" rows={3}
+                                            value={editando.observaciones ?? ''}
+                                            onChange={e => setEditando(v => ({ ...v, observaciones: e.target.value || null }))}
+                                            placeholder="Notas internas sobre el empleado..." />
+                                    </div>
+
+                                    {/* Historial salarial — solo al editar */}
+                                    {editando.id && (
+                                        <div className="border-t border-slate-100 pt-4">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                                <History className="w-3.5 h-3.5" />
+                                                Historial de cambios salariales
+                                            </p>
+                                            {historialLoading ? (
+                                                <div className="flex items-center gap-2 text-slate-400 text-sm">
+                                                    <Loader2 className="w-4 h-4 animate-spin" />Cargando...
+                                                </div>
+                                            ) : historial.length === 0 ? (
+                                                <p className="text-sm text-slate-400">Sin registros de cambios salariales.</p>
+                                            ) : (
+                                                <table className="w-full text-xs">
+                                                    <thead>
+                                                        <tr className="text-slate-500 border-b border-slate-100">
+                                                            <th className="text-left py-1.5 pr-3">Fecha</th>
+                                                            <th className="text-right py-1.5 pr-3">Anterior</th>
+                                                            <th className="text-right py-1.5 pr-3">Nuevo</th>
+                                                            <th className="text-left py-1.5">Motivo</th>
+                                                            <th className="py-1.5 w-8" />
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-50">
+                                                        {historial.map(h => (
+                                                            <tr key={h.id} className="hover:bg-slate-50">
+                                                                <td className="py-1.5 pr-3 text-slate-600">{h.fecha}</td>
+                                                                <td className="py-1.5 pr-3 text-right text-slate-500">${h.sueldo_anterior.toFixed(2)}</td>
+                                                                <td className="py-1.5 pr-3 text-right font-semibold text-slate-800">${h.sueldo_nuevo.toFixed(2)}</td>
+                                                                <td className="py-1.5 text-slate-500 truncate max-w-[120px]">{h.motivo ?? '—'}</td>
+                                                                <td className="py-1.5 text-right">
+                                                                    <button onClick={() => handleEliminarHistorial(h.id)}
+                                                                        className="p-1 text-slate-300 hover:text-red-400 transition-colors">
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    )}
+                                </>
+                            )}
                         </div>
 
                         {/* Footer */}
                         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
                             <div className="flex gap-1">
-                                {(['personal', 'laboral', 'nomina'] as TabForm[]).map((t, i) => (
-                                    <div key={t} className={cn('w-2 h-2 rounded-full transition-colors', tab === t ? 'bg-indigo-600' : 'bg-slate-300')}
-                                        title={['Personales', 'Laborales', 'Nómina'][i]} />
+                                {TABS.map(t => (
+                                    <div key={t.key}
+                                        className={cn('w-2 h-2 rounded-full transition-colors cursor-pointer', tab === t.key ? 'bg-indigo-600' : 'bg-slate-300')}
+                                        onClick={() => setTab(t.key)}
+                                        title={t.label} />
                                 ))}
                             </div>
                             <div className="flex gap-3">
