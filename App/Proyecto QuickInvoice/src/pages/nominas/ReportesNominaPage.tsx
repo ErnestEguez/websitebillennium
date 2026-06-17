@@ -169,13 +169,26 @@ window.onload = function() {
 }
 
 function abrirVentana(titulo: string, body: string, landscape: boolean) {
+    const html = buildDocumento(titulo, body, landscape)
+
+    // Intenta abrir popup
     const win = window.open('', '_blank', 'noopener,noreferrer')
-    if (!win) {
-        alert('Permite las ventanas emergentes (pop-ups) en el navegador para poder imprimir.')
+    if (win) {
+        win.document.write(html)
+        win.document.close()
         return
     }
-    win.document.write(buildDocumento(titulo, body, landscape))
-    win.document.close()
+
+    // Fallback: descarga como .html para abrir y imprimir con Ctrl+P
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `${titulo.replace(/[^a-zA-Z0-9\s\-_]/g, '').trim()}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1500)
 }
 
 // ── Componente principal ───────────────────────────────────────────────────────
