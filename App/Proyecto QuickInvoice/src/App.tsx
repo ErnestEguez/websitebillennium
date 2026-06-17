@@ -79,6 +79,8 @@ import { Formulario104DetallePage }               from './pages/contabilidad/tri
 // ── Módulo Talento Humano y Nóminas ──────────────────────────
 import { EmpleadosPage }                          from './pages/talento/EmpleadosPage'
 import { VacantesPage }                           from './pages/talento/VacantesPage'
+import { PlantillasChecklistPage }               from './pages/talento/PlantillasChecklistPage'
+import { ChecklistsPage }                        from './pages/talento/ChecklistsPage'
 import { EstructuraOrganizativaPage }             from './pages/talento/EstructuraOrganizativaPage'
 import { ConceptosNominaPage }                    from './pages/nominas/ConceptosNominaPage'
 import { ParametrosNominaPage }                   from './pages/nominas/ParametrosNominaPage'
@@ -545,9 +547,11 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <Routes>
-                      <Route path="vacantes"   element={<VacantesPage />} />
-                      <Route path="empleados"  element={<EmpleadosPage />} />
-                      <Route path="estructura" element={<EstructuraOrganizativaPage />} />
+                      <Route path="vacantes"              element={<VacantesPage />} />
+                      <Route path="empleados"             element={<EmpleadosPage />} />
+                      <Route path="plantillas-checklist"  element={<PlantillasChecklistPage />} />
+                      <Route path="checklists"            element={<ChecklistsPage />} />
+                      <Route path="estructura"            element={<EstructuraOrganizativaPage />} />
                       <Route path="*"          element={<Navigate to="/talento/empleados" replace />} />
                     </Routes>
                   </Layout>

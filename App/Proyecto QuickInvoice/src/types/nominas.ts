@@ -336,3 +336,71 @@ export interface CandidatoEvento {
     resultado?: ResultadoEvento | null
     created_at?: string
 }
+
+// ── Etapa 2D: Onboarding / Offboarding ───────────────────────────────────────
+
+export type TipoChecklist    = 'onboarding' | 'offboarding'
+export type EstadoChecklist  = 'pendiente' | 'en_progreso' | 'completado'
+export type TipoResponsable  = 'empleado' | 'rrhh' | 'it' | 'gerencia' | 'otro'
+
+export interface PlantillaChecklist {
+    id: string
+    empresa_id: string
+    nombre: string
+    tipo: TipoChecklist
+    cargo_id?: string | null
+    seccion_id?: string | null
+    descripcion?: string | null
+    activo: boolean
+    created_at?: string
+    updated_at?: string
+    cargo?: { nombre: string } | null
+    seccion?: { nombre: string } | null
+    items?: PlantillaItem[]
+    items_count?: number
+}
+
+export interface PlantillaItem {
+    id: string
+    empresa_id: string
+    plantilla_id: string
+    orden: number
+    descripcion: string
+    responsable_tipo: TipoResponsable
+    dias_plazo?: number | null
+    activo: boolean
+    created_at?: string
+}
+
+export interface ChecklistEmpleado {
+    id: string
+    empresa_id: string
+    empleado_id: string
+    plantilla_id?: string | null
+    tipo: TipoChecklist
+    estado: EstadoChecklist
+    fecha_inicio: string
+    fecha_limite?: string | null
+    created_at?: string
+    updated_at?: string
+    empleado?: { nombres: string; apellidos: string; cargo?: { nombre: string } | null } | null
+    items?: ChecklistItemEmpleado[]
+    items_count?: number
+    items_completados?: number
+}
+
+export interface ChecklistItemEmpleado {
+    id: string
+    empresa_id: string
+    checklist_id: string
+    orden: number
+    descripcion: string
+    responsable_tipo: TipoResponsable
+    dias_plazo?: number | null
+    completado: boolean
+    fecha_completado?: string | null
+    completado_por?: string | null
+    notas?: string | null
+    created_at?: string
+    updated_at?: string
+}
