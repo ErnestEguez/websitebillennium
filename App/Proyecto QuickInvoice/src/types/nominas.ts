@@ -307,6 +307,8 @@ export interface Vacante {
     candidatos_count?: number
 }
 
+export type IARecomendacion = 'Altamente recomendado' | 'Recomendado' | 'A evaluar' | 'No apto'
+
 export interface Candidato {
     id: string
     empresa_id: string
@@ -323,6 +325,15 @@ export interface Candidato {
     notas?: string | null
     created_at?: string
     updated_at?: string
+    // Evaluación IA
+    ia_score?: number | null
+    ia_recomendacion?: IARecomendacion | null
+    ia_resumen?: string | null
+    ia_fortalezas?: string[]
+    ia_alertas?: string[]
+    ia_habilidades?: string[]
+    ia_preguntas?: string[]
+    ia_evaluado_at?: string | null
     // Joins
     eventos?: CandidatoEvento[]
 }

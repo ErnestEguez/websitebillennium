@@ -13,8 +13,10 @@ import {
     Briefcase, Plus, Edit2, X, Save, Loader2, Users, UserPlus,
     Star, Calendar, ChevronRight, Trash2, Phone, Mail, FileText,
     CheckCircle, XCircle, Clock, ArrowRight, Upload, ExternalLink,
+    Sparkles, AlertTriangle, TrendingUp,
 } from 'lucide-react'
 import { storageService } from '../../services/storageService'
+import { iaScreeningService } from '../../services/nominas/iaScreeningService'
 import { cn } from '../../lib/utils'
 
 // ─── Helpers de etiqueta/color ────────────────────────────────────────────────
@@ -68,6 +70,18 @@ function estrellas(n: number | null | undefined) {
             ))}
         </span>
     )
+}
+const IA_RECO_COLOR: Record<string, string> = {
+    'Altamente recomendado': 'bg-emerald-100 text-emerald-700',
+    'Recomendado':           'bg-blue-100 text-blue-700',
+    'A evaluar':             'bg-amber-100 text-amber-700',
+    'No apto':               'bg-red-100 text-red-600',
+}
+function scoreColorClass(score: number) {
+    if (score >= 80) return 'bg-green-100 text-green-700'
+    if (score >= 60) return 'bg-blue-100 text-blue-700'
+    if (score >= 40) return 'bg-amber-100 text-amber-700'
+    return 'bg-red-100 text-red-600'
 }
 
 // ─── Tipos para los formularios ───────────────────────────────────────────────
@@ -139,7 +153,7 @@ export function VacantesPage() {
     const [vacanteActiva, setVacanteActiva] = useState<Vacante | null>(null)
     const [candidatoActivo, setCandidatoActivo] = useState<Candidato | null>(null)
     const [filtroEstado, setFiltroEstado] = useState<EstadoVacante | 'todas'>('todas')
-    const [tabCand, setTabCand] = useState<'datos' | 'seguimiento'>('datos')
+    const [tabCand, setTabCand] = useState<'datos' | 'seguimiento' | 'ia'>('datos')
 
     // Modales
     const [modalVac, setModalVac] = useState(false)
@@ -158,6 +172,9 @@ export function VacantesPage() {
     const [loadingEvts, setLoadingEvts] = useState(false)
     const [cvFile, setCvFile] = useState<File | null>(null)
     const [cvUploading, setCvUploading] = useState(false)
+    const [iaEvaluando, setIaEvaluando] = useState(false)
+    const [iaProgreso, setIaProgreso] = useState<{ actual: number; total: number; nombre: string } | null>(null)
+    const [sortByScore, setSortByScore] = useState(false)
 
     useEffect(() => {
         if (empresa?.id) loadData()
@@ -361,6 +378,51 @@ export function VacantesPage() {
         }
     }
 
+    async function evaluarTodosConIA() {
+        if (!vacanteActiva) return
+        const conCV = candidatos.filter(c => c.cv_url)
+        if (conCV.length === 0) { alert('Ningún candidato tiene CV cargado'); return }
+        setIaEvaluando(true)
+        setIaProgreso({ actual: 0, total: conCV.length, nombre: '' })
+        try {
+            const { ok, errores } = await iaScreeningService.evaluarTodos(
+                conCV,
+                vacanteActiva,
+                (actual, total, nombre) => setIaProgreso({ actual, total, nombre })
+            )
+            const updated = await candidatosService.listarPorVacante(vacanteActiva.id)
+            setCandidatos(updated)
+            const msg = errores.length > 0
+                ? `${ok} candidatos evaluados.\n\nErrores:\n${errores.join('\n')}`
+                : `${ok} candidato(s) evaluados con éxito.`
+            alert(msg)
+        } catch (e: any) {
+            alert(`Error al evaluar: ${e.message}`)
+        } finally {
+            setIaEvaluando(false)
+            setIaProgreso(null)
+        }
+    }
+
+    async function reevaluarCandidato(c: Candidato) {
+        if (!vacanteActiva || !c.cv_url) return
+        setIaEvaluando(true)
+        try {
+            const analisis = await iaScreeningService.evaluarCandidato(c, vacanteActiva)
+            await iaScreeningService.guardarAnalisis(c.id, analisis)
+            const updated = await candidatosService.listarPorVacante(vacanteActiva.id)
+            setCandidatos(updated)
+            if (candidatoActivo?.id === c.id) {
+                const updatedC = updated.find(x => x.id === c.id)
+                if (updatedC) setCandidatoActivo(updatedC)
+            }
+        } catch (e: any) {
+            alert(`Error al evaluar: ${e.message}`)
+        } finally {
+            setIaEvaluando(false)
+        }
+    }
+
     // ── Evento CRUD ───────────────────────────────────────────────────────────
 
     function abrirNuevoEvento(c: Candidato) {
@@ -442,6 +504,14 @@ export function VacantesPage() {
     const vacsFiltradas = vacantes.filter(v =>
         filtroEstado === 'todas' || v.estado === filtroEstado
     )
+    const candidatosOrdenados = sortByScore
+        ? [...candidatos].sort((a, b) => {
+            if (a.ia_score == null && b.ia_score == null) return 0
+            if (a.ia_score == null) return 1
+            if (b.ia_score == null) return -1
+            return b.ia_score - a.ia_score
+          })
+        : candidatos
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
@@ -553,7 +623,20 @@ export function VacantesPage() {
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {iaProgreso && (
+                                    <span className="text-xs text-slate-500 flex items-center gap-1">
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        {iaProgreso.actual}/{iaProgreso.total} {iaProgreso.nombre && `· ${iaProgreso.nombre}`}
+                                    </span>
+                                )}
+                                <button onClick={evaluarTodosConIA}
+                                    disabled={iaEvaluando || candidatos.filter(c => c.cv_url).length === 0}
+                                    title="Evaluar todos los CVs con IA"
+                                    className="btn text-sm flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
+                                    {iaEvaluando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                                    Evaluar con IA
+                                </button>
                                 <button onClick={() => abrirNuevoCandidato()}
                                     className="btn btn-primary text-sm flex items-center gap-1.5">
                                     <UserPlus className="w-3.5 h-3.5" /> Candidato
@@ -586,12 +669,20 @@ export function VacantesPage() {
                                         <tr>
                                             <th className="text-left px-4 py-3 font-semibold text-slate-600">Candidato</th>
                                             <th className="text-left px-4 py-3 font-semibold text-slate-600">Etapa</th>
+                                            <th className="text-left px-4 py-3 font-semibold text-slate-600">
+                                                <button onClick={() => setSortByScore(s => !s)}
+                                                    className={cn('flex items-center gap-1 transition-colors',
+                                                        sortByScore ? 'text-violet-600' : 'text-slate-600 hover:text-violet-500')}>
+                                                    <Sparkles className="w-3 h-3" /> Score IA
+                                                    <TrendingUp className="w-3 h-3" />
+                                                </button>
+                                            </th>
                                             <th className="text-left px-4 py-3 font-semibold text-slate-600">Fuente</th>
                                             <th className="px-4 py-3" />
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {candidatos.map(c => (
+                                        {candidatosOrdenados.map(c => (
                                             <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-4 py-3">
                                                     <p className="font-medium text-slate-900">{c.apellidos} {c.nombres}</p>
@@ -604,6 +695,22 @@ export function VacantesPage() {
                                                     <span className={cn('px-2 py-0.5 rounded-full text-xs font-semibold', ETAPA_COLOR[c.etapa])}>
                                                         {ETAPA_LABEL[c.etapa]}
                                                     </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {c.ia_score != null ? (
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className={cn('px-2 py-0.5 rounded-full text-xs font-bold w-fit', scoreColorClass(c.ia_score))}>
+                                                                {c.ia_score}
+                                                            </span>
+                                                            {c.ia_recomendacion && (
+                                                                <span className={cn('px-1.5 py-0 rounded text-xs font-medium w-fit', IA_RECO_COLOR[c.ia_recomendacion] ?? 'bg-slate-100 text-slate-600')}>
+                                                                    {c.ia_recomendacion}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-300">—</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-xs text-slate-500">
                                                     {FUENTE_LABEL[c.fuente]}
@@ -763,13 +870,29 @@ export function VacantesPage() {
                         </div>
                         {/* Tabs candidato */}
                         <div className="flex border-b border-slate-200 px-6 gap-1">
-                            {(['datos', 'seguimiento'] as const).map(t => (
-                                <button key={t} onClick={() => setTabCand(t)}
-                                    className={cn('px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors',
-                                        tabCand === t ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700')}>
-                                    {t === 'datos' ? 'Datos personales' : 'Etapa y seguimiento'}
+                            <button onClick={() => setTabCand('datos')}
+                                className={cn('px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors',
+                                    tabCand === 'datos' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700')}>
+                                Datos personales
+                            </button>
+                            <button onClick={() => setTabCand('seguimiento')}
+                                className={cn('px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors',
+                                    tabCand === 'seguimiento' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700')}>
+                                Etapa y seguimiento
+                            </button>
+                            {formCand.id && (
+                                <button onClick={() => setTabCand('ia')}
+                                    className={cn('px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors flex items-center gap-1.5',
+                                        tabCand === 'ia' ? 'border-violet-600 text-violet-600' : 'border-transparent text-slate-500 hover:text-slate-700')}>
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    Evaluación IA
+                                    {candidatoActivo?.ia_score != null && (
+                                        <span className={cn('px-1.5 rounded-full text-xs font-bold', scoreColorClass(candidatoActivo.ia_score))}>
+                                            {candidatoActivo.ia_score}
+                                        </span>
+                                    )}
                                 </button>
-                            ))}
+                            )}
                         </div>
                         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
 
@@ -904,6 +1027,116 @@ export function VacantesPage() {
                                             onChange={e => setFormCand(v => ({ ...v, notas: e.target.value }))}
                                             placeholder="Impresión general, fortalezas, debilidades..." />
                                     </div>
+                                </>
+                            )}
+
+                            {tabCand === 'ia' && (
+                                <>
+                                    {!candidatoActivo?.ia_evaluado_at ? (
+                                        <div className="text-center py-10 text-slate-400">
+                                            <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                                            <p className="font-semibold text-slate-500">Sin evaluación IA</p>
+                                            {candidatoActivo?.cv_url ? (
+                                                <button onClick={() => reevaluarCandidato(candidatoActivo!)}
+                                                    disabled={iaEvaluando}
+                                                    className="mt-4 btn text-sm flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white mx-auto disabled:opacity-50">
+                                                    {iaEvaluando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                                                    Evaluar CV con IA
+                                                </button>
+                                            ) : (
+                                                <p className="text-xs mt-2">El candidato necesita CV para ser evaluado</p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl">
+                                                <div className={cn('w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-bold',
+                                                    candidatoActivo!.ia_score != null ? scoreColorClass(candidatoActivo!.ia_score!) : 'bg-slate-100 text-slate-400')}>
+                                                    {candidatoActivo!.ia_score ?? '—'}
+                                                </div>
+                                                <div className="flex-1">
+                                                    {candidatoActivo!.ia_recomendacion && (
+                                                        <span className={cn('px-2 py-0.5 rounded-full text-sm font-semibold', IA_RECO_COLOR[candidatoActivo!.ia_recomendacion] ?? '')}>
+                                                            {candidatoActivo!.ia_recomendacion}
+                                                        </span>
+                                                    )}
+                                                    <p className="text-xs text-slate-400 mt-1">
+                                                        Evaluado el {new Date(candidatoActivo!.ia_evaluado_at!).toLocaleDateString('es-EC')}
+                                                    </p>
+                                                </div>
+                                                <button onClick={() => reevaluarCandidato(candidatoActivo!)}
+                                                    disabled={iaEvaluando || !candidatoActivo?.cv_url}
+                                                    title="Re-evaluar"
+                                                    className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40">
+                                                    {iaEvaluando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+
+                                            {candidatoActivo!.ia_resumen && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Resumen ejecutivo</p>
+                                                    <p className="text-sm text-slate-700 leading-relaxed">{candidatoActivo!.ia_resumen}</p>
+                                                </div>
+                                            )}
+
+                                            {(candidatoActivo!.ia_fortalezas?.length ?? 0) > 0 && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Fortalezas</p>
+                                                    <ul className="space-y-1.5">
+                                                        {candidatoActivo!.ia_fortalezas!.map((f, i) => (
+                                                            <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                                                                <CheckCircle className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                                                                {f}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+
+                                            {(candidatoActivo!.ia_alertas?.length ?? 0) > 0 && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Alertas</p>
+                                                    <ul className="space-y-1.5">
+                                                        {candidatoActivo!.ia_alertas!.map((a, i) => (
+                                                            <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                                                                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                                                {a}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+
+                                            {(candidatoActivo!.ia_habilidades?.length ?? 0) > 0 && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Habilidades detectadas</p>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {candidatoActivo!.ia_habilidades!.map((h, i) => (
+                                                            <span key={i} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs rounded-full font-medium">
+                                                                {h}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {(candidatoActivo!.ia_preguntas?.length ?? 0) > 0 && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Preguntas sugeridas para entrevista</p>
+                                                    <ol className="space-y-2">
+                                                        {candidatoActivo!.ia_preguntas!.map((pregunta, i) => (
+                                                            <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                                                                <span className="w-5 h-5 bg-slate-100 rounded-full text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                                                                    {i + 1}
+                                                                </span>
+                                                                {pregunta}
+                                                            </li>
+                                                        ))}
+                                                    </ol>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </>
                             )}
 
