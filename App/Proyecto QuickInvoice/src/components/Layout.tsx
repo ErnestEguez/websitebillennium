@@ -36,6 +36,7 @@ import {
     Star,
     GraduationCap,
     Smile,
+    Scale,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -150,6 +151,7 @@ const PERM_RUTAS: [string, string][] = [
     ['/talento/capacitacion',          'perm_th_empleados'],
     ['/talento/clima',                 'perm_th_empleados'],
     ['/talento/dashboard',             'perm_th_empleados'],
+    ['/talento/finiquito',             'perm_th_empleados'],
     ['/talento/',                      'perm_th_estructura'],
     ['/nominas/periodos',              'perm_th_rol_nomina'],
     ['/nominas/rol/',                  'perm_th_rol_nomina'],
@@ -508,6 +510,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/talento/capacitacion"         icon={GraduationCap} label="Capacitación"            active={location.pathname === '/talento/capacitacion'} sub disabled={!p.perm_th_empleados} />
                             <SidebarItem to="/talento/clima"                icon={Smile}         label="Clima Organizacional"    active={location.pathname === '/talento/clima'} sub disabled={!p.perm_th_empleados} />
                             <SidebarItem to="/talento/dashboard"            icon={BarChart3}     label="Dashboard Talento"       active={location.pathname === '/talento/dashboard'} sub disabled={!p.perm_th_empleados} />
+                            <SidebarItem to="/talento/finiquito"            icon={Scale}         label="Finiquitos"              active={location.pathname.startsWith('/talento/finiquito')} sub disabled={!p.perm_th_empleados} />
                             <SidebarItem to="/talento/estructura"           icon={Users}         label="Estructura Organizativa" active={location.pathname === '/talento/estructura'} sub disabled={!p.perm_th_estructura} />
                         </ModuleSection>}
 

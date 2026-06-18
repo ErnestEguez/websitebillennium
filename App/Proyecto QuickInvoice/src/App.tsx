@@ -85,6 +85,7 @@ import { EvaluacionDesempenoPage }               from './pages/talento/Evaluacio
 import { CapacitacionPage }                      from './pages/talento/CapacitacionPage'
 import { ClimaPage }                             from './pages/talento/ClimaPage'
 import { DashboardTalentoPage }                  from './pages/talento/DashboardTalentoPage'
+import { FiniquitoPage }                          from './pages/talento/FiniquitoPage'
 import { EstructuraOrganizativaPage }             from './pages/talento/EstructuraOrganizativaPage'
 import { ConceptosNominaPage }                    from './pages/nominas/ConceptosNominaPage'
 import { ParametrosNominaPage }                   from './pages/nominas/ParametrosNominaPage'
@@ -559,6 +560,7 @@ function App() {
                       <Route path="capacitacion"          element={<CapacitacionPage />} />
                       <Route path="clima"                 element={<ClimaPage />} />
                       <Route path="dashboard"             element={<DashboardTalentoPage />} />
+                      <Route path="finiquito"             element={<FiniquitoPage />} />
                       <Route path="estructura"            element={<EstructuraOrganizativaPage />} />
                       <Route path="*"          element={<Navigate to="/talento/empleados" replace />} />
                     </Routes>

@@ -541,3 +541,56 @@ export interface ChecklistItemEmpleado {
     created_at?: string
     updated_at?: string
 }
+
+// ── Finiquito / Acta de liquidación final ────────────────────────────────────
+
+export type CausaTerminacion =
+    | 'renuncia_voluntaria'
+    | 'desahucio_trabajador'
+    | 'acuerdo_partes'
+    | 'despido_intempestivo'
+    | 'fin_contrato'
+    | 'jubilacion'
+    | 'otro'
+
+export type EstadoFiniquito = 'borrador' | 'aprobado' | 'pagado' | 'registrado_sut'
+
+export interface Finiquito {
+    id: string
+    empresa_id: string
+    empleado_id: string
+    fecha_ingreso: string
+    fecha_salida: string
+    causa_terminacion: CausaTerminacion
+    ultimo_sueldo: number
+    mejor_sueldo: number
+    dias_pendientes: number
+    dias_vac_generadas: number
+    dias_vac_gozadas: number
+    horas_extras_pend: number
+    otros_ingresos: number
+    v_sueldo_pendiente: number
+    v_horas_extras: number
+    v_vacaciones: number
+    v_decimo_tercero: number
+    v_decimo_cuarto: number
+    v_fondos_reserva: number
+    v_bonif_desahucio: number
+    v_indemnizacion: number
+    v_otros_ingresos: number
+    d_iess_personal: number
+    d_prestamos_empresa: number
+    d_prestamos_iess: number
+    d_anticipos: number
+    d_otros_descuentos: number
+    total_ingresos: number
+    total_descuentos: number
+    neto_a_pagar: number
+    estado: EstadoFiniquito
+    fecha_pago?: string | null
+    numero_acta?: string | null
+    observaciones?: string | null
+    created_at?: string
+    updated_at?: string
+    empleado?: { nombres: string; apellidos: string; cedula?: string | null } | null
+}
