@@ -126,7 +126,7 @@ async function postearComprobante(
             secuencial: 1, fecha, glosa, estado: 'confirmado',
             total_debe: totalDebe, total_haber: totalHaber,
             moneda_id: null, tipo_cambio: 1,
-            origen: 'quickinvoice_nomina', referencia_externa: referencia, created_by: null,
+            origen: 'quickinvoice', referencia_externa: referencia, created_by: null,
         }).select('id').single()
 
         if (errComp || !comp) throw errComp ?? new Error('Error al insertar comprobante LP')
@@ -143,6 +143,9 @@ async function postearComprobante(
         ]
         const { error: errLineas } = await db.from('lp_comprobante_lineas').insert(lineas)
         if (errLineas) throw errLineas
+
+        // Actualizar saldos LP (igual que crearAsientoCompra / crearAsientoPago)
+        await db.rpc('lp_actualizar_saldos', { p_comprobante_id: comp.id, p_operacion: 'sumar' })
 
         console.log(`[nomContab] Comprobante LP creado: ${glosa} (${comp.id})`)
         return comp.id as string
