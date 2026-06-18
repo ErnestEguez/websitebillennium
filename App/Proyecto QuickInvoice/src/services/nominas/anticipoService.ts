@@ -138,7 +138,8 @@ export const anticipoService = {
         if (error) throw error
 
         // Asiento contable — se registra siempre al liquidar, independiente de si existe el rol
-        contabilidadNominaService.postearAnticipo(anticipoId, empresaId).catch(() => {})
+        contabilidadNominaService.postearAnticipo(anticipoId, empresaId)
+            .catch(e => console.error('[nomContab] hook anticipo falló:', e))
 
         // If the monthly rol already exists, insert ANTICIPO lines into it
         const { data: cabeceras } = await nominas()

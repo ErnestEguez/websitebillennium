@@ -113,17 +113,23 @@ async function postearComprobante(
         const { db, lpEmpresaId, periodoLpId, tipoId, tipoCodigo } = ctx
         const [añoNum, mesNum] = fecha.split('-').map(Number)
 
-        const { data: numero } = await db.rpc('lp_generar_numero_comprobante', {
-            p_empresa_id: lpEmpresaId, p_tipo_codigo: tipoCodigo, p_año: añoNum, p_mes: mesNum,
-        })
+        // Número propio: max secuencial existente (incluyendo anulados) + 1
+        // Esto evita duplicados cuando un comprobante previo fue anulado pero no borrado
+        const { data: lastComp } = await db
+            .from('lp_comprobantes').select('secuencial')
+            .eq('empresa_id', lpEmpresaId).eq('tipo_comprobante_id', tipoId).eq('periodo_id', periodoLpId)
+            .order('secuencial', { ascending: false }).limit(1).maybeSingle()
+        const nextSeq = ((lastComp?.secuencial as number) ?? 0) + 1
+        const mesStr  = String(mesNum).padStart(2, '0')
+        const numero  = `${tipoCodigo}-${añoNum}${mesStr}-${String(nextSeq).padStart(4, '0')}`
 
         const totalDebe  = r2(debe.reduce((s, l) => s + l.monto, 0))
         const totalHaber = r2(haber.reduce((s, l) => s + l.monto, 0))
 
         const { data: comp, error: errComp } = await db.from('lp_comprobantes').insert({
             empresa_id: lpEmpresaId, periodo_id: periodoLpId,
-            tipo_comprobante_id: tipoId, numero: numero || `NOM-${Date.now()}`,
-            secuencial: 1, fecha, glosa, estado: 'confirmado',
+            tipo_comprobante_id: tipoId, numero,
+            secuencial: nextSeq, fecha, glosa, estado: 'confirmado',
             total_debe: totalDebe, total_haber: totalHaber,
             moneda_id: null, tipo_cambio: 1,
             origen: 'quickinvoice', referencia_externa: referencia, created_by: null,
@@ -187,27 +193,37 @@ export const contabilidadNominaService = {
     // DEBE: Anticipos a empleados (activo)
     // HABER: Sueldos por pagar (fallback; idealmente banco — agregar cta_banco_pagos)
     async postearAnticipo(anticipoId: string, empresaId: string): Promise<void> {
+        console.log('[nomContab] ▶ postearAnticipo', { anticipoId, empresaId })
         try {
-            const { data: anticipo } = await nominas()
+            const { data: anticipo, error: eAnt } = await nominas()
                 .from('anticipos').select('id, nombre, periodo_id').eq('id', anticipoId).single()
-            if (!anticipo) return
+            console.log('[nomContab] anticipo:', anticipo, 'error:', eAnt)
+            if (!anticipo) { console.warn('[nomContab] anticipo no encontrado'); return }
 
-            const { data: lineas } = await nominas()
+            const { data: lineas, error: eLin } = await nominas()
                 .from('anticipo_lineas').select('monto_anticipo, neto')
                 .eq('anticipo_id', anticipoId)
-            if (!lineas?.length) return
+            console.log('[nomContab] lineas:', lineas?.length, 'error:', eLin)
+            if (!lineas?.length) { console.warn('[nomContab] sin líneas'); return }
 
             const totalAnticipo = r2(lineas.reduce((s, l) => s + (l.monto_anticipo ?? 0), 0))
-            if (totalAnticipo <= 0) return
+            console.log('[nomContab] totalAnticipo:', totalAnticipo)
+            if (totalAnticipo <= 0) { console.warn('[nomContab] total <= 0'); return }
 
             const { data: periodo } = await nominas()
                 .from('periodos').select('fecha_fin').eq('id', anticipo.periodo_id).single()
             const fecha = periodo?.fecha_fin?.substring(0, 10) ?? new Date().toISOString().substring(0, 10)
+            console.log('[nomContab] fecha:', fecha)
 
             const ctx = await initCtx(empresaId, fecha)
+            console.log('[nomContab] ctx:', ctx ? `OK (lp=${ctx.lpEmpresaId})` : 'NULL')
             if (!ctx) return
 
             const { c } = ctx
+            console.log('[nomContab] cuentas:', {
+                cta_anticipos: c.cta_anticipos_empleados,
+                cta_sueldos_pagar: c.cta_sueldos_pagar,
+            })
             if (!c.cta_anticipos_empleados || !c.cta_sueldos_pagar) {
                 console.warn('[nomContab] Anticipo: configura cta_anticipos_empleados y cta_sueldos_pagar')
                 return
@@ -220,13 +236,15 @@ export const contabilidadNominaService = {
                 ctx, `Anticipo nómina — ${anticipo.nombre}`,
                 fecha, `anticipo_${anticipoId}`, debe, haber,
             )
+            console.log('[nomContab] compId resultado:', compId)
             if (compId) {
-                await nominas().from('anticipos')
+                const { error: eUpd } = await nominas().from('anticipos')
                     .update({ lp_comprobante_id: compId, updated_at: new Date().toISOString() })
                     .eq('id', anticipoId)
+                console.log('[nomContab] update anticipo lp_comprobante_id:', eUpd ?? 'OK')
             }
         } catch (e) {
-            console.error('[nomContab] postearAnticipo:', e)
+            console.error('[nomContab] postearAnticipo EXCEPCIÓN:', e)
         }
     },
 
