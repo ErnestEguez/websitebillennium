@@ -389,7 +389,7 @@ export function FiniquitoPage() {
         }
         if (!confirm(`¿Marcar finiquito como "${labels[estado]}"?`)) return
         const extras = estado === 'pagado' ? { fecha_pago: new Date().toISOString().slice(0, 10) } : undefined
-        await finiquitoService.cambiarEstado(f.id, estado, extras)
+        await finiquitoService.cambiarEstado(f.id, estado, empresa!.id, extras)
         const updated = await finiquitoService.listar(empresa!.id)
         setFiniquitos(updated)
         const upd = updated.find(x => x.id === f.id)

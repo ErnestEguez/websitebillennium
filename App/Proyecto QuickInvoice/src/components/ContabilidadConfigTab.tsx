@@ -41,6 +41,31 @@ const PAGOS_CONCEPTOS = [
     { key: 'OTROS',           label: 'Otros / Cruce contable' },
 ]
 
+const NOMINA_CONCEPTOS = [
+    // Gastos de personal
+    { key: 'GASTO_SUELDOS',           label: 'Gasto sueldos y salarios' },
+    { key: 'GASTO_IESS_PATRONAL',     label: 'Gasto IESS patronal (11.15%)' },
+    { key: 'GASTO_D13',               label: 'Gasto / Provisión décimo tercero' },
+    { key: 'GASTO_D14',               label: 'Gasto / Provisión décimo cuarto' },
+    { key: 'GASTO_VACACIONES',        label: 'Gasto / Provisión vacaciones' },
+    { key: 'GASTO_FONDOS_RESERVA',    label: 'Gasto / Provisión fondos de reserva' },
+    { key: 'GASTO_INDEMNIZACION',     label: 'Gasto indemnización / desahucio / bonificación' },
+    // Pasivos — por pagar
+    { key: 'REMUNERACIONES_X_PAGAR',  label: 'Remuneraciones por pagar (neto empleados)' },
+    { key: 'IESS_PERSONAL_X_PAGAR',   label: 'IESS personal por pagar (9.45%)' },
+    { key: 'IESS_PATRONAL_X_PAGAR',   label: 'IESS patronal por pagar (11.15%)' },
+    { key: 'IR_X_PAGAR',              label: 'Retención IR trabajadores por pagar' },
+    // Activos y provisiones
+    { key: 'ANTICIPOS_EMPLEADOS',     label: 'Anticipos a empleados (activo corriente)' },
+    { key: 'PRESTAMOS_EMPLEADOS',     label: 'Préstamos a empleados / novedades (activo)' },
+    { key: 'PROVISION_D13',           label: 'Provisión acumulada décimo tercero' },
+    { key: 'PROVISION_D14',           label: 'Provisión acumulada décimo cuarto' },
+    { key: 'PROVISION_VACACIONES',    label: 'Provisión acumulada vacaciones' },
+    { key: 'PROVISION_FONDOS_RESERVA',label: 'Provisión acumulada fondos de reserva' },
+    // Pagos
+    { key: 'BANCO_PAGO_NOMINA',       label: 'Banco para pagos de nómina (transferencias)' },
+]
+
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
 interface MapeoVal {
@@ -244,6 +269,17 @@ export function ContabilidadConfigTab() {
                 titulo="Cobros — Cuentas por Forma de Pago"
                 proceso="COBROS"
                 conceptos={COBROS_CONCEPTOS}
+                cuentas={cuentas}
+                mapeos={mapeos}
+                onChange={setMapeo}
+            />
+
+            {/* Nómina */}
+            <MapeoCard
+                titulo="Nómina — Roles, Anticipos, Provisiones y Finiquitos"
+                descripcion="Cuentas para los asientos automáticos de nómina. Actívalo con Contabilización en Línea. Cada concepto del rol también puede tener su propia cuenta asignada en Nómina → Conceptos."
+                proceso="NOMINA"
+                conceptos={NOMINA_CONCEPTOS}
                 cuentas={cuentas}
                 mapeos={mapeos}
                 onChange={setMapeo}

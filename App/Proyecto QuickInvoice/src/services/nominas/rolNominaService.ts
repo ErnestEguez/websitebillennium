@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase'
 import type { RolCabecera, RolLinea, Empleado, ConceptoNomina } from '../../types/nominas'
 import { parametrosNominaService } from './parametrosNominaService'
+import { contabilidadNominaService } from './contabilidadNominaService'
 
 const nominas = () => supabase.schema('nominas')
 
@@ -120,6 +121,11 @@ export const rolNominaService = {
             throw new Error(`El anticipo "${antCheck.nombre}" no está liquidado definitivamente. Finaliza el anticipo antes de liquidar el rol.`)
         }
 
+        // Obtener empresa_id para contabilidad
+        const { data: perData } = await nominas()
+            .from('periodos').select('empresa_id').eq('id', periodoId).single()
+        const empresaId = perData?.empresa_id as string | undefined
+
         // 1. Marcar el período como liquidado
         const { error } = await nominas()
             .from('periodos')
@@ -173,6 +179,11 @@ export const rolNominaService = {
                     .update({ monto_fijo: null, updated_at: new Date().toISOString() })
                     .eq('id', linea.novedad_id)
             }
+        }
+
+        // Asientos contables — no bloqueantes
+        if (empresaId) {
+            contabilidadNominaService.postearRolMensual(periodoId, empresaId).catch(() => {})
         }
     },
 

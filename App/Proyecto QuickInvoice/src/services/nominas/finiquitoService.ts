@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import type { Finiquito, CausaTerminacion, EstadoFiniquito } from '../../types/nominas'
+import { contabilidadNominaService } from './contabilidadNominaService'
 
 const nominas = () => supabase.schema('nominas')
 const r2 = (n: number) => Math.round(n * 100) / 100
@@ -154,12 +155,16 @@ export const finiquitoService = {
         if (error) throw error
     },
 
-    async cambiarEstado(id: string, estado: EstadoFiniquito, extras?: { fecha_pago?: string }): Promise<void> {
+    async cambiarEstado(id: string, estado: EstadoFiniquito, empresaId: string, extras?: { fecha_pago?: string }): Promise<void> {
         const { error } = await nominas()
             .from('finiquitos')
             .update({ estado, ...extras })
             .eq('id', id)
         if (error) throw error
+
+        if (estado === 'pagado') {
+            contabilidadNominaService.postearFiniquito(id, empresaId).catch(() => {})
+        }
     },
 
     async eliminar(id: string): Promise<void> {

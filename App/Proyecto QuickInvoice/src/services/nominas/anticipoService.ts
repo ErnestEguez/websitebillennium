@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import type { AnticipoNomina, AnticipoLinea } from '../../types/nominas'
+import { contabilidadNominaService } from './contabilidadNominaService'
 
 const nominas = () => supabase.schema('nominas')
 const round2  = (n: number) => Math.round(n * 100) / 100
@@ -181,11 +182,14 @@ export const anticipoService = {
         const { error: insErr } = await nominas().from('rol_lineas').insert(nuevasLineas)
         if (insErr) throw insErr
         await recalcularTotales(cabsAfectadas, periodoId)
+
+        // Asiento contable — no bloqueante
+        contabilidadNominaService.postearAnticipo(anticipoId, empresaId).catch(() => {})
     },
 
     async deshacerLiquidacion(anticipoId: string): Promise<void> {
         const { data: anticipo } = await nominas()
-            .from('anticipos').select('periodo_id').eq('id', anticipoId).single()
+            .from('anticipos').select('empresa_id, periodo_id').eq('id', anticipoId).single()
         if (!anticipo) throw new Error('Anticipo no encontrado')
 
         const { data: lineas } = await nominas()
@@ -207,5 +211,8 @@ export const anticipoService = {
         await nominas().from('anticipos')
             .update({ estado: 'borrador', updated_at: new Date().toISOString() })
             .eq('id', anticipoId)
+
+        // Anular asiento contable — no bloqueante
+        contabilidadNominaService.anularAnticipo(anticipoId, anticipo.empresa_id).catch(() => {})
     },
 }

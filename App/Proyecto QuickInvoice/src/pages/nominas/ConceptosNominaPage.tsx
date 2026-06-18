@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { conceptosNominaService } from '../../services/nominas/conceptosNominaService'
+import { contableConfigService, type CuentaLP } from '../../services/contableConfigService'
 import type { ConceptoNomina, TipoConcepto, FormulaConcepto } from '../../types/nominas'
 import { BookOpen, Plus, Edit2, Save, X, UserX, RotateCcw, Loader2, Download } from 'lucide-react'
 import { cn } from '../../lib/utils'
@@ -31,6 +32,9 @@ export function ConceptosNominaPage() {
     const [loading, setLoading] = useState(true)
     const [sembrando, setSembrando] = useState(false)
 
+    const [cuentasLP, setCuentasLP] = useState<CuentaLP[]>([])
+    const [filtroCuenta, setFiltroCuenta] = useState('')
+
     const [modalOpen, setModalOpen] = useState(false)
     const [editando, setEditando] = useState<(typeof EMPTY) & { id?: string; es_legal?: boolean }>({ ...EMPTY })
     const [saving, setSaving] = useState(false)
@@ -42,8 +46,12 @@ export function ConceptosNominaPage() {
     async function loadData() {
         try {
             setLoading(true)
-            const data = await conceptosNominaService.listarConceptosTodos(empresa!.id)
+            const [data, ctasLP] = await Promise.all([
+                conceptosNominaService.listarConceptosTodos(empresa!.id),
+                contableConfigService.getCuentas((empresa as any).ruc).catch(() => [] as CuentaLP[]),
+            ])
             setConceptos(data)
+            setCuentasLP(ctasLP)
         } catch (e) {
             console.error(e)
             alert('Error al cargar conceptos')
@@ -66,6 +74,7 @@ export function ConceptosNominaPage() {
 
     function abrirNuevo() {
         setEditando({ ...EMPTY })
+        setFiltroCuenta('')
         setModalOpen(true)
     }
 
@@ -84,6 +93,7 @@ export function ConceptosNominaPage() {
             orden: c.orden,
             cuenta_contable: c.cuenta_contable ?? null,
         })
+        setFiltroCuenta('')
         setModalOpen(true)
     }
 
@@ -321,20 +331,45 @@ export function ConceptosNominaPage() {
                                 </label>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Orden en papeleta</label>
-                                    <input type="number" min="1" step="1" className="input w-full"
-                                        value={editando.orden}
-                                        onChange={e => setEditando(v => ({ ...v, orden: parseInt(e.target.value) || 99 }))} />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Cuenta contable</label>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1">Orden en papeleta</label>
+                                <input type="number" min="1" step="1" className="input w-full"
+                                    value={editando.orden}
+                                    onChange={e => setEditando(v => ({ ...v, orden: parseInt(e.target.value) || 99 }))} />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1">Cuenta contable</label>
+                                {cuentasLP.length > 0 ? (
+                                    <div className="space-y-1">
+                                        <input
+                                            type="text"
+                                            className="input w-full text-xs"
+                                            placeholder="Filtrar por código o nombre..."
+                                            value={filtroCuenta}
+                                            onChange={e => setFiltroCuenta(e.target.value)}
+                                        />
+                                        <select
+                                            className="input w-full text-xs font-mono"
+                                            value={editando.cuenta_contable ?? ''}
+                                            onChange={e => setEditando(v => ({ ...v, cuenta_contable: e.target.value || null }))}
+                                        >
+                                            <option value="">— Sin asignar —</option>
+                                            {cuentasLP
+                                                .filter(ct => !filtroCuenta.trim() ||
+                                                    ct.codigo.toLowerCase().includes(filtroCuenta.toLowerCase()) ||
+                                                    ct.nombre.toLowerCase().includes(filtroCuenta.toLowerCase()))
+                                                .map(ct => (
+                                                    <option key={ct.id} value={ct.codigo}>{ct.codigo} — {ct.nombre}</option>
+                                                ))}
+                                        </select>
+                                    </div>
+                                ) : (
                                     <input type="text" className="input w-full font-mono"
                                         value={editando.cuenta_contable ?? ''}
                                         onChange={e => setEditando(v => ({ ...v, cuenta_contable: e.target.value || null }))}
                                         placeholder="ej: 6101.01" />
-                                </div>
+                                )}
                             </div>
                         </div>
 
