@@ -59,9 +59,14 @@ CREATE TABLE IF NOT EXISTS nominas.finiquitos (
     updated_at  TIMESTAMPTZ DEFAULT timezone('utc', now())
 );
 
+CREATE OR REPLACE FUNCTION nominas.finiquitos_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN NEW.updated_at = timezone('utc', now()); RETURN NEW; END;
+$$;
+
 CREATE OR REPLACE TRIGGER nominas_finiquitos_updated_at
     BEFORE UPDATE ON nominas.finiquitos
-    FOR EACH ROW EXECUTE FUNCTION facturacion.set_updated_at();
+    FOR EACH ROW EXECUTE FUNCTION nominas.finiquitos_updated_at();
 
 ALTER TABLE nominas.finiquitos ENABLE ROW LEVEL SECURITY;
 
