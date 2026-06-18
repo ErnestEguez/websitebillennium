@@ -175,13 +175,6 @@ async function resolverCodigos(
     return new Map((data ?? []).map((c: any) => [c.codigo, c.id]))
 }
 
-// ─── Shared: check contabilidad_en_linea flag ─────────────────────────────────
-
-async function isContabEnLinea(empresaId: string): Promise<boolean> {
-    const config = await contableConfigService.getConfig(empresaId)
-    return config?.contabilidad_en_linea ?? false
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public service
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -193,8 +186,6 @@ export const contabilidadNominaService = {
     // HABER: Banco pago nómina (neto) + Préstamos empleados (descuentos del anticipo)
     async postearAnticipo(anticipoId: string, empresaId: string): Promise<void> {
         try {
-            if (!await isContabEnLinea(empresaId)) return
-
             const { data: anticipo } = await nominas()
                 .from('anticipos').select('id, nombre, periodo_id')
                 .eq('id', anticipoId).single()
@@ -271,8 +262,6 @@ export const contabilidadNominaService = {
     //   HABER: sus cuentas de provisión/por pagar respectivas
     async postearRolMensual(periodoId: string, empresaId: string): Promise<void> {
         try {
-            if (!await isContabEnLinea(empresaId)) return
-
             const { data: periodo } = await nominas()
                 .from('periodos').select('id, nombre, fecha_fin')
                 .eq('id', periodoId).single()
@@ -447,8 +436,6 @@ export const contabilidadNominaService = {
     // HABER: IESS, préstamos, anticipos, neto a pagar
     async postearFiniquito(finiquitoId: string, empresaId: string): Promise<void> {
         try {
-            if (!await isContabEnLinea(empresaId)) return
-
             const { data: fin } = await nominas()
                 .from('finiquitos')
                 .select('*, empleado:empleados(nombres, apellidos)')
@@ -610,7 +597,6 @@ async function pagarProvision(
 ): Promise<void> {
     if (total <= 0) return
     try {
-        if (!await isContabEnLinea(empresaId)) return
         const ctx = await initCtx(empresaId, fecha)
         if (!ctx) return
         const ctaProv  = ctx.cuenta('NOMINA', ctaProvKey)
