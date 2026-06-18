@@ -7,6 +7,16 @@ import type { CuentasNomina } from '../../types/nominas'
 const r2 = (n: number) => Math.round(n * 100) / 100
 const nominas = () => supabase.schema('nominas')
 
+// ─── Códigos estándar por beneficio ──────────────────────────────────────────
+const CODIGOS_D13 = new Set(['DEC3_MENS', 'DECIMO_TERCERO', 'DEC_TERCERO', 'D13'])
+const CODIGOS_D14 = new Set(['DEC4_MENS', 'DECIMO_CUARTO',  'DEC_CUARTO',  'D14'])
+const CODIGOS_VAC = new Set(['VAC_MENS', 'VACACIONES_MENS', 'VACACION_MENS'])
+const CODIGOS_FR  = new Set(['FR_MENS', 'FONDO_RESERVA_MENS', 'FONDOS_RESERVA_MENS'])
+const CODIGOS_HRS = new Set(['HRS_EXTRA_50', 'HRS_EXTRA_100', 'HRS_NOCT_25'])
+const CODIGOS_ANT = new Set(['ANTICIPO', 'ANT_QUINCENA'])
+const CODIGOS_IES = new Set(['IESS_PERSONAL'])
+const CODIGOS_IR  = new Set(['IR_RENTA', 'RET_RENTA'])
+
 // ─── Internal types ───────────────────────────────────────────────────────────
 
 type Linea = { cuenta_id: string; monto: number; desc: string }
@@ -297,7 +307,7 @@ export const contabilidadNominaService = {
 
             const { c } = ctx
 
-            // Batch-resolve cuenta_contable codes → LP IDs (para conceptos con código propio)
+            // Batch-resolve cuenta_contable codes → LP IDs
             const codigosSet = new Set<string>()
             for (const l of lineas) {
                 const cod: string | null = (l.concepto as any)?.cuenta_contable ?? null
@@ -305,22 +315,26 @@ export const contabilidadNominaService = {
             }
             const codigoToId = await resolverCodigos(ctx.db, ctx.lpEmpresaId, codigosSet)
 
-            const HRS_EXTRA = new Set(['HRS_EXTRA_50', 'HRS_EXTRA_100', 'HRS_NOCT_25'])
-            const ANTICIPO  = new Set(['ANTICIPO', 'ANT_QUINCENA'])
-            const IESS_P    = new Set(['IESS_PERSONAL'])
-            const IR        = new Set(['IR_RENTA', 'RET_RENTA'])
+            // Cuenta LP para una línea de ingreso: concepto.cuenta_contable > beneficio > sueldo
+            const ctaIngreso = (codigo: string, conceptoCod: string | null): string | null => {
+                if (conceptoCod) return codigoToId.get(conceptoCod) ?? null
+                if (CODIGOS_D13.has(codigo)) return c.cta_dec_tercero ?? null
+                if (CODIGOS_D14.has(codigo)) return c.cta_dec_cuarto  ?? null
+                if (CODIGOS_VAC.has(codigo)) return c.cta_vacaciones   ?? null
+                if (CODIGOS_FR.has(codigo))  return c.cta_fondo_reserva ?? null
+                if (CODIGOS_HRS.has(codigo)) return c.cta_horas_extra  ?? null
+                return c.cta_sueldos ?? null
+            }
 
             // ── Asiento 2: Rol mensual ─────────────────────────────────────
             const debe:  Linea[] = []
             const haber: Linea[] = []
 
-            // DEBE: ingresos
+            // DEBE: cada ingreso a su cuenta de gasto correspondiente
             for (const l of lineas) {
                 if (l.tipo !== 'ingreso') continue
-                const cod: string | null = (l.concepto as any)?.cuenta_contable ?? null
-                const ctaId = (cod ? codigoToId.get(cod) : null)
-                    ?? (HRS_EXTRA.has(l.codigo) ? c.cta_horas_extra : c.cta_sueldos)
-                addLinea(debe, ctaId, l.monto, l.nombre ?? 'Gasto nómina')
+                const conceptoCod: string | null = (l.concepto as any)?.cuenta_contable ?? null
+                addLinea(debe, ctaIngreso(l.codigo, conceptoCod), l.monto, l.nombre ?? 'Gasto nómina')
             }
 
             // HABER: descuentos por categoría
@@ -328,25 +342,21 @@ export const contabilidadNominaService = {
             for (const l of lineas) {
                 if (l.tipo !== 'descuento') continue
                 totalDescuentos = r2(totalDescuentos + l.monto)
+                const conceptoCod: string | null = (l.concepto as any)?.cuenta_contable ?? null
+                const ctaFallback = conceptoCod ? (codigoToId.get(conceptoCod) ?? c.cta_sueldos_pagar) : c.cta_sueldos_pagar
 
-                if (ANTICIPO.has(l.codigo)) {
+                if (CODIGOS_ANT.has(l.codigo)) {
                     addLinea(haber, c.cta_anticipos_empleados, l.monto, 'Anticipo quincena')
-                } else if (IESS_P.has(l.codigo)) {
+                } else if (CODIGOS_IES.has(l.codigo)) {
                     addLinea(haber, c.cta_iess_pagar, l.monto, 'IESS personal')
-                } else if (IR.has(l.codigo)) {
-                    // IR: usar cuenta del concepto o fallback a sueldos_pagar
-                    const cod: string | null = (l.concepto as any)?.cuenta_contable ?? null
-                    const ctaId = (cod ? codigoToId.get(cod) : null) ?? c.cta_sueldos_pagar
-                    addLinea(haber, ctaId, l.monto, 'Retención IR')
+                } else if (CODIGOS_IR.has(l.codigo)) {
+                    addLinea(haber, ctaFallback, l.monto, 'Retención IR')
                 } else {
-                    // Otros descuentos: usar cuenta del concepto o fallback
-                    const cod: string | null = (l.concepto as any)?.cuenta_contable ?? null
-                    const ctaId = (cod ? codigoToId.get(cod) : null) ?? c.cta_sueldos_pagar
-                    addLinea(haber, ctaId, l.monto, l.nombre ?? l.codigo)
+                    addLinea(haber, ctaFallback, l.monto, l.nombre ?? l.codigo)
                 }
             }
 
-            // HABER: neto = total_ingresos - total_descuentos → Remuneraciones x pagar
+            // HABER: neto → Remuneraciones x pagar
             const totalIngresos = r2(cabs.reduce((s, cab) => s + (cab.total_ingresos ?? 0), 0))
             const neto = r2(totalIngresos - totalDescuentos)
             addLinea(haber, c.cta_sueldos_pagar, neto, 'Remuneraciones por pagar')
@@ -483,14 +493,30 @@ async function postearProvisionLeyes(
         const sbu         = params?.sbu                       ?? 460
         const nEmpleados  = cabs.length
 
-        const iessBase      = r2(lineas.filter(l => l.tipo === 'ingreso' && (l.concepto as any)?.afecta_iess).reduce((s: number, l: any) => s + l.monto, 0))
-        const totalIngresos = r2(cabs.reduce((s: number, cab: any) => s + (cab.total_ingresos ?? 0), 0))
+        // Base IESS: solo ingresos afectos (excluye D13/D14/FR/vacaciones por definición de ley)
+        const iessBase = r2(
+            lineas.filter(l => l.tipo === 'ingreso' && (l.concepto as any)?.afecta_iess)
+                  .reduce((s: number, l: any) => s + l.monto, 0)
+        )
 
+        // Montos ya PAGADOS en el rol → van a gasto en el asiento del rol, no se vuelven a provisionar
+        const dec3Pagado = r2(lineas.filter(l => l.tipo === 'ingreso' && CODIGOS_D13.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
+        const dec4Pagado = r2(lineas.filter(l => l.tipo === 'ingreso' && CODIGOS_D14.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
+        const vacPagado  = r2(lineas.filter(l => l.tipo === 'ingreso' && CODIGOS_VAC.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
+        const frPagado   = r2(lineas.filter(l => l.tipo === 'ingreso' && CODIGOS_FR.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
+
+        // Obligación teórica del período
+        const teorD13 = r2(iessBase / 12)
+        const teorD14 = r2((sbu / 12) * nEmpleados)
+        const teorVac = r2(iessBase / 24)
+        const teorFR  = r2(iessBase * pctFR / 100 / 12)
+
+        // Provisión = max(0, obligación - ya pagado); IESS patronal siempre se provisiona
         const provIessP = r2(iessBase * pctPatronal / 100)
-        const provD13   = r2(totalIngresos / 12)
-        const provD14   = r2((sbu / 12) * nEmpleados)
-        const provVac   = r2(totalIngresos / 24)
-        const provFR    = r2(totalIngresos * pctFR / 100 / 12)
+        const provD13   = r2(Math.max(0, teorD13 - dec3Pagado))
+        const provD14   = r2(Math.max(0, teorD14 - dec4Pagado))
+        const provVac   = r2(Math.max(0, teorVac  - vacPagado))
+        const provFR    = r2(Math.max(0, teorFR   - frPagado))
 
         const debe:  Linea[] = []
         const haber: Linea[] = []
@@ -501,14 +527,14 @@ async function postearProvisionLeyes(
             addLinea(haber, ctaProv, monto, label)
         }
 
-        addPar(c.cta_iess_patronal,  c.cta_iess_pagar,          provIessP, 'IESS patronal')
-        addPar(c.cta_dec_tercero,    c.cta_prov_dec_tercero,    provD13,   'Provisión D13')
-        addPar(c.cta_dec_cuarto,     c.cta_prov_dec_cuarto,     provD14,   'Provisión D14')
-        addPar(c.cta_vacaciones,     c.cta_prov_vacaciones,     provVac,   'Provisión vacaciones')
-        addPar(c.cta_fondo_reserva,  c.cta_prov_fondo_reserva,  provFR,    'Provisión fondos de reserva')
+        addPar(c.cta_iess_patronal, c.cta_iess_pagar,         provIessP, 'IESS patronal')
+        addPar(c.cta_dec_tercero,   c.cta_prov_dec_tercero,   provD13,   'Provisión D13')
+        addPar(c.cta_dec_cuarto,    c.cta_prov_dec_cuarto,    provD14,   'Provisión D14')
+        addPar(c.cta_vacaciones,    c.cta_prov_vacaciones,    provVac,   'Provisión vacaciones')
+        addPar(c.cta_fondo_reserva, c.cta_prov_fondo_reserva, provFR,    'Provisión fondos de reserva')
 
         if (!debe.length) {
-            console.warn('[nomContab] Provisión leyes: sin cuentas configuradas en Nómina → Configuración')
+            console.warn('[nomContab] Provisión leyes: sin cuentas o todo ya pagado en el rol')
             return null
         }
 
