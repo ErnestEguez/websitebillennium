@@ -137,6 +137,9 @@ export const anticipoService = {
             .eq('id', anticipoId)
         if (error) throw error
 
+        // Asiento contable — se registra siempre al liquidar, independiente de si existe el rol
+        contabilidadNominaService.postearAnticipo(anticipoId, empresaId).catch(() => {})
+
         // If the monthly rol already exists, insert ANTICIPO lines into it
         const { data: cabeceras } = await nominas()
             .from('rol_cabecera').select('id, empleado_id').eq('periodo_id', periodoId)
@@ -182,9 +185,6 @@ export const anticipoService = {
         const { error: insErr } = await nominas().from('rol_lineas').insert(nuevasLineas)
         if (insErr) throw insErr
         await recalcularTotales(cabsAfectadas, periodoId)
-
-        // Asiento contable — no bloqueante
-        contabilidadNominaService.postearAnticipo(anticipoId, empresaId).catch(() => {})
     },
 
     async deshacerLiquidacion(anticipoId: string): Promise<void> {
