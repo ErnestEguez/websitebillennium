@@ -441,11 +441,19 @@ export const rolNominaService = {
     },
 
     async deshacerLiquidacion(periodoId: string): Promise<void> {
+        const { data: perData } = await nominas()
+            .from('periodos').select('empresa_id').eq('id', periodoId).single()
+
         const { error } = await nominas()
             .from('periodos')
             .update({ estado: 'borrador', updated_at: new Date().toISOString() })
             .eq('id', periodoId)
         if (error) throw error
+
+        // Anular diarios LP del rol y provisión
+        if (perData?.empresa_id) {
+            contabilidadNominaService.anularRolMensual(periodoId, perData.empresa_id).catch(() => {})
+        }
     },
 
     // Actualiza líneas desde el maestro de empleados y agrega novedades nuevas.
