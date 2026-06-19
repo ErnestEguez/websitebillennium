@@ -20,9 +20,226 @@ import {
     FileText, FilePlus, Search, Plus, Trash2, X, Save, Loader2,
     User, Briefcase, Package, ChevronDown, ChevronUp, ArrowLeft,
     CheckCircle2, RefreshCw, Ban, CreditCard, Eye,
-    FileCheck, AlertCircle,
+    FileCheck, AlertCircle, Printer,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
+
+// ─── Print helpers ───────────────────────────────────────────────────────────
+
+function esc(s: string | null | undefined): string {
+    if (!s) return ''
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+function n2(n: number): string { return n.toFixed(2) }
+
+function generarHtmlA4(
+    prf: Proforma,
+    emp: { nombre: string; ruc: string; logo_url?: string | null },
+): string {
+    const fecha = new Date(prf.created_at).toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })
+    const detalles = prf.detalles ?? []
+    const filas = detalles.map((d, i) => `
+        <tr>
+          <td class="c">${i + 1}</td>
+          <td>${esc(d.nombre_producto)}</td>
+          <td class="c">${n2(d.cantidad)}</td>
+          <td class="r">${n2(d.precio_unitario)}</td>
+          <td class="c">${d.descuento > 0 ? d.descuento + '%' : '—'}</td>
+          <td class="c">${d.iva_porcentaje}%</td>
+          <td class="r bold">${n2(d.total_linea)}</td>
+        </tr>`).join('')
+
+    const logoHtml = emp.logo_url
+        ? `<img src="${esc(emp.logo_url)}" alt="Logo" style="max-height:65px;max-width:150px;object-fit:contain;margin-bottom:6px;">`
+        : ''
+
+    const estadoColor = prf.estado === 'anulada' ? '#b91c1c' : prf.estado === 'convertida' ? '#3730a3' : '#065f46'
+    const estadoLabel = prf.estado === 'vigente' ? 'VIGENTE' : prf.estado === 'convertida' ? 'CONVERTIDA' : 'ANULADA'
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Proforma ${esc(prf.numero)}</title>
+<style>
+  @page { margin: 14mm 14mm 18mm 14mm; size: A4; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#1a1a2e}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;
+          padding-bottom:12px;margin-bottom:14px;border-bottom:3px solid #7c3aed}
+  .emp h1{font-size:14pt;font-weight:900;color:#7c3aed;margin-bottom:3px}
+  .emp p{font-size:8.5pt;color:#555;line-height:1.6}
+  .doc-box{text-align:right}
+  .doc-box .titulo{font-size:14pt;font-weight:900;color:#7c3aed;letter-spacing:.5px}
+  .doc-box .numero{font-family:monospace;font-size:10pt;font-weight:bold;color:#1a1a2e}
+  .doc-box .fec{font-size:8.5pt;color:#555;margin-top:3px}
+  .badge{display:inline-block;padding:2px 9px;border-radius:12px;font-size:7.5pt;
+         font-weight:bold;margin-top:5px;background:#f0fdf4;color:${estadoColor};border:1px solid ${estadoColor}}
+  .cli-box{background:#f5f3ff;border:1px solid #ddd6fe;border-radius:7px;
+           padding:10px 14px;margin-bottom:14px}
+  .cli-box h4{font-size:7pt;font-weight:900;text-transform:uppercase;letter-spacing:1px;
+              color:#7c3aed;margin-bottom:6px}
+  .cli-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 20px}
+  .lbl{font-size:8pt;color:#888}
+  .val{font-size:9pt;font-weight:bold;color:#1a1a2e}
+  table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:8.5pt}
+  thead tr{background:#7c3aed;color:#fff}
+  thead th{padding:6px 8px;text-align:left;font-size:7.5pt;font-weight:bold}
+  tbody tr:nth-child(even){background:#faf9ff}
+  tbody td{padding:5px 8px;border-bottom:1px solid #ede9fe}
+  .c{text-align:center}
+  .r{text-align:right}
+  .bold{font-weight:bold}
+  .totbox{width:270px;margin-left:auto;border:1px solid #ddd6fe;border-radius:7px;overflow:hidden}
+  .totbox table{margin-bottom:0}
+  .totbox tr td{padding:5px 10px;border-bottom:1px solid #ede9fe;font-size:9pt}
+  .totbox tr:last-child td{background:#7c3aed;color:#fff;font-size:11pt;font-weight:900;border-bottom:none}
+  .totbox td:last-child{text-align:right;font-weight:bold}
+  .obs{margin-top:14px;border-top:1px solid #ede9fe;padding-top:10px;font-size:8.5pt;color:#555}
+  .obs strong{color:#1a1a2e}
+  .footer{margin-top:18px;border-top:1px solid #ede9fe;padding-top:8px;
+          text-align:center;font-size:7.5pt;color:#aaa}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="emp">
+    ${logoHtml}
+    <h1>${esc(emp.nombre)}</h1>
+    <p>RUC: <strong>${esc(emp.ruc)}</strong></p>
+  </div>
+  <div class="doc-box">
+    <div class="titulo">PROFORMA DE VENTA</div>
+    <div class="numero">${esc(prf.numero)}</div>
+    <div class="fec">Fecha: ${fecha}</div>
+    <div><span class="badge">${estadoLabel}</span></div>
+    ${prf.factura_numero ? `<div style="margin-top:6px;font-size:8pt;color:#555">Factura: <strong style="color:#3730a3;font-family:monospace">${esc(prf.factura_numero)}</strong></div>` : ''}
+  </div>
+</div>
+
+<div class="cli-box">
+  <h4>Datos del cliente</h4>
+  <div class="cli-grid">
+    <div>
+      <div class="lbl">Nombre / Razón Social</div>
+      <div class="val">${esc(prf.cliente?.nombre)}</div>
+    </div>
+    <div>
+      <div class="lbl">RUC / Cédula</div>
+      <div class="val">${esc(prf.cliente?.identificacion)}</div>
+    </div>
+    ${prf.cliente?.email ? `<div><div class="lbl">Email</div><div class="val">${esc(prf.cliente.email)}</div></div>` : ''}
+    ${prf.cliente?.telefono ? `<div><div class="lbl">Teléfono</div><div class="val">${esc(prf.cliente.telefono)}</div></div>` : ''}
+    ${prf.cliente?.direccion ? `<div style="grid-column:1/-1"><div class="lbl">Dirección</div><div class="val">${esc(prf.cliente.direccion)}</div></div>` : ''}
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:28px">#</th>
+      <th>Descripción</th>
+      <th class="c" style="width:60px">Cant.</th>
+      <th class="r" style="width:88px">P.Unitario</th>
+      <th class="c" style="width:52px">Dto.</th>
+      <th class="c" style="width:50px">IVA</th>
+      <th class="r" style="width:88px">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${filas || '<tr><td colspan="7" style="text-align:center;color:#aaa;padding:14px">Sin ítems</td></tr>'}
+  </tbody>
+</table>
+
+<div class="totbox">
+  <table>
+    ${prf.base_iva_0 > 0 ? `<tr><td>Base 0%</td><td>$ ${n2(prf.base_iva_0)}</td></tr>` : ''}
+    ${prf.base_iva_15 > 0 ? `<tr><td>Base 15%</td><td>$ ${n2(prf.base_iva_15)}</td></tr>` : ''}
+    ${prf.descuento_total > 0 ? `<tr><td style="color:#b45309">Descuentos</td><td style="color:#b45309">− $ ${n2(prf.descuento_total)}</td></tr>` : ''}
+    <tr><td>IVA (15%)</td><td>$ ${n2(prf.valor_iva)}</td></tr>
+    <tr><td>TOTAL A PAGAR</td><td>$ ${n2(prf.total)}</td></tr>
+  </table>
+</div>
+
+${prf.observaciones ? `<div class="obs"><strong>Observaciones:</strong> ${esc(prf.observaciones)}</div>` : ''}
+
+<div class="footer">
+  Este documento es una cotización referencial y <strong>no tiene validez tributaria</strong>.<br>
+  Generado por QuickInvoice &nbsp;·&nbsp; ${new Date().toLocaleDateString('es-EC')}
+</div>
+</body>
+</html>`
+}
+
+function generarHtml80mm(
+    prf: Proforma,
+    emp: { nombre: string; ruc: string },
+): string {
+    const fecha = new Date(prf.created_at).toLocaleDateString('es-EC')
+    const detalles = prf.detalles ?? []
+    const filas = detalles.map(d => `
+        <tr>
+          <td style="padding:2px 0">${esc(d.nombre_producto)}<br>
+            <span style="font-size:7pt;color:#555">${n2(d.cantidad)} x $${n2(d.precio_unitario)}${d.descuento > 0 ? ` (-${d.descuento}%)` : ''}</span>
+          </td>
+          <td style="text-align:right;font-weight:bold;white-space:nowrap;padding:2px 0 2px 6px">$${n2(d.total_linea)}</td>
+        </tr>`).join('')
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Proforma ${esc(prf.numero)}</title>
+<style>
+  @page{margin:3mm;size:80mm auto}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Courier New',Courier,monospace;font-size:8pt;color:#000;width:74mm}
+  .c{text-align:center}
+  .r{text-align:right}
+  .b{font-weight:bold}
+  .emp{font-size:10.5pt;font-weight:900;text-align:center}
+  .sep{border:none;border-top:1px dashed #000;margin:4px 0}
+  table{width:100%;border-collapse:collapse}
+  td{vertical-align:top}
+  .tot-lbl{width:55%}
+  .tot-val{width:45%;text-align:right;font-weight:bold}
+  .gran-total td{border-top:1px solid #000;padding-top:3px;font-size:9.5pt;font-weight:900}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="emp">${esc(emp.nombre)}</div>
+<div class="c" style="font-size:7.5pt">RUC: ${esc(emp.ruc)}</div>
+<hr class="sep">
+<div class="c b" style="font-size:9pt">PROFORMA DE VENTA</div>
+<div class="c b" style="font-size:8pt">${esc(prf.numero)}</div>
+<div class="c" style="font-size:7.5pt">Fecha: ${fecha}</div>
+<hr class="sep">
+<div><span class="b">Cliente:</span> ${esc(prf.cliente?.nombre)}</div>
+<div><span class="b">RUC/CI:</span> ${esc(prf.cliente?.identificacion)}</div>
+${prf.cliente?.telefono ? `<div><span class="b">Tel:</span> ${esc(prf.cliente.telefono)}</div>` : ''}
+<hr class="sep">
+<table>
+  <tbody>
+    ${filas || '<tr><td colspan="2" style="text-align:center">Sin ítems</td></tr>'}
+  </tbody>
+</table>
+<hr class="sep">
+<table>
+  ${prf.base_iva_0 > 0 ? `<tr><td class="tot-lbl">Subtotal 0%</td><td class="tot-val">$${n2(prf.base_iva_0)}</td></tr>` : ''}
+  ${prf.base_iva_15 > 0 ? `<tr><td class="tot-lbl">Subtotal 15%</td><td class="tot-val">$${n2(prf.base_iva_15)}</td></tr>` : ''}
+  ${prf.descuento_total > 0 ? `<tr><td class="tot-lbl">Descuentos</td><td class="tot-val">-$${n2(prf.descuento_total)}</td></tr>` : ''}
+  <tr><td class="tot-lbl">IVA (15%)</td><td class="tot-val">$${n2(prf.valor_iva)}</td></tr>
+  <tr class="gran-total"><td class="tot-lbl">TOTAL</td><td class="tot-val">$${n2(prf.total)}</td></tr>
+</table>
+${prf.observaciones ? `<hr class="sep"><div style="font-size:7.5pt"><span class="b">Obs:</span> ${esc(prf.observaciones)}</div>` : ''}
+<hr class="sep">
+<div class="c" style="font-size:7pt">Cotización sin validez tributaria</div>
+<div class="c" style="font-size:7pt">${new Date().toLocaleDateString('es-EC')}</div>
+</body>
+</html>`
+}
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -98,6 +315,10 @@ export function ProformaPage() {
     const [productDropdown, setProductDropdown]   = useState<number | null>(null)
     const [saving, setSaving]                     = useState(false)
     const [savedProforma, setSavedProforma]       = useState<Proforma | null>(null)
+
+    // ── Modal impresión ───────────────────────────────────────────────────────
+    const [printModal, setPrintModal] = useState<{ open: boolean; proforma: Proforma | null }>({ open: false, proforma: null })
+    const [printLoading, setPrintLoading] = useState(false)
 
     // ── Modal conversión a factura ────────────────────────────────────────────
     const [convertModal, setConvertModal] = useState<{ open: boolean; proforma: Proforma | null }>({ open: false, proforma: null })
@@ -325,6 +546,33 @@ export function ProformaPage() {
         }
     }
 
+    // ─── Impresión ───────────────────────────────────────────────────────────
+
+    async function imprimirProforma(prf: Proforma, formato: 'a4' | '80mm') {
+        if (!empresa) return
+        setPrintLoading(true)
+        try {
+            const completa = (prf.detalles && prf.detalles.length > 0)
+                ? prf
+                : await proformaService.getCompleta(prf.id)
+            const html = formato === 'a4'
+                ? generarHtmlA4(completa, empresa)
+                : generarHtml80mm(completa, empresa)
+            const win = window.open('', '_blank', 'width=900,height=700')
+            if (win) {
+                win.document.write(html)
+                win.document.close()
+                win.focus()
+                setTimeout(() => { win.print() }, 450)
+            }
+            setPrintModal({ open: false, proforma: null })
+        } catch (e: any) {
+            alert('Error al generar impresión: ' + e.message)
+        } finally {
+            setPrintLoading(false)
+        }
+    }
+
     // ─── Totales del formulario ───────────────────────────────────────────────
 
     const totalesForm    = calcularTotalesFactura(detalles)
@@ -490,6 +738,13 @@ export function ProformaPage() {
                                                             className="p-1.5 rounded-lg text-slate-400 hover:text-violet-700 hover:bg-violet-50 transition-colors">
                                                             <Eye className="w-4 h-4" />
                                                         </button>
+                                                        {/* Imprimir */}
+                                                        <button
+                                                            onClick={() => setPrintModal({ open: true, proforma: prf })}
+                                                            title="Imprimir proforma"
+                                                            className="p-1.5 rounded-lg text-slate-400 hover:text-violet-700 hover:bg-violet-50 transition-colors">
+                                                            <Printer className="w-4 h-4" />
+                                                        </button>
                                                         {/* Convertir a factura */}
                                                         {prf.estado === 'vigente' && (
                                                             <button
@@ -548,6 +803,15 @@ export function ProformaPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                            {/* Imprimir (solo si ya existe una proforma guardada) */}
+                            {proformaEditando && (
+                                <button
+                                    onClick={() => setPrintModal({ open: true, proforma: proformaEditando })}
+                                    className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition-colors">
+                                    <Printer className="w-4 h-4" />
+                                    Imprimir
+                                </button>
+                            )}
                             {/* Convertir a Factura (solo si la proforma ya fue guardada y está vigente) */}
                             {proformaEditando?.estado === 'vigente' && (
                                 <button
@@ -965,6 +1229,67 @@ export function ProformaPage() {
                                     )}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════ */}
+            {/* MODAL: SELECCIÓN DE FORMATO DE IMPRESIÓN                  */}
+            {/* ══════════════════════════════════════════════════════════ */}
+            {printModal.open && printModal.proforma && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                            <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                <Printer className="w-5 h-5 text-violet-600" />
+                                Imprimir Proforma
+                            </h3>
+                            {!printLoading && (
+                                <button onClick={() => setPrintModal({ open: false, proforma: null })}
+                                    className="text-slate-400 hover:text-slate-600">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
+                        <div className="p-5 space-y-3">
+                            <p className="text-sm text-slate-500">
+                                Formato de impresión para{' '}
+                                <span className="font-bold font-mono text-violet-700">{printModal.proforma.numero}</span>
+                            </p>
+
+                            {/* Opción A4 */}
+                            <button
+                                onClick={() => imprimirProforma(printModal.proforma!, 'a4')}
+                                disabled={printLoading}
+                                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-violet-200 hover:border-violet-500 hover:bg-violet-50 transition-all group disabled:opacity-60 text-left">
+                                <div className="w-11 h-14 bg-violet-100 group-hover:bg-violet-200 rounded-lg flex flex-col items-center justify-center shrink-0 transition-colors gap-0.5">
+                                    <FileText className="w-5 h-6 text-violet-600" />
+                                    <span className="text-[9px] font-black text-violet-600">A4</span>
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-900 text-sm">Tamaño A4</div>
+                                    <div className="text-xs text-slate-500 mt-0.5">Impresora láser / inyección de tinta</div>
+                                    <div className="text-xs text-slate-400">Diseño profesional con logo y tabla completa</div>
+                                </div>
+                                {printLoading && <Loader2 className="w-4 h-4 animate-spin text-violet-500 ml-auto" />}
+                            </button>
+
+                            {/* Opción 80mm */}
+                            <button
+                                onClick={() => imprimirProforma(printModal.proforma!, '80mm')}
+                                disabled={printLoading}
+                                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-violet-400 hover:bg-violet-50 transition-all group disabled:opacity-60 text-left">
+                                <div className="w-11 h-14 bg-slate-100 group-hover:bg-violet-100 rounded-lg flex flex-col items-center justify-center shrink-0 transition-colors gap-0.5">
+                                    <Printer className="w-5 h-5 text-slate-500 group-hover:text-violet-600" />
+                                    <span className="text-[9px] font-black text-slate-500 group-hover:text-violet-600">80mm</span>
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-900 text-sm">Ticket 80mm</div>
+                                    <div className="text-xs text-slate-500 mt-0.5">Impresora térmica de recibos</div>
+                                    <div className="text-xs text-slate-400">Formato compacto para papel de rollo</div>
+                                </div>
+                            </button>
                         </div>
                     </div>
                 </div>
