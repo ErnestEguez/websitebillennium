@@ -256,10 +256,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('facturacion')}
                             onToggle={() => toggleGroup('facturacion')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/dashboard','/nueva-factura','/facturacion','/vendedores','/notas-credito','/anulacion-facturas','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/dashboard','/nueva-factura','/proformas','/facturacion','/vendedores','/notas-credito','/anulacion-facturas','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/dashboard"          icon={LayoutDashboard} label="Dashboard"          active={location.pathname === '/dashboard'} sub disabled={!p.perm_dashboard} />
                             <SidebarItem to="/nueva-factura"      icon={FilePlus}        label="Nueva Factura"      active={location.pathname === '/nueva-factura'} sub disabled={!p.perm_nueva_factura} />
+                            <SidebarItem to="/proformas"          icon={FileText}        label="Proformas"          active={location.pathname.startsWith('/proformas')} sub disabled={!p.perm_nueva_factura} />
                             <SidebarItem to="/facturacion"        icon={FileText}        label="Comprobantes"       active={location.pathname === '/facturacion'} sub disabled={!p.perm_comprobantes} />
                             <SidebarItem to="/notas-credito"      icon={FileMinus}       label="Notas de Crédito"   active={location.pathname === '/notas-credito'} sub disabled={!p.perm_notas_credito} />
                             <SidebarItem to="/anulacion-facturas" icon={Ban}             label="Anulación Facturas" active={location.pathname === '/anulacion-facturas'} sub disabled={!p.perm_anulacion_facturas} />

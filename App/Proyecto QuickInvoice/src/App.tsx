@@ -26,6 +26,7 @@ import { TransferenciaBodegaPage } from './pages/TransferenciaBodegaPage'
 import { CodigosRetencionPage } from './pages/CodigosRetencionPage'
 import { CierresPage } from './pages/CierresPage'
 import { FacturaDirectaPage } from './pages/FacturaDirectaPage'
+import { ProformaPage }       from './pages/ProformaPage'
 import { VendedoresPage } from './pages/VendedoresPage'
 import { CarteraCxcPage } from './pages/CarteraCxcPage'
 import { ConsultaVentasPage } from './pages/ConsultaVentasPage'
@@ -198,6 +199,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <FacturaDirectaPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/proformas" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <ProformaPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

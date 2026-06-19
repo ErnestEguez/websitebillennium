@@ -1,0 +1,1139 @@
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+import { facturacionService } from '../services/facturacionService'
+import {
+    facturaDirectaService,
+    calcularLinea,
+    calcularTotalesFactura,
+    type DetalleFacturaDirecta,
+    type PagoFactura,
+} from '../services/facturaDirectaService'
+import { proformaService, type Proforma, type EstadoProforma } from '../services/proformaService'
+import { vendedorService, type Vendedor } from '../services/vendedorService'
+import { catalogCacheService } from '../services/catalogCacheService'
+import { cuentasBancariasService } from '../services/finance/bancosService'
+import { precioVolumenService } from '../services/precioVolumenService'
+import type { CuentaBancaria } from '../types/finance'
+import { formatCurrency } from '../lib/utils'
+import {
+    FileText, FilePlus, Search, Plus, Trash2, X, Save, Loader2,
+    User, Briefcase, Package, ChevronDown, ChevronUp, ArrowLeft,
+    CheckCircle2, RefreshCw, Ban, CreditCard, Eye,
+    FileCheck, AlertCircle,
+} from 'lucide-react'
+import { cn } from '../lib/utils'
+
+// ─── Constantes ──────────────────────────────────────────────────────────────
+
+const DETALLE_VACIO: DetalleFacturaDirecta = {
+    producto_id: null,
+    nombre_producto: '',
+    cantidad: 1,
+    precio_unitario: 0,
+    descuento: 0,
+    iva_porcentaje: 15,
+    subproducto_id: null,
+    factor_conversion: 1,
+}
+
+const METODOS_PAGO: { value: PagoFactura['metodo']; label: string }[] = [
+    { value: 'efectivo',     label: '💵 Efectivo' },
+    { value: 'tarjeta',      label: '💳 Tarjeta D/C' },
+    { value: 'transferencia',label: '🏦 Transferencia' },
+    { value: 'credito',      label: '📄 Crédito' },
+    { value: 'cheque',       label: '✏️ Cheque al día' },
+    { value: 'cheque_fecha', label: '📅 Cheque a fecha' },
+    { value: 'otros',        label: '🔄 Otros' },
+]
+
+const ESTADO_BADGE: Record<EstadoProforma, string> = {
+    vigente:    'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    convertida: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+    anulada:    'bg-red-50 text-red-600 border border-red-200',
+}
+
+const ESTADO_LABEL: Record<EstadoProforma, string> = {
+    vigente:    'Vigente',
+    convertida: 'Convertida',
+    anulada:    'Anulada',
+}
+
+// ─── Componente principal ────────────────────────────────────────────────────
+
+export function ProformaPage() {
+    const { empresa, cajaSesion } = useAuth()
+
+    // Vista: 'lista' | 'form'
+    const [vista, setVista] = useState<'lista' | 'form'>('lista')
+
+    // ── Datos maestros ────────────────────────────────────────────────────────
+    const [clientes, setClientes]       = useState<any[]>([])
+    const [productos, setProductos]     = useState<any[]>([])
+    const [vendedores, setVendedores]   = useState<Vendedor[]>([])
+    const [, setCuentasBancarias] = useState<CuentaBancaria[]>([])
+
+    // ── Lista de proformas ────────────────────────────────────────────────────
+    const [proformas, setProformas]     = useState<Proforma[]>([])
+    const [loadingLista, setLoadingLista] = useState(false)
+    const [filtroTexto, setFiltroTexto] = useState('')
+    const [filtroDesde, setFiltroDesde] = useState('')
+    const [filtroHasta, setFiltroHasta] = useState('')
+    const [filtroEstado, setFiltroEstado] = useState<EstadoProforma | ''>('')
+
+    // ── Formulario ────────────────────────────────────────────────────────────
+    const [proformaEditando, setProformaEditando] = useState<Proforma | null>(null) // null = nueva
+    const [searchCliente,    setSearchCliente]    = useState('')
+    const [selectedCliente,  setSelectedCliente]  = useState<any>(null)
+    const [isClientFormOpen, setIsClientFormOpen] = useState(false)
+    const [newClient, setNewClient] = useState({ identificacion: '', nombre: '', email: '', direccion: '', telefono: '' })
+    const [isSavingClient, setIsSavingClient]     = useState(false)
+    const [selectedVendedorId, setSelectedVendedorId] = useState('')
+    const [detalles, setDetalles]                 = useState<DetalleFacturaDirecta[]>([{ ...DETALLE_VACIO }])
+    const [observaciones, setObservaciones]       = useState('')
+    const [esModoServicio, setEsModoServicio]     = useState(false)
+    const [clienteCollapsed, setClienteCollapsed] = useState(false)
+    const [vendedorCollapsed, setVendedorCollapsed] = useState(false)
+    const [searchProducto, setSearchProducto]     = useState<Record<number, string>>({})
+    const [productDropdown, setProductDropdown]   = useState<number | null>(null)
+    const [saving, setSaving]                     = useState(false)
+    const [savedProforma, setSavedProforma]       = useState<Proforma | null>(null)
+
+    // ── Modal conversión a factura ────────────────────────────────────────────
+    const [convertModal, setConvertModal] = useState<{ open: boolean; proforma: Proforma | null }>({ open: false, proforma: null })
+    const [pagos,         setPagos]         = useState<PagoFactura[]>([{ metodo: 'efectivo', valor: 0 }])
+    const [montoRecibido, setMontoRecibido] = useState(0)
+    const [diasPlazoCredito, setDiasPlazoCredito] = useState(30)
+    const [converting, setConverting]       = useState(false)
+    const [facturaGenerada, setFacturaGenerada] = useState<{ numero: string; id: string } | null>(null)
+
+    // ─── Carga inicial ────────────────────────────────────────────────────────
+
+    useEffect(() => {
+        if (empresa?.id) {
+            loadDatos()
+            buscarProformas()
+        }
+    }, [empresa?.id])
+
+    async function loadDatos() {
+        const [clientsList, prodList, vends, cuentas] = await Promise.all([
+            catalogCacheService.getClientes(empresa!.id).catch(() => []),
+            catalogCacheService.getProductos(empresa!.id).catch(() => []),
+            vendedorService.getVendedoresActivos(empresa!.id).catch(() => []),
+            cuentasBancariasService.listar(empresa!.id).catch(() => []),
+        ])
+        setClientes(clientsList)
+        setProductos(prodList)
+        setVendedores(vends)
+        setCuentasBancarias(cuentas.filter((c: CuentaBancaria) => c.estado === 'activa'))
+        if (vends.length === 1) setSelectedVendedorId(vends[0].id)
+        // Pre-seleccionar consumidor final
+        const cf = clientsList.find((c: any) => c.identificacion === '9999999999999')
+        if (cf) setSelectedCliente(cf)
+    }
+
+    async function buscarProformas() {
+        if (!empresa?.id) return
+        setLoadingLista(true)
+        try {
+            const lista = await proformaService.listar(empresa.id, {
+                clienteTexto: filtroTexto || undefined,
+                desde:        filtroDesde || undefined,
+                hasta:        filtroHasta || undefined,
+                estado:       filtroEstado || undefined,
+            })
+            setProformas(lista)
+        } catch (e: any) {
+            alert('Error al cargar proformas: ' + e.message)
+        } finally {
+            setLoadingLista(false)
+        }
+    }
+
+    // ─── Lista: acciones ──────────────────────────────────────────────────────
+
+    async function handleAbrir(prf: Proforma) {
+        const completa = await proformaService.getCompleta(prf.id)
+        setProformaEditando(completa)
+
+        // Cargar estado del formulario con los datos de la proforma
+        const cli = clientes.find(c => c.id === completa.cliente_id) ?? { id: completa.cliente_id, nombre: completa.cliente?.nombre ?? '', identificacion: completa.cliente?.identificacion ?? '' }
+        setSelectedCliente(cli)
+        setSelectedVendedorId(completa.vendedor_id ?? '')
+        setObservaciones(completa.observaciones ?? '')
+        // Convertir detalles guardados al formato del formulario
+        const dets: DetalleFacturaDirecta[] = (completa.detalles ?? []).map(d => ({
+            producto_id:      d.producto_id ?? null,
+            nombre_producto:  d.nombre_producto,
+            cantidad:         d.cantidad,
+            precio_unitario:  d.precio_unitario,
+            descuento:        d.descuento,
+            iva_porcentaje:   d.iva_porcentaje,
+            subproducto_id:   null,
+            factor_conversion: 1,
+        }))
+        setDetalles(dets.length > 0 ? dets : [{ ...DETALLE_VACIO }])
+        setSearchProducto({})
+        setSavedProforma(null)
+        setClienteCollapsed(true)
+        setVendedorCollapsed(true)
+        setVista('form')
+    }
+
+    async function handleAnular(prf: Proforma) {
+        if (!window.confirm(`¿Anular la proforma ${prf.numero}? Esta acción no se puede deshacer.`)) return
+        try {
+            await proformaService.anular(prf.id)
+            await buscarProformas()
+        } catch (e: any) {
+            alert('Error al anular: ' + e.message)
+        }
+    }
+
+    function handleIniciarConvertir(prf: Proforma) {
+        // Pre-cargar detalles de la proforma
+        const total = prf.total ?? 0
+        setPagos([{ metodo: 'efectivo', valor: total }])
+        setMontoRecibido(total)
+        setDiasPlazoCredito(30)
+        setFacturaGenerada(null)
+        setConvertModal({ open: true, proforma: prf })
+    }
+
+    // ─── Formulario: detalles ─────────────────────────────────────────────────
+
+    const addLinea    = () => setDetalles(prev => [...prev, { ...DETALLE_VACIO }])
+    const removeLinea = (i: number) => setDetalles(prev => prev.filter((_, j) => j !== i))
+    const updateLinea = (i: number, field: keyof DetalleFacturaDirecta, val: any) =>
+        setDetalles(prev => prev.map((d, j) => j === i ? { ...d, [field]: val } : d))
+
+    async function selectProducto(idx: number, prod: any) {
+        let precioFinal = prod.precio_venta
+        if (empresa?.id) {
+            try {
+                const pv = await precioVolumenService.resolverPrecio(empresa.id, prod.id, detalles[idx]?.cantidad || 1)
+                if (pv !== null) precioFinal = pv
+            } catch { /* sin rangos, usa precio_venta */ }
+        }
+        setDetalles(prev => prev.map((d, i) => i === idx ? {
+            ...d,
+            producto_id:     prod.id,
+            nombre_producto: prod.nombre,
+            precio_unitario: precioFinal,
+            iva_porcentaje:  prod.iva_porcentaje ?? 15,
+            subproducto_id:  null,
+            factor_conversion: 1,
+        } : d))
+        setSearchProducto(prev => ({ ...prev, [idx]: prod.nombre }))
+        setProductDropdown(null)
+    }
+
+    // ─── Formulario: guardar proforma ─────────────────────────────────────────
+
+    async function handleGuardarProforma() {
+        if (!selectedCliente) return alert('Seleccione un cliente')
+        const validos = detalles.filter(d => d.nombre_producto && d.cantidad > 0 && d.precio_unitario > 0)
+        if (validos.length === 0) return alert('Agregue al menos un ítem con cantidad y precio')
+
+        try {
+            setSaving(true)
+            const saved = await proformaService.crear({
+                empresa_id:   empresa!.id,
+                cliente_id:   selectedCliente.id,
+                detalles:     validos,
+                vendedor_id:  selectedVendedorId || null,
+                observaciones: observaciones || undefined,
+            })
+            setSavedProforma(saved)
+            setProformaEditando(saved)
+            await buscarProformas()
+        } catch (e: any) {
+            alert('Error al guardar proforma: ' + e.message)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    function handleNuevaProforma() {
+        setProformaEditando(null)
+        setSavedProforma(null)
+        setSelectedCliente(null)
+        setSearchCliente('')
+        setSelectedVendedorId(vendedores.length === 1 ? vendedores[0].id : '')
+        setDetalles([{ ...DETALLE_VACIO }])
+        setObservaciones('')
+        setSearchProducto({})
+        setClienteCollapsed(false)
+        setVendedorCollapsed(true)
+        const cf = clientes.find(c => c.identificacion === '9999999999999')
+        if (cf) setSelectedCliente(cf)
+        setVista('form')
+    }
+
+    // ─── Modal conversión ─────────────────────────────────────────────────────
+
+    const addPago    = () => setPagos(prev => [...prev, { metodo: 'efectivo', valor: 0 }])
+    const removePago = (i: number) => setPagos(prev => prev.filter((_, j) => j !== i))
+    const updatePago = (i: number, f: keyof PagoFactura, v: any) =>
+        setPagos(prev => prev.map((p, j) => j === i ? { ...p, [f]: v } : p))
+
+    async function handleConvertirAFactura() {
+        const prf = convertModal.proforma
+        if (!prf) return
+        if (!cajaSesion) return alert('No hay caja abierta. Abra caja antes de facturar.')
+
+        const prfCompleta = await proformaService.getCompleta(prf.id)
+        const detallesValidos: DetalleFacturaDirecta[] = (prfCompleta.detalles ?? []).map(d => ({
+            producto_id:      d.producto_id ?? null,
+            nombre_producto:  d.nombre_producto,
+            cantidad:         d.cantidad,
+            precio_unitario:  d.precio_unitario,
+            descuento:        d.descuento,
+            iva_porcentaje:   d.iva_porcentaje,
+            subproducto_id:   null,
+            factor_conversion: 1,
+        }))
+
+        const totales     = calcularTotalesFactura(detallesValidos)
+        const totalPagado = pagos.reduce((s, p) => s + (Number(p.valor) || 0), 0)
+        if (totalPagado < totales.total - 0.01) {
+            return alert(`El monto de pago (${formatCurrency(totalPagado)}) no cubre el total (${formatCurrency(totales.total)}).`)
+        }
+
+        try {
+            setConverting(true)
+            const factura = await facturaDirectaService.generarFacturaDirecta({
+                empresa_id:          empresa!.id,
+                cliente_id:          prf.cliente_id,
+                detalles:            detallesValidos,
+                pagos:               pagos.filter(p => p.valor > 0),
+                caja_sesion_id:      cajaSesion.id,
+                vendedor_id:         prf.vendedor_id ?? null,
+                dias_plazo_credito:  diasPlazoCredito,
+            })
+
+            // Marcar referencia cruzada en ambas tablas
+            await proformaService.marcarConvertida(prf.id, factura.id, factura.secuencial)
+
+            setFacturaGenerada({ id: factura.id, numero: factura.secuencial })
+            await buscarProformas()
+        } catch (e: any) {
+            alert('Error al generar factura: ' + e.message)
+        } finally {
+            setConverting(false)
+        }
+    }
+
+    // ─── Totales del formulario ───────────────────────────────────────────────
+
+    const totalesForm    = calcularTotalesFactura(detalles)
+    const totalPagoConv  = pagos.reduce((s, p) => s + (Number(p.valor) || 0), 0)
+    const pendienteConv  = (convertModal.proforma?.total ?? 0) - totalPagoConv
+    const tieneEfectivo  = pagos.some(p => p.metodo === 'efectivo')
+    const vuelto         = tieneEfectivo ? Math.max(0, montoRecibido - (convertModal.proforma?.total ?? 0)) : 0
+
+    const filteredClientes = clientes.filter(c =>
+        c.nombre?.toLowerCase().includes(searchCliente.toLowerCase()) ||
+        c.identificacion?.includes(searchCliente)
+    )
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RENDER
+    // ─────────────────────────────────────────────────────────────────────────
+
+    return (
+        <div className="space-y-6">
+
+            {/* ── Header con selector Factura / Proforma ── */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <FileText className="w-7 h-7 text-violet-600" />
+                        Proformas
+                    </h1>
+                    <p className="text-slate-500 text-sm">Cotizaciones y presupuestos para clientes</p>
+                </div>
+
+                {/* Toggle Factura / Proforma */}
+                <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit self-start md:self-auto">
+                    <Link
+                        to="/nueva-factura"
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:text-slate-700 hover:bg-white/60 transition-colors"
+                    >
+                        <FilePlus className="w-4 h-4" />
+                        Factura
+                    </Link>
+                    <button
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold bg-white shadow text-violet-700 cursor-default"
+                    >
+                        <FileText className="w-4 h-4" />
+                        Proforma
+                    </button>
+                </div>
+            </div>
+
+            {/* ══════════════════════════════════════════════════════════ */}
+            {/* VISTA: LISTA DE PROFORMAS                                 */}
+            {/* ══════════════════════════════════════════════════════════ */}
+            {vista === 'lista' && (
+                <div className="space-y-4">
+
+                    {/* Filtros de búsqueda */}
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div className="md:col-span-2 relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por cliente, identificación o N.º proforma…"
+                                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-violet-400"
+                                    value={filtroTexto}
+                                    onChange={e => setFiltroTexto(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && buscarProformas()}
+                                />
+                            </div>
+                            <input type="date" className="input text-sm" value={filtroDesde}
+                                onChange={e => setFiltroDesde(e.target.value)}
+                                title="Desde" />
+                            <input type="date" className="input text-sm" value={filtroHasta}
+                                onChange={e => setFiltroHasta(e.target.value)}
+                                title="Hasta" />
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                            {(['', 'vigente', 'convertida', 'anulada'] as const).map(est => (
+                                <button
+                                    key={est}
+                                    onClick={() => setFiltroEstado(est as any)}
+                                    className={cn(
+                                        'px-3 py-1 rounded-full text-xs font-semibold border transition-colors',
+                                        filtroEstado === est
+                                            ? 'bg-violet-600 text-white border-violet-600'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:border-violet-400'
+                                    )}
+                                >
+                                    {est === '' ? 'Todos' : ESTADO_LABEL[est as EstadoProforma]}
+                                </button>
+                            ))}
+                            <button onClick={buscarProformas}
+                                disabled={loadingLista}
+                                className="ml-auto flex items-center gap-1 px-3 py-1 bg-violet-600 text-white rounded-lg text-xs font-bold disabled:opacity-60">
+                                {loadingLista
+                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    : <RefreshCw className="w-3.5 h-3.5" />}
+                                Buscar
+                            </button>
+                            <button onClick={handleNuevaProforma}
+                                className="flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold">
+                                <Plus className="w-3.5 h-3.5" /> Nueva Proforma
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Tabla de proformas */}
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                        {proformas.length === 0 ? (
+                            <div className="flex flex-col items-center gap-3 py-16 text-slate-400">
+                                <FileText className="w-12 h-12 opacity-30" />
+                                <p className="text-sm">No hay proformas. Cree una nueva.</p>
+                                <button onClick={handleNuevaProforma}
+                                    className="mt-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-bold flex items-center gap-2">
+                                    <Plus className="w-4 h-4" /> Nueva Proforma
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-50 border-b border-slate-100">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">N.º Proforma</th>
+                                            <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase">Cliente</th>
+                                            <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase">Fecha</th>
+                                            <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase">Total</th>
+                                            <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase">Estado</th>
+                                            <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase">Factura</th>
+                                            <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {proformas.map((prf, i) => (
+                                            <tr key={prf.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                                                <td className="px-4 py-3 font-mono font-bold text-violet-700 text-xs">
+                                                    {prf.numero}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <p className="font-semibold text-slate-900 text-sm">{prf.cliente?.nombre ?? '—'}</p>
+                                                    <p className="text-xs text-slate-400">{prf.cliente?.identificacion}</p>
+                                                </td>
+                                                <td className="px-4 py-3 text-center text-xs text-slate-500">
+                                                    {prf.created_at ? new Date(prf.created_at).toLocaleDateString('es-EC') : '—'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-bold text-slate-900">
+                                                    {formatCurrency(prf.total)}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className={cn('text-xs px-2 py-0.5 rounded-full font-semibold', ESTADO_BADGE[prf.estado])}>
+                                                        {ESTADO_LABEL[prf.estado]}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center text-xs">
+                                                    {prf.factura_numero
+                                                        ? <span className="font-mono text-indigo-700">{prf.factura_numero}</span>
+                                                        : <span className="text-slate-300">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        {/* Abrir/editar */}
+                                                        <button
+                                                            onClick={() => handleAbrir(prf)}
+                                                            title="Abrir proforma"
+                                                            className="p-1.5 rounded-lg text-slate-400 hover:text-violet-700 hover:bg-violet-50 transition-colors">
+                                                            <Eye className="w-4 h-4" />
+                                                        </button>
+                                                        {/* Convertir a factura */}
+                                                        {prf.estado === 'vigente' && (
+                                                            <button
+                                                                onClick={() => handleIniciarConvertir(prf)}
+                                                                title="Convertir a Factura"
+                                                                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors">
+                                                                <FileCheck className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                        {/* Anular */}
+                                                        {prf.estado === 'vigente' && (
+                                                            <button
+                                                                onClick={() => handleAnular(prf)}
+                                                                title="Anular"
+                                                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                                                                <Ban className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════ */}
+            {/* VISTA: FORMULARIO DE PROFORMA                             */}
+            {/* ══════════════════════════════════════════════════════════ */}
+            {vista === 'form' && (
+                <div className="space-y-4">
+
+                    {/* Barra superior del formulario */}
+                    <div className="flex items-center justify-between gap-4 bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                        <button
+                            onClick={() => { setVista('lista'); setSavedProforma(null) }}
+                            className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors">
+                            <ArrowLeft className="w-4 h-4" /> Volver a lista
+                        </button>
+
+                        <div className="flex items-center gap-3">
+                            {proformaEditando && (
+                                <span className="font-mono text-xs font-bold text-violet-700 bg-violet-50 px-3 py-1.5 rounded-full border border-violet-200">
+                                    {proformaEditando.numero}
+                                </span>
+                            )}
+                            {proformaEditando && (
+                                <span className={cn('text-xs px-2 py-1 rounded-full font-semibold', ESTADO_BADGE[proformaEditando.estado])}>
+                                    {ESTADO_LABEL[proformaEditando.estado]}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {/* Convertir a Factura (solo si la proforma ya fue guardada y está vigente) */}
+                            {proformaEditando?.estado === 'vigente' && (
+                                <button
+                                    onClick={() => handleIniciarConvertir(proformaEditando)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors">
+                                    <FileCheck className="w-4 h-4" />
+                                    Convertir a Factura
+                                </button>
+                            )}
+                            {/* Guardar proforma (solo si está vigente o es nueva) */}
+                            {(!proformaEditando || proformaEditando.estado === 'vigente') && (
+                                <button
+                                    onClick={handleGuardarProforma}
+                                    disabled={saving}
+                                    className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold disabled:opacity-60 transition-colors">
+                                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                    {proformaEditando ? 'Actualizar Proforma' : 'Guardar Proforma'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Proforma guardada exitosamente */}
+                    {savedProforma && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 flex items-center gap-3">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                            <div>
+                                <p className="font-bold text-emerald-800 text-sm">Proforma guardada correctamente</p>
+                                <p className="text-xs text-emerald-600">N.º {savedProforma.numero} · Total: {formatCurrency(savedProforma.total)}</p>
+                            </div>
+                            <button onClick={() => { handleNuevaProforma() }} className="ml-auto text-xs font-bold text-emerald-700 hover:text-emerald-900">
+                                Nueva proforma
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        {/* ── COLUMNA PRINCIPAL ── */}
+                        <div className="xl:col-span-2 space-y-6">
+
+                            {/* SECCIÓN CLIENTE */}
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                <div
+                                    className="flex items-center justify-between px-5 py-3 cursor-pointer select-none hover:bg-slate-50 transition-colors"
+                                    onClick={() => !isClientFormOpen && setClienteCollapsed(c => !c)}>
+                                    <h2 className="font-bold text-slate-900 flex items-center gap-2 text-sm">
+                                        <User className="w-4 h-4 text-violet-500" /> Cliente
+                                        {clienteCollapsed && selectedCliente && (
+                                            <span className="font-semibold text-slate-700 ml-1">
+                                                — {selectedCliente.nombre}
+                                                <span className="text-slate-400 font-normal ml-1">({selectedCliente.identificacion})</span>
+                                            </span>
+                                        )}
+                                    </h2>
+                                    <div className="flex items-center gap-3">
+                                        {!clienteCollapsed && !isClientFormOpen && (
+                                            <button onClick={e => { e.stopPropagation(); setIsClientFormOpen(true) }}
+                                                className="text-violet-600 hover:text-violet-700 flex items-center gap-1 text-xs font-bold">
+                                                <Plus className="w-3.5 h-3.5" /> Nuevo
+                                            </button>
+                                        )}
+                                        {clienteCollapsed ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
+                                    </div>
+                                </div>
+                                {!clienteCollapsed && (
+                                    <div className="px-5 pb-5 space-y-3 border-t border-slate-50">
+                                        {isClientFormOpen ? (
+                                            <div className="bg-slate-50 rounded-xl border border-violet-100 p-4 space-y-3 mt-3">
+                                                <input placeholder="Identificación / RUC / Cédula"
+                                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm"
+                                                    value={newClient.identificacion}
+                                                    onChange={e => setNewClient({ ...newClient, identificacion: e.target.value })} />
+                                                <input placeholder="Nombre / Razón Social *"
+                                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm"
+                                                    value={newClient.nombre}
+                                                    onChange={e => setNewClient({ ...newClient, nombre: e.target.value })} />
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input placeholder="Email"
+                                                        className="px-4 py-2 rounded-lg border border-slate-200 text-sm"
+                                                        value={newClient.email}
+                                                        onChange={e => setNewClient({ ...newClient, email: e.target.value })} />
+                                                    <input placeholder="Teléfono"
+                                                        className="px-4 py-2 rounded-lg border border-slate-200 text-sm"
+                                                        value={newClient.telefono}
+                                                        onChange={e => setNewClient({ ...newClient, telefono: e.target.value })} />
+                                                </div>
+                                                <input placeholder="Dirección"
+                                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm"
+                                                    value={newClient.direccion}
+                                                    onChange={e => setNewClient({ ...newClient, direccion: e.target.value })} />
+                                                <div className="flex gap-2 pt-1">
+                                                    <button onClick={() => setIsClientFormOpen(false)}
+                                                        className="flex-1 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold hover:bg-slate-50">
+                                                        Cancelar
+                                                    </button>
+                                                    <button
+                                                        disabled={isSavingClient}
+                                                        onClick={async () => {
+                                                            if (!newClient.identificacion || !newClient.nombre) return alert('Identificación y nombre son requeridos')
+                                                            try {
+                                                                setIsSavingClient(true)
+                                                                const created = await facturacionService.createCliente({ ...newClient, empresa_id: empresa!.id })
+                                                                const fresh   = await catalogCacheService.forceRefreshClientes(empresa!.id).catch(() => null)
+                                                                setClientes(fresh ?? (prev => [...prev, created]))
+                                                                setSelectedCliente(created)
+                                                                setIsClientFormOpen(false)
+                                                                setNewClient({ identificacion: '', nombre: '', email: '', direccion: '', telefono: '' })
+                                                                setClienteCollapsed(true)
+                                                            } catch { alert('Error al guardar cliente') }
+                                                            finally { setIsSavingClient(false) }
+                                                        }}
+                                                        className="flex-1 py-2 bg-violet-600 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60">
+                                                        {isSavingClient ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2 mt-3">
+                                                <div className="relative">
+                                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                    <input type="text"
+                                                        placeholder="Buscar cliente por nombre o identificación…"
+                                                        className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-violet-400 outline-none text-sm"
+                                                        value={searchCliente}
+                                                        onChange={e => setSearchCliente(e.target.value)} />
+                                                </div>
+                                                {searchCliente && (
+                                                    <div className="absolute z-20 w-full max-w-lg bg-white border border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto">
+                                                        {filteredClientes.map(c => (
+                                                            <button key={c.id}
+                                                                className="w-full px-4 py-3 text-left hover:bg-slate-50 flex justify-between items-center border-b border-slate-50 last:border-0 text-sm"
+                                                                onClick={() => { setSelectedCliente(c); setSearchCliente(''); setClienteCollapsed(true) }}>
+                                                                <div>
+                                                                    <p className="font-bold text-slate-900">{c.nombre}</p>
+                                                                    <p className="text-xs text-slate-500">{c.identificacion}</p>
+                                                                </div>
+                                                                <User className="w-4 h-4 text-slate-300" />
+                                                            </button>
+                                                        ))}
+                                                        {filteredClientes.length === 0 && (
+                                                            <div className="px-4 py-3 text-sm text-slate-400">No se encontraron clientes</div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {selectedCliente && (
+                                                    <div className="bg-violet-50 border border-violet-100 rounded-xl p-3">
+                                                        <div className="flex items-start justify-between">
+                                                            <div>
+                                                                <p className="text-[10px] font-bold text-violet-600 uppercase tracking-widest">Seleccionado</p>
+                                                                <p className="font-black text-violet-900 text-sm">{selectedCliente.nombre}</p>
+                                                                <p className="text-xs text-violet-600">{selectedCliente.identificacion}</p>
+                                                            </div>
+                                                            <button onClick={() => setSelectedCliente(null)} className="text-violet-400 hover:text-violet-700">
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* SECCIÓN VENDEDOR */}
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                <div
+                                    className="flex items-center justify-between px-5 py-3 cursor-pointer select-none hover:bg-slate-50 transition-colors"
+                                    onClick={() => setVendedorCollapsed(c => !c)}>
+                                    <h2 className="font-bold text-slate-900 flex items-center gap-2 text-sm">
+                                        <Briefcase className="w-4 h-4 text-violet-500" /> Vendedor
+                                        {vendedorCollapsed && selectedVendedorId && (
+                                            <span className="font-semibold text-slate-700 ml-1">
+                                                — {vendedores.find(v => v.id === selectedVendedorId)?.nombre || ''}
+                                            </span>
+                                        )}
+                                    </h2>
+                                    {vendedorCollapsed ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
+                                </div>
+                                {!vendedorCollapsed && (
+                                    <div className="px-5 pb-4 pt-3 border-t border-slate-50">
+                                        <select
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                                            value={selectedVendedorId}
+                                            onChange={e => { setSelectedVendedorId(e.target.value); if (e.target.value) setVendedorCollapsed(true) }}>
+                                            <option value="">— Sin vendedor asignado —</option>
+                                            {vendedores.map(v => (
+                                                <option key={v.id} value={v.id}>{v.nombre}{v.iniciales ? ` (${v.iniciales})` : ''}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* SECCIÓN DETALLE */}
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+                                <div className="flex items-center justify-between flex-wrap gap-3">
+                                    <h2 className="font-bold text-slate-900 flex items-center gap-2">
+                                        <Package className="w-5 h-5 text-violet-500" />
+                                        {esModoServicio ? 'Detalle de Servicios' : 'Detalle de Artículos / Servicios'}
+                                    </h2>
+                                    <div className="flex items-center gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <div
+                                                onClick={() => {
+                                                    if (!esModoServicio && detalles.some(d => d.producto_id)) {
+                                                        if (!window.confirm('Al cambiar a modo Servicios se limpiarán las líneas. ¿Continuar?')) return
+                                                    }
+                                                    setEsModoServicio(prev => !prev)
+                                                    setDetalles([{ ...DETALLE_VACIO, producto_id: null }])
+                                                    setSearchProducto({})
+                                                }}
+                                                className={cn(
+                                                    'relative w-10 h-5 rounded-full transition-colors duration-200 cursor-pointer',
+                                                    esModoServicio ? 'bg-violet-600' : 'bg-slate-300'
+                                                )}>
+                                                <span className={cn(
+                                                    'absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200',
+                                                    esModoServicio ? 'left-5' : 'left-0.5'
+                                                )} />
+                                            </div>
+                                            <span className="text-sm font-medium text-slate-600">Modo Servicios</span>
+                                        </label>
+                                        <button onClick={addLinea}
+                                            className="text-violet-600 hover:text-violet-700 flex items-center gap-1 text-sm font-bold">
+                                            <Plus className="w-4 h-4" /> Agregar línea
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Encabezados */}
+                                <div className="hidden md:grid grid-cols-12 gap-2 px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    <div className={esModoServicio ? 'col-span-5' : 'col-span-3'}>Descripción</div>
+                                    {!esModoServicio && <div className="col-span-2 text-center">Cantidad</div>}
+                                    {esModoServicio && <div className="col-span-1 text-center">Cant.</div>}
+                                    <div className="col-span-2 text-right">P. Unitario</div>
+                                    <div className="col-span-1 text-right">Dto%</div>
+                                    <div className="col-span-1 text-center">IVA%</div>
+                                    <div className="col-span-2 text-right">Subtotal</div>
+                                    <div className="col-span-1 text-right">Total</div>
+                                    <div className="col-span-1" />
+                                </div>
+
+                                {/* Líneas */}
+                                <div className="space-y-2">
+                                    {detalles.map((det, idx) => {
+                                        const lin  = calcularLinea(det)
+                                        const prods = esModoServicio ? [] : productos.filter(p => {
+                                            const q = (searchProducto[idx] || '').toLowerCase()
+                                            return !q || p.nombre?.toLowerCase().includes(q) || p.codigo?.toLowerCase().includes(q)
+                                        }).slice(0, 20)
+
+                                        return (
+                                            <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-slate-50/50 rounded-xl p-2 border border-slate-100">
+                                                {/* Descripción */}
+                                                <div className={cn('relative', esModoServicio ? 'col-span-5' : 'col-span-3')}>
+                                                    <input
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-violet-400"
+                                                        placeholder={esModoServicio ? 'Descripción del servicio' : 'Buscar producto…'}
+                                                        value={esModoServicio ? det.nombre_producto : (searchProducto[idx] ?? det.nombre_producto)}
+                                                        onChange={e => {
+                                                            if (esModoServicio) {
+                                                                updateLinea(idx, 'nombre_producto', e.target.value)
+                                                            } else {
+                                                                setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
+                                                                setProductDropdown(idx)
+                                                            }
+                                                        }}
+                                                        onFocus={() => !esModoServicio && setProductDropdown(idx)}
+                                                        onBlur={() => setTimeout(() => setProductDropdown(null), 200)}
+                                                    />
+                                                    {/* Dropdown productos */}
+                                                    {!esModoServicio && productDropdown === idx && prods.length > 0 && (
+                                                        <div className="absolute z-30 left-0 top-full mt-1 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                                                            {prods.map(prod => (
+                                                                <button
+                                                                    key={prod.id}
+                                                                    className="w-full px-3 py-2.5 text-left hover:bg-violet-50 text-sm flex items-center justify-between border-b border-slate-50 last:border-0"
+                                                                    onMouseDown={() => selectProducto(idx, prod)}>
+                                                                    <div>
+                                                                        <p className="font-semibold text-slate-800">{prod.nombre}</p>
+                                                                        <p className="text-[10px] text-slate-400">{prod.codigo} · IVA {prod.iva_porcentaje}%</p>
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-violet-700 shrink-0 ml-2">{formatCurrency(prod.precio_venta)}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Cantidad */}
+                                                <div className={esModoServicio ? 'col-span-1' : 'col-span-2'}>
+                                                    <input type="number" min="0.01" step="0.01"
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-center outline-none focus:ring-2 focus:ring-violet-400"
+                                                        value={det.cantidad}
+                                                        onChange={e => updateLinea(idx, 'cantidad', parseFloat(e.target.value) || 0)} />
+                                                </div>
+
+                                                {/* Precio unitario */}
+                                                <div className="col-span-2">
+                                                    <input type="number" min="0" step="0.01"
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-violet-400"
+                                                        value={det.precio_unitario}
+                                                        onChange={e => updateLinea(idx, 'precio_unitario', parseFloat(e.target.value) || 0)} />
+                                                </div>
+
+                                                {/* Descuento % */}
+                                                <div className="col-span-1">
+                                                    <input type="number" min="0" max="100" step="0.01"
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-violet-400"
+                                                        value={det.descuento}
+                                                        onChange={e => updateLinea(idx, 'descuento', parseFloat(e.target.value) || 0)} />
+                                                </div>
+
+                                                {/* IVA % */}
+                                                <div className="col-span-1">
+                                                    <select
+                                                        className="w-full px-2 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-white"
+                                                        value={det.iva_porcentaje}
+                                                        onChange={e => updateLinea(idx, 'iva_porcentaje', parseFloat(e.target.value))}>
+                                                        <option value={0}>0%</option>
+                                                        <option value={5}>5%</option>
+                                                        <option value={15}>15%</option>
+                                                    </select>
+                                                </div>
+
+                                                {/* Subtotal (sin IVA) */}
+                                                <div className="col-span-2 flex items-center justify-end">
+                                                    <span className="text-sm font-semibold text-slate-700">
+                                                        {formatCurrency(lin.subtotal_neto)}
+                                                    </span>
+                                                </div>
+
+                                                {/* Total (con IVA) */}
+                                                <div className="col-span-1 flex items-center justify-end">
+                                                    <span className="text-sm font-bold text-slate-900">
+                                                        {formatCurrency(lin.total)}
+                                                    </span>
+                                                </div>
+
+                                                {/* Eliminar */}
+                                                <div className="col-span-1 flex items-center justify-center">
+                                                    <button onClick={() => removeLinea(idx)}
+                                                        disabled={detalles.length === 1}
+                                                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-20 transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Observaciones */}
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                                <label className="text-sm font-bold text-slate-700 mb-2 block">Observaciones</label>
+                                <textarea
+                                    rows={3}
+                                    placeholder="Notas adicionales para el cliente, condiciones, validez de la proforma…"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+                                    value={observaciones}
+                                    onChange={e => setObservaciones(e.target.value)} />
+                            </div>
+                        </div>
+
+                        {/* ── COLUMNA LATERAL: TOTALES ── */}
+                        <div className="space-y-4">
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-3 sticky top-4">
+                                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-widest">Resumen</h3>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-500">Subtotal</span>
+                                        <span className="font-semibold">{formatCurrency(totalesForm.subtotal)}</span>
+                                    </div>
+                                    {totalesForm.descuentos > 0 && (
+                                        <div className="flex justify-between text-sm text-amber-600">
+                                            <span>Descuentos</span>
+                                            <span className="font-semibold">−{formatCurrency(totalesForm.descuentos)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-slate-500">IVA</span>
+                                        <span className="font-semibold">{formatCurrency(totalesForm.iva)}</span>
+                                    </div>
+                                    <div className="border-t border-slate-100 pt-2 flex justify-between">
+                                        <span className="font-bold text-slate-900">TOTAL</span>
+                                        <span className="font-black text-xl text-violet-700">{formatCurrency(totalesForm.total)}</span>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 space-y-2">
+                                    {(!proformaEditando || proformaEditando.estado === 'vigente') && (
+                                        <button
+                                            onClick={handleGuardarProforma}
+                                            disabled={saving}
+                                            className="w-full flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm disabled:opacity-60 transition-colors">
+                                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                            {proformaEditando ? 'Actualizar Proforma' : 'Guardar Proforma'}
+                                        </button>
+                                    )}
+                                    {proformaEditando?.estado === 'vigente' && (
+                                        <button
+                                            onClick={() => handleIniciarConvertir(proformaEditando)}
+                                            className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors">
+                                            <FileCheck className="w-4 h-4" />
+                                            Convertir a Factura
+                                        </button>
+                                    )}
+                                    {proformaEditando?.estado === 'convertida' && (
+                                        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center">
+                                            <p className="text-xs font-bold text-indigo-700">Convertida a factura</p>
+                                            <p className="text-xs text-indigo-600 font-mono">{proformaEditando.factura_numero}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════ */}
+            {/* MODAL: CONVERTIR A FACTURA                                */}
+            {/* ══════════════════════════════════════════════════════════ */}
+            {convertModal.open && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+                        {/* Header del modal */}
+                        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                            <div>
+                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                    <FileCheck className="w-5 h-5 text-emerald-600" />
+                                    Convertir a Factura
+                                </h3>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Proforma {convertModal.proforma?.numero}  · Total {formatCurrency(convertModal.proforma?.total ?? 0)}
+                                </p>
+                            </div>
+                            {!facturaGenerada && (
+                                <button onClick={() => setConvertModal({ open: false, proforma: null })}
+                                    className="text-slate-400 hover:text-slate-600">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
+
+                        {facturaGenerada ? (
+                            /* ── Éxito ── */
+                            <div className="p-6 text-center space-y-4">
+                                <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto" />
+                                <div>
+                                    <p className="font-bold text-slate-900 text-lg">¡Factura generada!</p>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                        N.º <span className="font-mono font-bold text-indigo-700">{facturaGenerada.numero}</span>
+                                    </p>
+                                    <p className="text-xs text-slate-400 mt-2">
+                                        La proforma quedó marcada como "Convertida" con referencia a esta factura.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => { setConvertModal({ open: false, proforma: null }); setVista('lista') }}
+                                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm">
+                                    Cerrar y volver a lista
+                                </button>
+                            </div>
+                        ) : (
+                            /* ── Formulario de pago ── */
+                            <div className="p-5 space-y-4">
+                                {!cajaSesion && (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-sm text-amber-700">
+                                        <AlertCircle className="w-4 h-4 shrink-0" />
+                                        No hay caja abierta. Abra caja antes de facturar.
+                                    </div>
+                                )}
+
+                                {/* Pagos */}
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-bold text-slate-700">Forma de pago</h4>
+                                        <button onClick={addPago}
+                                            className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                                            <Plus className="w-3 h-3" /> Agregar
+                                        </button>
+                                    </div>
+                                    {pagos.map((pago, i) => (
+                                        <div key={i} className="flex gap-2 items-center">
+                                            <select
+                                                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                                                value={pago.metodo}
+                                                onChange={e => updatePago(i, 'metodo', e.target.value as any)}>
+                                                {METODOS_PAGO.map(m => (
+                                                    <option key={m.value} value={m.value}>{m.label}</option>
+                                                ))}
+                                            </select>
+                                            <input type="number" min="0" step="0.01"
+                                                className="w-28 px-3 py-2 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-emerald-400"
+                                                value={pago.valor}
+                                                onChange={e => updatePago(i, 'valor', parseFloat(e.target.value) || 0)} />
+                                            {pagos.length > 1 && (
+                                                <button onClick={() => removePago(i)}
+                                                    className="text-slate-300 hover:text-red-500 transition-colors">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Crédito: plazo */}
+                                {pagos.some(p => p.metodo === 'credito') && (
+                                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                                        <CreditCard className="w-4 h-4 text-amber-600 shrink-0" />
+                                        <label className="text-sm font-bold text-amber-800 whitespace-nowrap">Plazo crédito</label>
+                                        <select
+                                            className="flex-1 px-3 py-2 rounded-lg border border-amber-200 text-sm bg-white outline-none focus:ring-2 focus:ring-amber-400"
+                                            value={diasPlazoCredito}
+                                            onChange={e => setDiasPlazoCredito(Number(e.target.value))}>
+                                            {[15, 30, 45, 60, 90, 120].map(d => (
+                                                <option key={d} value={d}>{d} días</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {/* Efectivo: monto recibido y vuelto */}
+                                {tieneEfectivo && (
+                                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-sm text-slate-600 font-medium whitespace-nowrap">Recibido en efectivo</label>
+                                            <input type="number" min="0" step="0.01"
+                                                className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-right outline-none"
+                                                value={montoRecibido}
+                                                onChange={e => setMontoRecibido(parseFloat(e.target.value) || 0)} />
+                                        </div>
+                                        {vuelto > 0 && (
+                                            <div className="flex justify-between text-sm font-bold text-emerald-700">
+                                                <span>Vuelto</span>
+                                                <span>{formatCurrency(vuelto)}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Resumen totales modal */}
+                                <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-sm">
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>Total proforma</span>
+                                        <span className="font-bold">{formatCurrency(convertModal.proforma?.total ?? 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-slate-600">
+                                        <span>Total pagado</span>
+                                        <span className={cn('font-bold', pendienteConv > 0.01 ? 'text-red-600' : 'text-emerald-600')}>
+                                            {formatCurrency(totalPagoConv)}
+                                        </span>
+                                    </div>
+                                    {pendienteConv > 0.01 && (
+                                        <div className="flex justify-between text-red-600 font-bold">
+                                            <span>Pendiente</span>
+                                            <span>{formatCurrency(pendienteConv)}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Acciones */}
+                                <div className="flex gap-2 pt-1">
+                                    <button
+                                        onClick={() => setConvertModal({ open: false, proforma: null })}
+                                        className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold hover:bg-slate-50">
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleConvertirAFactura}
+                                        disabled={converting || !cajaSesion || pendienteConv > 0.01}
+                                        className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60">
+                                        {converting
+                                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                                            : <FileCheck className="w-4 h-4" />}
+                                        Generar Factura
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
