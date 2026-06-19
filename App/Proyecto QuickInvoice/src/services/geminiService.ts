@@ -7,22 +7,105 @@ interface GeminiPart {
     inline_data?: { mime_type: string; data: string }
 }
 
+export interface ProductoOcr {
+    codigo: string
+    descripcion: string
+    cantidad: number
+    precio_unitario: number
+    descuento: number
+    iva_porcentaje: number
+    subtotal: number
+    categoria_sugerida?: string
+}
+
+export interface FacturaOcr {
+    proveedor_nombre: string
+    proveedor_ruc: string
+    proveedor_direccion?: string
+    proveedor_telefono?: string
+    proveedor_correo?: string
+    proveedor_contribuyente_especial?: boolean
+    estab: string
+    pto_emi: string
+    secuencial: string
+    fecha_emision: string
+    clave_acceso: string | null
+    subtotal: number
+    base_iva_0: number
+    base_iva_15: number
+    valor_iva: number
+    total: number
+    detalle: ProductoOcr[]
+}
+
+async function callGemini(parts: GeminiPart[], maxTokens = 1500): Promise<string> {
+    const res = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: maxTokens },
+        }),
+    })
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as any).error?.message ?? `HTTP ${res.status}`)
+    }
+    const data = await res.json()
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+}
+
 export const geminiService = {
     async generateContent(parts: GeminiPart[]): Promise<string> {
-        const res = await fetch(GEMINI_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts }],
-                generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
-            }),
-        })
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error((err as any).error?.message ?? `HTTP ${res.status}`)
-        }
-        const data = await res.json()
-        return data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+        return callGemini(parts, 1500)
+    },
+
+    async analizarFacturaCompra(
+        base64: string,
+        mimeType: string,
+        categorias: string[],
+    ): Promise<FacturaOcr> {
+        const catList = categorias.length > 0 ? categorias.join(', ') : 'General'
+        const prompt = `Analiza esta factura de proveedor ecuatoriana y extrae todos sus datos.
+Categorías de productos disponibles: ${catList}
+Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional.
+
+{
+  "proveedor_nombre": "nombre o razón social del EMISOR de la factura",
+  "proveedor_ruc": "RUC del EMISOR (13 dígitos)",
+  "proveedor_direccion": "dirección del emisor o null",
+  "proveedor_telefono": "teléfono del emisor o null",
+  "proveedor_correo": "correo electrónico del emisor o null",
+  "proveedor_contribuyente_especial": false,
+  "estab": "001",
+  "pto_emi": "001",
+  "secuencial": "000000001",
+  "fecha_emision": "YYYY-MM-DD",
+  "clave_acceso": "clave de acceso de 49 dígitos o null si no aparece",
+  "subtotal": 0.00,
+  "base_iva_0": 0.00,
+  "base_iva_15": 0.00,
+  "valor_iva": 0.00,
+  "total": 0.00,
+  "detalle": [
+    {
+      "codigo": "código del artículo en la factura",
+      "descripcion": "descripción completa del producto",
+      "cantidad": 1,
+      "precio_unitario": 0.00,
+      "descuento": 0.00,
+      "iva_porcentaje": 15,
+      "subtotal": 0.00,
+      "categoria_sugerida": "la categoría más apropiada de la lista disponible"
+    }
+  ]
+}`
+        const raw = await callGemini(
+            [{ inline_data: { mime_type: mimeType, data: base64 } }, { text: prompt }],
+            4000,
+        )
+        const json = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+        return JSON.parse(json) as FacturaOcr
     },
 
     // Convierte una URL (signed URL o pública) a base64 + mimeType para enviar como inline_data

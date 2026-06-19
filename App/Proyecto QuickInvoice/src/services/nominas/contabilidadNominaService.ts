@@ -480,6 +480,7 @@ export const contabilidadNominaService = {
     },
 }
 
+
 // ─── Private: provisión leyes sociales ───────────────────────────────────────
 
 async function postearProvisionLeyes(
@@ -495,46 +496,40 @@ async function postearProvisionLeyes(
 
         // Base IESS: solo ingresos afectos (excluye D13/D14/FR/vacaciones por definición de ley)
         const iessBase = r2(
-            lineas.filter(l => l.tipo === 'ingreso' && (l.concepto as any)?.afecta_iess)
+            lineas.filter((l: any) => l.tipo === 'ingreso' && (l.concepto as any)?.afecta_iess)
                   .reduce((s: number, l: any) => s + l.monto, 0)
         )
 
-        // Montos ya PAGADOS en el rol → van a gasto en el asiento del rol, no se vuelven a provisionar
-        const dec3Pagado = r2(lineas.filter(l => l.tipo === 'ingreso' && CODIGOS_D13.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
-        const dec4Pagado = r2(lineas.filter(l => l.tipo === 'ingreso' && CODIGOS_D14.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
-        const vacPagado  = r2(lineas.filter(l => l.tipo === 'ingreso' && CODIGOS_VAC.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
-        const frPagado   = r2(lineas.filter(l => l.tipo === 'ingreso' && CODIGOS_FR.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
+        // Montos ya PAGADOS en el rol → ya van a gasto en el asiento del rol; no se vuelven a provisionar
+        const dec3Pagado = r2(lineas.filter((l: any) => l.tipo === 'ingreso' && CODIGOS_D13.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
+        const dec4Pagado = r2(lineas.filter((l: any) => l.tipo === 'ingreso' && CODIGOS_D14.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
+        const vacPagado  = r2(lineas.filter((l: any) => l.tipo === 'ingreso' && CODIGOS_VAC.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
+        const frPagado   = r2(lineas.filter((l: any) => l.tipo === 'ingreso' && CODIGOS_FR.has(l.codigo)).reduce((s: number, l: any) => s + l.monto, 0))
 
-        // Obligación teórica del período
-        const teorD13 = r2(iessBase / 12)
-        const teorD14 = r2((sbu / 12) * nEmpleados)
-        const teorVac = r2(iessBase / 24)
-        const teorFR  = r2(iessBase * pctFR / 100 / 12)
-
-        // Provisión = max(0, obligación - ya pagado); IESS patronal siempre se provisiona
+        // Provisión = max(0, obligación teórica - ya pagado en el rol)
         const provIessP = r2(iessBase * pctPatronal / 100)
-        const provD13   = r2(Math.max(0, teorD13 - dec3Pagado))
-        const provD14   = r2(Math.max(0, teorD14 - dec4Pagado))
-        const provVac   = r2(Math.max(0, teorVac  - vacPagado))
-        const provFR    = r2(Math.max(0, teorFR   - frPagado))
+        const provD13   = r2(Math.max(0, iessBase / 12 - dec3Pagado))
+        const provD14   = r2(Math.max(0, (sbu / 12) * nEmpleados - dec4Pagado))
+        const provVac   = r2(Math.max(0, iessBase / 24 - vacPagado))
+        const provFR    = r2(Math.max(0, iessBase * pctFR / 100 / 12 - frPagado))
 
         const debe:  Linea[] = []
         const haber: Linea[] = []
 
         const addPar = (ctaGasto: string | null | undefined, ctaProv: string | null | undefined, monto: number, label: string) => {
             if (!ctaGasto || !ctaProv || monto < 0.01) return
-            addLinea(debe, ctaGasto, monto, label)
-            addLinea(haber, ctaProv, monto, label)
+            addLinea(debe,  ctaGasto, monto, label)
+            addLinea(haber, ctaProv,  monto, label)
         }
 
-        addPar(c.cta_iess_patronal, c.cta_iess_pagar,         provIessP, 'IESS patronal')
-        addPar(c.cta_dec_tercero,   c.cta_prov_dec_tercero,   provD13,   'Provisión D13')
-        addPar(c.cta_dec_cuarto,    c.cta_prov_dec_cuarto,    provD14,   'Provisión D14')
-        addPar(c.cta_vacaciones,    c.cta_prov_vacaciones,    provVac,   'Provisión vacaciones')
-        addPar(c.cta_fondo_reserva, c.cta_prov_fondo_reserva, provFR,    'Provisión fondos de reserva')
+        addPar(c.cta_iess_patronal, c.cta_iess_pagar,           provIessP, 'IESS patronal')
+        addPar(c.cta_dec_tercero,   c.cta_prov_dec_tercero,     provD13,   'Provisión D13')
+        addPar(c.cta_dec_cuarto,    c.cta_prov_dec_cuarto,      provD14,   'Provisión D14')
+        addPar(c.cta_vacaciones,    c.cta_prov_vacaciones,      provVac,   'Provisión vacaciones')
+        addPar(c.cta_fondo_reserva, c.cta_prov_fondo_reserva,   provFR,    'Provisión fondos de reserva')
 
         if (!debe.length) {
-            console.warn('[nomContab] Provisión leyes: sin cuentas o todo ya pagado en el rol')
+            console.warn('[nomContab] Provisión leyes: sin cuentas configuradas o todo ya pagado en el rol')
             return null
         }
 
