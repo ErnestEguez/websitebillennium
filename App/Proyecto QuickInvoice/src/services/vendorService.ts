@@ -186,16 +186,21 @@ export const compraService = {
         }
 
         // 4. CxP si es crédito (saldo = total - suma retenciones)
+        let cxpError: string | undefined
         if (cabecera.forma_pago === 'CREDITO' && cabecera.proveedor_id && cabecera.fecha_vencimiento) {
             const totalRet = retenciones.reduce((s, r) => s + r.valor, 0)
-            await cxpService.crear({
-                empresa_id: cabecera.empresa_id, proveedor_id: cabecera.proveedor_id,
-                compra_id: compra.id, fecha_emision: cabecera.fecha_ingreso,
-                fecha_vencimiento: cabecera.fecha_vencimiento,
-                monto_original: cabecera.total,
-                saldo_pendiente: Math.max(cabecera.total - totalRet, 0),
-                estado: 'PENDIENTE',
-            })
+            try {
+                await cxpService.crear({
+                    empresa_id: cabecera.empresa_id, proveedor_id: cabecera.proveedor_id,
+                    compra_id: compra.id, fecha_emision: cabecera.fecha_ingreso,
+                    fecha_vencimiento: cabecera.fecha_vencimiento,
+                    monto_original: cabecera.total,
+                    saldo_pendiente: Math.max(cabecera.total - totalRet, 0),
+                    estado: 'PENDIENTE',
+                })
+            } catch (e: any) {
+                cxpError = e?.message ?? String(e)
+            }
         }
 
         // 5. Retenciones (puede haber hasta 4)
@@ -204,7 +209,9 @@ export const compraService = {
                 .insert(retenciones.map(r => ({ ...r, compra_id: compra.id, empresa_id: cabecera.empresa_id })))
         }
 
-        return compraService.obtenerConDetalle(compra.id)
+        const result = await compraService.obtenerConDetalle(compra.id)
+        if (cxpError) result.cxpError = cxpError
+        return result
     },
 
     async crearServicio(
@@ -225,16 +232,21 @@ export const compraService = {
         if (eDetalle) throw eDetalle
 
         // 3. CxP si es crédito
+        let cxpError: string | undefined
         if (cabecera.forma_pago === 'CREDITO' && cabecera.proveedor_id && cabecera.fecha_vencimiento) {
             const totalRet = retenciones.reduce((s, r) => s + r.valor, 0)
-            await cxpService.crear({
-                empresa_id: cabecera.empresa_id, proveedor_id: cabecera.proveedor_id,
-                compra_id: compra.id, fecha_emision: cabecera.fecha_ingreso,
-                fecha_vencimiento: cabecera.fecha_vencimiento,
-                monto_original: cabecera.total,
-                saldo_pendiente: Math.max(cabecera.total - totalRet, 0),
-                estado: 'PENDIENTE',
-            })
+            try {
+                await cxpService.crear({
+                    empresa_id: cabecera.empresa_id, proveedor_id: cabecera.proveedor_id,
+                    compra_id: compra.id, fecha_emision: cabecera.fecha_ingreso,
+                    fecha_vencimiento: cabecera.fecha_vencimiento,
+                    monto_original: cabecera.total,
+                    saldo_pendiente: Math.max(cabecera.total - totalRet, 0),
+                    estado: 'PENDIENTE',
+                })
+            } catch (e: any) {
+                cxpError = e?.message ?? String(e)
+            }
         }
 
         // 4. Retenciones
@@ -243,7 +255,9 @@ export const compraService = {
                 .insert(retenciones.map(r => ({ ...r, compra_id: compra.id, empresa_id: cabecera.empresa_id })))
         }
 
-        return compraService.obtenerConDetalle(compra.id)
+        const result = await compraService.obtenerConDetalle(compra.id)
+        if (cxpError) result.cxpError = cxpError
+        return result
     },
 
     async anular(id: string, motivo: string, anuladoPor: string): Promise<void> {

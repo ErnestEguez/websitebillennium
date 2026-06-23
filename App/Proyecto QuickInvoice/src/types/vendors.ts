@@ -117,6 +117,7 @@ export interface CompraConDetalle extends Compra {
     detalle_servicios?:      DetalleServicio[]
     retenciones?:            RetencionCompra[]
     cxp?:                    CuentaPorPagar
+    cxpError?:               string
 }
 
 // ── Detalle inventario ──────────────────────────────────────

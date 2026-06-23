@@ -479,6 +479,10 @@ export function NuevaCompraInventarioPage() {
                 retsParaGuardar,
             )
 
+            if (compraGuardada?.cxpError) {
+                alert(`⚠️ Compra guardada, pero la cuenta por pagar NO se creó:\n${compraGuardada.cxpError}\n\nLa factura no aparecerá en Tesorería → Egresos.\nContacte al administrador para revisar los permisos de la base de datos.`)
+            }
+
             // Asiento contable automático
             try {
                 const contaConfig = await contableConfigService.getConfig(empresa!.id)
