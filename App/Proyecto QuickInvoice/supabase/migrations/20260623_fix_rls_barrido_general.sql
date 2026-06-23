@@ -35,6 +35,7 @@ BEGIN
         'productos','proveedores','stock_bodega','vendedores'
     ] LOOP
         EXECUTE format('DROP POLICY IF EXISTS "authenticated_full_access" ON facturacion.%I', _tbl);
+        EXECUTE format('DROP POLICY IF EXISTS %I ON facturacion.%I', _tbl || '_all', _tbl);
         EXECUTE format('CREATE POLICY %I ON facturacion.%I FOR SELECT USING (%s)',
             _tbl || '_select', _tbl, _using);
         EXECUTE format('CREATE POLICY %I ON facturacion.%I FOR INSERT WITH CHECK (%s)',
