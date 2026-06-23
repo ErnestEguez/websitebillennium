@@ -96,14 +96,14 @@ export function NuevoEgresoPage() {
         setProvSelec(p); setBusqProv('')
         setCargCxp(true); setError('')
         try {
-            const [cxps, anticipos] = await Promise.all([
-                cxpService.listarPendientes(empresa!.id, p.id),
-                anticipoService.listarDisponibles(empresa!.id, p.id),
-            ])
+            const cxps = await cxpService.listarPendientes(empresa!.id, p.id)
             setCxpLista(cxps.map(c => ({ cxp: c, monto: c.saldo_pendiente, seleccionado: false })))
+        } catch (e: unknown) { setError('Error cargando facturas: ' + String(e)) }
+        try {
+            const anticipos = await anticipoService.listarDisponibles(empresa!.id, p.id)
             setAnticiposLista(anticipos.map(a => ({ anticipo: a, monto: a.monto - a.monto_aplicado, seleccionado: false })))
-        } catch (e: unknown) { setError(String(e)) }
-        finally { setCargCxp(false) }
+        } catch { setAnticiposLista([]) }
+        setCargCxp(false)
     }
 
     function toggleCxp(id: string) {
