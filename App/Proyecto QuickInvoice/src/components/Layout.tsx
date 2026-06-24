@@ -214,7 +214,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         }
     }, [location.pathname, permisos, authLoading])
 
-    const mods: Modules = modules ?? { vendor: false, finance: false, ledgerpro: false }
+    const mods: Modules = modules ?? { vendor: false, finance: false, ledgerpro: false, talento_humano: false }
     const ROLES_ESPECIALES = ['mesero', 'cocina', 'admin_plataforma']
     const esOficina = profile?.rol && !ROLES_ESPECIALES.includes(profile.rol)
 
@@ -495,7 +495,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </ModuleSection>}
 
                         {/* ── MÓDULO 5: Talento Humano ────────────────────── */}
-                        {esOficina && modules.talento_humano && <ModuleSection
+                        {esOficina && mods.talento_humano && <ModuleSection
                             label="Talento Humano"
                             icon={Users}
                             colorClass="text-indigo-600"
@@ -517,7 +517,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </ModuleSection>}
 
                         {/* ── MÓDULO 6: Liquidación de Nóminas ────────────── */}
-                        {esOficina && modules.talento_humano && <ModuleSection
+                        {esOficina && mods.talento_humano && <ModuleSection
                             label="Liquidación de Nóminas"
                             icon={Wallet}
                             colorClass="text-cyan-600"
