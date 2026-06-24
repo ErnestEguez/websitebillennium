@@ -472,26 +472,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 )}
                             </div>
 
-                            {/* Tributario */}
-                            <div>
-                                <button onClick={() => toggleGroup('conta-trib')}
-                                    className={cn(`w-full flex items-center gap-2 pl-8 pr-3 py-2 rounded-lg text-sm transition-colors`, !p.perm_tributario ? 'opacity-35 cursor-not-allowed' : location.pathname.startsWith('/conta/tributario') ? 'text-primary-700 font-medium' : 'text-slate-600 hover:bg-slate-100')}>
-                                    <UserCheck className="w-4 h-4 shrink-0 text-slate-400" />
-                                    {isSidebarOpen && <span className={cn("flex-1 text-left", !p.perm_tributario ? 'line-through decoration-slate-300' : '')}>Tributario</span>}
-                                    {isSidebarOpen && !(!p.perm_tributario) && <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openGroups.includes('conta-trib') ? 'rotate-180' : ''}`} />}
-                                </button>
-                                {openGroups.includes('conta-trib') && isSidebarOpen && p.perm_tributario && (
-                                    <div className="ml-4 border-l border-slate-100 pl-1 space-y-0.5">
-                                        <SidebarItem to="/conta/tributario/compras"     icon={ShoppingCart} label="Compras SRI"    active={location.pathname === '/conta/tributario/compras'} sub />
-                                        <SidebarItem to="/conta/tributario/retenciones" icon={FileText}     label="Retenciones"   active={location.pathname === '/conta/tributario/retenciones'} sub />
-                                        <SidebarItem to="/conta/tributario/nc-nd"       icon={FileMinus}    label="N/C y N/D"     active={location.pathname === '/conta/tributario/nc-nd'} sub />
-                                        <SidebarItem to="/conta/tributario/ats"         icon={FileText}     label="ATS"           active={location.pathname === '/conta/tributario/ats'} sub />
-                                        <SidebarItem to="/conta/tributario/104"         icon={BarChart3}    label="Form. 104 IVA" active={location.pathname === '/conta/tributario/104'} sub />
-                                    </div>
-                                )}
-                            </div>
-
                             <SidebarItem to="/conta/configuracion" icon={Settings} label="Configuración" active={location.pathname === '/conta/configuracion'} sub />
+                        </ModuleSection>}
+
+                        {/* ── MÓDULO 4b: Tributario ────────────────────── */}
+                        {esOficina && mods.ledgerpro && p.perm_tributario && <ModuleSection
+                            label="Tributario"
+                            icon={UserCheck}
+                            colorClass="text-amber-600"
+                            isOpen={openGroups.includes('tributario')}
+                            onToggle={() => toggleGroup('tributario')}
+                            isSidebarOpen={isSidebarOpen}
+                            anyActive={location.pathname.startsWith('/conta/tributario')}
+                        >
+                            <SidebarItem to="/conta/tributario/compras"     icon={ShoppingCart} label="Compras SRI"    active={location.pathname === '/conta/tributario/compras'} sub />
+                            <SidebarItem to="/conta/tributario/retenciones" icon={FileText}     label="Retenciones"   active={location.pathname === '/conta/tributario/retenciones'} sub />
+                            <SidebarItem to="/conta/tributario/nc-nd"       icon={FileMinus}    label="N/C y N/D"     active={location.pathname === '/conta/tributario/nc-nd'} sub />
+                            <SidebarItem to="/conta/tributario/ats"         icon={FileText}     label="ATS"           active={location.pathname === '/conta/tributario/ats'} sub />
+                            <SidebarItem to="/conta/tributario/104"         icon={BarChart3}    label="Form. 104 IVA" active={location.pathname === '/conta/tributario/104'} sub />
                         </ModuleSection>}
 
                         {/* ── MÓDULO 5: Talento Humano ────────────────────── */}
