@@ -4,8 +4,10 @@ import {
     FileDown, Loader2, AlertCircle, CheckCircle, X,
     FileText, ShoppingCart, Receipt, ChevronDown, ChevronUp, Info,
 } from 'lucide-react'
-import { supabase } from '../../../lib/supabaseContabilidad'
-import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
+import { supabase as supabaseConta } from '../../../lib/supabaseContabilidad'
+import { supabase } from '../../../lib/supabase'
+import { useAuth as useContaAuth } from '../../../contexts/contabilidad/ContabilidadContext'
+import { useAuth as useQIAuth } from '../../../contexts/AuthContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
@@ -77,14 +79,25 @@ function tipoCompSRI(tipo: SriComp['tipo']): string {
 
 // ── Generador XML ATS v1.31 ────────────────────────────────────────────────
 
+interface VentaAts {
+    cliente_ruc: string
+    cliente_nombre: string
+    base_cero: number
+    base_iva: number
+    iva: number
+    total: number
+    cantidad: number
+}
+
 function generarXmlAts(params: {
     ruc: string
     razonSocial: string
     año: number
     mes: number
     compras: SriComp[]
+    ventas: VentaAts[]
 }): string {
-    const { ruc, razonSocial, año, mes, compras } = params
+    const { ruc, razonSocial, año, mes, compras, ventas } = params
 
     const mesStr = String(mes).padStart(2, '0')
 
@@ -157,12 +170,33 @@ function generarXmlAts(params: {
   <compras>
 ${xmlCompras}
   </compras>
-  <ventas></ventas>
+  <ventas>
+${ventas.map(v => {
+    const tpId = tipoIdProv(v.cliente_ruc)
+    const totalVta = v.base_cero + v.base_iva + v.iva
+    const fpBlock = totalVta > 500 ? `\n      <formasDePago><formaPago>20</formaPago></formasDePago>` : ''
+    return `    <detalleVentas>
+      <tpIdCliente>${tpId}</tpIdCliente>
+      <idCliente>${v.cliente_ruc}</idCliente>
+      <parteRelVta>NO</parteRelVta>
+      <tipoComprobante>18</tipoComprobante>
+      <tipoEmision>F</tipoEmision>
+      <numeroComprobantes>${v.cantidad}</numeroComprobantes>
+      <baseNoGraIva>0.00</baseNoGraIva>
+      <baseImponible>${f2(v.base_cero)}</baseImponible>
+      <baseImpGrav>${f2(v.base_iva)}</baseImpGrav>
+      <montoIva>${f2(v.iva)}</montoIva>
+      <montoIce>0.00</montoIce>
+      <valorRetIva>0.00</valorRetIva>
+      <valorRetRenta>0.00</valorRetRenta>${fpBlock}
+    </detalleVentas>`
+}).join('\n')}
+  </ventas>
   <ventasEstablecimiento>
     <ventaEst>
       <codEstab>001</codEstab>
-      <ventasEstab>0.00</ventasEstab>
-      <ivaComp>0.00</ivaComp>
+      <ventasEstab>${f2(ventas.reduce((s, v) => s + v.base_cero + v.base_iva + v.iva, 0))}</ventasEstab>
+      <ivaComp>${f2(ventas.reduce((s, v) => s + v.iva, 0))}</ivaComp>
     </ventaEst>
   </ventasEstablecimiento>
 </iva>`
@@ -171,7 +205,8 @@ ${xmlCompras}
 // ── Componente ─────────────────────────────────────────────────────────────
 
 export function AtsPage() {
-    const { empresaActiva } = useAuth()
+    const { empresaActiva } = useContaAuth()
+    const { empresa } = useQIAuth() as any
     const [searchParams] = useSearchParams()
 
     const [año, setAño] = useState(() => {
@@ -185,70 +220,139 @@ export function AtsPage() {
 
     const [compras, setCompras]         = useState<SriComp[]>([])
     const [retenciones, setRetenciones] = useState<SriComp[]>([])
+    const [ventasAts, setVentasAts]     = useState<VentaAts[]>([])
     const [cargando, setCargando]       = useState(false)
     const [error, setError]             = useState('')
     const [ok, setOk]                   = useState('')
 
-    const [tabVista, setTabVista] = useState<'compras' | 'retenciones'>('compras')
+    const [tabVista, setTabVista] = useState<'compras' | 'ventas' | 'retenciones'>('compras')
     const [expandido, setExpandido] = useState<string | null>(null)
 
     const sym = empresaActiva?.moneda?.simbolo ?? '$'
 
     useEffect(() => {
-        if (empresaActiva) cargarDatos()
-    }, [empresaActiva, año, mes])
+        if (empresaActiva || empresa?.id) cargarDatos()
+    }, [empresaActiva, empresa?.id, año, mes])
 
     async function cargarDatos() {
-        if (!empresaActiva) return
         setCargando(true)
         setError('')
 
-        const [{ data: compData, error: e1 }, { data: retData, error: e2 }] = await Promise.all([
-            supabase.from('lp_sri_comprobantes')
-                .select('*')
-                .eq('empresa_id', empresaActiva.id)
-                .eq('año', año)
-                .eq('mes', mes)
-                .in('tipo', ['factura', 'nota_credito', 'nota_debito'])
-                .order('fecha_emision'),
-            supabase.from('lp_sri_comprobantes')
-                .select('*')
-                .eq('empresa_id', empresaActiva.id)
-                .eq('año', año)
-                .eq('mes', mes)
-                .eq('tipo', 'retencion')
-                .order('fecha_emision'),
-        ])
+        const mesStr = String(mes).padStart(2, '0')
+        const desde = `${año}-${mesStr}-01`
+        const hasta = `${año}-${mesStr}-${new Date(año, mes, 0).getDate()}`
 
-        if (e1 || e2) setError((e1 ?? e2)?.message ?? 'Error al cargar datos')
-        setCompras((compData ?? []) as SriComp[])
-        setRetenciones((retData ?? []) as SriComp[])
+        // Fuente 1: SRI CSV (contabilidad schema) — compras + retenciones importadas
+        let sriCompras: SriComp[] = []
+        let sriRetenciones: SriComp[] = []
+        if (empresaActiva) {
+            const [{ data: cd }, { data: rd }] = await Promise.all([
+                supabaseConta.from('lp_sri_comprobantes').select('*')
+                    .eq('empresa_id', empresaActiva.id).eq('año', año).eq('mes', mes)
+                    .in('tipo', ['factura', 'nota_credito', 'nota_debito']).order('fecha_emision'),
+                supabaseConta.from('lp_sri_comprobantes').select('*')
+                    .eq('empresa_id', empresaActiva.id).eq('año', año).eq('mes', mes)
+                    .eq('tipo', 'retencion').order('fecha_emision'),
+            ])
+            sriCompras = (cd ?? []) as SriComp[]
+            sriRetenciones = (rd ?? []) as SriComp[]
+        }
+
+        // Fuente 2: Facturación directa — compras manuales
+        let facCompras: SriComp[] = []
+        if (empresa?.id) {
+            const { data } = await supabase
+                .from('ingresos_stock')
+                .select('id, numero_factura, clave_acceso, fecha_emision, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, proveedor:proveedores(ruc, nombre_empresa), retenciones:retenciones_compras(codigo_retencion, porcentaje, valor)')
+                .eq('empresa_id', empresa.id)
+                .eq('estado', 'ACTIVO')
+                .gte('fecha_emision', desde).lte('fecha_emision', hasta)
+                .order('fecha_emision')
+            facCompras = (data ?? []).map((r: any) => ({
+                id: r.id,
+                tipo: 'factura' as const,
+                proveedor_ruc: r.proveedor?.ruc ?? '',
+                proveedor_nombre: r.proveedor?.nombre_empresa ?? '',
+                numero: r.numero_factura ?? '',
+                clave_acceso: r.clave_acceso,
+                fecha_emision: r.fecha_emision,
+                base_cero: r.base_iva_0 ?? 0,
+                base_iva: (r.base_iva_5 ?? 0) + (r.base_iva_15 ?? 0),
+                iva: r.valor_iva ?? 0,
+                total: r.total ?? 0,
+                codigo_retencion: r.retenciones?.[0]?.codigo_retencion ?? null,
+                porcentaje_ret: r.retenciones?.[0]?.porcentaje ?? null,
+                valor_retenido: r.retenciones?.reduce((s: number, ret: any) => s + (ret.valor ?? 0), 0) || null,
+            }))
+        }
+
+        // Fuente 3: Facturación directa — ventas (agrupadas por cliente para ATS)
+        let ventasAgrupadas: VentaAts[] = []
+        if (empresa?.id) {
+            const { data } = await supabase
+                .from('comprobantes')
+                .select('id, total, cliente:clientes(identificacion, nombre), comprobante_detalles(subtotal, iva_porcentaje, iva_valor)')
+                .eq('empresa_id', empresa.id)
+                .gte('created_at', desde).lte('created_at', hasta + 'T23:59:59')
+            const porCliente: Record<string, VentaAts> = {}
+            for (const v of (data ?? []) as any[]) {
+                const ruc = v.cliente?.identificacion ?? '9999999999999'
+                if (!porCliente[ruc]) {
+                    porCliente[ruc] = {
+                        cliente_ruc: ruc,
+                        cliente_nombre: v.cliente?.nombre ?? 'CONSUMIDOR FINAL',
+                        base_cero: 0, base_iva: 0, iva: 0, total: 0, cantidad: 0,
+                    }
+                }
+                const c = porCliente[ruc]
+                for (const d of (v.comprobante_detalles ?? [])) {
+                    if ((d.iva_porcentaje ?? 0) === 0) c.base_cero += d.subtotal ?? 0
+                    else c.base_iva += d.subtotal ?? 0
+                    c.iva += d.iva_valor ?? 0
+                }
+                c.total += v.total ?? 0
+                c.cantidad += 1
+            }
+            ventasAgrupadas = Object.values(porCliente)
+        }
+
+        // Merge compras: SRI + facturación, deduplicar por numero+ruc
+        const sriKeys = new Set(sriCompras.map(c => `${c.numero}|${c.proveedor_ruc}`))
+        const facNuevas = facCompras.filter(c => !sriKeys.has(`${c.numero}|${c.proveedor_ruc}`))
+        const todasCompras = [...sriCompras, ...facNuevas]
+
+        setCompras(todasCompras)
+        setRetenciones(sriRetenciones)
+        setVentasAts(ventasAgrupadas)
         setCargando(false)
     }
 
     function descargarXml() {
-        if (!empresaActiva) return
-        if (compras.length === 0) {
-            setError('No hay comprobantes de compra para el período seleccionado. Importa los comprobantes del SRI primero.')
+        if (compras.length === 0 && ventasAts.length === 0) {
+            setError('No hay comprobantes para el período seleccionado.')
             return
         }
 
+        const rucDeclarante = empresaActiva?.ruc ?? empresa?.ruc ?? '9999999999999'
+        const razon = empresaActiva?.razon_social ?? empresaActiva?.nombre ?? empresa?.nombre ?? ''
+
         const xml = generarXmlAts({
-            ruc: empresaActiva.ruc ?? '9999999999999',
-            razonSocial: empresaActiva.razon_social ?? empresaActiva.nombre,
+            ruc: rucDeclarante,
+            razonSocial: razon,
             año,
             mes,
             compras,
+            ventas: ventasAts,
         })
 
         const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `ATS_${empresaActiva.ruc ?? 'RUC'}_${año}${String(mes).padStart(2, '0')}.xml`
+        a.download = `ATS_${rucDeclarante}_${año}${String(mes).padStart(2, '0')}.xml`
         a.click()
         URL.revokeObjectURL(url)
-        setOk(`ATS generado: ${compras.length} comprobante(s) de compra`)
+        setOk(`ATS generado: ${compras.length} compra(s), ${ventasAts.reduce((s, v) => s + v.cantidad, 0)} venta(s)`)
     }
 
     // ── Totales ────────────────────────────────────────────────────────────
@@ -312,7 +416,7 @@ export function AtsPage() {
                     <div className="flex-1" />
                     <button
                         onClick={descargarXml}
-                        disabled={cargando || (compras.length === 0 && retenciones.length === 0)}
+                        disabled={cargando || (compras.length === 0 && retenciones.length === 0 && ventasAts.length === 0)}
                         className="btn btn-primary gap-2 px-6"
                     >
                         {cargando
@@ -343,10 +447,10 @@ export function AtsPage() {
             {/* Resumen */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Compras / Facturas',       value: compras.filter(c => c.tipo === 'factura').length,      color: 'text-blue-600',   bg: 'bg-blue-50',   icon: ShoppingCart },
-                    { label: 'NC / ND Recibidas',         value: compras.filter(c => c.tipo !== 'factura').length,      color: 'text-orange-600', bg: 'bg-orange-50', icon: FileText },
-                    { label: 'Retenciones Recibidas',     value: retenciones.length,                                    color: 'text-purple-600', bg: 'bg-purple-50', icon: Receipt },
-                    { label: 'Total Compras (IVA incl.)', value: formatMoneda(totCompras.total, sym),                   color: 'text-emerald-600',bg: 'bg-emerald-50',icon: FileDown },
+                    { label: 'Compras',                   value: compras.length,                                        color: 'text-blue-600',   bg: 'bg-blue-50',   icon: ShoppingCart },
+                    { label: 'Ventas (facturas)',          value: ventasAts.reduce((s, v) => s + v.cantidad, 0),         color: 'text-emerald-600',bg: 'bg-emerald-50',icon: Receipt },
+                    { label: 'Retenciones Recibidas',     value: retenciones.length,                                    color: 'text-purple-600', bg: 'bg-purple-50', icon: FileText },
+                    { label: 'Total Compras (IVA incl.)', value: formatMoneda(totCompras.total, sym),                   color: 'text-slate-800',  bg: 'bg-slate-50',  icon: FileDown },
                 ].map(({ label, value, color, bg, icon: Icon }) => (
                     <div key={label} className="card p-4">
                         <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center mb-3`}>
@@ -362,8 +466,9 @@ export function AtsPage() {
             <div>
                 <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm w-fit mb-4">
                     {([
-                        ['compras',     `Compras (${compras.length})`,           ShoppingCart],
-                        ['retenciones', `Retenciones (${retenciones.length})`,   Receipt],
+                        ['compras',     `Compras (${compras.length})`,                                         ShoppingCart],
+                        ['ventas',      `Ventas (${ventasAts.reduce((s, v) => s + v.cantidad, 0)})`,           Receipt],
+                        ['retenciones', `Retenciones (${retenciones.length})`,                                 FileText],
                     ] as const).map(([id, label, Icon]) => (
                         <button key={id} type="button" onClick={() => setTabVista(id)}
                             className={cn('flex items-center gap-2 px-5 py-2.5 border-l border-slate-200 first:border-l-0',
@@ -493,6 +598,65 @@ export function AtsPage() {
                     </div>
                 )}
 
+                {/* ── Tabla VENTAS ── */}
+                {tabVista === 'ventas' && (
+                    <div className="card overflow-hidden">
+                        <div className="bg-emerald-700 px-5 py-3 text-white font-bold text-sm">
+                            Ventas del período — {mesNombre(mes)} {año} (agrupadas por cliente)
+                        </div>
+                        {cargando ? (
+                            <div className="py-10 text-center text-slate-400">
+                                <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Cargando...
+                            </div>
+                        ) : ventasAts.length === 0 ? (
+                            <div className="py-10 text-center text-slate-400">
+                                <Receipt className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                Sin facturas de venta para este período.
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-slate-50 border-b text-xs text-slate-500 uppercase tracking-wide">
+                                            <th className="py-2 px-3 text-left">Cliente</th>
+                                            <th className="py-2 px-3 text-center">Facturas</th>
+                                            <th className="py-2 px-3 text-right">Base 0%</th>
+                                            <th className="py-2 px-3 text-right">Base Grav.</th>
+                                            <th className="py-2 px-3 text-right">IVA</th>
+                                            <th className="py-2 px-3 text-right">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {ventasAts.map(v => (
+                                            <tr key={v.cliente_ruc} className="border-b border-slate-100 hover:bg-slate-50">
+                                                <td className="py-2 px-3">
+                                                    <div className="font-medium text-slate-700 text-xs">{v.cliente_nombre}</div>
+                                                    <div className="text-slate-400 text-xs font-mono">{v.cliente_ruc}</div>
+                                                </td>
+                                                <td className="py-2 px-3 text-center font-semibold text-xs">{v.cantidad}</td>
+                                                <td className="py-2 px-3 text-right text-xs">{v.base_cero > 0 ? formatMoneda(v.base_cero, sym) : '—'}</td>
+                                                <td className="py-2 px-3 text-right text-xs">{v.base_iva > 0 ? formatMoneda(v.base_iva, sym) : '—'}</td>
+                                                <td className="py-2 px-3 text-right text-xs">{v.iva > 0 ? formatMoneda(v.iva, sym) : '—'}</td>
+                                                <td className="py-2 px-3 text-right font-semibold text-xs">{formatMoneda(v.total, sym)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr className="bg-slate-50 border-t-2 font-semibold text-sm">
+                                            <td className="py-2.5 px-3 text-right text-xs text-slate-500 uppercase">Totales</td>
+                                            <td className="py-2.5 px-3 text-center text-xs">{ventasAts.reduce((s, v) => s + v.cantidad, 0)}</td>
+                                            <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(ventasAts.reduce((s, v) => s + v.base_cero, 0), sym)}</td>
+                                            <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(ventasAts.reduce((s, v) => s + v.base_iva, 0), sym)}</td>
+                                            <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(ventasAts.reduce((s, v) => s + v.iva, 0), sym)}</td>
+                                            <td className="py-2.5 px-3 text-right">{formatMoneda(ventasAts.reduce((s, v) => s + v.total, 0), sym)}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* ── Tabla RETENCIONES ── */}
                 {tabVista === 'retenciones' && (
                     <div className="card overflow-hidden">
@@ -561,9 +725,9 @@ export function AtsPage() {
                 <div>
                     <strong>ATS v1.31 — Información importante:</strong>
                     <ul className="mt-1 space-y-0.5 list-disc ml-4">
-                        <li>Las compras se toman de los CSV importados desde el SRI (Integración SRI).</li>
-                        <li>Las <strong>ventas</strong> se agregarán automáticamente cuando conectes QuickInvoice (Integración QI).</li>
-                        <li>El <code>codSustento</code> se declara como <strong>01</strong> por defecto. Para ajustarlo por tipo de gasto, usa las Reglas de Mapeo en Integración SRI.</li>
+                        <li><strong>Compras:</strong> se combinan las ingresadas en QuickInvoice + las importadas desde CSV del SRI (sin duplicar).</li>
+                        <li><strong>Ventas:</strong> se toman automáticamente de las facturas emitidas en QuickInvoice, agrupadas por cliente.</li>
+                        <li>El <code>codSustento</code> se declara como <strong>01</strong> por defecto.</li>
                         <li>Verifica que el RUC y razón social de la empresa estén correctos en Configuración antes de declarar.</li>
                     </ul>
                 </div>

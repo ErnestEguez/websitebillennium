@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
-import { ShoppingCart, Loader2, AlertCircle, X, Download, ChevronDown, ChevronUp, FileText } from 'lucide-react'
+import { ShoppingCart, Loader2, AlertCircle, X, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { supabase } from '../../../lib/supabaseContabilidad'
-import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
+import { supabase } from '../../../lib/supabase'
+import { useAuth } from '../../../contexts/AuthContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
 
 interface Compra {
     id: string
-    tipo: 'factura' | 'nota_credito' | 'nota_debito'
+    tipo: 'compra' | 'venta'
     proveedor_ruc: string
     proveedor_nombre: string
     numero: string
@@ -20,26 +20,25 @@ interface Compra {
     codigo_retencion: string | null
     porcentaje_ret: number | null
     valor_retenido: number | null
+    tipo_compra?: string
 }
 
 const TIPO_LABEL: Record<string, string> = {
-    factura:      'Factura',
-    nota_credito: 'N/C',
-    nota_debito:  'N/D',
+    compra: 'Compra',
+    venta:  'Venta',
 }
 
 const TIPO_STYLE: Record<string, string> = {
-    factura:      'bg-blue-100 text-blue-700',
-    nota_credito: 'bg-amber-100 text-amber-700',
-    nota_debito:  'bg-orange-100 text-orange-700',
+    compra: 'bg-blue-100 text-blue-700',
+    venta:  'bg-emerald-100 text-emerald-700',
 }
 
 export function ConsultaComprasPage() {
-    const { empresaActiva } = useAuth()
+    const { empresa } = useAuth() as any
 
     const [año, setAño]           = useState(new Date().getFullYear())
     const [mes, setMes]           = useState(0)
-    const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'factura' | 'nota_credito' | 'nota_debito'>('todos')
+    const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'compra' | 'venta'>('todos')
     const [busqueda, setBusqueda] = useState('')
     const [expandido, setExpandido] = useState<string | null>(null)
 
@@ -47,30 +46,93 @@ export function ConsultaComprasPage() {
     const [cargando, setCargando] = useState(false)
     const [error, setError]       = useState('')
 
-    const sym = empresaActiva?.moneda?.simbolo ?? '$'
-
     useEffect(() => {
-        if (empresaActiva) cargar()
-    }, [empresaActiva, año, mes])
+        if (empresa?.id) cargar()
+    }, [empresa?.id, año, mes])
 
     async function cargar() {
-        if (!empresaActiva) return
+        if (!empresa?.id) return
         setCargando(true)
         setError('')
 
-        let q = supabase
-            .from('lp_sri_comprobantes')
-            .select('id,tipo,proveedor_ruc,proveedor_nombre,numero,clave_acceso,fecha_emision,base_cero,base_iva,iva,total,codigo_retencion,porcentaje_ret,valor_retenido')
-            .eq('empresa_id', empresaActiva.id)
-            .in('tipo', ['factura', 'nota_credito', 'nota_debito'])
-            .eq('año', año)
-            .order('fecha_emision', { ascending: false })
+        const desde = mes > 0
+            ? `${año}-${String(mes).padStart(2, '0')}-01`
+            : `${año}-01-01`
+        const hasta = mes > 0
+            ? `${año}-${String(mes).padStart(2, '0')}-${new Date(año, mes, 0).getDate()}`
+            : `${año}-12-31`
 
-        if (mes > 0) q = q.eq('mes', mes)
+        try {
+            const [comprasRes, ventasRes] = await Promise.all([
+                supabase
+                    .from('ingresos_stock')
+                    .select('id, numero_factura, clave_acceso, fecha_emision, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, tipo_compra, proveedor:proveedores(ruc, nombre_empresa), retenciones:retenciones_compras(codigo_retencion, porcentaje, valor)')
+                    .eq('empresa_id', empresa.id)
+                    .eq('estado', 'ACTIVO')
+                    .gte('fecha_emision', desde)
+                    .lte('fecha_emision', hasta)
+                    .order('fecha_emision', { ascending: false }),
 
-        const { data, error: err } = await q
-        if (err) setError(err.message)
-        setDatos((data ?? []) as Compra[])
+                supabase
+                    .from('comprobantes')
+                    .select('id, secuencial, clave_acceso, created_at, total, cliente:clientes(identificacion, nombre), comprobante_detalles(subtotal, iva_porcentaje, iva_valor)')
+                    .eq('empresa_id', empresa.id)
+                    .gte('created_at', desde)
+                    .lte('created_at', hasta + 'T23:59:59')
+                    .order('created_at', { ascending: false }),
+            ])
+
+            const compras: Compra[] = (comprasRes.data ?? []).map((r: any) => ({
+                id:               r.id,
+                tipo:             'compra' as const,
+                proveedor_ruc:    r.proveedor?.ruc ?? '',
+                proveedor_nombre: r.proveedor?.nombre_empresa ?? '',
+                numero:           r.numero_factura ?? '',
+                clave_acceso:     r.clave_acceso,
+                fecha_emision:    r.fecha_emision,
+                base_cero:        r.base_iva_0 ?? 0,
+                base_iva:         (r.base_iva_5 ?? 0) + (r.base_iva_15 ?? 0),
+                iva:              r.valor_iva ?? 0,
+                total:            r.total ?? 0,
+                codigo_retencion: r.retenciones?.[0]?.codigo_retencion ?? null,
+                porcentaje_ret:   r.retenciones?.[0]?.porcentaje ?? null,
+                valor_retenido:   r.retenciones?.reduce((s: number, ret: any) => s + (ret.valor ?? 0), 0) || null,
+                tipo_compra:      r.tipo_compra,
+            }))
+
+            const ventas: Compra[] = (ventasRes.data ?? []).map((r: any) => {
+                const dets = r.comprobante_detalles ?? []
+                let b0 = 0, bG = 0, iv = 0
+                for (const d of dets) {
+                    if ((d.iva_porcentaje ?? 0) === 0) b0 += d.subtotal ?? 0
+                    else bG += d.subtotal ?? 0
+                    iv += d.iva_valor ?? 0
+                }
+                return {
+                    id:               r.id,
+                    tipo:             'venta' as const,
+                    proveedor_ruc:    r.cliente?.identificacion ?? '',
+                    proveedor_nombre: r.cliente?.nombre ?? '',
+                    numero:           r.secuencial ?? '',
+                    clave_acceso:     r.clave_acceso,
+                    fecha_emision:    r.created_at?.slice(0, 10) ?? '',
+                    base_cero:        b0,
+                    base_iva:         bG,
+                    iva:              iv,
+                    total:            r.total ?? 0,
+                    codigo_retencion: null,
+                    porcentaje_ret:   null,
+                    valor_retenido:   null,
+                }
+            })
+
+            if (comprasRes.error) setError(comprasRes.error.message)
+            if (ventasRes.error) setError(prev => prev ? prev + ' | ' + ventasRes.error!.message : ventasRes.error!.message)
+
+            setDatos([...compras, ...ventas].sort((a, b) => b.fecha_emision.localeCompare(a.fecha_emision)))
+        } catch (e: any) {
+            setError(e.message ?? 'Error cargando datos')
+        }
         setCargando(false)
     }
 
@@ -88,8 +150,8 @@ export function ConsultaComprasPage() {
     })
 
     const totales = {
-        facturas:  datos.filter(r => r.tipo === 'factura').length,
-        ncnd:      datos.filter(r => r.tipo !== 'factura').length,
+        compras:   datos.filter(r => r.tipo === 'compra').length,
+        ventas:    datos.filter(r => r.tipo === 'venta').length,
         base0:     filtradas.reduce((s, r) => s + r.base_cero, 0),
         baseGrav:  filtradas.reduce((s, r) => s + r.base_iva,  0),
         iva:       filtradas.reduce((s, r) => s + r.iva,        0),
@@ -100,8 +162,8 @@ export function ConsultaComprasPage() {
     function exportarExcel() {
         const filas = filtradas.map(r => ({
             'Tipo':             TIPO_LABEL[r.tipo] ?? r.tipo,
-            'RUC Proveedor':    r.proveedor_ruc,
-            'Nombre Proveedor': r.proveedor_nombre,
+            'RUC / CI':         r.proveedor_ruc,
+            'Nombre':           r.proveedor_nombre,
             'Número':           r.numero,
             'Fecha':            r.fecha_emision,
             'Base 0%':          r.base_cero,
@@ -115,17 +177,16 @@ export function ConsultaComprasPage() {
         }))
         const ws = XLSX.utils.json_to_sheet(filas)
         const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Compras SRI')
-        XLSX.writeFile(wb, `Compras_SRI_${empresaActiva?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.xlsx`)
+        XLSX.utils.book_append_sheet(wb, ws, 'Compras y Ventas')
+        XLSX.writeFile(wb, `Tributario_${empresa?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.xlsx`)
     }
 
     return (
         <div className="space-y-5 max-w-6xl">
-            {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Consulta de Compras SRI</h1>
+                <h1 className="text-2xl font-bold text-slate-900">Consulta Tributaria — Compras y Ventas</h1>
                 <p className="text-slate-500 text-sm mt-0.5">
-                    Facturas, Notas de Crédito y Notas de Débito importadas desde el SRI
+                    Facturas de compra y venta registradas en el sistema
                 </p>
             </div>
 
@@ -159,9 +220,8 @@ export function ConsultaComprasPage() {
                         <label className="label">Tipo</label>
                         <select className="input" value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value as typeof tipoFiltro)}>
                             <option value="todos">Todos</option>
-                            <option value="factura">Facturas</option>
-                            <option value="nota_credito">Notas de Crédito</option>
-                            <option value="nota_debito">Notas de Débito</option>
+                            <option value="compra">Compras</option>
+                            <option value="venta">Ventas</option>
                         </select>
                     </div>
                     <div className="flex-1 min-w-[200px]">
@@ -187,10 +247,10 @@ export function ConsultaComprasPage() {
             {/* Resumen */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Facturas',        value: totales.facturas,               color: 'text-blue-600' },
-                    { label: 'N/C y N/D',       value: totales.ncnd,                   color: 'text-amber-600' },
-                    { label: 'Total IVA',        value: formatMoneda(totales.iva, sym), color: 'text-indigo-600' },
-                    { label: 'Total Compras',    value: formatMoneda(totales.total, sym), color: 'text-emerald-600' },
+                    { label: 'Compras',        value: totales.compras,              color: 'text-blue-600' },
+                    { label: 'Ventas',         value: totales.ventas,               color: 'text-emerald-600' },
+                    { label: 'Total IVA',      value: formatMoneda(totales.iva),    color: 'text-indigo-600' },
+                    { label: 'Total General',  value: formatMoneda(totales.total),  color: 'text-slate-800' },
                 ].map(({ label, value, color }) => (
                     <div key={label} className="card p-4">
                         <p className={`text-xl font-bold ${color}`}>{value}</p>
@@ -203,7 +263,7 @@ export function ConsultaComprasPage() {
             <div className="card overflow-hidden">
                 <div className="bg-slate-700 px-5 py-3 text-white font-bold text-sm flex items-center gap-2">
                     <ShoppingCart className="w-4 h-4" />
-                    Comprobantes de compra — {mes > 0 ? mesNombre(mes) : 'Año completo'} {año}
+                    Comprobantes — {mes > 0 ? mesNombre(mes) : 'Año completo'} {año}
                     {filtradas.length !== datos.length && (
                         <span className="ml-2 text-xs font-normal text-slate-300">
                             ({filtradas.length} de {datos.length})
@@ -219,7 +279,6 @@ export function ConsultaComprasPage() {
                     <div className="py-12 text-center text-slate-400">
                         <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-20" />
                         <p>Sin comprobantes para los filtros seleccionados.</p>
-                        <p className="text-xs mt-1">Importa los comprobantes del SRI en Integración SRI.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -228,7 +287,7 @@ export function ConsultaComprasPage() {
                                 <tr className="bg-slate-50 border-b text-xs text-slate-500 uppercase tracking-wide">
                                     <th className="py-2 px-2 w-8" />
                                     <th className="py-2 px-3 text-left">Tipo</th>
-                                    <th className="py-2 px-3 text-left">Proveedor</th>
+                                    <th className="py-2 px-3 text-left">Proveedor / Cliente</th>
                                     <th className="py-2 px-3 text-left">Número</th>
                                     <th className="py-2 px-3 text-left">Fecha</th>
                                     <th className="py-2 px-3 text-right">Base 0%</th>
@@ -264,16 +323,16 @@ export function ConsultaComprasPage() {
                                                 <td className="py-2 px-3 font-mono text-xs text-slate-600">{r.numero}</td>
                                                 <td className="py-2 px-3 text-xs text-slate-500">{r.fecha_emision}</td>
                                                 <td className="py-2 px-3 text-right text-xs">
-                                                    {r.base_cero > 0 ? formatMoneda(r.base_cero, sym) : '—'}
+                                                    {r.base_cero > 0 ? formatMoneda(r.base_cero) : '—'}
                                                 </td>
                                                 <td className="py-2 px-3 text-right text-xs">
-                                                    {r.base_iva > 0 ? formatMoneda(r.base_iva, sym) : '—'}
+                                                    {r.base_iva > 0 ? formatMoneda(r.base_iva) : '—'}
                                                 </td>
                                                 <td className="py-2 px-3 text-right text-xs">
-                                                    {r.iva > 0 ? formatMoneda(r.iva, sym) : '—'}
+                                                    {r.iva > 0 ? formatMoneda(r.iva) : '—'}
                                                 </td>
                                                 <td className="py-2 px-3 text-right font-semibold text-xs">
-                                                    {formatMoneda(r.total, sym)}
+                                                    {formatMoneda(r.total)}
                                                 </td>
                                                 <td className="py-2 px-3 text-center">
                                                     {r.codigo_retencion ? (
@@ -293,6 +352,7 @@ export function ConsultaComprasPage() {
                                                             <div><span className="text-slate-400">Base 0%:</span> {r.base_cero.toFixed(2)}</div>
                                                             <div><span className="text-slate-400">Base gravada:</span> {r.base_iva.toFixed(2)}</div>
                                                             <div><span className="text-slate-400">IVA:</span> {r.iva.toFixed(2)}</div>
+                                                            {r.tipo_compra && <div><span className="text-slate-400">Tipo compra:</span> {r.tipo_compra}</div>}
                                                             {r.codigo_retencion && (
                                                                 <>
                                                                     <div><span className="text-slate-400">Cód. Ret. IR:</span> {r.codigo_retencion}</div>
@@ -315,12 +375,12 @@ export function ConsultaComprasPage() {
                             <tfoot>
                                 <tr className="bg-slate-50 border-t-2 font-semibold text-sm">
                                     <td colSpan={5} className="py-2.5 px-3 text-right text-xs text-slate-500 uppercase">Totales</td>
-                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.base0, sym)}</td>
-                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.baseGrav, sym)}</td>
-                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.iva, sym)}</td>
-                                    <td className="py-2.5 px-3 text-right">{formatMoneda(totales.total, sym)}</td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.base0)}</td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.baseGrav)}</td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.iva)}</td>
+                                    <td className="py-2.5 px-3 text-right">{formatMoneda(totales.total)}</td>
                                     <td className="py-2.5 px-3 text-center text-xs text-slate-500">
-                                        {totales.retenido > 0 ? formatMoneda(totales.retenido, sym) : ''}
+                                        {totales.retenido > 0 ? formatMoneda(totales.retenido) : ''}
                                     </td>
                                 </tr>
                             </tfoot>
@@ -328,21 +388,6 @@ export function ConsultaComprasPage() {
                     </div>
                 )}
             </div>
-
-            {/* Nota */}
-            {filtradas.some(r => r.tipo !== 'factura') && (
-                <div className="card p-4 bg-amber-50 border-amber-200 text-xs text-amber-700 flex gap-2 items-start">
-                    <FileText className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>
-                        Las <strong>Notas de Crédito y Débito</strong> aparecen en este listado porque son comprobantes de compra descargados del SRI.
-                        Para el ATS, se declaran en la sección de compras con código de comprobante 04 (N/C) y 05 (N/D).
-                    </span>
-                </div>
-            )}
         </div>
     )
 }
-
-
-
-
