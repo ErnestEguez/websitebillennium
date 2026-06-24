@@ -27,9 +27,10 @@ interface Empresa {
 }
 
 export interface Modules {
-    vendor:    boolean
-    finance:   boolean
-    ledgerpro: boolean
+    vendor:         boolean
+    finance:        boolean
+    ledgerpro:      boolean
+    talento_humano: boolean
 }
 
 export interface Permisos {
@@ -93,7 +94,7 @@ function guardarEmpresaActual(userId: string, empresaId: string) {
     try { localStorage.setItem(EMPRESA_ACTUAL_KEY + userId, empresaId) } catch {}
 }
 
-const DEFAULT_MODULES: Modules = { vendor: false, finance: false, ledgerpro: false }
+const DEFAULT_MODULES: Modules = { vendor: false, finance: false, ledgerpro: false, talento_humano: false }
 
 export const DEFAULT_PERMISOS: Permisos = {
     perm_dashboard:          true,
@@ -226,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (isMounted.current) {
             setModules(modData
-                ? { vendor: !!modData.vendor, finance: !!modData.finance, ledgerpro: !!modData.ledgerpro }
+                ? { vendor: !!modData.vendor, finance: !!modData.finance, ledgerpro: !!modData.ledgerpro, talento_humano: !!modData.talento_humano }
                 : DEFAULT_MODULES)
             setIsAdmin(!!modData?.is_admin)
         }

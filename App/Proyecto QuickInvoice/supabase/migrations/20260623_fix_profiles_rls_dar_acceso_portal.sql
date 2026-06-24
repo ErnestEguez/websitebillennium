@@ -191,8 +191,8 @@ BEGIN
     END IF;
 
     -- 6. Asegurar entrada en user_modules (módulos activos por default)
-    INSERT INTO facturacion.user_modules (user_id, empresa_id, vendor, finance, ledgerpro, is_admin)
-    VALUES (v_user_id, p_empresa_id, true, true, true, false)
+    INSERT INTO facturacion.user_modules (user_id, empresa_id, vendor, finance, ledgerpro, talento_humano, is_admin)
+    VALUES (v_user_id, p_empresa_id, true, true, true, true, false)
     ON CONFLICT (user_id, empresa_id) DO NOTHING;
 
     RETURN jsonb_build_object('ok', true, 'user_id', v_user_id);

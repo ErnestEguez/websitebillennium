@@ -38,16 +38,18 @@ interface ModulosForm {
     vendor: boolean
     finance: boolean
     ledgerpro: boolean
+    talento_humano: boolean
     is_admin: boolean
 }
 
-const DEFAULT_MODULOS: ModulosForm = { vendor: false, finance: false, ledgerpro: false, is_admin: false }
+const DEFAULT_MODULOS: ModulosForm = { vendor: false, finance: false, ledgerpro: false, talento_humano: false, is_admin: false }
 
 const MODULO_FIELDS: { key: keyof ModulosForm; label: string; short: string }[] = [
-    { key: 'vendor',    label: 'Compras / Proveedores (CxP)', short: 'C' },
-    { key: 'finance',   label: 'Tesorería',                    short: 'T' },
-    { key: 'ledgerpro', label: 'Contabilidad',                 short: 'L' },
-    { key: 'is_admin',  label: 'Administrador de la empresa',  short: 'A' },
+    { key: 'vendor',         label: 'Compras / Proveedores (CxP)',    short: 'C' },
+    { key: 'finance',        label: 'Tesorería',                       short: 'T' },
+    { key: 'ledgerpro',      label: 'Contabilidad',                    short: 'L' },
+    { key: 'talento_humano', label: 'Talento Humano y Nóminas',        short: 'TH' },
+    { key: 'is_admin',       label: 'Administrador de la empresa',     short: 'A' },
 ]
 
 const ROLES = ['oficina', 'mesero', 'cocina', 'contador', 'admin']
@@ -98,7 +100,7 @@ export function AdminUserEmpresasPage() {
             const modulosPorParData: Record<string, ModulosForm> = {}
             ;(mods || []).forEach((m: any) => {
                 modulosPorParData[`${m.user_id}_${m.empresa_id}`] = {
-                    vendor: !!m.vendor, finance: !!m.finance, ledgerpro: !!m.ledgerpro, is_admin: !!m.is_admin,
+                    vendor: !!m.vendor, finance: !!m.finance, ledgerpro: !!m.ledgerpro, talento_humano: !!m.talento_humano, is_admin: !!m.is_admin,
                 }
             })
 
