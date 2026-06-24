@@ -103,6 +103,7 @@ export const AdminERPModules = () => {
   const [formVendor, setFormVendor]     = useState(false);
   const [formFinance, setFormFinance]   = useState(false);
   const [formLedger, setFormLedger]     = useState(false);
+  const [formTH, setFormTH]             = useState(false);
   const [formIsAdmin, setFormIsAdmin]   = useState(false);
   const [submitting, setSubmitting]   = useState(false);
   const [loadingForm, setLoadingForm] = useState(false);
@@ -127,7 +128,7 @@ export const AdminERPModules = () => {
   const openForm = async () => {
     setShowForm(true);
     setFormUser(''); setFormEmpresa('');
-    setFormVendor(false); setFormFinance(false); setFormLedger(false); setFormIsAdmin(false);
+    setFormVendor(false); setFormFinance(false); setFormLedger(false); setFormTH(false); setFormIsAdmin(false);
     setLoadingForm(true);
     try {
       const token = localStorage.getItem('token');
@@ -154,7 +155,7 @@ export const AdminERPModules = () => {
       const token = localStorage.getItem('token');
       await axios.put(
         `${API}/admin/erp-modules/${formUser}/${formEmpresa}`,
-        { vendor: formVendor, finance: formFinance, ledgerpro: formLedger, is_admin: formIsAdmin },
+        { vendor: formVendor, finance: formFinance, ledgerpro: formLedger, talento_humano: formTH, is_admin: formIsAdmin },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success('Acceso ERP creado correctamente');
@@ -179,10 +180,11 @@ export const AdminERPModules = () => {
       await axios.put(
         `${API}/admin/erp-modules/${userId}/${empresaId}`,
         {
-          vendor:    field === 'vendor'    ? value : current.vendor,
-          finance:   field === 'finance'   ? value : current.finance,
-          ledgerpro: field === 'ledgerpro' ? value : current.ledgerpro,
-          is_admin:  field === 'is_admin'  ? value : current.is_admin,
+          vendor:         field === 'vendor'         ? value : current.vendor,
+          finance:        field === 'finance'        ? value : current.finance,
+          ledgerpro:      field === 'ledgerpro'      ? value : current.ledgerpro,
+          talento_humano: field === 'talento_humano' ? value : current.talento_humano,
+          is_admin:       field === 'is_admin'       ? value : current.is_admin,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -208,7 +210,7 @@ export const AdminERPModules = () => {
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Módulos ERP</h1>
               <p className="text-slate-500 text-sm">
-                Gestiona acceso a Compras/Proveedores, Tesorería y Contabilidad por usuario.
+                Gestiona acceso a módulos del ERP por usuario y empresa.
               </p>
             </div>
           </div>
@@ -244,12 +246,13 @@ export const AdminERPModules = () => {
                     <th className="px-5 py-3 text-center font-semibold text-slate-600">Compras / Proveedores</th>
                     <th className="px-5 py-3 text-center font-semibold text-slate-600">Tesorería</th>
                     <th className="px-5 py-3 text-center font-semibold text-slate-600">Contabilidad</th>
+                    <th className="px-5 py-3 text-center font-semibold text-slate-600">TH / Nóminas</th>
                   </tr>
                 </thead>
                 <tbody>
                   {modules.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-16 text-center">
+                      <td colSpan={7} className="px-5 py-16 text-center">
                         <div className="flex flex-col items-center gap-3 text-slate-400">
                           <Layers className="h-10 w-10 opacity-30" />
                           <p className="text-sm">No hay registros aún.</p>
@@ -307,6 +310,13 @@ export const AdminERPModules = () => {
                           <ModuleSwitch
                             checked={m.ledgerpro}
                             onChange={v => handleToggle(m.user_id, m.empresa_id, 'ledgerpro', v)}
+                            disabled={isSaving}
+                          />
+                        </td>
+                        <td className="px-5 py-4 text-center">
+                          <ModuleSwitch
+                            checked={m.talento_humano}
+                            onChange={v => handleToggle(m.user_id, m.empresa_id, 'talento_humano', v)}
                             disabled={isSaving}
                           />
                         </td>
@@ -395,9 +405,10 @@ export const AdminERPModules = () => {
                 </div>
                 <div className="divide-y divide-slate-100">
                   {[
-                    { key: 'vendor',  label: 'Compras / Proveedores', val: formVendor,  set: setFormVendor },
-                    { key: 'finance', label: 'Tesorería',              val: formFinance, set: setFormFinance },
-                    { key: 'ledger',  label: 'Contabilidad',           val: formLedger,  set: setFormLedger  },
+                    { key: 'vendor',  label: 'Compras / Proveedores',     val: formVendor,  set: setFormVendor },
+                    { key: 'finance', label: 'Tesorería',                  val: formFinance, set: setFormFinance },
+                    { key: 'ledger',  label: 'Contabilidad',               val: formLedger,  set: setFormLedger  },
+                    { key: 'th',      label: 'Talento Humano / Nóminas',   val: formTH,      set: setFormTH      },
                   ].map(mod => (
                     <div key={mod.key} className="flex items-center justify-between px-4 py-3">
                       <div className="flex items-center gap-2">
