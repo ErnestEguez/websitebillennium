@@ -17,6 +17,30 @@
 --
 -- Fix: reemplazar por política que permite gestión solo a admins y solo
 -- dentro de las empresas accesibles.
+--
+-- ═══ Solución técnica ═══
+-- Las políticas de user_modules y user_permisos necesitan verificar
+-- user_modules.is_admin. Pero un EXISTS directo dentro de la política
+-- de user_modules genera auto-referencia que causa error 500 en
+-- PostgREST/Supabase. Se usa una función SECURITY DEFINER que consulta
+-- user_modules SIN pasar por RLS, rompiendo la cadena circular.
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Función helper: verifica is_admin sin RLS (evita auto-referencia)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION facturacion.es_admin_empresa()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path TO facturacion
+AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM facturacion.user_modules
+        WHERE user_id = auth.uid() AND is_admin = true
+    );
+$$;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- user_permisos
@@ -27,10 +51,7 @@ DROP POLICY IF EXISTS "usuario_lee_sus_permisos" ON facturacion.user_permisos;
 
 CREATE POLICY "admin_gestiona_permisos" ON facturacion.user_permisos
     FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM facturacion.user_modules um
-            WHERE um.user_id = auth.uid() AND um.is_admin = true
-        )
+        facturacion.es_admin_empresa()
         AND empresa_id IN (
             SELECT empresa_id FROM facturacion.profiles WHERE id = auth.uid()
             UNION
@@ -48,14 +69,9 @@ CREATE POLICY "admin_gestiona_permisos" ON facturacion.user_permisos
 
 DROP POLICY IF EXISTS "user_modules_admin_all" ON facturacion.user_modules;
 
--- Nota: la subquery a user_modules (um2) dentro de una política sobre
--- user_modules NO aplica RLS recursivo — PostgreSQL lo excluye por diseño.
 CREATE POLICY "user_modules_admin_empresa" ON facturacion.user_modules
     FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM facturacion.user_modules um2
-            WHERE um2.user_id = auth.uid() AND um2.is_admin = true
-        )
+        facturacion.es_admin_empresa()
         AND empresa_id IN (
             SELECT empresa_id FROM facturacion.profiles WHERE id = auth.uid()
             UNION
@@ -79,7 +95,8 @@ CREATE POLICY "user_modules_admin_empresa" ON facturacion.user_modules
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Rollback (comentado)
 -- ═══════════════════════════════════════════════════════════════════════════
--- -- user_permisos: restaurar política original
+-- DROP FUNCTION IF EXISTS facturacion.es_admin_empresa();
+--
 -- DROP POLICY IF EXISTS "admin_gestiona_permisos" ON facturacion.user_permisos;
 -- CREATE POLICY "admin_gestiona_permisos" ON facturacion.user_permisos
 --     FOR ALL USING (
@@ -93,7 +110,6 @@ CREATE POLICY "user_modules_admin_empresa" ON facturacion.user_modules
 -- CREATE POLICY "usuario_lee_sus_permisos" ON facturacion.user_permisos
 --     FOR SELECT USING (auth.uid() = user_id);
 --
--- -- user_modules: restaurar política abierta
 -- DROP POLICY IF EXISTS "user_modules_admin_empresa" ON facturacion.user_modules;
 -- CREATE POLICY "user_modules_admin_all" ON facturacion.user_modules
 --     FOR ALL USING (true);
