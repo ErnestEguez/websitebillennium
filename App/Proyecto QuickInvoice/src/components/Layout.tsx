@@ -495,7 +495,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </ModuleSection>}
 
                         {/* ── MÓDULO 5: Talento Humano ────────────────────── */}
-                        {esOficina && empresa?.usar_talento_humano && modules.talento_humano && <ModuleSection
+                        {esOficina && modules.talento_humano && <ModuleSection
                             label="Talento Humano"
                             icon={Users}
                             colorClass="text-indigo-600"
@@ -517,7 +517,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </ModuleSection>}
 
                         {/* ── MÓDULO 6: Liquidación de Nóminas ────────────── */}
-                        {esOficina && empresa?.usar_talento_humano && modules.talento_humano && <ModuleSection
+                        {esOficina && modules.talento_humano && <ModuleSection
                             label="Liquidación de Nóminas"
                             icon={Wallet}
                             colorClass="text-cyan-600"
