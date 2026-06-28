@@ -396,7 +396,7 @@ async function firmarXmlXadesBes(
   p12Password: string
 ): Promise<string> {
   const p12Der   = atob(p12Base64);
-  const p12Asn1  = forge.asn1.fromDer(p12Der);
+  const p12Asn1  = forge.asn1.fromDer(p12Der, false);
   const p12      = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, p12Password);
 
   const keyBags  = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
