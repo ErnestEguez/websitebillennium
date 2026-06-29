@@ -749,27 +749,29 @@ export function FacturaDirectaPage() {
 
                         {/* Encabezados tabla */}
                         <div className="hidden md:grid grid-cols-12 gap-2 px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            <div className={esModoServicio ? 'col-span-5' : 'col-span-3'}>Descripción</div>
+                            <div className={esModoServicio ? 'col-span-5' : 'col-span-4'}>Descripción</div>
                             {!esModoServicio && <div className="col-span-2 text-center">Cantidad</div>}
                             {esModoServicio && <div className="col-span-1 text-center">Cant.</div>}
                             <div className="col-span-2 text-right">P. Unitario</div>
                             <div className="col-span-1 text-center">Desc%</div>
                             <div className="col-span-1 text-center">IVA%</div>
-                            <div className="col-span-2 text-right">Total</div>
+                            <div className="col-span-1 text-right">Total</div>
                             <div className="col-span-1" />
                         </div>
 
                         <div className="space-y-3">
                             {detalles.map((det, idx) => {
                                 const linea = det.cantidad > 0 && det.precio_unitario > 0 ? calcularLinea(det) : null
+                                const _busq = (searchProducto[idx] || '').toLowerCase()
                                 const filtProd = productos.filter(p =>
-                                    p.nombre.toLowerCase().includes((searchProducto[idx] || '').toLowerCase())
-                                ).slice(0, 8)
+                                    p.nombre.toLowerCase().includes(_busq) ||
+                                    (p.codigo && p.codigo.toLowerCase().includes(_busq))
+                                ).slice(0, 20)
 
                                 return (
                                     <div key={idx} className="relative grid grid-cols-12 gap-2 items-start bg-slate-50 rounded-xl p-3 border border-slate-100 animate-in fade-in">
                                         {/* Descripción — textarea en modo servicio, input+buscador en modo inventario */}
-                                        <div className={cn('col-span-12 relative', esModoServicio ? 'md:col-span-5' : 'md:col-span-3')}>
+                                        <div className={cn('col-span-12 relative', esModoServicio ? 'md:col-span-5' : 'md:col-span-4')}>
                                             {esModoServicio ? (
                                                 <textarea
                                                     placeholder="Descripción del servicio prestado..."
@@ -803,12 +805,15 @@ export function FacturaDirectaPage() {
                                                     }, 200)}
                                                 />
                                                 {productDropdown === idx && filtProd.length > 0 && (
-                                                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+                                                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto">
                                                         {filtProd.map(p => (
                                                             <button key={p.id} type="button"
-                                                                className="w-full px-4 py-2.5 text-left hover:bg-primary-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0"
+                                                                className="w-full px-4 py-2 text-left hover:bg-primary-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0"
                                                                 onMouseDown={() => selectProducto(idx, p)}>
-                                                                <span className="font-medium text-slate-800">{p.nombre}</span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="font-medium text-slate-800 truncate">{p.nombre}</div>
+                                                                    {p.codigo && <div className="text-xs text-slate-400 font-mono">{p.codigo}</div>}
+                                                                </div>
                                                                 <span className="flex flex-col items-end">
                                                                     <span className="text-primary-600 font-bold text-xs">{formatCurrency(p.precio_venta)}</span>
                                                                     <span className="text-red-600 font-bold text-xs">Stock: {p.stock ?? 0}</span>
@@ -903,7 +908,7 @@ export function FacturaDirectaPage() {
                                         </div>
 
                                         {/* Total línea */}
-                                        <div className="col-span-4 md:col-span-2 flex items-center justify-end">
+                                        <div className="col-span-4 md:col-span-1 flex items-center justify-end">
                                             <span className="text-sm font-bold text-primary-700">
                                                 {linea ? formatCurrency(linea.total) : '—'}
                                             </span>
