@@ -578,7 +578,7 @@ export function ConfigurationPage() {
                         .eq('empresa_id', empresa!.id)
                         .neq('id', editingPuntoEmision.id)
                 }
-                const { id, empresa_id, created_at, updated_at, secuenciales, ...updates } = editingPuntoEmision as any
+                const { id, empresa_id, created_at, updated_at, ...updates } = editingPuntoEmision as any
                 await puntoEmisionService.actualizar(editingPuntoEmision.id, { ...updates, establecimiento: est, punto_emision: pto })
             } else {
                 // Si el nuevo es principal, desmarcar el anterior
@@ -2404,11 +2404,20 @@ export function ConfigurationPage() {
                                 </div>
                             </div>
 
-                            {/* Info de solo lectura — solo al editar */}
+                            {/* Secuencial + Estado — solo al editar */}
                             {editingPuntoEmision?.id && (
                                 <div className="space-y-2">
-                                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border bg-slate-50 text-slate-600 border-slate-200">
-                                        Secuencial actual (Factura): {editingPuntoEmision.secuenciales?.FACTURA ?? 0}
+                                    <div>
+                                        <label className="label">Secuencial actual (Factura)</label>
+                                        <input type="number" min="0" step="1"
+                                            className="input font-mono text-lg font-bold"
+                                            value={editingPuntoEmision.secuenciales?.FACTURA ?? 0}
+                                            onChange={e => setEditingPuntoEmision((prev: any) => ({
+                                                ...prev,
+                                                secuenciales: { ...(prev?.secuenciales || {}), FACTURA: parseInt(e.target.value) || 0 }
+                                            }))}
+                                        />
+                                        <p className="text-xs text-slate-400 mt-1">La próxima factura será este número + 1</p>
                                     </div>
                                     <div className={cn(
                                         'flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border',
