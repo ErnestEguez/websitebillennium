@@ -37,6 +37,7 @@ import {
     GraduationCap,
     Smile,
     Scale,
+    Upload,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -288,9 +289,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('inventario')}
                             onToggle={() => toggleGroup('inventario')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/productos','/importar-articulos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub />
+                            <SidebarItem to="/importar-articulos"      icon={Upload}            label="Importar Artículos"    active={location.pathname === '/importar-articulos'} sub />
                             <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub />
                             <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub />
                             <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub />

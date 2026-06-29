@@ -100,6 +100,7 @@ import { ReporteAnticipoPage }                    from './pages/nominas/ReporteA
 import { CapacidadPagoPage }                      from './pages/nominas/CapacidadPagoPage'
 import { LiquidacionDecimosPage }                 from './pages/nominas/LiquidacionDecimosPage'
 import { LiquidacionVacacionesPage }             from './pages/nominas/LiquidacionVacacionesPage'
+import { ImportarArticulosPage }                  from './pages/ImportarArticulosPage'
 // ── Módulo Tesorería (Finance Suite) ─────────────────────────
 
 import { CuentasBancariasPage }                   from './pages/tesoreria/bancos/CuentasBancariasPage'
@@ -343,6 +344,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <TransferenciaBodegaPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/importar-articulos" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <ImportarArticulosPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>
