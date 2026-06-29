@@ -92,7 +92,8 @@ export function FacturaDirectaPage() {
     const [productos, setProductos] = useState<any[]>([])
     const [searchProducto, setSearchProducto] = useState<{ [idx: number]: string }>({})
     const [productDropdown, setProductDropdown] = useState<number | null>(null)
-    const [prodShowAll, setProdShowAll] = useState(false)
+    const [searchResults, setSearchResults] = useState<any[]>([])
+    const [buscando, setBuscando] = useState(false)
 
     // Estado: detalle
     const [detalles, setDetalles] = useState<DetalleFacturaDirecta[]>([{ ...DETALLE_VACIO }])
@@ -140,6 +141,30 @@ export function FacturaDirectaPage() {
     useEffect(() => {
         if (empresa?.id) loadData()
     }, [empresa?.id])
+
+    // Búsqueda en servidor con debounce
+    useEffect(() => {
+        if (productDropdown === null || !empresa?.id) { setSearchResults([]); return }
+        const texto = (searchProducto[productDropdown] || '').trim()
+        if (texto.length < 2) { setSearchResults([]); return }
+        const timer = setTimeout(async () => {
+            setBuscando(true)
+            try {
+                const pattern = '%' + texto.split(/[*]+/).filter(Boolean).join('%') + '%'
+                const { data } = await supabase
+                    .from('productos')
+                    .select('*, subproductos(*)')
+                    .eq('empresa_id', empresa!.id)
+                    .eq('activo', true)
+                    .or(`nombre.ilike.${pattern},codigo.ilike.${pattern}`)
+                    .order('nombre')
+                    .limit(50)
+                setSearchResults(data ?? [])
+            } catch { setSearchResults([]) }
+            setBuscando(false)
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [searchProducto, productDropdown, empresa?.id])
 
     async function loadData() {
         try {
@@ -753,17 +778,7 @@ export function FacturaDirectaPage() {
                         <div className="space-y-3">
                             {detalles.map((det, idx) => {
                                 const linea = det.cantidad > 0 && det.precio_unitario > 0 ? calcularLinea(det) : null
-                                const _busqRaw = (searchProducto[idx] || '').toLowerCase().trim()
-                                const _palabras = _busqRaw.split(/[*\s]+/).filter(Boolean)
-                                const filtProdAll = _palabras.length > 0
-                                    ? productos.filter(p => {
-                                        const texto = ((p.codigo || '') + ' ' + p.nombre).toLowerCase()
-                                        return _palabras.every(pal => texto.includes(pal))
-                                    })
-                                    : []
-                                const LIMIT_PROD = 20
-                                const filtProd = prodShowAll ? filtProdAll : filtProdAll.slice(0, LIMIT_PROD)
-                                const hayMasProductos = !prodShowAll && filtProdAll.length > LIMIT_PROD
+                                const filtProd = productDropdown === idx ? searchResults : []
 
                                 return (
                                     <div key={idx} className="bg-slate-50 rounded-xl p-3 border border-slate-100 animate-in fade-in space-y-2">
@@ -788,16 +803,16 @@ export function FacturaDirectaPage() {
                                                             setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
                                                             updateLinea(idx, 'nombre_producto', e.target.value)
                                                             setProductDropdown(idx)
-                                                            setProdShowAll(false)
+
                                                         }}
                                                         onFocus={() => {
                                                             setSearchProducto(prev => ({ ...prev, [idx]: '' }))
                                                             setProductDropdown(idx)
-                                                            setProdShowAll(false)
+
                                                         }}
                                                         onBlur={() => setTimeout(() => {
                                                             setProductDropdown(null)
-                                                            setProdShowAll(false)
+
                                                             setSearchProducto(prev => {
                                                                 const updated = { ...prev }
                                                                 delete updated[idx]
@@ -805,8 +820,16 @@ export function FacturaDirectaPage() {
                                                             })
                                                         }, 250)}
                                                     />
-                                                    {productDropdown === idx && filtProd.length > 0 && (
-                                                        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-72 overflow-y-auto">
+                                                    {productDropdown === idx && buscando && (
+                                                        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 text-sm text-slate-400 flex items-center gap-2">
+                                                            <Loader2 className="w-4 h-4 animate-spin" /> Buscando...
+                                                        </div>
+                                                    )}
+                                                    {productDropdown === idx && !buscando && filtProd.length > 0 && (
+                                                        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-80 overflow-y-auto">
+                                                            <div className="sticky top-0 bg-slate-50 px-3 py-1 text-[10px] text-slate-400 font-bold border-b">
+                                                                {filtProd.length} resultado{filtProd.length !== 1 ? 's' : ''}
+                                                            </div>
                                                             {filtProd.map(p => (
                                                                 <button key={p.id} type="button"
                                                                     className="w-full px-4 py-2 text-left hover:bg-primary-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0"
@@ -821,13 +844,6 @@ export function FacturaDirectaPage() {
                                                                     </span>
                                                                 </button>
                                                             ))}
-                                                            {hayMasProductos && (
-                                                                <button type="button"
-                                                                    className="w-full px-4 py-2.5 text-center text-xs font-bold text-primary-600 hover:bg-primary-50 border-t border-slate-200"
-                                                                    onMouseDown={e => { e.preventDefault(); setProdShowAll(true) }}>
-                                                                    Ver todos ({filtProdAll.length} resultados)
-                                                                </button>
-                                                            )}
                                                         </div>
                                                     )}
                                                     </>
