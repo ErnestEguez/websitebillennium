@@ -748,17 +748,7 @@ export function FacturaDirectaPage() {
                             </div>
                         </div>
 
-                        {/* Encabezados tabla */}
-                        <div className="hidden md:grid grid-cols-12 gap-2 px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            <div className={esModoServicio ? 'col-span-5' : 'col-span-4'}>Descripción</div>
-                            {!esModoServicio && <div className="col-span-2 text-center">Cantidad</div>}
-                            {esModoServicio && <div className="col-span-1 text-center">Cant.</div>}
-                            <div className="col-span-2 text-right">P. Unitario</div>
-                            <div className="col-span-1 text-center">Desc%</div>
-                            <div className="col-span-1 text-center">IVA%</div>
-                            <div className="col-span-1 text-right">Total</div>
-                            <div className="col-span-1" />
-                        </div>
+                        {/* Encabezados numéricos — se muestran inline con cada línea */}
 
                         <div className="space-y-3">
                             {detalles.map((det, idx) => {
@@ -776,166 +766,170 @@ export function FacturaDirectaPage() {
                                 const hayMasProductos = !prodShowAll && filtProdAll.length > LIMIT_PROD
 
                                 return (
-                                    <div key={idx} className="relative grid grid-cols-12 gap-2 items-start bg-slate-50 rounded-xl p-3 border border-slate-100 animate-in fade-in">
-                                        {/* Descripción — textarea en modo servicio, input+buscador en modo inventario */}
-                                        <div className={cn('col-span-12 relative', esModoServicio ? 'md:col-span-5' : 'md:col-span-4')}>
-                                            {esModoServicio ? (
-                                                <textarea
-                                                    placeholder="Descripción del servicio prestado..."
-                                                    rows={3}
-                                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-2 focus:ring-primary-400 resize-y min-h-[80px]"
-                                                    value={det.nombre_producto}
-                                                    onChange={e => updateLinea(idx, 'nombre_producto', e.target.value)}
-                                                />
-                                            ) : (
-                                                <>
-                                                <input
-                                                    placeholder="Buscar producto o escribir descripción..."
-                                                    className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-2 focus:ring-primary-400"
-                                                    value={searchProducto[idx] !== undefined ? searchProducto[idx] : det.nombre_producto}
-                                                    onChange={e => {
-                                                        setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
-                                                        updateLinea(idx, 'nombre_producto', e.target.value)
-                                                        setProductDropdown(idx)
-                                                        setProdShowAll(false)
-                                                    }}
-                                                    onFocus={() => {
-                                                        setSearchProducto(prev => ({ ...prev, [idx]: '' }))
-                                                        setProductDropdown(idx)
-                                                        setProdShowAll(false)
-                                                    }}
-                                                    onBlur={() => setTimeout(() => {
-                                                        setProductDropdown(null)
-                                                        setSearchProducto(prev => {
-                                                            const updated = { ...prev }
-                                                            delete updated[idx]
-                                                            return updated
-                                                        })
-                                                    }, 200)}
-                                                />
-                                                {productDropdown === idx && filtProd.length > 0 && (
-                                                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto">
-                                                        {filtProd.map(p => (
-                                                            <button key={p.id} type="button"
-                                                                className="w-full px-4 py-2 text-left hover:bg-primary-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0"
-                                                                onMouseDown={() => selectProducto(idx, p)}>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="font-medium text-slate-800 truncate">{p.nombre}</div>
-                                                                    {p.codigo && <div className="text-xs text-slate-400 font-mono">{p.codigo}</div>}
-                                                                </div>
-                                                                <span className="flex flex-col items-end">
-                                                                    <span className="text-primary-600 font-bold text-xs">{formatCurrency(p.precio_venta)}</span>
-                                                                    <span className="text-red-600 font-bold text-xs">Stock: {p.stock ?? 0}</span>
-                                                                </span>
-                                                            </button>
-                                                        ))}
-                                                        {hayMasProductos && (
-                                                            <button type="button"
-                                                                className="w-full px-4 py-2.5 text-center text-xs font-bold text-primary-600 hover:bg-primary-50 border-t border-slate-200"
-                                                                onMouseDown={() => setProdShowAll(true)}>
-                                                                Ver todos ({filtProdAll.length} resultados)
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                    <div key={idx} className="bg-slate-50 rounded-xl p-3 border border-slate-100 animate-in fade-in space-y-2">
+                                        {/* FILA 1: Descripción / Buscador — ancho completo */}
+                                        <div className="relative flex gap-2">
+                                            <div className="flex-1 relative">
+                                                {esModoServicio ? (
+                                                    <textarea
+                                                        placeholder="Descripción del servicio prestado..."
+                                                        rows={2}
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-2 focus:ring-primary-400 resize-y"
+                                                        value={det.nombre_producto}
+                                                        onChange={e => updateLinea(idx, 'nombre_producto', e.target.value)}
+                                                    />
+                                                ) : (
+                                                    <>
+                                                    <input
+                                                        placeholder="Buscar: riel*45*luxus ..."
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                        value={searchProducto[idx] !== undefined ? searchProducto[idx] : det.nombre_producto}
+                                                        onChange={e => {
+                                                            setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
+                                                            updateLinea(idx, 'nombre_producto', e.target.value)
+                                                            setProductDropdown(idx)
+                                                            setProdShowAll(false)
+                                                        }}
+                                                        onFocus={() => {
+                                                            setSearchProducto(prev => ({ ...prev, [idx]: '' }))
+                                                            setProductDropdown(idx)
+                                                            setProdShowAll(false)
+                                                        }}
+                                                        onBlur={() => setTimeout(() => {
+                                                            setProductDropdown(null)
+                                                            setProdShowAll(false)
+                                                            setSearchProducto(prev => {
+                                                                const updated = { ...prev }
+                                                                delete updated[idx]
+                                                                return updated
+                                                            })
+                                                        }, 250)}
+                                                    />
+                                                    {productDropdown === idx && filtProd.length > 0 && (
+                                                        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-72 overflow-y-auto">
+                                                            {filtProd.map(p => (
+                                                                <button key={p.id} type="button"
+                                                                    className="w-full px-4 py-2 text-left hover:bg-primary-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0"
+                                                                    onMouseDown={e => { e.preventDefault(); selectProducto(idx, p); setProductDropdown(null) }}>
+                                                                    <div className="flex-1 min-w-0 mr-3">
+                                                                        <div className="font-medium text-slate-800">{p.nombre}</div>
+                                                                        {p.codigo && <div className="text-xs text-slate-400 font-mono">{p.codigo}</div>}
+                                                                    </div>
+                                                                    <span className="flex flex-col items-end shrink-0">
+                                                                        <span className="text-primary-600 font-bold text-xs">{formatCurrency(p.precio_venta)}</span>
+                                                                        <span className="text-slate-500 text-xs">Stock: {p.stock ?? 0}</span>
+                                                                    </span>
+                                                                </button>
+                                                            ))}
+                                                            {hayMasProductos && (
+                                                                <button type="button"
+                                                                    className="w-full px-4 py-2.5 text-center text-xs font-bold text-primary-600 hover:bg-primary-50 border-t border-slate-200"
+                                                                    onMouseDown={e => { e.preventDefault(); setProdShowAll(true) }}>
+                                                                    Ver todos ({filtProdAll.length} resultados)
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    </>
                                                 )}
-                                                </>
-                                            )}
+                                            </div>
+                                            <button onClick={() => removeLinea(idx)} disabled={detalles.length === 1}
+                                                className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20 shrink-0 self-start">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                         </div>
 
-                                        {/* Selector de presentación (subproducto) — solo en modo inventario */}
+                                        {/* Selector de presentación (subproducto) */}
                                         {!esModoServicio && (() => {
                                             const prod = productos.find(p => p.id === det.producto_id)
                                             const subsActivos = (prod?.subproductos || []).filter((s: any) => s.estado)
                                             if (subsActivos.length === 0) return null
                                             return (
-                                                <div className="col-span-12">
-                                                    <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-                                                        <Layers className="w-4 h-4 text-orange-400 shrink-0" />
-                                                        <select
-                                                            value={det.subproducto_id || ''}
-                                                            onChange={e => {
-                                                                const sub = subsActivos.find((s: any) => s.id === e.target.value)
-                                                                if (sub) selectSubproducto(idx, sub)
-                                                            }}
-                                                            className="flex-1 bg-transparent text-sm text-orange-800 font-medium outline-none"
-                                                        >
-                                                            <option value="">— Seleccione presentación —</option>
-                                                            {subsActivos.map((s: any) => (
-                                                                <option key={s.id} value={s.id}>
-                                                                    {s.nombre} · ${Number(s.precio_sin_iva).toFixed(4)} · factor {Number(s.factor_conversion)}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
+                                                <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5">
+                                                    <Layers className="w-4 h-4 text-orange-400 shrink-0" />
+                                                    <select
+                                                        value={det.subproducto_id || ''}
+                                                        onChange={e => {
+                                                            const sub = subsActivos.find((s: any) => s.id === e.target.value)
+                                                            if (sub) selectSubproducto(idx, sub)
+                                                        }}
+                                                        className="flex-1 bg-transparent text-sm text-orange-800 font-medium outline-none"
+                                                    >
+                                                        <option value="">— Seleccione presentación —</option>
+                                                        {subsActivos.map((s: any) => (
+                                                            <option key={s.id} value={s.id}>
+                                                                {s.nombre} · ${Number(s.precio_sin_iva).toFixed(4)} · factor {Number(s.factor_conversion)}
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                             )
                                         })()}
 
-                                        {/* ✅ Cantidad - más grande (col-span-2) */}
-                                        <div className="col-span-4 md:col-span-2">
-                                            <input type="number" min="0.01" step="0.01"
-                                                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-base font-bold text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
-                                                value={det.cantidad}
-                                                onChange={async e => {
-                                                    const nuevaCantidad = parseFloat(e.target.value) || 0
-                                                    updateLinea(idx, 'cantidad', nuevaCantidad)
-                                                    if (det.producto_id && !det.subproducto_id && empresa?.id && nuevaCantidad > 0) {
-                                                        try {
-                                                            const prod = productos.find(p => p.id === det.producto_id)
-                                                            const precioVol = await precioVolumenService.resolverPrecio(empresa.id, det.producto_id, nuevaCantidad)
-                                                            updateLinea(idx, 'precio_unitario', precioVol !== null ? precioVol : (prod?.precio_venta ?? det.precio_unitario))
-                                                        } catch { /* mantener precio actual */ }
-                                                    }
-                                                }} />
-                                        </div>
-
-                                        {/* Precio Unitario */}
-                                        <div className="col-span-4 md:col-span-2">
-                                            <div className="relative">
-                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
-                                                <input type="number" min="0" step="0.01"
-                                                    className="w-full pl-5 pr-2 py-2.5 rounded-lg border border-slate-200 text-sm text-right bg-white outline-none focus:ring-2 focus:ring-primary-400"
-                                                    value={det.precio_unitario}
-                                                    onChange={e => updateLinea(idx, 'precio_unitario', parseFloat(e.target.value) || 0)} />
+                                        {/* FILA 2: Cantidad | Precio | Desc% | IVA% | Total */}
+                                        <div className="grid grid-cols-12 gap-2 items-center">
+                                            {/* Cantidad */}
+                                            <div className="col-span-4 md:col-span-3">
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">Cantidad</label>
+                                                <input type="number" min="0.01" step="0.01"
+                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-base font-bold text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                    value={det.cantidad}
+                                                    onChange={async e => {
+                                                        const nuevaCantidad = parseFloat(e.target.value) || 0
+                                                        updateLinea(idx, 'cantidad', nuevaCantidad)
+                                                        if (det.producto_id && !det.subproducto_id && empresa?.id && nuevaCantidad > 0) {
+                                                            try {
+                                                                const prod = productos.find(p => p.id === det.producto_id)
+                                                                const precioVol = await precioVolumenService.resolverPrecio(empresa.id, det.producto_id, nuevaCantidad)
+                                                                updateLinea(idx, 'precio_unitario', precioVol !== null ? precioVol : (prod?.precio_venta ?? det.precio_unitario))
+                                                            } catch { /* mantener precio actual */ }
+                                                        }
+                                                    }} />
                                             </div>
-                                        </div>
 
-                                        {/* Descuento % */}
-                                        <div className="col-span-4 md:col-span-1">
-                                            <div className="relative">
-                                                <input type="number" min="0" max="100" step="0.1"
-                                                    className="w-full px-2 py-2.5 rounded-lg border border-slate-200 text-sm text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
-                                                    value={det.descuento}
-                                                    onChange={e => updateLinea(idx, 'descuento', parseFloat(e.target.value) || 0)} />
-                                                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+                                            {/* Precio Unitario */}
+                                            <div className="col-span-4 md:col-span-3">
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">P. Unit.</label>
+                                                <div className="relative">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                                    <input type="number" min="0" step="0.01"
+                                                        className="w-full pl-5 pr-2 py-2 rounded-lg border border-slate-200 text-sm text-right bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                        value={det.precio_unitario}
+                                                        onChange={e => updateLinea(idx, 'precio_unitario', parseFloat(e.target.value) || 0)} />
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* IVA % */}
-                                        <div className="col-span-6 md:col-span-1">
-                                            <select
-                                                className="w-full px-2 py-2.5 rounded-lg border border-slate-200 text-sm text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
-                                                value={det.iva_porcentaje}
-                                                onChange={e => updateLinea(idx, 'iva_porcentaje', parseFloat(e.target.value))}>
-                                                <option value={0}>0%</option>
-                                                <option value={5}>5%</option>
-                                                <option value={15}>15%</option>
-                                            </select>
-                                        </div>
+                                            {/* Descuento % */}
+                                            <div className="col-span-4 md:col-span-2">
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">Desc%</label>
+                                                <div className="relative">
+                                                    <input type="number" min="0" max="100" step="0.1"
+                                                        className="w-full px-2 py-2 rounded-lg border border-slate-200 text-sm text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                        value={det.descuento}
+                                                        onChange={e => updateLinea(idx, 'descuento', parseFloat(e.target.value) || 0)} />
+                                                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+                                                </div>
+                                            </div>
 
-                                        {/* Total línea */}
-                                        <div className="col-span-4 md:col-span-1 flex items-center justify-end">
-                                            <span className="text-sm font-bold text-primary-700">
-                                                {linea ? formatCurrency(linea.total) : '—'}
-                                            </span>
-                                        </div>
+                                            {/* IVA % */}
+                                            <div className="col-span-6 md:col-span-2">
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">IVA%</label>
+                                                <select
+                                                    className="w-full px-2 py-2 rounded-lg border border-slate-200 text-sm text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                    value={det.iva_porcentaje}
+                                                    onChange={e => updateLinea(idx, 'iva_porcentaje', parseFloat(e.target.value))}>
+                                                    <option value={0}>0%</option>
+                                                    <option value={5}>5%</option>
+                                                    <option value={15}>15%</option>
+                                                </select>
+                                            </div>
 
-                                        {/* Eliminar */}
-                                        <div className="col-span-1 flex flex-col items-center justify-center gap-1">
-                                            <button onClick={() => removeLinea(idx)} disabled={detalles.length === 1}
-                                                className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            {/* Total línea */}
+                                            <div className="col-span-6 md:col-span-2 flex items-center justify-end">
+                                                <span className="text-sm font-bold text-primary-700">
+                                                    {linea ? formatCurrency(linea.total) : '—'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 )
