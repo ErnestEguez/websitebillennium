@@ -92,6 +92,7 @@ export function FacturaDirectaPage() {
     const [productos, setProductos] = useState<any[]>([])
     const [searchProducto, setSearchProducto] = useState<{ [idx: number]: string }>({})
     const [productDropdown, setProductDropdown] = useState<number | null>(null)
+    const [prodShowAll, setProdShowAll] = useState(false)
 
     // Estado: detalle
     const [detalles, setDetalles] = useState<DetalleFacturaDirecta[]>([{ ...DETALLE_VACIO }])
@@ -762,11 +763,17 @@ export function FacturaDirectaPage() {
                         <div className="space-y-3">
                             {detalles.map((det, idx) => {
                                 const linea = det.cantidad > 0 && det.precio_unitario > 0 ? calcularLinea(det) : null
-                                const _busq = (searchProducto[idx] || '').toLowerCase()
-                                const filtProd = productos.filter(p =>
-                                    p.nombre.toLowerCase().includes(_busq) ||
-                                    (p.codigo && p.codigo.toLowerCase().includes(_busq))
-                                ).slice(0, 20)
+                                const _busqRaw = (searchProducto[idx] || '').toLowerCase().trim()
+                                const _palabras = _busqRaw.split(/[*\s]+/).filter(Boolean)
+                                const filtProdAll = _palabras.length > 0
+                                    ? productos.filter(p => {
+                                        const texto = ((p.codigo || '') + ' ' + p.nombre).toLowerCase()
+                                        return _palabras.every(pal => texto.includes(pal))
+                                    })
+                                    : []
+                                const LIMIT_PROD = 20
+                                const filtProd = prodShowAll ? filtProdAll : filtProdAll.slice(0, LIMIT_PROD)
+                                const hayMasProductos = !prodShowAll && filtProdAll.length > LIMIT_PROD
 
                                 return (
                                     <div key={idx} className="relative grid grid-cols-12 gap-2 items-start bg-slate-50 rounded-xl p-3 border border-slate-100 animate-in fade-in">
@@ -790,10 +797,12 @@ export function FacturaDirectaPage() {
                                                         setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
                                                         updateLinea(idx, 'nombre_producto', e.target.value)
                                                         setProductDropdown(idx)
+                                                        setProdShowAll(false)
                                                     }}
                                                     onFocus={() => {
                                                         setSearchProducto(prev => ({ ...prev, [idx]: '' }))
                                                         setProductDropdown(idx)
+                                                        setProdShowAll(false)
                                                     }}
                                                     onBlur={() => setTimeout(() => {
                                                         setProductDropdown(null)
@@ -820,6 +829,13 @@ export function FacturaDirectaPage() {
                                                                 </span>
                                                             </button>
                                                         ))}
+                                                        {hayMasProductos && (
+                                                            <button type="button"
+                                                                className="w-full px-4 py-2.5 text-center text-xs font-bold text-primary-600 hover:bg-primary-50 border-t border-slate-200"
+                                                                onMouseDown={() => setProdShowAll(true)}>
+                                                                Ver todos ({filtProdAll.length} resultados)
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 )}
                                                 </>
