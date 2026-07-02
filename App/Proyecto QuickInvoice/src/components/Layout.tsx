@@ -38,6 +38,7 @@ import {
     Smile,
     Scale,
     Upload,
+    User,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -121,6 +122,7 @@ const PERM_RUTAS: [string, string][] = [
     ['/notas-credito',                 'perm_notas_credito'],
     ['/cierres',                       'perm_cierres_caja'],
     ['/consultas/ventas',              'perm_consulta_ventas'],
+    ['/consultas/ventas-cliente',      'perm_consulta_ventas'],
     ['/clientes',                      'perm_clientes'],
     ['/cartera-cxc',                   'perm_cartera_cxc'],
     ['/consultas/cartera-clientes',    'perm_consulta_cartera'],
@@ -268,7 +270,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/notas-credito"      icon={FileMinus}       label="Notas de Crédito"   active={location.pathname === '/notas-credito'} sub disabled={!p.perm_notas_credito} />
                             <SidebarItem to="/anulacion-facturas" icon={Ban}             label="Anulación Facturas" active={location.pathname === '/anulacion-facturas'} sub disabled={!p.perm_anulacion_facturas} />
                             <SidebarItem to="/cierres"            icon={BookOpen}        label="Cierres de Caja"    active={location.pathname === '/cierres'} sub disabled={!p.perm_cierres_caja} />
-                            <SidebarItem to="/consultas/ventas"   icon={Search}          label="Consulta Ventas"    active={location.pathname.startsWith('/consultas/ventas')} sub disabled={!p.perm_consulta_ventas} />
+                            <SidebarItem to="/consultas/ventas"         icon={Search}    label="Consulta Ventas"      active={location.pathname === '/consultas/ventas'} sub disabled={!p.perm_consulta_ventas} />
+                            <SidebarItem to="/consultas/ventas-cliente" icon={User}      label="Ventas por Cliente"   active={location.pathname === '/consultas/ventas-cliente'} sub disabled={!p.perm_consulta_ventas} />
                             {profile?.rol === 'oficina' && (
                                 <button
                                     onClick={() => setIsCierreCajaOpen(true)}

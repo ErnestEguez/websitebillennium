@@ -29,7 +29,8 @@ import { FacturaDirectaPage } from './pages/FacturaDirectaPage'
 import { ProformaPage }       from './pages/ProformaPage'
 import { VendedoresPage } from './pages/VendedoresPage'
 import { CarteraCxcPage } from './pages/CarteraCxcPage'
-import { ConsultaVentasPage } from './pages/ConsultaVentasPage'
+import { ConsultaVentasPage }    from './pages/ConsultaVentasPage'
+import { VentasClientePage }     from './pages/VentasClientePage'
 import { ConsultaCarteraClientesPage } from './pages/ConsultaCarteraClientesPage'
 import { EstadoCuentaClientePage } from './pages/EstadoCuentaClientePage'
 import { AnulacionFacturasPage } from './pages/AnulacionFacturasPage'
@@ -433,6 +434,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <ConsultaVentasPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/consultas/ventas-cliente" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <VentasClientePage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>
