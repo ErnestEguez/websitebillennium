@@ -117,6 +117,7 @@ import { ConfiguracionPage as TesoConfig }        from './pages/tesoreria/Config
 import { EstadoCuentaPage as TesoEstadoCuenta }   from './pages/tesoreria/reportes/EstadoCuentaPage'
 import { MovimientosPeriodoPage }                 from './pages/tesoreria/reportes/MovimientosPeriodoPage'
 import { ChequesAFechaReportePage }               from './pages/tesoreria/reportes/ChequesAFechaReportePage'
+import { CierreGeneralPage }                      from './pages/tesoreria/CierreGeneralPage'
 
 // Monta el sync en background sin afectar el árbol de rutas
 function SyncManager() {
@@ -524,6 +525,7 @@ function App() {
                       <Route path="reportes/estado-cuenta"   element={<TesoEstadoCuenta />} />
                       <Route path="reportes/movimientos"     element={<MovimientosPeriodoPage />} />
                       <Route path="reportes/cheques-fecha"   element={<ChequesAFechaReportePage />} />
+                      <Route path="cierre-general"           element={<CierreGeneralPage />} />
                       <Route path="*"                        element={<Navigate to="/teso/cuentas-bancarias" replace />} />
                     </Routes>
                   </Layout>

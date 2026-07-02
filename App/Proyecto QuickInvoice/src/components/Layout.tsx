@@ -137,6 +137,7 @@ const PERM_RUTAS: [string, string][] = [
     ['/teso/cheques',                  'perm_cheques'],
     ['/teso/movimientos',              'perm_movimientos_banc'],
     ['/teso/conciliacion',             'perm_conciliacion'],
+    ['/teso/cierre-general',           'perm_cierres_caja'],
     ['/conta/plan-cuentas',            'perm_plan_cuentas'],
     ['/conta/diarios',                 'perm_asientos'],
     ['/conta/reportes',                'perm_reportes_cont'],
@@ -402,6 +403,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/teso/movimientos"   icon={ArrowDownUp} label="Movimientos Banc."  active={location.pathname === '/teso/movimientos'} sub disabled={!p.perm_movimientos_banc} />
                             <SidebarItem to="/teso/conciliacion"  icon={BarChart3}   label="Conciliación"       active={location.pathname.startsWith('/teso/conciliacion')} sub disabled={!p.perm_conciliacion} />
                             <SidebarItem to="/teso/configuracion" icon={Settings} label="Configuración" active={location.pathname === '/teso/configuracion'} sub />
+                            <SidebarItem to="/teso/cierre-general" icon={Wallet} label="Cierre Caja General" active={location.pathname === '/teso/cierre-general'} sub disabled={!p.perm_cierres_caja} />
 
                             {/* Reportes */}
                             <div>
