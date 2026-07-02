@@ -55,6 +55,12 @@ const MODULOS = [
         ],
     },
     {
+        key: 'gerencia', label: 'Gerencia',
+        items: [
+            { field: 'perm_gerencia', label: 'Resumen Operacional' },
+        ],
+    },
+    {
         key: 'ledgerpro', label: 'Contabilidad',
         items: [
             { field: 'perm_plan_cuentas',   label: 'Plan de Cuentas' },
@@ -125,6 +131,7 @@ export function AdminPermisosPage() {
                     perm_anulacion_facturas: r.perm_anulacion_facturas ?? def.perm_anulacion_facturas,
                     perm_cierres_caja:       r.perm_cierres_caja       ?? def.perm_cierres_caja,
                     perm_consulta_ventas:    r.perm_consulta_ventas    ?? def.perm_consulta_ventas,
+                    perm_gerencia:           r.perm_gerencia           ?? def.perm_gerencia,
                     perm_clientes:           r.perm_clientes           ?? def.perm_clientes,
                     perm_cartera_cxc:        r.perm_cartera_cxc        ?? def.perm_cartera_cxc,
                     perm_consulta_cartera:   r.perm_consulta_cartera   ?? def.perm_consulta_cartera,

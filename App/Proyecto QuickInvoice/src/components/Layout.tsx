@@ -39,6 +39,7 @@ import {
     Scale,
     Upload,
     User,
+    TrendingUp,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -118,6 +119,7 @@ function ModuleSection({ label, icon: Icon, colorClass, isOpen, onToggle, isSide
 
 // Mapa: prefijo de ruta → campo de permiso
 const PERM_RUTAS: [string, string][] = [
+    ['/gerencia',                      'perm_gerencia'],
     ['/anulacion-facturas',            'perm_anulacion_facturas'],
     ['/notas-credito',                 'perm_notas_credito'],
     ['/cierres',                       'perm_cierres_caja'],
@@ -252,6 +254,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 <SidebarItem to="/admin/user-empresas" icon={ArrowLeftRight} label="Asignar empresas" active={location.pathname === '/admin/user-empresas'} />
                             </>
                         )}
+
+                        {/* ── MÓDULO 0: Gerencia ───────────────────────── */}
+                        {esOficina && p.perm_gerencia && <ModuleSection
+                            label="Gerencia"
+                            icon={TrendingUp}
+                            colorClass="text-violet-600"
+                            isOpen={openGroups.includes('gerencia')}
+                            onToggle={() => toggleGroup('gerencia')}
+                            isSidebarOpen={isSidebarOpen}
+                            anyActive={location.pathname.startsWith('/gerencia')}
+                        >
+                            <SidebarItem to="/gerencia/resumen-operacional" icon={BarChart3} label="Resumen Operacional" active={location.pathname === '/gerencia/resumen-operacional'} sub disabled={!p.perm_gerencia} />
+                        </ModuleSection>}
 
                         {/* ── MÓDULO 1: Facturación ────────────────────── */}
                         {esOficina && <ModuleSection

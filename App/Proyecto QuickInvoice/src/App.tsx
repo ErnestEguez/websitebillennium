@@ -30,7 +30,8 @@ import { ProformaPage }       from './pages/ProformaPage'
 import { VendedoresPage } from './pages/VendedoresPage'
 import { CarteraCxcPage } from './pages/CarteraCxcPage'
 import { ConsultaVentasPage }    from './pages/ConsultaVentasPage'
-import { VentasClientePage }     from './pages/VentasClientePage'
+import { VentasClientePage }          from './pages/VentasClientePage'
+import { ResumenOperacionalPage }     from './pages/gerencia/ResumenOperacionalPage'
 import { ConsultaCarteraClientesPage } from './pages/ConsultaCarteraClientesPage'
 import { EstadoCuentaClientePage } from './pages/EstadoCuentaClientePage'
 import { AnulacionFacturasPage } from './pages/AnulacionFacturasPage'
@@ -434,6 +435,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <ConsultaVentasPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/gerencia/resumen-operacional" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <ResumenOperacionalPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

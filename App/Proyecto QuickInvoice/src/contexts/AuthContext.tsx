@@ -41,6 +41,7 @@ export interface Permisos {
     perm_anulacion_facturas: boolean
     perm_cierres_caja:       boolean
     perm_consulta_ventas:    boolean
+    perm_gerencia:           boolean
     perm_clientes:           boolean
     perm_cartera_cxc:        boolean
     perm_consulta_cartera:   boolean
@@ -104,6 +105,7 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_anulacion_facturas: true,
     perm_cierres_caja:       true,
     perm_consulta_ventas:    true,
+    perm_gerencia:           true,
     perm_clientes:           true,
     perm_cartera_cxc:        true,
     perm_consulta_cartera:   true,
@@ -247,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_anulacion_facturas: permData.perm_anulacion_facturas ?? true,
                     perm_cierres_caja:       permData.perm_cierres_caja       ?? true,
                     perm_consulta_ventas:    permData.perm_consulta_ventas    ?? true,
+                    perm_gerencia:           permData.perm_gerencia           ?? true,
                     perm_clientes:           permData.perm_clientes           ?? true,
                     perm_cartera_cxc:        permData.perm_cartera_cxc        ?? true,
                     perm_consulta_cartera:   permData.perm_consulta_cartera   ?? true,
