@@ -284,80 +284,150 @@ ${mov.cuenta_contable_codigo ? `<p class="center" style="font-size:9px;color:#55
 
 function imprimirReporteCierre(
     cierre: CierreGeneral,
-    _movimientos: MovimientoCajaGeneral[],
+    movimientos: MovimientoCajaGeneral[],
     ventas: unknown[],
-    _cartera: unknown[],
+    cartera: unknown[],
     depositos: DepositoCierre[],
-    empresaNombre: string
+    empresaNombre: string,
+    cajeroNombre: string
 ) {
-    const totalDepositos = depositos.reduce((s, d) => s + d.valor, 0)
-    const totalEfectDepositar = cierre.total_efectivo_dia - cierre.base_caja
+    const trunc = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + '…' : s
 
-    const filasVentas = ventas.map((v: unknown) => {
+    // ── Totales ventas por FP ──
+    const ventasPorFP: Record<string, number> = {}
+    for (const v of ventas) {
+        const vt = v as Record<string, unknown>
+        for (const p of (vt.comprobante_pagos as unknown[]) ?? []) {
+            const pt = p as Record<string, unknown>
+            const met = String(pt.metodo_pago || 'otros').toLowerCase()
+            ventasPorFP[met] = (ventasPorFP[met] ?? 0) + Number(pt.valor || 0)
+        }
+    }
+
+    // ── Totales cartera por FP ──
+    const carteraPorFP: Record<string, number> = {}
+    for (const p of cartera) {
+        const pt = p as Record<string, unknown>
+        const met = String(pt.metodo_pago || 'otros').toLowerCase()
+        carteraPorFP[met] = (carteraPorFP[met] ?? 0) + Number(pt.valor || 0)
+    }
+
+    // ── Detalle ventas: una fila por pago ──
+    const filasVentas = ventas.map(v => {
         const vt = v as Record<string, unknown>
         const pagos = (vt.comprobante_pagos as unknown[]) ?? []
-        const efectivo = pagos.filter((p: unknown) => (p as Record<string, string>).metodo_pago === 'efectivo')
-            .reduce((s: number, p: unknown) => s + Number((p as Record<string, unknown>).valor), 0)
-        const cheque = pagos.filter((p: unknown) =>
-            ['cheque', 'transferencia'].includes((p as Record<string, string>).metodo_pago))
-            .reduce((s: number, p: unknown) => s + Number((p as Record<string, unknown>).valor), 0)
-        return `<tr><td>${vt.secuencial}</td><td>${(vt.clientes as Record<string, string> | null)?.nombre ?? ''}</td>
-<td style="text-align:right">${formatMoneda(Number(vt.total))}</td>
-<td style="text-align:right">${formatMoneda(efectivo)}</td>
-<td style="text-align:right">${formatMoneda(cheque)}</td></tr>`
+        const cli = trunc((vt.clientes as Record<string, string> | null)?.nombre ?? '', 14)
+        const num = String(vt.secuencial ?? '').split('-').pop() ?? String(vt.secuencial ?? '')
+        return pagos.map((p, i) => {
+            const pt = p as Record<string, unknown>
+            const met = String(pt.metodo_pago || 'otros').toLowerCase()
+            return `<tr>
+              <td style="white-space:nowrap">${i === 0 ? num : ''}</td>
+              <td style="white-space:nowrap">${i === 0 ? cli : ''}</td>
+              <td class="r">${formatMoneda(Number(pt.valor || 0))}</td>
+              <td class="r" style="font-weight:bold">${fmtMetodo(met)}</td>
+            </tr>`
+        }).join('')
     }).join('')
+
+    // ── Detalle cartera: una fila por cobro ──
+    const filasCartera = cartera.map(p => {
+        const pt = p as Record<string, unknown>
+        const cxc = pt.cartera_cxc as Record<string, unknown> | null
+        const cli = trunc((cxc?.clientes as Record<string, string> | null)?.nombre ?? '—', 14)
+        const ref = trunc(String(pt.referencia || '—'), 10)
+        const met = String(pt.metodo_pago || 'otros').toLowerCase()
+        return `<tr>
+          <td style="white-space:nowrap">${ref}</td>
+          <td>${cli}</td>
+          <td class="r">${formatMoneda(Number(pt.valor || 0))}</td>
+          <td class="r" style="font-weight:bold">${fmtMetodo(met)}</td>
+        </tr>`
+    }).join('')
+
+    const totalDepositos = depositos.reduce((s, d) => s + d.valor, 0)
+    const totalADepositar = Math.max(0, cierre.total_efectivo_dia - cierre.base_caja) + cierre.total_cheques_dia
+
+    const resumenFP = (map: Record<string, number>) =>
+        Object.entries(map).filter(([, v]) => v > 0)
+            .map(([m, v]) => `<div class="row"><span>${fmtMetodo(m)}</span><span>${formatMoneda(v)}</span></div>`)
+            .join('')
 
     const html = `<!DOCTYPE html><html><head>
 <meta charset="utf-8">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:monospace;font-size:11px;width:72mm;padding:4mm}
-h2{font-size:13px;text-align:center}
-.line{border-top:1px dashed #000;margin:2mm 0}
-.row{display:flex;justify-content:space-between;margin:1mm 0}
-.section{font-weight:bold;margin:2mm 0 1mm}
-table{width:100%;font-size:9px;border-collapse:collapse}
-th{text-align:left;border-bottom:1px solid #ccc}
-td{padding:0.5mm 0}
-.right{text-align:right}
+body{font-family:'Courier New',monospace;font-size:9px;width:72mm;padding:3mm}
+h2{font-size:12px;text-align:center;font-weight:bold;margin-bottom:1mm}
+.line{border-top:1px dashed #000;margin:1.5mm 0}
+.row{display:flex;justify-content:space-between;margin:0.7mm 0}
+.bold{font-weight:bold}
+.section{font-weight:bold;font-size:10px;margin:2mm 0 1mm;text-transform:uppercase}
+.sub{font-size:8px;color:#555;margin:1mm 0 0.5mm}
+table{width:100%;border-collapse:collapse;font-size:8.5px}
+th{text-align:left;border-bottom:1px solid #888;padding:0.5mm 0;font-size:8px}
+td{padding:0.4mm 0}
+.r{text-align:right}
 </style></head><body>
 <h2>${empresaNombre}</h2>
-<p style="text-align:center">REPORTE CIERRE DE CAJA GENERAL</p>
+<p style="text-align:center;font-size:9px">REPORTE CIERRE DE CAJA GENERAL</p>
 <div class="line"></div>
 <div class="row"><span>Fecha:</span><span>${fmtFecha(cierre.fecha)}</span></div>
 <div class="row"><span>Base caja:</span><span>${formatMoneda(cierre.base_caja)}</span></div>
 <div class="line"></div>
-<p class="section">VENTAS DEL DÍA (${ventas.length})</p>
-${filasVentas ? `<table><tr><th>Comprobante</th><th>Cliente</th><th class="right">Total</th><th class="right">Efec.</th><th class="right">Cheq.</th></tr>${filasVentas}</table>` : ''}
-<div class="row"><span>Efectivo:</span><span>${formatMoneda(cierre.total_ventas_efectivo)}</span></div>
-<div class="row"><span>Cheque/Transf.:</span><span>${formatMoneda(cierre.total_ventas_cheque)}</span></div>
-<div class="row"><span>Otros:</span><span>${formatMoneda(cierre.total_ventas_otros)}</span></div>
-<div class="row"><span><b>Total ventas:</b></span><span><b>${formatMoneda(cierre.total_ventas)}</b></span></div>
+
+<p class="section">Ventas del Día (${ventas.length})</p>
+${cierre.con_detalle && ventas.length > 0 ? `
+<table>
+<tr><th style="width:18mm">No.Fact.</th><th>Cliente</th><th class="r" style="width:17mm">Valor</th><th class="r" style="width:8mm">FP</th></tr>
+${filasVentas}
+</table>` : ''}
+<p class="sub">Por forma de pago:</p>
+${resumenFP(ventasPorFP)}
+<div class="row bold"><span>TOTAL VENTAS:</span><span>${formatMoneda(cierre.total_ventas)}</span></div>
 <div class="line"></div>
-<p class="section">RECUPERACIÓN CARTERA</p>
-<div class="row"><span>Efectivo:</span><span>${formatMoneda(cierre.total_cartera_efectivo)}</span></div>
-<div class="row"><span>Cheque/Transf.:</span><span>${formatMoneda(cierre.total_cartera_cheque)}</span></div>
-<div class="row"><span>Otros:</span><span>${formatMoneda(cierre.total_cartera_otros)}</span></div>
-<div class="row"><span><b>Total cartera:</b></span><span><b>${formatMoneda(cierre.total_cartera)}</b></span></div>
+
+<p class="section">Recuperación Cartera (${cartera.length})</p>
+${cierre.con_detalle && cartera.length > 0 ? `
+<table>
+<tr><th style="width:16mm">Referencia</th><th>Cliente</th><th class="r" style="width:17mm">Valor</th><th class="r" style="width:8mm">FP</th></tr>
+${filasCartera}
+</table>` : ''}
+<p class="sub">Por forma de pago:</p>
+${resumenFP(carteraPorFP)}
+<div class="row bold"><span>TOTAL CARTERA:</span><span>${formatMoneda(cierre.total_cartera)}</span></div>
 <div class="line"></div>
-<p class="section">MOVIMIENTOS EXTRA</p>
-<div class="row"><span>Ingresos:</span><span>${formatMoneda(cierre.total_ingresos_extra)}</span></div>
-<div class="row"><span>Egresos:</span><span>${formatMoneda(cierre.total_egresos_extra)}</span></div>
-<div class="line"></div>
-<div class="row"><span><b>EFECTIVO TOTAL:</b></span><span><b>${formatMoneda(cierre.total_efectivo_dia)}</b></span></div>
-<div class="row"><span><b>CHEQUES TOTAL:</b></span><span><b>${formatMoneda(cierre.total_cheques_dia)}</b></span></div>
+
+${movimientos.length > 0 ? `
+<p class="section">Movimientos Extra</p>
+${cierre.con_detalle ? `
+<table>
+<tr><th style="width:18mm">No.</th><th>Motivo</th><th class="r" style="width:17mm">Valor</th><th class="r" style="width:6mm">T</th></tr>
+${movimientos.filter(m => m.tipo === 'INGRESO').map(m => `<tr><td>${m.numero}</td><td>${trunc(m.motivo, 14)}</td><td class="r">${formatMoneda(m.valor)}</td><td class="r">I</td></tr>`).join('')}
+${movimientos.filter(m => m.tipo === 'EGRESO').map(m => `<tr><td>${m.numero}</td><td>${trunc(m.motivo, 14)}</td><td class="r">${formatMoneda(m.valor)}</td><td class="r">E</td></tr>`).join('')}
+</table>` : ''}
+<div class="row"><span>Total ingresos:</span><span>${formatMoneda(cierre.total_ingresos_extra)}</span></div>
+<div class="row"><span>Total egresos:</span><span>${formatMoneda(cierre.total_egresos_extra)}</span></div>
+<div class="line"></div>` : ''}
+
+<p class="section">Resumen Final</p>
+<div class="row bold"><span>EFECTIVO TOTAL:</span><span>${formatMoneda(cierre.total_efectivo_dia)}</span></div>
+<div class="row bold"><span>CHEQUES TOTAL:</span><span>${formatMoneda(cierre.total_cheques_dia)}</span></div>
 <div class="row"><span>(-) Base caja:</span><span>${formatMoneda(cierre.base_caja)}</span></div>
-<div class="row"><span><b>A DEPOSITAR:</b></span><span><b>${formatMoneda(totalEfectDepositar + cierre.total_cheques_dia)}</b></span></div>
+<div class="row bold"><span>A DEPOSITAR:</span><span>${formatMoneda(totalADepositar)}</span></div>
 <div class="line"></div>
-<p class="section">DEPÓSITOS</p>
-${depositos.map(d => `<div class="row"><span>${d.cuenta_banco_nombre} (${d.tipo_deposito})</span><span>${formatMoneda(d.valor)}</span></div>`).join('')}
-<div class="row"><span><b>Total depósitos:</b></span><span><b>${formatMoneda(totalDepositos)}</b></span></div>
+<p class="section">Depósitos</p>
+${depositos.length > 0
+    ? depositos.map(d => `<div class="row"><span>${trunc(d.cuenta_banco_nombre, 22)} (${fmtMetodo(d.tipo_deposito.toLowerCase())})</span><span>${formatMoneda(d.valor)}</span></div>`).join('')
+    : '<p style="font-size:8px;color:#888">Sin depósitos registrados</p>'}
+<div class="row bold"><span>Total depósitos:</span><span>${formatMoneda(totalDepositos)}</span></div>
+${cierre.observaciones ? `<div class="line"></div><p style="font-size:8px">Obs: ${cierre.observaciones}</p>` : ''}
 <div class="line"></div>
-${cierre.observaciones ? `<p style="font-size:9px">Obs: ${cierre.observaciones}</p>` : ''}
-<p style="text-align:center;font-size:9px">QuickInvoice — Documento interno</p>
+<p style="margin-top:6mm;border-top:1px solid #000;padding-top:1mm">f. Cajero</p>
+<p style="margin-top:1mm">${cajeroNombre}</p>
 </body></html>`
 
-    const w = window.open('', '_blank', 'width=320,height=600')
+    const w = window.open('', '_blank', 'width=320,height=700')
     if (!w) return
     w.document.write(html)
     w.document.close()
@@ -1287,7 +1357,9 @@ export function CierreGeneralPage() {
                     <button
                         onClick={() => imprimirReporteCierre(
                             { ...cierre!, ...totales, base_caja: baseEdited },
-                            movimientos, ventas, cartera, depositoRows, empresa?.nombre || ''
+                            movimientos, ventas, cartera, depositoRows,
+                            empresa?.nombre || '',
+                            profile?.nombre || user?.email || ''
                         )}
                         className="flex items-center gap-2 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50"
                     >
