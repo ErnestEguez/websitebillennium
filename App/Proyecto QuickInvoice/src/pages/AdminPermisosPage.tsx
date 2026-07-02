@@ -51,6 +51,7 @@ const MODULOS = [
             { field: 'perm_cheques',            label: 'Cheques' },
             { field: 'perm_movimientos_banc',   label: 'Movimientos Bancarios' },
             { field: 'perm_conciliacion',       label: 'Conciliación' },
+            { field: 'perm_cierres_caja',       label: 'Cierre Caja General' },
         ],
     },
     {

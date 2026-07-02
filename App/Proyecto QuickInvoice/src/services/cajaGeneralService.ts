@@ -147,41 +147,32 @@ export const cajaGeneralService = {
         return data as MovimientoCajaGeneral
     },
 
-    // Get all cashier sessions data for the day (consolidated)
+    // Get consolidated day data directly by date (no dependency on caja_sesiones)
     async getDatosConsolidados(
         empresaId: string,
         fecha: string
     ): Promise<{ ventas: unknown[]; cartera: unknown[]; cajasIds: string[] }> {
-        // Get closed caja_sesiones for the day
-        const { data: sesiones } = await supabase
-            .from('caja_sesiones')
-            .select('id')
-            .eq('empresa_id', empresaId)
-            .gte('fecha_apertura', fecha + 'T00:00:00')
-            .lte('fecha_apertura', fecha + 'T23:59:59')
-            .eq('estado', 'cerrada')
-        const cajasIds = (sesiones ?? []).map((s: Record<string, unknown>) => s.id as string)
-        if (cajasIds.length === 0) return { ventas: [], cartera: [], cajasIds: [] }
-
-        // Get comprobantes (ventas) for those sessions
-        const { data: ventas } = await supabase
-            .from('comprobantes')
-            .select('id, secuencial, total, comprobante_pagos(metodo_pago, valor), clientes(nombre, identificacion)')
-            .eq('empresa_id', empresaId)
-            .in('caja_sesion_id', cajasIds)
-            .neq('estado_sistema', 'ANULADO')
-            .order('created_at')
-
-        // Get cartera recovered for those sessions
-        const { data: cartera } = await supabase
-            .from('cartera_cxc_pagos')
-            .select('id, valor, metodo_pago, referencia, cartera_cxc(cliente_id, clientes(nombre))')
-            .eq('empresa_id', empresaId)
-            .in('caja_sesion_id', cajasIds)
-            .eq('estado', 'activo')
-            .order('created_at')
-
-        return { ventas: ventas ?? [], cartera: cartera ?? [], cajasIds }
+        const [ventasRes, carteraRes] = await Promise.all([
+            supabase
+                .from('comprobantes')
+                .select('id, secuencial, total, comprobante_pagos(metodo_pago, valor), clientes(nombre, identificacion)')
+                .eq('empresa_id', empresaId)
+                .eq('fecha_emision', fecha)
+                .neq('estado_sistema', 'ANULADO')
+                .order('created_at'),
+            supabase
+                .from('cartera_cxc_pagos')
+                .select('id, valor, metodo_pago, referencia, cartera_cxc(cliente_id, clientes(nombre))')
+                .eq('empresa_id', empresaId)
+                .eq('fecha_pago', fecha)
+                .eq('estado', 'activo')
+                .order('created_at'),
+        ])
+        return {
+            ventas: ventasRes.data ?? [],
+            cartera: carteraRes.data ?? [],
+            cajasIds: [],
+        }
     },
 
     // Depositos

@@ -27,6 +27,21 @@ function hoy(): string {
     return new Date().toISOString().slice(0, 10)
 }
 
+const METODO_ABREV: Record<string, string> = {
+    efectivo:     'EF',
+    cheque:       'CD',
+    cheque_fecha: 'CF',
+    transferencia:'TR',
+    credito:      'CRE',
+    tarjeta:      'TC',
+    nota_credito: 'NC',
+    otros:        'OT',
+}
+
+function fmtMetodo(m: string): string {
+    return METODO_ABREV[m.toLowerCase()] ?? m.slice(0, 3).toUpperCase()
+}
+
 // ─── Plan-cuentas mini-selector (contabilidad schema) ────────────────────────
 
 interface LpCuentaMini {
@@ -372,6 +387,16 @@ function ModalMovimiento({ empresaId, fecha, userName, userId, cuentas, onClose,
     const [err, setErr]       = useState('')
     const [saved, setSaved]   = useState<MovimientoCajaGeneral | null>(null)
 
+    function resetForm() {
+        setMotivo('')
+        setValor('')
+        setCtaId(null)
+        setCtaCod(null)
+        setCtaNom(null)
+        setSaved(null)
+        setErr('')
+    }
+
     async function handleSave() {
         if (!motivo.trim()) { setErr('Ingrese el motivo'); return }
         const v = parseFloat(valor)
@@ -391,8 +416,10 @@ function ModalMovimiento({ empresaId, fecha, userName, userId, cuentas, onClose,
                 user_nombre: userName,
                 cierre_id: null,
             })
-            setSaved(mov)
             onSaved(mov)
+            setSaved(mov)
+            // Limpiar campos después de guardar
+            setTimeout(() => resetForm(), 1200)
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : String(e))
         } finally {
@@ -618,6 +645,8 @@ export function CierreGeneralPage() {
     const [conDetalle, setConDetalle]       = useState(true)
     const [baseCajaEdit, setBaseCajaEdit]   = useState('0')
     const [cerrandoCierre, setCerrandoCierre] = useState(false)
+    const [savingBase, setSavingBase]         = useState(false)
+    const [baseSaved, setBaseSaved]           = useState(false)
 
     // Deposits form
     const [depositoRows, setDepositoRows] = useState<DepositoCierre[]>([])
@@ -769,6 +798,18 @@ export function CierreGeneralPage() {
         }
     }
 
+    async function handleSaveBase() {
+        if (!empresa?.id) return
+        setSavingBase(true)
+        try {
+            await cajaGeneralService.setBaseCaja(empresa.id, baseEdited)
+            setBaseSaved(true)
+            setTimeout(() => setBaseSaved(false), 2000)
+        } finally {
+            setSavingBase(false)
+        }
+    }
+
     function addDepositoRow() {
         setDepositoRows(r => [...r, {
             cuenta_banco_id: null,
@@ -899,35 +940,33 @@ export function CierreGeneralPage() {
                                 <th className="px-4 py-3">Comprobante</th>
                                 <th className="px-4 py-3">Cliente</th>
                                 <th className="px-4 py-3 text-right">Total</th>
-                                <th className="px-4 py-3 text-right">Efectivo</th>
-                                <th className="px-4 py-3 text-right">Cheque/Transf.</th>
-                                <th className="px-4 py-3 text-right">Otros</th>
+                                <th className="px-4 py-3">Formas de Pago</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {ventas.length === 0 && (
-                                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Sin ventas registradas.</td></tr>
+                                <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">Sin ventas registradas.</td></tr>
                             )}
                             {ventas.map((v, i) => {
                                 const vt = v as Record<string, unknown>
                                 const pagos = (vt.comprobante_pagos as unknown[]) ?? []
-                                let ef = 0, ch = 0, otros = 0
+                                // Agrupa pagos por metodo
+                                const porMetodo: Record<string, number> = {}
                                 for (const p of pagos) {
                                     const pt = p as Record<string, unknown>
-                                    const val = Number(pt.valor) || 0
-                                    const met = String(pt.metodo_pago || '').toLowerCase()
-                                    if (met === 'efectivo') ef += val
-                                    else if (met === 'cheque' || met === 'transferencia') ch += val
-                                    else otros += val
+                                    const met = String(pt.metodo_pago || 'otros').toLowerCase()
+                                    porMetodo[met] = (porMetodo[met] ?? 0) + (Number(pt.valor) || 0)
                                 }
+                                const detalles = Object.entries(porMetodo)
+                                    .filter(([, v]) => v > 0)
+                                    .map(([m, v]) => `${fmtMetodo(m)} ${formatMoneda(v)}`)
+                                    .join(' | ')
                                 return (
                                     <tr key={i} className="hover:bg-slate-50">
                                         <td className="px-4 py-3 font-mono text-xs">{vt.secuencial as string}</td>
                                         <td className="px-4 py-3 text-slate-700">{(vt.clientes as Record<string, string> | null)?.nombre || '—'}</td>
-                                        <td className="px-4 py-3 text-right font-mono">{formatMoneda(Number(vt.total))}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-emerald-700">{formatMoneda(ef)}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-blue-700">{formatMoneda(ch)}</td>
-                                        <td className="px-4 py-3 text-right font-mono">{formatMoneda(otros)}</td>
+                                        <td className="px-4 py-3 text-right font-mono font-bold">{formatMoneda(Number(vt.total))}</td>
+                                        <td className="px-4 py-3 text-xs text-slate-600">{detalles || '—'}</td>
                                     </tr>
                                 )
                             })}
@@ -936,9 +975,9 @@ export function CierreGeneralPage() {
                             <tr>
                                 <td colSpan={2} className="px-4 py-3 text-right">TOTAL</td>
                                 <td className="px-4 py-3 text-right font-mono">{formatMoneda(totales.total_ventas)}</td>
-                                <td className="px-4 py-3 text-right font-mono text-emerald-700">{formatMoneda(totales.total_ventas_efectivo)}</td>
-                                <td className="px-4 py-3 text-right font-mono text-blue-700">{formatMoneda(totales.total_ventas_cheque)}</td>
-                                <td className="px-4 py-3 text-right font-mono">{formatMoneda(totales.total_ventas_otros)}</td>
+                                <td className="px-4 py-3 text-xs text-slate-500">
+                                    EF {formatMoneda(totales.total_ventas_efectivo)} | CD/TR {formatMoneda(totales.total_ventas_cheque)} | OT {formatMoneda(totales.total_ventas_otros)}
+                                </td>
                             </tr>
                         </tfoot>
                     </table>
@@ -966,8 +1005,8 @@ export function CierreGeneralPage() {
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
                             <tr>
+                                <th className="px-4 py-3">Cliente</th>
                                 <th className="px-4 py-3">Referencia</th>
-                                <th className="px-4 py-3">Forma Pago</th>
                                 <th className="px-4 py-3 text-right">Valor</th>
                             </tr>
                         </thead>
@@ -977,11 +1016,17 @@ export function CierreGeneralPage() {
                             )}
                             {cartera.map((p, i) => {
                                 const pt = p as Record<string, unknown>
+                                const cxc = pt.cartera_cxc as Record<string, unknown> | null
+                                const clienteNom = (cxc?.clientes as Record<string, string> | null)?.nombre ?? '—'
+                                const met = String(pt.metodo_pago || 'otros').toLowerCase()
                                 return (
                                     <tr key={i} className="hover:bg-slate-50">
+                                        <td className="px-4 py-3 text-slate-700 text-sm">{clienteNom}</td>
                                         <td className="px-4 py-3 text-xs font-mono text-slate-500">{(pt.referencia as string) || '—'}</td>
-                                        <td className="px-4 py-3 text-slate-700 capitalize">{(pt.metodo_pago as string) || '—'}</td>
-                                        <td className="px-4 py-3 text-right font-mono font-bold">{formatMoneda(Number(pt.valor))}</td>
+                                        <td className="px-4 py-3 text-right font-mono font-bold">
+                                            <span className="text-xs text-slate-500 mr-1">{fmtMetodo(met)}</span>
+                                            {formatMoneda(Number(pt.valor))}
+                                        </td>
                                     </tr>
                                 )
                             })}
@@ -1054,17 +1099,27 @@ export function CierreGeneralPage() {
                 {/* Base caja */}
                 <div className="bg-white rounded-xl border border-slate-200 p-5">
                     <h3 className="font-semibold text-slate-700 mb-3">Base de Caja</h3>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 flex-wrap">
                         <input
                             type="number"
                             step="0.01"
                             min="0"
                             disabled={isCerrado}
-                            className="w-40 px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono text-right focus:ring-2 focus:ring-primary-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                            className="w-36 px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono text-right focus:ring-2 focus:ring-primary-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
                             value={baseCajaEdit}
-                            onChange={e => setBaseCajaEdit(e.target.value)}
+                            onChange={e => { setBaseCajaEdit(e.target.value); setBaseSaved(false) }}
                         />
-                        <p className="text-sm text-slate-500">Esta cantidad no se deposita y queda para el día siguiente.</p>
+                        {!isCerrado && (
+                            <button
+                                onClick={handleSaveBase}
+                                disabled={savingBase}
+                                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                            >
+                                {savingBase ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                                {baseSaved ? '✓ Guardado' : 'Guardar base'}
+                            </button>
+                        )}
+                        <p className="text-sm text-slate-500">No se deposita; queda para el día siguiente.</p>
                     </div>
                     <div className="mt-3 flex justify-between text-sm font-bold border-t border-slate-100 pt-3">
                         <span>Efectivo a depositar</span>
