@@ -140,23 +140,35 @@ export function VentasClientePage() {
 
             const rows: FilaFactura[] = (data ?? []).map((c: any) => {
                 const anulada = c.estado_sistema === 'ANULADO'
-                const cxc = c.cartera_cxc?.[0] ?? null
+                // cartera_cxc puede llegar como objeto (FK única) o como array (sin unique constraint)
+                const cxcRaw = c.cartera_cxc
+                const cxc = Array.isArray(cxcRaw)
+                    ? (cxcRaw[0] ?? null)
+                    : (cxcRaw ?? null)
+
+                const total = anulada ? 0 : Number(c.total ?? 0)
 
                 let estado_cartera: FilaFactura['estado_cartera']
                 let saldo = 0
+
                 if (anulada) {
                     estado_cartera = 'ANULADA'
-                } else if (!cxc || cxc.estado === 'pagada') {
-                    estado_cartera = 'CANCELADA'
-                } else if (cxc.estado === 'parcial') {
-                    estado_cartera = 'PARCIAL'
+                } else if (cxc) {
                     saldo = Number(cxc.saldo ?? 0)
+                    if (cxc.estado === 'pagada' || saldo <= 0) {
+                        estado_cartera = 'CANCELADA'
+                        saldo = 0
+                    } else if (cxc.estado === 'parcial') {
+                        estado_cartera = 'PARCIAL'
+                    } else {
+                        estado_cartera = 'CRÉDITO'
+                    }
                 } else {
-                    estado_cartera = 'CRÉDITO'
-                    saldo = Number(cxc.saldo ?? 0)
+                    // Sin registro cartera: totalmente pagado al contado
+                    estado_cartera = 'CANCELADA'
+                    saldo = 0
                 }
 
-                const total = anulada ? 0 : Number(c.total ?? 0)
                 const pagado = total - saldo
 
                 return {
