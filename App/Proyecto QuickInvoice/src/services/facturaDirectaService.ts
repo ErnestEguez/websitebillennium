@@ -153,6 +153,7 @@ export const facturaDirectaService = {
                 total: totales.total,
                 estado_sri: 'PENDIENTE',
                 fecha_autorizacion: null,
+                fecha_emision: new Date().toLocaleDateString('en-CA'),
                 sri_utilizacion_sistema_financiero: false,
                 caja_sesion_id: caja_sesion_id || null,
                 vendedor_id: vendedor_id || null,
