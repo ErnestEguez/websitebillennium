@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
     Wallet, ArrowUpCircle, ArrowDownCircle, Printer, CheckCircle,
-    AlertCircle, X, Plus, RotateCcw, Loader2, FileText, Search,
+    AlertCircle, X, Plus, RotateCcw, Loader2, FileText, Search, Calendar,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabaseContabilidad } from '../../lib/supabaseContabilidad'
@@ -12,6 +12,8 @@ import {
     type CierreGeneral,
     type DepositoCierre,
 } from '../../services/cajaGeneralService'
+import { cuentasBancariasService } from '../../services/finance/bancosService'
+import type { CuentaBancaria } from '../../types/finance'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,19 @@ function useCuentasLP() {
     }, [])
     return cuentas
 }
+
+function useCuentasBancarias(empresaId: string | undefined) {
+    const [cuentas, setCuentas] = useState<CuentaBancaria[]>([])
+    useEffect(() => {
+        if (!empresaId) return
+        cuentasBancariasService.listar(empresaId)
+            .then(data => setCuentas(data.filter(c => c.estado === 'activa')))
+            .catch(() => {})
+    }, [empresaId])
+    return cuentas
+}
+
+// ─── SelectorCuenta contable ─────────────────────────────────────────────────
 
 interface SelectorCuentaProps {
     cuentas: LpCuentaMini[]
@@ -124,6 +139,88 @@ function SelectorCuenta({ cuentas, value, onChange, placeholder = 'Seleccionar c
                                 >
                                     <span className="font-mono text-xs text-slate-500 w-24 shrink-0">{c.codigo}</span>
                                     <span className="text-slate-700 truncate">{c.nombre}</span>
+                                </button>
+                            ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── SelectorCuentaBancaria ───────────────────────────────────────────────────
+
+interface SelectorCuentaBancProps {
+    cuentas: CuentaBancaria[]
+    value: string | null
+    onChange: (id: string | null, nombre: string) => void
+    disabled?: boolean
+}
+
+function getNombreCuenta(c: CuentaBancaria): string {
+    const bancoNom = (c.banco as Record<string, string> | null)?.nombre ?? ''
+    const tipo = c.tipo === 'corriente' ? 'Cte' : 'Aho'
+    return `${bancoNom} — ${tipo} ${c.numero_cuenta}`
+}
+
+function SelectorCuentaBancaria({ cuentas, value, onChange, disabled }: SelectorCuentaBancProps) {
+    const [open, setOpen] = useState(false)
+    const [q, setQ] = useState('')
+    const cuenta = cuentas.find(c => c.id === value)
+
+    const filtradas = cuentas.filter(c => {
+        if (!q) return true
+        const str = getNombreCuenta(c).toLowerCase()
+        return str.includes(q.toLowerCase()) || c.numero_cuenta.includes(q)
+    }).slice(0, 20)
+
+    if (disabled) {
+        return (
+            <div className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-500">
+                {cuenta ? getNombreCuenta(cuenta) : '—'}
+            </div>
+        )
+    }
+
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                className="w-full text-left px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+            >
+                {cuenta ? (
+                    <span className="text-slate-700 text-xs">{getNombreCuenta(cuenta)}</span>
+                ) : (
+                    <span className="text-slate-400 text-xs">Seleccionar banco...</span>
+                )}
+            </button>
+            {open && (
+                <div className="absolute left-0 top-full mt-1 w-80 bg-white rounded-xl border border-slate-200 shadow-xl z-50">
+                    <div className="p-2 border-b flex items-center gap-2">
+                        <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                        <input
+                            autoFocus
+                            className="flex-1 text-sm outline-none"
+                            placeholder="Banco o número..."
+                            value={q}
+                            onChange={e => setQ(e.target.value)}
+                        />
+                        <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                        {filtradas.length === 0
+                            ? <p className="text-sm text-slate-400 text-center py-4">Sin resultados</p>
+                            : filtradas.map(c => (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => { onChange(c.id, getNombreCuenta(c)); setOpen(false); setQ('') }}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-primary-50 text-sm text-slate-700"
+                                >
+                                    {getNombreCuenta(c)}
                                 </button>
                             ))}
                     </div>
@@ -492,11 +589,11 @@ const TABS = [
 
 export function CierreGeneralPage() {
     const { empresa, user, profile } = useAuth()
-    const cuentasLP = useCuentasLP()
-
-    const fechaHoy = hoy()
+    const cuentasLP        = useCuentasLP()
+    const cuentasBancarias = useCuentasBancarias(empresa?.id)
 
     // ── state ──
+    const [fechaSeleccionada, setFechaSeleccionada] = useState(hoy())
     const [tab, setTab]                   = useState<TabId>(0)
     const [loading, setLoading]           = useState(true)
     const [error, setError]               = useState('')
@@ -533,16 +630,16 @@ export function CierreGeneralPage() {
         try {
             const [base, cajeros, cierreExist] = await Promise.all([
                 cajaGeneralService.getBaseCaja(empresa.id),
-                cajaGeneralService.todosCajerosCerraron(empresa.id, fechaHoy),
-                cajaGeneralService.getCierreDelDia(empresa.id, fechaHoy),
+                cajaGeneralService.todosCajerosCerraron(empresa.id, fechaSeleccionada),
+                cajaGeneralService.getCierreDelDia(empresa.id, fechaSeleccionada),
             ])
             setBaseCajaEdit(String(base))
             setCajerosPendientes(cajeros.pendientes)
             setCierre(cierreExist)
 
             const [movs, consol] = await Promise.all([
-                cajaGeneralService.getMovimientosDia(empresa.id, fechaHoy),
-                cajaGeneralService.getDatosConsolidados(empresa.id, fechaHoy),
+                cajaGeneralService.getMovimientosDia(empresa.id, fechaSeleccionada),
+                cajaGeneralService.getDatosConsolidados(empresa.id, fechaSeleccionada),
             ])
             setMovimientos(movs)
             setVentas(consol.ventas)
@@ -552,13 +649,16 @@ export function CierreGeneralPage() {
                 const deps = await cajaGeneralService.getDepositosCierre(cierreExist.id)
                 setDepositoRows(deps)
                 setObservaciones(cierreExist.observaciones ?? '')
+            } else {
+                setDepositoRows([])
+                setObservaciones('')
             }
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : String(e))
         } finally {
             setLoading(false)
         }
-    }, [empresa?.id, fechaHoy])
+    }, [empresa?.id, fechaSeleccionada])
 
     const cargarHistorico = useCallback(async () => {
         if (!empresa?.id) return
@@ -642,7 +742,7 @@ export function CierreGeneralPage() {
         try {
             let cierreId = cierre?.id
             if (!cierreId) {
-                const nuevo = await cajaGeneralService.crearCierre(empresa.id, fechaHoy, baseEdited)
+                const nuevo = await cajaGeneralService.crearCierre(empresa.id, fechaSeleccionada, baseEdited)
                 cierreId = nuevo.id
             }
             // Save deposits first
@@ -652,7 +752,7 @@ export function CierreGeneralPage() {
                 cierreId,
                 {
                     empresa_id: empresa.id,
-                    fecha: fechaHoy,
+                    fecha: fechaSeleccionada,
                     base_caja: baseEdited,
                     observaciones: observaciones || null,
                     con_detalle: conDetalle,
@@ -671,14 +771,15 @@ export function CierreGeneralPage() {
 
     function addDepositoRow() {
         setDepositoRows(r => [...r, {
+            cuenta_banco_id: null,
             cuenta_banco_nombre: '',
             tipo_deposito: 'EFECTIVO',
             valor: 0,
         }])
     }
 
-    function updateDepositoRow(i: number, field: keyof DepositoCierre, value: unknown) {
-        setDepositoRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: value } : row))
+    function updateDepositoRow(i: number, patch: Partial<DepositoCierre>) {
+        setDepositoRows(r => r.map((row, idx) => idx === i ? { ...row, ...patch } : row))
     }
 
     function removeDepositoRow(i: number) {
@@ -716,7 +817,7 @@ export function CierreGeneralPage() {
                             {movimientos.length === 0 && (
                                 <tr>
                                     <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                                        No hay movimientos registrados hoy.
+                                        No hay movimientos registrados.
                                     </td>
                                 </tr>
                             )}
@@ -986,23 +1087,30 @@ export function CierreGeneralPage() {
                     </div>
                     <div className="space-y-2">
                         {depositoRows.map((d, i) => (
-                            <div key={i} className="grid grid-cols-12 gap-2 items-center text-sm">
-                                <input
-                                    className="col-span-4 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-primary-400 focus:outline-none disabled:bg-slate-50"
-                                    placeholder="Cuenta / banco"
-                                    disabled={isCerrado}
-                                    value={d.cuenta_banco_nombre}
-                                    onChange={e => updateDepositoRow(i, 'cuenta_banco_nombre', e.target.value)}
-                                />
+                            <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                                {/* Bank account selector */}
+                                <div className="col-span-5">
+                                    <SelectorCuentaBancaria
+                                        cuentas={cuentasBancarias}
+                                        value={d.cuenta_banco_id ?? null}
+                                        disabled={isCerrado}
+                                        onChange={(id, nombre) => updateDepositoRow(i, {
+                                            cuenta_banco_id: id,
+                                            cuenta_banco_nombre: nombre,
+                                        })}
+                                    />
+                                </div>
+                                {/* Tipo */}
                                 <select
                                     className="col-span-2 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-primary-400 focus:outline-none disabled:bg-slate-50"
                                     disabled={isCerrado}
                                     value={d.tipo_deposito}
-                                    onChange={e => updateDepositoRow(i, 'tipo_deposito', e.target.value as 'EFECTIVO' | 'CHEQUE')}
+                                    onChange={e => updateDepositoRow(i, { tipo_deposito: e.target.value as 'EFECTIVO' | 'CHEQUE' })}
                                 >
                                     <option value="EFECTIVO">Efectivo</option>
                                     <option value="CHEQUE">Cheque</option>
                                 </select>
+                                {/* Valor */}
                                 <input
                                     type="number"
                                     step="0.01"
@@ -1010,14 +1118,15 @@ export function CierreGeneralPage() {
                                     placeholder="0.00"
                                     disabled={isCerrado}
                                     value={d.valor || ''}
-                                    onChange={e => updateDepositoRow(i, 'valor', parseFloat(e.target.value) || 0)}
+                                    onChange={e => updateDepositoRow(i, { valor: parseFloat(e.target.value) || 0 })}
                                 />
+                                {/* Comprobante */}
                                 <input
-                                    className="col-span-3 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-primary-400 focus:outline-none disabled:bg-slate-50"
+                                    className="col-span-2 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:ring-1 focus:ring-primary-400 focus:outline-none disabled:bg-slate-50"
                                     placeholder="Nro. comprobante"
                                     disabled={isCerrado}
                                     value={d.numero_comprobante || ''}
-                                    onChange={e => updateDepositoRow(i, 'numero_comprobante', e.target.value)}
+                                    onChange={e => updateDepositoRow(i, { numero_comprobante: e.target.value })}
                                 />
                                 {!isCerrado && (
                                     <button
@@ -1181,17 +1290,31 @@ export function CierreGeneralPage() {
                         Cierre de Caja General
                     </h1>
                     <p className="text-slate-500 text-sm mt-0.5">
-                        {new Date(fechaHoy + 'T12:00:00').toLocaleDateString('es-EC', {
+                        {new Date(fechaSeleccionada + 'T12:00:00').toLocaleDateString('es-EC', {
                             weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
                         })}
                     </p>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-3 flex-wrap">
+                    {/* Date picker */}
+                    <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5">
+                        <Calendar className="w-4 h-4 text-slate-400" />
+                        <input
+                            type="date"
+                            value={fechaSeleccionada}
+                            max={hoy()}
+                            onChange={e => {
+                                if (e.target.value) setFechaSeleccionada(e.target.value)
+                            }}
+                            className="text-sm text-slate-700 focus:outline-none bg-transparent"
+                        />
+                    </div>
+                    {/* Cajero status */}
                     {cajerosPendientes.length === 0
-                        ? <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
+                        ? <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200 text-sm">
                             <CheckCircle className="w-4 h-4" /> Todos los cajeros cerraron
                         </span>
-                        : <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200">
+                        : <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full border border-amber-200 text-sm">
                             <AlertCircle className="w-4 h-4" /> {cajerosPendientes.length} caja(s) abierta(s)
                         </span>}
                 </div>
@@ -1232,7 +1355,7 @@ export function CierreGeneralPage() {
             {showModalMov && empresa?.id && user?.id && (
                 <ModalMovimiento
                     empresaId={empresa.id}
-                    fecha={fechaHoy}
+                    fecha={fechaSeleccionada}
                     userName={profile?.nombre || user.email || ''}
                     userId={user.id}
                     cuentas={cuentasLP}

@@ -49,7 +49,9 @@ export interface DepositoCierre {
     id?: string
     cierre_id?: string
     empresa_id?: string
+    cuenta_banco_id?: string | null
     cuenta_banco_nombre: string
+    cuenta_contable_banco_id?: string | null
     cuenta_contable_banco_codigo?: string | null
     cuenta_contable_banco_nombre?: string | null
     tipo_deposito: 'EFECTIVO' | 'CHEQUE'
