@@ -228,6 +228,18 @@ export const cajaGeneralService = {
             .is('cierre_id', null)
     },
 
+    // Actualizar borrador (sin cerrar)
+    async actualizarBorrador(
+        cierreId: string,
+        observaciones: string | null,
+        conDetalle: boolean
+    ): Promise<void> {
+        await supabase
+            .from('caja_general_cierres')
+            .update({ observaciones, con_detalle: conDetalle, updated_at: new Date().toISOString() })
+            .eq('id', cierreId)
+    },
+
     // Reversar cierre
     async reversarCierre(cierreId: string, motivo: string, userId: string): Promise<void> {
         const { error } = await supabase

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
     Wallet, ArrowUpCircle, ArrowDownCircle, Printer, CheckCircle,
     AlertCircle, X, Plus, RotateCcw, Loader2, FileText, Search, Calendar,
@@ -651,6 +651,11 @@ export function CierreGeneralPage() {
     // Deposits form
     const [depositoRows, setDepositoRows] = useState<DepositoCierre[]>([])
 
+    // Refs para detectar cambios del usuario (evitar auto-guardar lo que viene de la BD)
+    const lastSavedDepositos = useRef<string>('[]')
+    const lastSavedObs       = useRef<string>('')
+    const lastSavedDetalle   = useRef<boolean>(true)
+
     // ── data loaders ──
     const cargarDia = useCallback(async () => {
         if (!empresa?.id) return
@@ -664,7 +669,13 @@ export function CierreGeneralPage() {
             ])
             setBaseCajaEdit(String(base))
             setCajerosPendientes(cajeros.pendientes)
-            setCierre(cierreExist)
+
+            // Auto-crear borrador para hoy si no existe aún
+            let cierreActual = cierreExist
+            if (!cierreExist && fechaSeleccionada === hoy()) {
+                cierreActual = await cajaGeneralService.crearCierre(empresa.id, fechaSeleccionada, base)
+            }
+            setCierre(cierreActual)
 
             const [movs, consol] = await Promise.all([
                 cajaGeneralService.getMovimientosDia(empresa.id, fechaSeleccionada),
@@ -674,13 +685,22 @@ export function CierreGeneralPage() {
             setVentas(consol.ventas)
             setCartera(consol.cartera)
 
-            if (cierreExist) {
-                const deps = await cajaGeneralService.getDepositosCierre(cierreExist.id)
+            if (cierreActual) {
+                const deps = await cajaGeneralService.getDepositosCierre(cierreActual.id)
+                const obsDB = cierreActual.observaciones ?? ''
+                const detDB = cierreActual.con_detalle ?? true
                 setDepositoRows(deps)
-                setObservaciones(cierreExist.observaciones ?? '')
+                setObservaciones(obsDB)
+                setConDetalle(detDB)
+                // Sincronizar refs con lo que vino de la BD
+                lastSavedDepositos.current = JSON.stringify(deps)
+                lastSavedObs.current       = obsDB
+                lastSavedDetalle.current   = detDB
             } else {
                 setDepositoRows([])
                 setObservaciones('')
+                lastSavedDepositos.current = '[]'
+                lastSavedObs.current       = ''
             }
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : String(e))
@@ -701,6 +721,34 @@ export function CierreGeneralPage() {
 
     useEffect(() => { cargarDia() }, [cargarDia])
     useEffect(() => { if (tab === 4) cargarHistorico() }, [tab, cargarHistorico])
+
+    // Auto-guardar depósitos en BD cuando el usuario los edita
+    useEffect(() => {
+        if (!cierre?.id || cierre.estado === 'CERRADO' || !empresa?.id) return
+        const serialized = JSON.stringify(depositoRows)
+        if (serialized === lastSavedDepositos.current) return  // sin cambios
+        const timer = setTimeout(async () => {
+            try {
+                await cajaGeneralService.guardarDepositos(cierre.id, empresa.id, depositoRows)
+                lastSavedDepositos.current = serialized
+            } catch { /* silent */ }
+        }, 800)
+        return () => clearTimeout(timer)
+    }, [depositoRows, cierre?.id, cierre?.estado, empresa?.id])
+
+    // Auto-guardar observaciones y conDetalle en BD cuando cambian
+    useEffect(() => {
+        if (!cierre?.id || cierre.estado === 'CERRADO') return
+        if (observaciones === lastSavedObs.current && conDetalle === lastSavedDetalle.current) return
+        const timer = setTimeout(async () => {
+            try {
+                await cajaGeneralService.actualizarBorrador(cierre.id, observaciones, conDetalle)
+                lastSavedObs.current     = observaciones
+                lastSavedDetalle.current = conDetalle
+            } catch { /* silent */ }
+        }, 800)
+        return () => clearTimeout(timer)
+    }, [observaciones, conDetalle, cierre?.id, cierre?.estado])
 
     // ── computed totals ──
     function calcularTotales() {
@@ -1343,6 +1391,11 @@ export function CierreGeneralPage() {
                     <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                         <Wallet className="w-6 h-6 text-emerald-600" />
                         Cierre de Caja General
+                        {cierre && cierre.estado !== 'CERRADO' && (
+                            <span className="text-xs font-normal text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                ● Abierto — auto-guardado
+                            </span>
+                        )}
                     </h1>
                     <p className="text-slate-500 text-sm mt-0.5">
                         {new Date(fechaSeleccionada + 'T12:00:00').toLocaleDateString('es-EC', {
