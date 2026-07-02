@@ -32,6 +32,7 @@ import { CarteraCxcPage } from './pages/CarteraCxcPage'
 import { ConsultaVentasPage }    from './pages/ConsultaVentasPage'
 import { VentasClientePage }          from './pages/VentasClientePage'
 import { ResumenOperacionalPage }     from './pages/gerencia/ResumenOperacionalPage'
+import { GestionCarteraPage }        from './pages/clientes/GestionCarteraPage'
 import { ConsultaCarteraClientesPage } from './pages/ConsultaCarteraClientesPage'
 import { EstadoCuentaClientePage } from './pages/EstadoCuentaClientePage'
 import { AnulacionFacturasPage } from './pages/AnulacionFacturasPage'
@@ -455,6 +456,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <VentasClientePage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/clientes/gestion-cartera" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <GestionCarteraPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

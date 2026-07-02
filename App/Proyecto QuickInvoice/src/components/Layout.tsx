@@ -120,6 +120,7 @@ function ModuleSection({ label, icon: Icon, colorClass, isOpen, onToggle, isSide
 // Mapa: prefijo de ruta → campo de permiso
 const PERM_RUTAS: [string, string][] = [
     ['/gerencia',                      'perm_gerencia'],
+    ['/clientes/gestion-cartera',      'perm_cartera_cxc'],
     ['/anulacion-facturas',            'perm_anulacion_facturas'],
     ['/notas-credito',                 'perm_notas_credito'],
     ['/cierres',                       'perm_cierres_caja'],
@@ -332,6 +333,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         >
                             <SidebarItem to="/clientes"                    icon={Users}      label="Clientes"         active={location.pathname === '/clientes'} sub disabled={!p.perm_clientes} />
                             <SidebarItem to="/cartera-cxc"                 icon={CreditCard} label="Cartera / Abonos" active={location.pathname === '/cartera-cxc'} sub disabled={!p.perm_cartera_cxc} />
+                            <SidebarItem to="/clientes/gestion-cartera"    icon={ClipboardList} label="Gestión de Cartera" active={location.pathname === '/clientes/gestion-cartera'} sub disabled={!p.perm_cartera_cxc} />
                             <SidebarItem to="/consultas/cartera-clientes"  icon={FileSearch} label="Consulta Cartera" active={location.pathname === '/consultas/cartera-clientes'} sub disabled={!p.perm_consulta_cartera} />
                             <SidebarItem to="/cartera/estado-cuenta"       icon={BarChart3}  label="Estado de Cuenta" active={location.pathname.startsWith('/cartera/estado-cuenta')} sub disabled={!p.perm_estado_cuenta} />
                         </ModuleSection>}
