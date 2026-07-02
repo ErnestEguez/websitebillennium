@@ -153,12 +153,12 @@ export const cajaGeneralService = {
         fecha: string
     ): Promise<{ ventas: unknown[]; cartera: unknown[]; cajasIds: string[] }> {
         const [ventasRes, carteraRes] = await Promise.all([
-            // Busca por fecha_emision; si es NULL (facturas antiguas sin ese campo) cae en created_at
             supabase
                 .from('comprobantes')
                 .select('id, secuencial, total, comprobante_pagos(metodo_pago, valor), clientes(nombre, identificacion)')
                 .eq('empresa_id', empresaId)
-                .or(`fecha_emision.eq.${fecha},and(fecha_emision.is.null,created_at.gte.${fecha}T00:00:00,created_at.lte.${fecha}T23:59:59)`)
+                .gte('created_at', `${fecha}T00:00:00`)
+                .lte('created_at', `${fecha}T23:59:59`)
                 .neq('estado_sistema', 'ANULADO')
                 .order('created_at'),
             supabase
