@@ -98,7 +98,7 @@ export const facturaDirectaService = {
             pto = puntoEmision.punto_emision
             const seriePrefix = `${est.padStart(3,'0')}-${pto.padStart(3,'0')}-`
 
-            // Obtener el MAX real de comprobantes emitidos para esta serie
+            // MAX real de comprobantes emitidos en esta serie
             const { data: maxComp } = await supabase
                 .from('comprobantes')
                 .select('secuencial')
@@ -111,25 +111,28 @@ export const facturaDirectaService = {
                 ? parseInt(maxComp.secuencial.split('-').pop() || '0', 10)
                 : 0
 
-            // Llamar a la RPC atómica para obtener el siguiente número
+            // secuencial_inicio de config_sri actúa como piso mínimo:
+            // si el usuario configuró 469 ahí, el sistema nunca emitirá por debajo de 469
+            const configMin = Number(config.secuencial_inicio ?? 0) || 0
+            const pisoMinimo = Math.max(maxEmitido, configMin)
+
+            // RPC atómica para obtener el siguiente número
             const { data: nextSecData, error: errorSec } = await supabase
                 .rpc('qi_next_secuencial_punto', { p_punto_emision_id: puntoEmision.id, p_tipo_comprobante: 'FACTURA' })
             if (errorSec) throw errorSec
             nextSec = nextSecData as number
 
-            // PROTECCIÓN: si el contador está desincronizado (es menor o igual al MAX real),
-            // corregir automáticamente antes de emitir
-            if (nextSec <= maxEmitido) {
-                const secCorregido = maxEmitido + 1
-                // Actualizar el contador en la BD al valor correcto
+            // PROTECCIÓN: si el contador RPC es menor o igual al piso mínimo,
+            // autocorregir el contador en la BD y usar pisoMinimo + 1
+            if (nextSec <= pisoMinimo) {
                 await supabase
                     .from('puntos_emision')
                     .update({
-                        secuenciales: { ...(puntoEmision.secuenciales ?? {}), FACTURA: secCorregido },
+                        secuenciales: { ...(puntoEmision.secuenciales ?? {}), FACTURA: pisoMinimo },
                         updated_at: new Date().toISOString(),
                     })
                     .eq('id', puntoEmision.id)
-                nextSec = secCorregido
+                nextSec = pisoMinimo + 1
             }
         } else {
             // Fallback: empresa todavía sin punto de emisión migrado, usar MAX(secuencial)+1
