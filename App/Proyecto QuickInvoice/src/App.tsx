@@ -7,7 +7,8 @@ import { useOfflineSync } from './hooks/useOfflineSync'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { Dashboard }  from './pages/Dashboard'
-import { HomePage }   from './pages/HomePage'
+import { HomePage }            from './pages/HomePage'
+import { ImportarClientesPage } from './pages/ImportarClientesPage'
 import { MesaGrid } from './pages/MesaGrid'
 import { OrderTake } from './pages/OrderTake'
 import { InvoicingPage } from './pages/InvoicingPage'
@@ -368,6 +369,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <ImportarArticulosPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/importar-clientes" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <ImportarClientesPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

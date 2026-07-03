@@ -85,22 +85,23 @@ export function ImportarArticulosPage() {
     const [progress, setProgress]     = useState({ current: 0, total: 0 })
     const [summary, setSummary]       = useState<ImportSummary | null>(null)
 
-    // Bodega principal de la empresa
-    const [bodegaId, setBodegaId]   = useState<string | null>(null)
-    const [bodegaNom, setBodegaNom] = useState<string>('')
+    // Bodegas de la empresa
+    const [bodegas, setBodegas]   = useState<{ id: string; nombre: string; es_principal: boolean }[]>([])
+    const [bodegaId, setBodegaId] = useState<string | null>(null)
 
     useEffect(() => {
         if (!empresa?.id) return
         supabase
             .from('bodegas')
-            .select('id, nombre')
+            .select('id, nombre, es_principal')
             .eq('empresa_id', empresa.id)
             .eq('activo', true)
             .order('es_principal', { ascending: false })
-            .limit(1)
-            .maybeSingle()
             .then(({ data }) => {
-                if (data) { setBodegaId(data.id); setBodegaNom(data.nombre) }
+                const lista = data ?? []
+                setBodegas(lista)
+                const principal = lista.find(b => b.es_principal) ?? lista[0]
+                if (principal) setBodegaId(principal.id)
             })
     }, [empresa?.id])
 
@@ -250,9 +251,26 @@ export function ImportarArticulosPage() {
                 <h1 className="text-2xl font-bold text-slate-900">Importar Artículos</h1>
                 <p className="text-sm text-slate-500 mt-1">
                     Empresa: <span className="font-medium">{empresa?.nombre || 'N/A'}</span>
-                    {bodegaNom && <> · Bodega: <span className="font-medium">{bodegaNom}</span></>}
                 </p>
             </div>
+
+            {/* Selector de bodega */}
+            {bodegas.length > 0 && (
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-semibold text-slate-600 whitespace-nowrap">Bodega destino:</label>
+                    <select
+                        value={bodegaId ?? ''}
+                        onChange={e => setBodegaId(e.target.value)}
+                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500 outline-none"
+                    >
+                        {bodegas.map(b => (
+                            <option key={b.id} value={b.id}>
+                                {b.nombre}{b.es_principal ? ' (Principal)' : ''}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
 
             {/* Instrucciones del formato */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
