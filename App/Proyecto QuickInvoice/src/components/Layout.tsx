@@ -294,10 +294,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('inventario')}
                             onToggle={() => toggleGroup('inventario')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/productos','/importar-articulos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub />
-                            <SidebarItem to="/importar-articulos"      icon={Upload}            label="Importar Artículos"    active={location.pathname === '/importar-articulos'} sub />
                             <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub />
                             <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub />
                             <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub />
@@ -567,6 +566,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub />
                                     {isAdmin && <SidebarItem to="/ajustes/permisos" icon={UserCog} label="Permisos de usuario" active={location.pathname === '/ajustes/permisos'} sub />}
                                     {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub />}
+                                    {esOficina && <SidebarItem to="/importar-articulos" icon={Upload} label="Importar Artículos" active={location.pathname === '/importar-articulos'} sub />}
                                     <button
                                         onClick={toggleDarkSidebar}
                                         className="flex items-center gap-3 w-full pl-8 pr-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors"
