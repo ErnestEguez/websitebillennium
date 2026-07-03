@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import {
     Search, RefreshCw, Download, Printer, Phone, Mail, MessageCircle,
-    ClipboardList, X, Save, Loader2,
+    ClipboardList, X, Save, Loader2, ChevronDown,
     Users, BarChart3, Info,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -411,7 +411,13 @@ export function GestionCarteraPage() {
 
     // UI
     const [drawerFila, setDrawerFila]   = useState<FilaCartera | null>(null)
-    const [agingLoading, setAgingLoading] = useState(false)
+    const [agingLoading, setAgingLoading]   = useState(false)
+    const [showReportes, setShowReportes]   = useState(false)
+    const [fechaDesdeRep, setFechaDesdeRep] = useState(() => {
+        const d = new Date(); d.setMonth(d.getMonth() - 1)
+        return d.toISOString().split('T')[0]
+    })
+    const [fechaHastaRep, setFechaHastaRep] = useState(() => new Date().toISOString().split('T')[0])
     const printRef = useRef<HTMLDivElement>(null)
     const handlePrint = useReactToPrint({ contentRef: printRef, documentTitle: `Cartera_${fechaCorte}` })
 
@@ -466,16 +472,62 @@ export function GestionCarteraPage() {
                     </h1>
                     <p className="text-slate-500 text-sm mt-0.5">Control de cuentas por cobrar y cobros</p>
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                    <button onClick={exportarAging} disabled={agingLoading}
-                        className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50">
-                        {agingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />} Aging
-                    </button>
-                    <button onClick={() => carteraGestionService.exportarCarteraExcel(filasFiltradas, (empresa as any)?.nombre ?? '', fechaCorte)}
-                        disabled={filasFiltradas.length === 0}
-                        className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">
-                        <Download className="w-4 h-4" /> Excel
-                    </button>
+                <div className="flex gap-2 flex-wrap relative">
+                    {/* Menú de Reportes */}
+                    <div className="relative">
+                        <button onClick={() => setShowReportes(r => !r)}
+                            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
+                            <BarChart3 className="w-4 h-4" /> Reportes <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                        {showReportes && (
+                            <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-xl border border-slate-200 shadow-xl w-72 p-3 space-y-1" onClick={e => e.stopPropagation()}>
+                                <p className="text-xs font-semibold text-slate-400 uppercase px-2 pb-1">Reportes de Cartera</p>
+                                <button onClick={() => { exportarAging(); setShowReportes(false) }} disabled={agingLoading}
+                                    className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 flex items-center gap-2 disabled:opacity-50">
+                                    {agingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4 text-primary-500" />}
+                                    R1 · Aging (Antigüedad de Saldos)
+                                </button>
+                                <button onClick={() => { carteraGestionService.exportarCarteraExcel(filasFiltradas, (empresa as any)?.nombre ?? '', fechaCorte); setShowReportes(false) }}
+                                    disabled={filasFiltradas.length === 0}
+                                    className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 flex items-center gap-2 disabled:opacity-40">
+                                    <Download className="w-4 h-4 text-slate-400" /> R · Cartera actual (filtrada)
+                                </button>
+                                <button onClick={() => { carteraGestionService.exportarPorVendedorExcel(empresa!.id, fechaCorte, (empresa as any)?.nombre ?? ''); setShowReportes(false) }}
+                                    className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                                    <Download className="w-4 h-4 text-emerald-500" /> R2 · Por Vendedor
+                                </button>
+                                <button onClick={() => { carteraGestionService.exportarPromesasExcel(empresa!.id, (empresa as any)?.nombre ?? ''); setShowReportes(false) }}
+                                    className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                                    <Download className="w-4 h-4 text-amber-500" /> R4 · Promesas de Pago
+                                </button>
+                                <button onClick={() => { carteraGestionService.exportarAcuerdosExcel(empresa!.id, (empresa as any)?.nombre ?? ''); setShowReportes(false) }}
+                                    className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                                    <Download className="w-4 h-4 text-blue-500" /> R5 · Acuerdos en Cuotas
+                                </button>
+                                <button onClick={() => { carteraGestionService.exportarComparativoExcel(empresa!.id, (empresa as any)?.nombre ?? ''); setShowReportes(false) }}
+                                    className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                                    <Download className="w-4 h-4 text-violet-500" /> R6 · Comparativo 12 meses
+                                </button>
+                                <button onClick={() => { carteraGestionService.exportarAltoRiesgoExcel(empresa!.id, (empresa as any)?.nombre ?? '', fechaCorte); setShowReportes(false) }}
+                                    className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                                    <Download className="w-4 h-4 text-red-500" /> R7 · Clientes Alto Riesgo
+                                </button>
+                                <div className="border-t border-slate-100 pt-2 mt-1">
+                                    <p className="text-xs font-semibold text-slate-400 uppercase px-2 pb-1">R3 · Efectividad Cobrador</p>
+                                    <div className="flex gap-1 px-2 pb-1">
+                                        <input type="date" value={fechaDesdeRep} onChange={e => setFechaDesdeRep(e.target.value)}
+                                            className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded" />
+                                        <input type="date" value={fechaHastaRep} onChange={e => setFechaHastaRep(e.target.value)}
+                                            className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded" />
+                                    </div>
+                                    <button onClick={() => { carteraGestionService.exportarEfectividadExcel(empresa!.id, fechaDesdeRep, fechaHastaRep, (empresa as any)?.nombre ?? ''); setShowReportes(false) }}
+                                        className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-50 flex items-center gap-2">
+                                        <Download className="w-4 h-4 text-orange-500" /> Exportar Efectividad
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     <button onClick={() => handlePrint()} disabled={filasFiltradas.length === 0}
                         className="flex items-center gap-1.5 px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40">
                         <Printer className="w-4 h-4" /> Imprimir

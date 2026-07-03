@@ -543,4 +543,240 @@ export const carteraGestionService = {
         XLSX.utils.book_append_sheet(wb, ws, 'Cartera')
         XLSX.writeFile(wb, `Cartera_${fechaCorte}.xlsx`)
     },
+
+    // ── R2: Reporte por Vendedor ──────────────────────────────────────────────
+    async exportarPorVendedorExcel(empresaId: string, fechaCorte: string, empresaNombre: string) {
+        const { data } = await supabase
+            .from('cartera_cxc')
+            .select(`saldo, fecha_vencimiento,
+                comprobantes!inner(vendedores(nombre))`)
+            .eq('empresa_id', empresaId)
+            .in('estado', ['pendiente', 'parcial'])
+            .gt('saldo', 0)
+
+        const mapa: Record<string, { vencido: number; por_vencer: number; total: number; cnt: number; dias: number[] }> = {}
+        for (const c of (data ?? []) as any[]) {
+            const nombre = c.comprobantes?.vendedores?.nombre ?? '(Sin vendedor)'
+            if (!mapa[nombre]) mapa[nombre] = { vencido: 0, por_vencer: 0, total: 0, cnt: 0, dias: [] }
+            const s = Number(c.saldo || 0)
+            const d = calcDias(c.fecha_vencimiento, fechaCorte)
+            mapa[nombre].total += s; mapa[nombre].cnt++
+            if (d > 0) { mapa[nombre].vencido += s; mapa[nombre].dias.push(d) }
+            else mapa[nombre].por_vencer += s
+        }
+
+        const rows = Object.entries(mapa).map(([v, d]) => [
+            v, d.cnt, +d.total.toFixed(2), +d.vencido.toFixed(2), +d.por_vencer.toFixed(2),
+            d.dias.length ? Math.round(d.dias.reduce((a,b)=>a+b,0)/d.dias.length) : 0,
+        ])
+        const header = [[empresaNombre], ['CARTERA POR VENDEDOR'], [`Fecha de corte: ${fechaCorte}`], [],
+            ['Vendedor','Documentos','Total Cartera','Total Vencido','Por Vencer','Prom. Días Mora']]
+        const ws = XLSX.utils.aoa_to_sheet([...header, ...rows])
+        ws['!cols'] = [30,12,16,16,14,14].map(w=>({wch:w}))
+        ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:5}},{s:{r:1,c:0},e:{r:1,c:5}},{s:{r:2,c:0},e:{r:2,c:5}}]
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Por Vendedor')
+        XLSX.writeFile(wb, `Cartera_Vendedor_${fechaCorte}.xlsx`)
+    },
+
+    // ── R3: Efectividad del Cobrador ──────────────────────────────────────────
+    async exportarEfectividadExcel(empresaId: string, desde: string, hasta: string, empresaNombre: string) {
+        const { data } = await supabase
+            .from('cartera_gestiones')
+            .select('usuario_nombre, canal, promesa_fecha, promesa_cumplida, created_at')
+            .eq('empresa_id', empresaId)
+            .gte('fecha_gestion', desde)
+            .lte('fecha_gestion', hasta)
+
+        const mapa: Record<string, { gestiones: number; promesas: number; cumplidas: number }> = {}
+        for (const g of (data ?? []) as any[]) {
+            const u = g.usuario_nombre ?? '—'
+            if (!mapa[u]) mapa[u] = { gestiones: 0, promesas: 0, cumplidas: 0 }
+            mapa[u].gestiones++
+            if (g.promesa_fecha) {
+                mapa[u].promesas++
+                if (g.promesa_cumplida) mapa[u].cumplidas++
+            }
+        }
+
+        const rows = Object.entries(mapa).map(([u, d]) => [
+            u, d.gestiones, d.promesas, d.cumplidas,
+            d.promesas > 0 ? +((d.cumplidas / d.promesas * 100).toFixed(1)) : 100,
+        ])
+        const header = [[empresaNombre], ['EFECTIVIDAD DEL COBRADOR'], [`Período: ${desde} al ${hasta}`], [],
+            ['Cobrador','Total Gestiones','Promesas Hechas','Promesas Cumplidas','% Cumplimiento']]
+        const ws = XLSX.utils.aoa_to_sheet([...header, ...rows])
+        ws['!cols'] = [30,16,16,18,14].map(w=>({wch:w}))
+        ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:4}},{s:{r:1,c:0},e:{r:1,c:4}},{s:{r:2,c:0},e:{r:2,c:4}}]
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Efectividad')
+        XLSX.writeFile(wb, `Efectividad_Cobrador_${desde}_${hasta}.xlsx`)
+    },
+
+    // ── R4: Promesas de Pago ──────────────────────────────────────────────────
+    async exportarPromesasExcel(empresaId: string, empresaNombre: string) {
+        const fechaHoy = new Date().toISOString().split('T')[0]
+        const { data } = await supabase
+            .from('cartera_gestiones')
+            .select(`promesa_fecha, promesa_monto, promesa_cumplida,
+                usuario_nombre, created_at,
+                cartera_cxc!inner(
+                    saldo, fecha_vencimiento,
+                    clientes(nombre, identificacion),
+                    comprobantes(secuencial)
+                )`)
+            .eq('empresa_id', empresaId)
+            .not('promesa_fecha', 'is', null)
+            .order('promesa_fecha', { ascending: true })
+
+        const rows = (data ?? []).map((g: any) => {
+            const vencida = g.promesa_fecha < fechaHoy && g.promesa_cumplida !== true
+            return [
+                g.cartera_cxc?.comprobantes?.secuencial ?? '',
+                g.cartera_cxc?.clientes?.nombre ?? '',
+                g.cartera_cxc?.clientes?.identificacion ?? '',
+                g.promesa_fecha,
+                +Number(g.promesa_monto || 0).toFixed(2),
+                g.promesa_cumplida === true ? 'Cumplida' : vencida ? 'Incumplida' : 'Pendiente',
+                g.usuario_nombre ?? '',
+            ]
+        })
+        const header = [[empresaNombre], ['LISTADO DE PROMESAS DE PAGO'], [`Generado: ${fechaHoy}`], [],
+            ['Factura','Cliente','RUC/CI','Fecha Prometida','Monto Comprometido','Estado','Registrado por']]
+        const ws = XLSX.utils.aoa_to_sheet([...header, ...rows])
+        ws['!cols'] = [18,28,14,14,16,12,20].map(w=>({wch:w}))
+        ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:6}},{s:{r:1,c:0},e:{r:1,c:6}},{s:{r:2,c:0},e:{r:2,c:6}}]
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Promesas')
+        XLSX.writeFile(wb, `Promesas_Pago_${fechaHoy}.xlsx`)
+    },
+
+    // ── R5: Acuerdos de Pago en Cuotas ───────────────────────────────────────
+    async exportarAcuerdosExcel(empresaId: string, empresaNombre: string) {
+        const { data: acuerdos } = await supabase
+            .from('cartera_acuerdos')
+            .select(`id, total_acuerdo, n_cuotas, estado, fecha_inicio, observaciones,
+                clientes!inner(nombre, identificacion),
+                cartera_cxc!inner(comprobantes(secuencial)),
+                cartera_acuerdo_cuotas(numero_cuota, fecha_vencimiento, monto, estado, fecha_pago)`)
+            .eq('empresa_id', empresaId)
+            .order('fecha_inicio', { ascending: false })
+
+        const filas: any[][] = []
+        for (const a of (acuerdos ?? []) as any[]) {
+            filas.push([
+                (a.cartera_cxc as any)?.comprobantes?.secuencial ?? '',
+                (a.clientes as any)?.nombre ?? '',
+                (a.clientes as any)?.identificacion ?? '',
+                a.fecha_inicio, a.total_acuerdo, a.n_cuotas, a.estado, '', '', '',
+            ])
+            const cuotas = a.cartera_acuerdo_cuotas ?? []
+            for (const c of cuotas) {
+                filas.push(['', '', '', '', '', '', '',
+                    `Cuota ${c.numero_cuota}`, c.fecha_vencimiento,
+                    +Number(c.monto).toFixed(2), c.estado, c.fecha_pago ?? '',
+                ])
+            }
+        }
+        const header = [[empresaNombre], ['ACUERDOS DE PAGO EN CUOTAS'], [`Generado: ${new Date().toISOString().split('T')[0]}`], [],
+            ['Factura','Cliente','RUC/CI','Fecha Inicio','Total Acuerdo','N° Cuotas','Estado Acuerdo','Cuota','Vencimiento Cuota','Monto Cuota','Estado Cuota','Fecha Pago']]
+        const ws = XLSX.utils.aoa_to_sheet([...header, ...filas])
+        ws['!cols'] = [18,25,13,12,13,10,14,10,16,12,12,12].map(w=>({wch:w}))
+        ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:11}},{s:{r:1,c:0},e:{r:1,c:11}},{s:{r:2,c:0},e:{r:2,c:11}}]
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Acuerdos')
+        XLSX.writeFile(wb, `Acuerdos_Pago_${new Date().toISOString().split('T')[0]}.xlsx`)
+    },
+
+    // ── R6: Comparativo mes a mes (últimos 12 meses) ──────────────────────────
+    async exportarComparativoExcel(empresaId: string, empresaNombre: string) {
+        const hoy = new Date()
+        const meses: { label: string; desde: string; hasta: string }[] = []
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1)
+            const h = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+            meses.push({
+                label: d.toLocaleDateString('es-EC', { month: 'short', year: 'numeric' }),
+                desde: d.toISOString().split('T')[0],
+                hasta: h.toISOString().split('T')[0],
+            })
+        }
+
+        const rows: any[][] = []
+        for (const m of meses) {
+            const { data } = await supabase
+                .from('cartera_cxc')
+                .select('saldo, fecha_vencimiento, cliente_id')
+                .eq('empresa_id', empresaId)
+                .in('estado', ['pendiente', 'parcial'])
+                .gt('saldo', 0)
+                .lte('created_at', `${m.hasta}T23:59:59`)
+
+            let total = 0, vencido = 0, clientesMora = new Set<string>()
+            for (const c of (data ?? []) as any[]) {
+                const s = Number(c.saldo || 0)
+                total += s
+                const d = calcDias(c.fecha_vencimiento, m.hasta)
+                if (d > 0) { vencido += s; clientesMora.add(c.cliente_id) }
+            }
+            rows.push([m.label, +total.toFixed(2), +vencido.toFixed(2),
+                +(total - vencido).toFixed(2), clientesMora.size])
+        }
+
+        const header = [[empresaNombre], ['COMPARATIVO CARTERA — ÚLTIMOS 12 MESES'], [],
+            ['Mes','Total Cartera','Total Vencido','Por Vencer','Clientes en Mora']]
+        const ws = XLSX.utils.aoa_to_sheet([...header, ...rows])
+        ws['!cols'] = [16,16,16,14,16].map(w=>({wch:w}))
+        ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:4}},{s:{r:1,c:0},e:{r:1,c:4}}]
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Comparativo')
+        XLSX.writeFile(wb, `Comparativo_Cartera.xlsx`)
+    },
+
+    // ── R7: Clientes de Alto Riesgo ───────────────────────────────────────────
+    async exportarAltoRiesgoExcel(empresaId: string, empresaNombre: string, fechaCorte: string) {
+        const { data } = await supabase
+            .from('cartera_cxc')
+            .select(`saldo, fecha_vencimiento, estado_gestion,
+                clientes!inner(nombre, identificacion, score_credito, bloqueo_credito, telefono, email)`)
+            .eq('empresa_id', empresaId)
+            .in('estado', ['pendiente', 'parcial'])
+            .gt('saldo', 0)
+
+        // Agrupar por cliente
+        const mapa: Record<string, any> = {}
+        for (const c of (data ?? []) as any[]) {
+            const cli = c.clientes
+            if (!mapa[cli.identificacion]) {
+                mapa[cli.identificacion] = {
+                    nombre: cli.nombre, identificacion: cli.identificacion,
+                    score: cli.score_credito, bloqueo: cli.bloqueo_credito,
+                    telefono: cli.telefono, email: cli.email,
+                    total: 0, max_dias: 0,
+                }
+            }
+            mapa[cli.identificacion].total += Number(c.saldo || 0)
+            const d = calcDias(c.fecha_vencimiento, fechaCorte)
+            if (d > mapa[cli.identificacion].max_dias) mapa[cli.identificacion].max_dias = d
+        }
+
+        const rows = Object.values(mapa)
+            .filter((c: any) => (c.score !== null && c.score < 50) || c.bloqueo || c.max_dias > 90)
+            .sort((a: any, b: any) => a.score - b.score)
+            .map((c: any) => [
+                c.nombre, c.identificacion, c.score ?? '—',
+                c.max_dias > 180 ? 'Negro' : c.max_dias > 90 ? 'Rojo' : 'Amarillo',
+                +c.total.toFixed(2), c.max_dias, c.bloqueo ? 'SÍ' : 'NO',
+                c.telefono ?? '', c.email ?? '',
+            ])
+
+        const header = [[empresaNombre], ['CLIENTES DE ALTO RIESGO / INCOBRABLE'], [`Fecha de corte: ${fechaCorte}`], [],
+            ['Cliente','RUC/CI','Score','Semáforo','Saldo Total','Máx. Días Mora','Bloqueado','Teléfono','Email']]
+        const ws = XLSX.utils.aoa_to_sheet([...header, ...rows])
+        ws['!cols'] = [28,14,8,10,14,14,10,14,24].map(w=>({wch:w}))
+        ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:8}},{s:{r:1,c:0},e:{r:1,c:8}},{s:{r:2,c:0},e:{r:2,c:8}}]
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Alto Riesgo')
+        XLSX.writeFile(wb, `Clientes_Alto_Riesgo_${fechaCorte}.xlsx`)
+    },
 }

@@ -44,6 +44,7 @@ export interface Permisos {
     perm_gerencia:           boolean
     perm_clientes:           boolean
     perm_cartera_cxc:        boolean
+    perm_gestion_cartera:    boolean
     perm_consulta_cartera:   boolean
     perm_estado_cuenta:      boolean
     perm_proveedores:        boolean
@@ -108,6 +109,7 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_gerencia:           true,
     perm_clientes:           true,
     perm_cartera_cxc:        true,
+    perm_gestion_cartera:    true,
     perm_consulta_cartera:   true,
     perm_estado_cuenta:      true,
     perm_proveedores:        true,
@@ -252,6 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_gerencia:           permData.perm_gerencia           ?? true,
                     perm_clientes:           permData.perm_clientes           ?? true,
                     perm_cartera_cxc:        permData.perm_cartera_cxc        ?? true,
+                    perm_gestion_cartera:    permData.perm_gestion_cartera    ?? true,
                     perm_consulta_cartera:   permData.perm_consulta_cartera   ?? true,
                     perm_estado_cuenta:      permData.perm_estado_cuenta      ?? true,
                     perm_proveedores:        permData.perm_proveedores        ?? true,

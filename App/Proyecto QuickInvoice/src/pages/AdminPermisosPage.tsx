@@ -30,6 +30,7 @@ const MODULOS = [
         items: [
             { field: 'perm_clientes',           label: 'Clientes' },
             { field: 'perm_cartera_cxc',        label: 'Cartera / Abonos' },
+            { field: 'perm_gestion_cartera',    label: 'Gestión de Cartera' },
             { field: 'perm_consulta_cartera',   label: 'Consulta Cartera' },
             { field: 'perm_estado_cuenta',      label: 'Estado de Cuenta' },
         ],
@@ -134,6 +135,7 @@ export function AdminPermisosPage() {
                     perm_gerencia:           r.perm_gerencia           ?? def.perm_gerencia,
                     perm_clientes:           r.perm_clientes           ?? def.perm_clientes,
                     perm_cartera_cxc:        r.perm_cartera_cxc        ?? def.perm_cartera_cxc,
+                    perm_gestion_cartera:    r.perm_gestion_cartera    ?? def.perm_gestion_cartera,
                     perm_consulta_cartera:   r.perm_consulta_cartera   ?? def.perm_consulta_cartera,
                     perm_estado_cuenta:      r.perm_estado_cuenta      ?? def.perm_estado_cuenta,
                     perm_proveedores:        r.perm_proveedores        ?? def.perm_proveedores,
