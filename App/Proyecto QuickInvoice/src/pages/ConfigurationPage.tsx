@@ -1375,7 +1375,8 @@ export function ConfigurationPage() {
                                         <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Nombre</th>
                                         <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Dirección</th>
                                         <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Bodega</th>
-                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Secuencial Factura</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Sec. Factura</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Sec. Nota Crédito</th>
                                         <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Principal</th>
                                         <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Estado</th>
                                         <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Acciones</th>
@@ -1405,6 +1406,9 @@ export function ConfigurationPage() {
                                             </td>
                                             <td className="py-3 px-4 text-center font-mono text-slate-600">
                                                 {pe.secuenciales?.FACTURA ?? 0}
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-mono text-slate-600">
+                                                {pe.secuenciales?.NOTA_CREDITO ?? 0}
                                             </td>
                                             <td className="py-3 px-4 text-center">
                                                 {pe.es_principal ? (
@@ -2514,6 +2518,42 @@ export function ConfigurationPage() {
                                         </div>
                                         <p className="text-xs text-slate-400 mt-1">Próxima factura = este número + 1. <span className="text-amber-600 font-medium">Solo cambiar si hay error de numeración.</span></p>
                                     </div>
+
+                                    {/* Nota de Crédito */}
+                                    <div>
+                                        <label className="label">Secuencial actual (Nota de Crédito)</label>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-mono text-lg font-bold text-slate-700">
+                                                {editingPuntoEmision.secuenciales?.NOTA_CREDITO ?? 0}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    const actual = editingPuntoEmision.secuenciales?.NOTA_CREDITO ?? 0
+                                                    const nuevo = window.prompt(
+                                                        `Secuencial NC actual: ${actual}\n\nIngresa el ÚLTIMO número de NC emitida (la próxima NC será ese número + 1).`,
+                                                        String(actual)
+                                                    )
+                                                    if (nuevo === null) return
+                                                    const n = parseInt(nuevo, 10)
+                                                    if (isNaN(n) || n < 0) { alert('Número inválido'); return }
+                                                    if (!window.confirm(`¿Confirmas cambiar el secuencial NC a ${n}?\nLa próxima Nota de Crédito será la #${n + 1}.`)) return
+                                                    const { error } = await supabase
+                                                        .from('puntos_emision')
+                                                        .update({ secuenciales: { ...editingPuntoEmision.secuenciales, NOTA_CREDITO: n }, updated_at: new Date().toISOString() })
+                                                        .eq('id', editingPuntoEmision.id!)
+                                                    if (error) { alert('Error: ' + error.message); return }
+                                                    setEditingPuntoEmision((prev: any) => ({ ...prev, secuenciales: { ...(prev?.secuenciales || {}), NOTA_CREDITO: n } }))
+                                                    alert(`✓ Secuencial NC actualizado a ${n}. Próxima NC: #${n + 1}`)
+                                                }}
+                                                className="px-4 py-3 text-sm font-semibold border border-amber-300 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors whitespace-nowrap"
+                                            >
+                                                Cambiar secuencial NC
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-1">Próxima NC = este número + 1.</p>
+                                    </div>
+
                                     <div className={cn(
                                         'flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border',
                                         editingPuntoEmision.activo === false
