@@ -96,10 +96,41 @@ export const facturaDirectaService = {
         if (puntoEmision) {
             est = puntoEmision.establecimiento
             pto = puntoEmision.punto_emision
+            const seriePrefix = `${est.padStart(3,'0')}-${pto.padStart(3,'0')}-`
+
+            // Obtener el MAX real de comprobantes emitidos para esta serie
+            const { data: maxComp } = await supabase
+                .from('comprobantes')
+                .select('secuencial')
+                .eq('empresa_id', empresa_id)
+                .like('secuencial', `${seriePrefix}%`)
+                .order('secuencial', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            const maxEmitido = maxComp?.secuencial
+                ? parseInt(maxComp.secuencial.split('-').pop() || '0', 10)
+                : 0
+
+            // Llamar a la RPC atómica para obtener el siguiente número
             const { data: nextSecData, error: errorSec } = await supabase
                 .rpc('qi_next_secuencial_punto', { p_punto_emision_id: puntoEmision.id, p_tipo_comprobante: 'FACTURA' })
             if (errorSec) throw errorSec
             nextSec = nextSecData as number
+
+            // PROTECCIÓN: si el contador está desincronizado (es menor o igual al MAX real),
+            // corregir automáticamente antes de emitir
+            if (nextSec <= maxEmitido) {
+                const secCorregido = maxEmitido + 1
+                // Actualizar el contador en la BD al valor correcto
+                await supabase
+                    .from('puntos_emision')
+                    .update({
+                        secuenciales: { ...(puntoEmision.secuenciales ?? {}), FACTURA: secCorregido },
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', puntoEmision.id)
+                nextSec = secCorregido
+            }
         } else {
             // Fallback: empresa todavía sin punto de emisión migrado, usar MAX(secuencial)+1
             est = config.establecimiento || '001'
