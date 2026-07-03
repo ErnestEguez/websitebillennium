@@ -109,23 +109,23 @@ export async function detectarContabilidad(): Promise<{ tiene: boolean; lpEmpres
 // ─── Fuentes de datos ────────────────────────────────────────────────────────
 
 async function getVentasNetas(empresaId: string, desde: string, hasta: string): Promise<number> {
-    // Facturas activas
+    // Facturas activas (excluir ANULADA — valor exacto usado en el sistema)
     const { data: facturas } = await supabase
         .from('comprobantes')
         .select('total')
         .eq('empresa_id', empresaId)
         .eq('tipo_comprobante', 'FACTURA')
-        .neq('estado_sistema', 'ANULADO')
+        .neq('estado_sistema', 'ANULADA')
         .gte('created_at', `${desde}T00:00:00`)
         .lte('created_at', `${hasta}T23:59:59`)
     const ventas = (facturas ?? []).reduce((s: number, f: any) => s + Number(f.total || 0), 0)
 
-    // Notas de crédito del período
+    // Notas de crédito del período (excluir ANULADA)
     const { data: ncs } = await supabase
         .from('notas_credito')
         .select('total')
         .eq('empresa_id', empresaId)
-        .neq('estado_sistema', 'ANULADO')
+        .neq('estado_sistema', 'ANULADA')
         .gte('created_at', `${desde}T00:00:00`)
         .lte('created_at', `${hasta}T23:59:59`)
     const devoluciones = (ncs ?? []).reduce((s: number, n: any) => s + Number(n.total || 0), 0)
@@ -247,7 +247,7 @@ async function getTopClientes(empresaId: string, desde: string, hasta: string): 
         .select('total, clientes(nombre)')
         .eq('empresa_id', empresaId)
         .eq('tipo_comprobante', 'FACTURA')
-        .neq('estado_sistema', 'ANULADO')
+        .neq('estado_sistema', 'ANULADA')
         .gte('created_at', `${desde}T00:00:00`)
         .lte('created_at', `${hasta}T23:59:59`)
 
@@ -267,7 +267,7 @@ async function getTopProductos(empresaId: string, desde: string, hasta: string):
         .from('comprobante_detalles')
         .select('nombre_producto, cantidad, total, comprobantes!inner(empresa_id, estado_sistema, created_at)')
         .eq('comprobantes.empresa_id', empresaId)
-        .neq('comprobantes.estado_sistema', 'ANULADO')
+        .neq('comprobantes.estado_sistema', 'ANULADA')
         .gte('comprobantes.created_at', `${desde}T00:00:00`)
         .lte('comprobantes.created_at', `${hasta}T23:59:59`)
 
