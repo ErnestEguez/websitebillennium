@@ -593,7 +593,11 @@ export function ConfigurationPage() {
                         .eq('empresa_id', empresa!.id)
                         .neq('id', editingPuntoEmision.id)
                 }
-                const { id, empresa_id, created_at, updated_at, ...updates } = editingPuntoEmision as any
+                // IMPORTANTE: nunca pasar secuenciales al actualizar general —
+                // los secuenciales solo los modifica qi_next_secuencial_punto (RPC atómica)
+                // o la acción explícita "Cambiar secuencial" de abajo.
+                const { id, empresa_id, created_at, updated_at, secuenciales, ...updates } = editingPuntoEmision as any
+                void secuenciales  // excluido intencionalmente
                 await puntoEmisionService.actualizar(editingPuntoEmision.id, { ...updates, establecimiento: est, punto_emision: pto })
             } else {
                 // Si el nuevo es principal, desmarcar el anterior
@@ -2456,15 +2460,36 @@ export function ConfigurationPage() {
                                 <div className="space-y-2">
                                     <div>
                                         <label className="label">Secuencial actual (Factura)</label>
-                                        <input type="number" min="0" step="1"
-                                            className="input font-mono text-lg font-bold"
-                                            value={editingPuntoEmision.secuenciales?.FACTURA ?? 0}
-                                            onChange={e => setEditingPuntoEmision((prev: any) => ({
-                                                ...prev,
-                                                secuenciales: { ...(prev?.secuenciales || {}), FACTURA: parseInt(e.target.value) || 0 }
-                                            }))}
-                                        />
-                                        <p className="text-xs text-slate-400 mt-1">La próxima factura será este número + 1</p>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-mono text-lg font-bold text-slate-700">
+                                                {editingPuntoEmision.secuenciales?.FACTURA ?? 0}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    const actual = editingPuntoEmision.secuenciales?.FACTURA ?? 0
+                                                    const nuevo = window.prompt(
+                                                        `Secuencial actual: ${actual}\n\nIngresa el ÚLTIMO número emitido (la próxima factura será ese número + 1).\n⚠️ Solo cambiar si hay un error real de numeración.`,
+                                                        String(actual)
+                                                    )
+                                                    if (nuevo === null) return
+                                                    const n = parseInt(nuevo, 10)
+                                                    if (isNaN(n) || n < 0) { alert('Número inválido'); return }
+                                                    if (!window.confirm(`¿Confirmas cambiar el secuencial a ${n}?\nLa próxima factura será la #${n + 1}.`)) return
+                                                    const { error } = await supabase
+                                                        .from('puntos_emision')
+                                                        .update({ secuenciales: { ...editingPuntoEmision.secuenciales, FACTURA: n }, updated_at: new Date().toISOString() })
+                                                        .eq('id', editingPuntoEmision.id!)
+                                                    if (error) { alert('Error: ' + error.message); return }
+                                                    setEditingPuntoEmision((prev: any) => ({ ...prev, secuenciales: { ...(prev?.secuenciales || {}), FACTURA: n } }))
+                                                    alert(`✓ Secuencial actualizado a ${n}. Próxima factura: #${n + 1}`)
+                                                }}
+                                                className="px-4 py-3 text-sm font-semibold border border-amber-300 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors whitespace-nowrap"
+                                            >
+                                                Cambiar secuencial
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-1">Próxima factura = este número + 1. <span className="text-amber-600 font-medium">Solo cambiar si hay error de numeración.</span></p>
                                     </div>
                                     <div className={cn(
                                         'flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border',
