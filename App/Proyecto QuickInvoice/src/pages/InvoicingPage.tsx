@@ -41,13 +41,18 @@ export function InvoicingPage() {
     const [sriConfig, setSriConfig] = useState<Partial<SriConfig>>({})
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [showDiagnostic, setShowDiagnostic] = useState(false)
-    const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA')) // YYYY-MM-DD
+    const hoy = new Date().toLocaleDateString('en-CA')
+    const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA')
+    const [fechaDesde, setFechaDesde] = useState(primerDiaMes)
+    const [fechaHasta, setFechaHasta] = useState(hoy)
+
+    function aplicarAtajo(desde: string, hasta: string) { setFechaDesde(desde); setFechaHasta(hasta) }
 
     useEffect(() => {
         if (empresa?.id) {
             loadData()
         }
-    }, [empresa?.id, selectedDate])
+    }, [empresa?.id, fechaDesde, fechaHasta])
 
     async function loadData() {
         try {
@@ -58,7 +63,7 @@ export function InvoicingPage() {
                 .catch(() => {})
 
             const [docsData, configData] = await Promise.all([
-                sriService.getComprobantes(empresa!.id, selectedDate),
+                sriService.getComprobantes(empresa!.id, undefined, fechaDesde, fechaHasta),
                 facturacionService.getSriConfig(empresa!.id)
             ])
             setComprobantes(docsData)
@@ -277,14 +282,29 @@ export function InvoicingPage() {
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-400 uppercase">Fecha:</span>
-                        <input
-                            type="date"
-                            className="px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 text-sm font-mono"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                        />
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Atajos rápidos */}
+                        {[
+                            { label: 'Hoy',    desde: hoy, hasta: hoy },
+                            { label: 'Ayer',   desde: new Date(Date.now()-86400000).toLocaleDateString('en-CA'), hasta: new Date(Date.now()-86400000).toLocaleDateString('en-CA') },
+                            { label: 'Este mes', desde: primerDiaMes, hasta: hoy },
+                            { label: 'Mes ant.', desde: new Date(new Date().getFullYear(), new Date().getMonth()-1, 1).toLocaleDateString('en-CA'), hasta: new Date(new Date().getFullYear(), new Date().getMonth(), 0).toLocaleDateString('en-CA') },
+                        ].map(a => (
+                            <button key={a.label} onClick={() => aplicarAtajo(a.desde, a.hasta)}
+                                className={cn('px-2.5 py-1.5 text-xs rounded-lg border transition-colors',
+                                    fechaDesde === a.desde && fechaHasta === a.hasta
+                                        ? 'bg-primary-600 text-white border-primary-600'
+                                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                                )}>
+                                {a.label}
+                            </button>
+                        ))}
+                        <span className="text-xs text-slate-400">Desde:</span>
+                        <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
+                            className="px-2 py-1.5 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
+                        <span className="text-xs text-slate-400">Hasta:</span>
+                        <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
+                            className="px-2 py-1.5 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 text-sm" />
                     </div>
                 </div>
                 <div className="overflow-x-auto">

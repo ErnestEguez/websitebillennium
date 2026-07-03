@@ -21,25 +21,21 @@ export interface Comprobante {
 }
 
 export const sriService = {
-    async getComprobantes(empresaId: string, fecha?: string) {
-        // Para facturas directas pedido_id = null, evitamos el join a pedidos/mesas
+    async getComprobantes(empresaId: string, _fechaLegacy?: string, desde?: string, hasta?: string) {
         let query = supabase
             .from('comprobantes')
             .select('*, clientes(nombre, identificacion)')
             .eq('empresa_id', empresaId)
             .order('created_at', { ascending: false })
 
-        if (fecha) {
-            // fecha viene como YYYY-MM-DD desde el input[type=date]
-            // Filtramos con el inicio y fin del día en formato ISO (timezone local)
-            const [year, month, day] = fecha.split('-').map(Number)
-            const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0)
-            const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999)
+        if (desde && hasta) {
+            const [dy, dm, dd] = desde.split('-').map(Number)
+            const [hy, hm, hd] = hasta.split('-').map(Number)
             query = query
-                .gte('created_at', startOfDay.toISOString())
-                .lte('created_at', endOfDay.toISOString())
+                .gte('created_at', new Date(dy, dm - 1, dd, 0, 0, 0, 0).toISOString())
+                .lte('created_at', new Date(hy, hm - 1, hd, 23, 59, 59, 999).toISOString())
         } else {
-            // Sin filtro de fecha: mostrar el mes actual
+            // Fallback: mostrar el mes actual
             const now = new Date()
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
             query = query.gte('created_at', startOfMonth.toISOString())
