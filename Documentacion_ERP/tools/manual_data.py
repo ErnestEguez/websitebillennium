@@ -289,7 +289,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 7,
+        "numero": 8,
         "archivo": "07_inventario",
         "titulo": "Ingreso de Inventario",
         "seccion": "Inventario y Cartera por Cobrar",
@@ -326,7 +326,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 8,
+        "numero": 9,
         "archivo": "08_inventario_valorizado",
         "titulo": "Inventario Valorado",
         "seccion": "Inventario y Cartera por Cobrar",
@@ -360,7 +360,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 9,
+        "numero": 10,
         "archivo": "09_kardex",
         "titulo": "Kardex de Inventario",
         "seccion": "Inventario y Cartera por Cobrar",
@@ -396,7 +396,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 10,
+        "numero": 11,
         "archivo": "10_vendedores",
         "titulo": "Vendedores",
         "seccion": "Inventario y Cartera por Cobrar",
@@ -431,7 +431,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 11,
+        "numero": 13,
         "archivo": "11_cartera_cxc",
         "titulo": "Cartera por Cobrar",
         "seccion": "Inventario y Cartera por Cobrar",
@@ -477,7 +477,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 12,
+        "numero": 14,
         "archivo": "12_estado_cuenta_cliente",
         "titulo": "Estado de Cuenta por Cliente",
         "seccion": "Inventario y Cartera por Cobrar",
@@ -513,7 +513,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 13,
+        "numero": 15,
         "archivo": "13_notas_credito",
         "titulo": "Notas de Crédito",
         "seccion": "Inventario y Cartera por Cobrar",
@@ -549,7 +549,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 14,
+        "numero": 16,
         "archivo": "14_anulacion_facturas",
         "titulo": "Anulación de Facturas",
         "seccion": "Inventario y Cartera por Cobrar",
@@ -587,7 +587,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 15,
+        "numero": 18,
         "archivo": "15_cierres",
         "titulo": "Historial de Cierres de Caja",
         "seccion": "Consultas, Compras y Cartera por Pagar",
@@ -616,7 +616,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 16,
+        "numero": 19,
         "archivo": "16_consulta_ventas",
         "titulo": "Ventas por Período",
         "seccion": "Consultas, Compras y Cartera por Pagar",
@@ -647,7 +647,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 17,
+        "numero": 21,
         "archivo": "17_cxp",
         "titulo": "Cuentas por Pagar",
         "seccion": "Consultas, Compras y Cartera por Pagar",
@@ -678,7 +678,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 18,
+        "numero": 22,
         "archivo": "18_compras",
         "titulo": "Compras (Inventario y Servicios)",
         "seccion": "Consultas, Compras y Cartera por Pagar",
@@ -712,7 +712,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 19,
+        "numero": 23,
         "archivo": "19_compras_nueva_inventario",
         "titulo": "Nueva Compra de Inventario",
         "seccion": "Consultas, Compras y Cartera por Pagar",
@@ -754,7 +754,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 20,
+        "numero": 24,
         "archivo": "20_estado_cuenta_proveedor",
         "titulo": "Estado de Cuenta por Proveedor",
         "seccion": "Consultas, Compras y Cartera por Pagar",
@@ -792,7 +792,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 21,
+        "numero": 25,
         "archivo": "21_teso_cuentas_bancarias",
         "titulo": "Gestión de Cuentas Bancarias",
         "seccion": "Tesorería",
@@ -828,7 +828,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 22,
+        "numero": 26,
         "archivo": "22_teso_egresos",
         "titulo": "Listado de Comprobantes de Egreso",
         "seccion": "Tesorería",
@@ -865,7 +865,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 23,
+        "numero": 27,
         "archivo": "23_teso_egresos_nuevo",
         "titulo": "Crear Nuevo Comprobante de Egreso",
         "seccion": "Tesorería",
@@ -908,7 +908,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 24,
+        "numero": 28,
         "archivo": "24_teso_cheques",
         "titulo": "Gestión de Cheques Emitidos",
         "seccion": "Tesorería",
@@ -944,7 +944,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 25,
+        "numero": 29,
         "archivo": "25_teso_conciliacion",
         "titulo": "Conciliación Bancaria",
         "seccion": "Tesorería",
@@ -979,7 +979,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 26,
+        "numero": 31,
         "archivo": "26_conta_dashboard",
         "titulo": "Dashboard Contable",
         "seccion": "Contabilidad y Configuración",
@@ -1007,7 +1007,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 27,
+        "numero": 32,
         "archivo": "27_conta_plan_cuentas",
         "titulo": "Plan de Cuentas",
         "seccion": "Contabilidad y Configuración",
@@ -1047,7 +1047,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 28,
+        "numero": 33,
         "archivo": "28_conta_diarios",
         "titulo": "Diarios Contables (Comprobantes)",
         "seccion": "Contabilidad y Configuración",
@@ -1084,7 +1084,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 29,
+        "numero": 34,
         "archivo": "29_conta_balance_comprobacion",
         "titulo": "Balance de Comprobación",
         "seccion": "Contabilidad y Configuración",
@@ -1117,7 +1117,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 30,
+        "numero": 35,
         "archivo": "30_conta_balance_general",
         "titulo": "Estado de Situación Financiera (Balance General)",
         "seccion": "Contabilidad y Configuración",
@@ -1150,7 +1150,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 31,
+        "numero": 36,
         "archivo": "31_conta_estado_resultados",
         "titulo": "Estado de Resultados",
         "seccion": "Contabilidad y Configuración",
@@ -1183,7 +1183,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 32,
+        "numero": 37,
         "archivo": "32_retenciones",
         "titulo": "Comprobantes de Retención",
         "seccion": "Contabilidad y Configuración",
@@ -1222,7 +1222,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 33,
+        "numero": 38,
         "archivo": "33_ajustes",
         "titulo": "Ajustes de Contabilidad",
         "seccion": "Contabilidad y Configuración",
@@ -1254,7 +1254,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 34,
+        "numero": 39,
         "archivo": "34_configuracion",
         "titulo": "Configuración General del Sistema",
         "seccion": "Contabilidad y Configuración",
@@ -1319,7 +1319,7 @@ MODULOS = [
     # ─── NUEVOS MÓDULOS 2026 ──────────────────────────────────────────────────
 
     {
-        "numero": 35,
+        "numero": 7,
         "archivo": "35_proformas",
         "titulo": "Proformas (Cotizaciones)",
         "seccion": "Facturación y Ventas",
@@ -1356,7 +1356,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 36,
+        "numero": 12,
         "archivo": "36_importar_articulos",
         "titulo": "Importación Masiva de Artículos",
         "seccion": "Inventario y Cartera por Cobrar",
@@ -1396,7 +1396,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 37,
+        "numero": 40,
         "archivo": "37_permisos_usuario",
         "titulo": "Permisos de Usuario",
         "seccion": "Contabilidad y Configuración",
@@ -1434,7 +1434,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 38,
+        "numero": 30,
         "archivo": "38_cierre_caja_general",
         "titulo": "Cierre de Caja General",
         "seccion": "Tesorería",
@@ -1483,7 +1483,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 39,
+        "numero": 20,
         "archivo": "39_ventas_cliente",
         "titulo": "Ventas por Cliente",
         "seccion": "Consultas, Compras y Cartera por Pagar",
@@ -1523,7 +1523,7 @@ MODULOS = [
         ],
     },
     {
-        "numero": 40,
+        "numero": 17,
         "archivo": "40_gestion_cartera",
         "titulo": "Gestión de Cartera y Cobros",
         "seccion": "Inventario y Cartera por Cobrar",
