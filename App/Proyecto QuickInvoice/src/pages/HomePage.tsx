@@ -25,6 +25,7 @@ export function HomePage() {
                 src="/home-banner.png"
                 alt="QuickInvoice"
                 className="absolute inset-0 w-full h-full object-cover"
+                data-pin-nopin="true"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
             />
 
