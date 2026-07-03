@@ -96,44 +96,15 @@ export const facturaDirectaService = {
         if (puntoEmision) {
             est = puntoEmision.establecimiento
             pto = puntoEmision.punto_emision
-            const seriePrefix = `${est.padStart(3,'0')}-${pto.padStart(3,'0')}-`
 
-            // MAX real de comprobantes emitidos en esta serie
-            const { data: maxComp } = await supabase
-                .from('comprobantes')
-                .select('secuencial')
-                .eq('empresa_id', empresa_id)
-                .like('secuencial', `${seriePrefix}%`)
-                .order('secuencial', { ascending: false })
-                .limit(1)
-                .maybeSingle()
-            const maxEmitido = maxComp?.secuencial
-                ? parseInt(maxComp.secuencial.split('-').pop() || '0', 10)
-                : 0
-
-            // secuencial_inicio de config_sri actúa como piso mínimo:
-            // si el usuario configuró 469 ahí, el sistema nunca emitirá por debajo de 469
-            const configMin = Number(config.secuencial_inicio ?? 0) || 0
-            const pisoMinimo = Math.max(maxEmitido, configMin)
-
-            // RPC atómica para obtener el siguiente número
+            // RPC atómica: lee puntos_emision.secuenciales.FACTURA, suma 1, lo graba y lo devuelve.
+            // El usuario controla ese contador desde:
+            //   a) Configuración → Empresa → "Secuencial Inicial Facturas" (que sincroniza al guardar)
+            //   b) Configuración → Puntos de Emisión → "Cambiar secuencial"
             const { data: nextSecData, error: errorSec } = await supabase
                 .rpc('qi_next_secuencial_punto', { p_punto_emision_id: puntoEmision.id, p_tipo_comprobante: 'FACTURA' })
             if (errorSec) throw errorSec
             nextSec = nextSecData as number
-
-            // PROTECCIÓN: si el contador RPC es menor o igual al piso mínimo,
-            // autocorregir el contador en la BD y usar pisoMinimo + 1
-            if (nextSec <= pisoMinimo) {
-                await supabase
-                    .from('puntos_emision')
-                    .update({
-                        secuenciales: { ...(puntoEmision.secuenciales ?? {}), FACTURA: pisoMinimo },
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', puntoEmision.id)
-                nextSec = pisoMinimo + 1
-            }
         } else {
             // Fallback: empresa todavía sin punto de emisión migrado, usar MAX(secuencial)+1
             est = config.establecimiento || '001'

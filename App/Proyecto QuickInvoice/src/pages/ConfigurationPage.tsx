@@ -320,7 +320,6 @@ export function ConfigurationPage() {
         e.preventDefault()
         try {
             setSaving(true)
-            // ✅ Solo campos que existen en la tabla empresas
             const { error } = await supabase
                 .from('empresas')
                 .update({
@@ -333,9 +332,33 @@ export function ConfigurationPage() {
                     usar_vendor_management: companyData.usar_vendor_management ?? false
                 })
                 .eq('id', empresa!.id)
-
             if (error) throw error
-            alert('Configuración de empresa guardada')
+
+            // Sincronizar el secuencial_inicio con el contador del punto de emisión principal.
+            // puntos_emision.secuenciales.FACTURA es el ÚNICO contador que controla el número
+            // de factura. secuencial_inicio indica cuál será la PRÓXIMA factura, por lo tanto
+            // el contador debe quedar en (secuencial_inicio - 1) para que la RPC devuelva el valor correcto.
+            const nuevoSecuencial = Number(companyData.config_sri?.secuencial_inicio ?? 1)
+            if (nuevoSecuencial > 0) {
+                const { data: pe } = await supabase
+                    .from('puntos_emision')
+                    .select('id, secuenciales')
+                    .eq('empresa_id', empresa!.id)
+                    .eq('es_principal', true)
+                    .eq('activo', true)
+                    .maybeSingle()
+                if (pe) {
+                    await supabase
+                        .from('puntos_emision')
+                        .update({
+                            secuenciales: { ...(pe.secuenciales ?? {}), FACTURA: nuevoSecuencial - 1 },
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq('id', pe.id)
+                }
+            }
+
+            alert(`Configuración guardada. Próxima factura: #${nuevoSecuencial}`)
         } catch (error: any) {
             alert(`Error al guardar: ${error.message}`)
         } finally {
