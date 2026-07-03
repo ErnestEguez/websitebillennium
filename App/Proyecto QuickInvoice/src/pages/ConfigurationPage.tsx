@@ -40,7 +40,9 @@ import { getPuntoEmisionDispositivo, setPuntoEmisionDispositivo } from '../lib/d
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
     const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'bodegas' | 'puntos_emision' | 'plataforma' | 'contabilidad' | 'talento_nominas'>('empresa')
-    const [platformSubTab, setPlatformSubTab] = useState<'empresas' | 'personal'>('empresas')
+    const [platformSubTab, setPlatformSubTab]   = useState<'empresas' | 'personal'>('empresas')
+    const [mensajePlataforma, setMensajePlataforma] = useState('')
+    const [savingMsg, setSavingMsg]               = useState(false)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
@@ -92,8 +94,21 @@ export function ConfigurationPage() {
     useEffect(() => {
         if (profile?.rol === 'admin_plataforma') {
             setActiveTab('plataforma')
+            // Cargar mensaje del sistema
+            supabase.from('mensajes_plataforma').select('mensaje').eq('id', 1).maybeSingle()
+                .then(({ data }) => { if (data) setMensajePlataforma(data.mensaje ?? '') })
         }
     }, [profile?.rol])
+
+    async function guardarMensajePlataforma() {
+        setSavingMsg(true)
+        const { error } = await supabase
+            .from('mensajes_plataforma')
+            .update({ mensaje: mensajePlataforma, updated_at: new Date().toISOString() })
+            .eq('id', 1)
+        if (error) alert('Error al guardar mensaje: ' + error.message)
+        setSavingMsg(false)
+    }
 
     useEffect(() => {
         if (profile) {
@@ -1426,6 +1441,38 @@ export function ConfigurationPage() {
                 <TalentoNominasConfigTab />
             ) : (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    {/* ── Mensaje del Sistema ────────────────────────── */}
+                    <div className="bg-white rounded-xl border border-slate-200 p-5">
+                        <h3 className="font-semibold text-slate-800 mb-1 flex items-center gap-2">
+                            📢 Mensaje del Sistema
+                        </h3>
+                        <p className="text-xs text-slate-400 mb-3">
+                            Este mensaje se mostrará a <strong>todos los usuarios</strong> al abrir la aplicación.
+                            Si lo deja vacío, no aparece ningún aviso y la pantalla de inicio muestra solo la imagen.
+                        </p>
+                        <textarea
+                            rows={4}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-none"
+                            placeholder="Ej: Estimados usuarios, el SRI estará en mantenimiento desde el 5 de julio 20:00 hasta el 6 de julio 06:00..."
+                            value={mensajePlataforma}
+                            onChange={e => setMensajePlataforma(e.target.value)}
+                        />
+                        <div className="flex justify-between items-center mt-2">
+                            <p className="text-xs text-slate-400">{mensajePlataforma.length} caracteres</p>
+                            <div className="flex gap-2">
+                                <button onClick={() => setMensajePlataforma('')}
+                                    className="px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 rounded-lg">
+                                    Limpiar
+                                </button>
+                                <button onClick={guardarMensajePlataforma} disabled={savingMsg}
+                                    className="flex items-center gap-2 px-4 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                                    {savingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                    Guardar mensaje
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Sub-tabs for Platform Admin */}
                     <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
                         <button

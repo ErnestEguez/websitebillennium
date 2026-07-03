@@ -6,7 +6,8 @@ import { OfflineBanner } from './components/OfflineBanner'
 import { useOfflineSync } from './hooks/useOfflineSync'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
-import { Dashboard } from './pages/Dashboard'
+import { Dashboard }  from './pages/Dashboard'
+import { HomePage }   from './pages/HomePage'
 import { MesaGrid } from './pages/MesaGrid'
 import { OrderTake } from './pages/OrderTake'
 import { InvoicingPage } from './pages/InvoicingPage'
@@ -149,11 +150,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // Componente para manejar la redirección del Dashboard inicial según rol
 function HomeRedirect() {
-  const { loading, profile, permisos } = useAuth() as any
+  const { loading, profile } = useAuth()
 
   if (!loading && profile?.rol === 'oficina') {
-    // Dashboard es solo para gerencia; si tiene permiso va ahí, si no, a Nueva Factura
-    return <Navigate to={permisos?.perm_dashboard ? '/dashboard' : '/nueva-factura'} replace />
+    return <Navigate to="/home" replace />
   }
 
   return (
@@ -184,6 +184,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina', 'admin_plataforma']}>
                   <Layout>
                     <HomeRedirect />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/home" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <HomePage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

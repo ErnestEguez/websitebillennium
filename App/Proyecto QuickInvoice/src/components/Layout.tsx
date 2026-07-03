@@ -182,16 +182,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         setDarkSidebar(next)
         localStorage.setItem('qi-dark-sidebar', String(next))
     }
-    const [openGroups, setOpenGroups] = React.useState<string[]>(() => {
-        const p = window.location.pathname
-        if (p.startsWith('/conta/')) return ['contabilidad']
-        if (p.startsWith('/teso/'))  return ['tesoreria']
-        if (['/compras','/cxp','/proveedores','/retenciones'].some(x => p.startsWith(x)))
-            return ['cxp']
-        if (['/clientes','/cartera','/consultas/cartera'].some(x => p.startsWith(x)))
-            return ['clientes']
-        return ['facturacion']
-    })
+    const [openGroups, setOpenGroups] = React.useState<string[]>([])
 
     const toggleGroup = (label: string) => {
         setOpenGroups(prev => prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label])

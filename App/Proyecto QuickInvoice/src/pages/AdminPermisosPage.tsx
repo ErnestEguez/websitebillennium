@@ -205,21 +205,22 @@ export function AdminPermisosPage() {
         const fila = filas.find(f => f.user_id === userId)
         if (!fila) return
         setFilas(prev => prev.map(f => f.user_id === userId ? { ...f, saving: true } : f))
-        try {
-            await supabase
-                .from('user_permisos')
-                .upsert({
-                    user_id: userId, empresa_id: empresa.id,
-                    ...fila.permisos,
-                    updated_at: new Date().toISOString(),
-                }, { onConflict: 'user_id,empresa_id' })
+        const { error } = await supabase
+            .from('user_permisos')
+            .upsert({
+                user_id: userId, empresa_id: empresa.id,
+                ...fila.permisos,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id,empresa_id' })
 
-            setFilas(prev => prev.map(f =>
-                f.user_id === userId ? { ...f, dirty: false, saving: false } : f
-            ))
-        } catch {
+        if (error) {
+            alert(`Error al guardar permisos: ${error.message}`)
             setFilas(prev => prev.map(f => f.user_id === userId ? { ...f, saving: false } : f))
+            return
         }
+        setFilas(prev => prev.map(f =>
+            f.user_id === userId ? { ...f, dirty: false, saving: false } : f
+        ))
     }
 
     if (authLoading) return (
