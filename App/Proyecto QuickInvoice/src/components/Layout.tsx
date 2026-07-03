@@ -205,12 +205,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         return () => document.removeEventListener('click', close)
     }, [showEmpresaDropdown])
 
-    // Guardia de ruta: si el usuario no tiene permiso, redirige al dashboard
+    // Guardia de ruta: si el usuario no tiene permiso, redirige a Nueva Factura
+    // (no a /dashboard porque ese también puede estar restringido)
     React.useEffect(() => {
         if (authLoading) return
         const ruta = PERM_RUTAS.find(([path]) => location.pathname.startsWith(path))
         if (ruta && !(p as any)[ruta[1]]) {
-            navigate('/dashboard', { replace: true })
+            navigate('/nueva-factura', { replace: true })
         }
     }, [location.pathname, permisos, authLoading])
 

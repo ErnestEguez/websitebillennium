@@ -149,11 +149,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // Componente para manejar la redirección del Dashboard inicial según rol
 function HomeRedirect() {
-  const { loading, profile } = useAuth()
+  const { loading, profile, permisos } = useAuth() as any
 
-  // Oficina va directo al dashboard gerencial como pantalla principal
   if (!loading && profile?.rol === 'oficina') {
-    return <Navigate to="/dashboard" replace />
+    // Dashboard es solo para gerencia; si tiene permiso va ahí, si no, a Nueva Factura
+    return <Navigate to={permisos?.perm_dashboard ? '/dashboard' : '/nueva-factura'} replace />
   }
 
   return (
