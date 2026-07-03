@@ -334,31 +334,7 @@ export function ConfigurationPage() {
                 .eq('id', empresa!.id)
             if (error) throw error
 
-            // Sincronizar el secuencial_inicio con el contador del punto de emisión principal.
-            // puntos_emision.secuenciales.FACTURA es el ÚNICO contador que controla el número
-            // de factura. secuencial_inicio indica cuál será la PRÓXIMA factura, por lo tanto
-            // el contador debe quedar en (secuencial_inicio - 1) para que la RPC devuelva el valor correcto.
-            const nuevoSecuencial = Number(companyData.config_sri?.secuencial_inicio ?? 1)
-            if (nuevoSecuencial > 0) {
-                const { data: pe } = await supabase
-                    .from('puntos_emision')
-                    .select('id, secuenciales')
-                    .eq('empresa_id', empresa!.id)
-                    .eq('es_principal', true)
-                    .eq('activo', true)
-                    .maybeSingle()
-                if (pe) {
-                    await supabase
-                        .from('puntos_emision')
-                        .update({
-                            secuenciales: { ...(pe.secuenciales ?? {}), FACTURA: nuevoSecuencial - 1 },
-                            updated_at: new Date().toISOString(),
-                        })
-                        .eq('id', pe.id)
-                }
-            }
-
-            alert(`Configuración guardada. Próxima factura: #${nuevoSecuencial}`)
+            alert('Configuración de empresa guardada')
         } catch (error: any) {
             alert(`Error al guardar: ${error.message}`)
         } finally {
@@ -935,18 +911,6 @@ export function ConfigurationPage() {
                                             <option value="PRUEBAS">PRUEBAS</option>
                                             <option value="PRODUCCION">PRODUCCIÓN</option>
                                         </select>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Secuencial Inicial Facturas</label>
-                                        <input
-                                            type="number" min={1} placeholder="1"
-                                            className="w-full px-4 py-3 rounded-xl border font-mono"
-                                            value={companyData.config_sri?.secuencial_inicio || 1}
-                                            onChange={e => setCompanyData({ ...companyData, config_sri: { ...(companyData.config_sri || {}), secuencial_inicio: parseInt(e.target.value) || 1 } })}
-                                        />
-                                        <p className="text-[11px] text-slate-400">Número desde el cual inicia la secuencia si no hay facturas previas</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
