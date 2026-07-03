@@ -55,15 +55,7 @@ interface SidebarItemProps {
 }
 
 const SidebarItem = ({ to, icon: Icon, label, active, sub, disabled }: SidebarItemProps) => {
-    if (disabled) return (
-        <div className={cn(
-            "flex items-center gap-3 px-4 py-2.5 rounded-lg opacity-35 cursor-not-allowed select-none",
-            sub ? "pl-8 py-2" : ""
-        )}>
-            <Icon className={cn("w-5 h-5 shrink-0 text-slate-400", sub ? "w-4 h-4" : "")} />
-            <span className={cn("text-slate-400 line-through decoration-slate-300", sub ? "text-sm" : "")}>{label}</span>
-        </div>
-    )
+    if (disabled) return null  // ocultar completamente cuando no tiene permiso
     return (
         <Link
             to={to}
@@ -119,6 +111,7 @@ function ModuleSection({ label, icon: Icon, colorClass, isOpen, onToggle, isSide
 
 // Mapa: prefijo de ruta → campo de permiso
 const PERM_RUTAS: [string, string][] = [
+    ['/dashboard',                     'perm_dashboard'],
     ['/gerencia',                      'perm_gerencia'],
     ['/clientes/gestion-cartera',      'perm_gestion_cartera'],
     ['/anulacion-facturas',            'perm_anulacion_facturas'],
@@ -257,16 +250,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         )}
 
                         {/* ── MÓDULO 0: Gerencia ───────────────────────── */}
-                        {esOficina && p.perm_gerencia && <ModuleSection
+                        {esOficina && (p.perm_gerencia || p.perm_dashboard) && <ModuleSection
                             label="Gerencia"
                             icon={TrendingUp}
                             colorClass="text-violet-600"
                             isOpen={openGroups.includes('gerencia')}
                             onToggle={() => toggleGroup('gerencia')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={location.pathname.startsWith('/gerencia')}
+                            anyActive={location.pathname === '/dashboard' || location.pathname.startsWith('/gerencia')}
                         >
-                            <SidebarItem to="/gerencia/resumen-operacional" icon={BarChart3} label="Resumen Operacional" active={location.pathname === '/gerencia/resumen-operacional'} sub disabled={!p.perm_gerencia} />
+                            <SidebarItem to="/dashboard"                    icon={LayoutDashboard} label="Dashboard"            active={location.pathname === '/dashboard'} sub disabled={!p.perm_dashboard} />
+                            <SidebarItem to="/gerencia/resumen-operacional" icon={BarChart3}        label="Resumen Operacional" active={location.pathname === '/gerencia/resumen-operacional'} sub disabled={!p.perm_gerencia} />
                         </ModuleSection>}
 
                         {/* ── MÓDULO 1: Facturación ────────────────────── */}
@@ -277,9 +271,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('facturacion')}
                             onToggle={() => toggleGroup('facturacion')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/dashboard','/nueva-factura','/proformas','/facturacion','/vendedores','/notas-credito','/anulacion-facturas','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/nueva-factura','/proformas','/facturacion','/vendedores','/notas-credito','/anulacion-facturas','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
                         >
-                            <SidebarItem to="/dashboard"          icon={LayoutDashboard} label="Dashboard"          active={location.pathname === '/dashboard'} sub disabled={!p.perm_dashboard} />
                             <SidebarItem to="/nueva-factura"      icon={FilePlus}        label="Nueva Factura"      active={location.pathname === '/nueva-factura'} sub disabled={!p.perm_nueva_factura} />
                             <SidebarItem to="/proformas"          icon={FileText}        label="Proformas"          active={location.pathname.startsWith('/proformas')} sub disabled={!p.perm_nueva_factura} />
                             <SidebarItem to="/facturacion"        icon={FileText}        label="Comprobantes"       active={location.pathname === '/facturacion'} sub disabled={!p.perm_comprobantes} />

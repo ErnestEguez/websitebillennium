@@ -16,7 +16,6 @@ const MODULOS = [
     {
         key: 'facturacion', label: 'Facturación',
         items: [
-            { field: 'perm_dashboard',          label: 'Dashboard' },
             { field: 'perm_nueva_factura',       label: 'Nueva Factura' },
             { field: 'perm_comprobantes',        label: 'Comprobantes' },
             { field: 'perm_notas_credito',       label: 'Notas de Crédito' },
@@ -58,7 +57,8 @@ const MODULOS = [
     {
         key: 'gerencia', label: 'Gerencia',
         items: [
-            { field: 'perm_gerencia', label: 'Resumen Operacional' },
+            { field: 'perm_dashboard', label: 'Dashboard' },
+            { field: 'perm_gerencia',  label: 'Resumen Operacional' },
         ],
     },
     {
