@@ -8,7 +8,8 @@ import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { Dashboard }  from './pages/Dashboard'
 import { HomePage }            from './pages/HomePage'
-import { ImportarClientesPage } from './pages/ImportarClientesPage'
+import { ImportarClientesPage }   from './pages/ImportarClientesPage'
+import { AdminDepuracionPage }    from './pages/admin/AdminDepuracionPage'
 import { MesaGrid } from './pages/MesaGrid'
 import { OrderTake } from './pages/OrderTake'
 import { InvoicingPage } from './pages/InvoicingPage'
@@ -429,6 +430,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
                   <Layout>
                     <AdminUserEmpresasPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/admin/depuracion" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
+                  <Layout>
+                    <AdminDepuracionPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>

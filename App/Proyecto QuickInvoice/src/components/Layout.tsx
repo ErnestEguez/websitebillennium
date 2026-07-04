@@ -40,6 +40,7 @@ import {
     Upload,
     User,
     TrendingUp,
+    Trash2,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -237,7 +238,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <>
                                 <SidebarItem to="/" icon={LayoutDashboard} label="Dashboard" active={location.pathname === '/'} />
                                 <SidebarItem to="/configuracion" icon={Settings} label="Plataforma" active={location.pathname === '/configuracion'} />
-                                <SidebarItem to="/admin/user-empresas" icon={ArrowLeftRight} label="Asignar empresas" active={location.pathname === '/admin/user-empresas'} />
+                                <SidebarItem to="/admin/user-empresas" icon={ArrowLeftRight} label="Asignar empresas"  active={location.pathname === '/admin/user-empresas'} />
+                                <SidebarItem to="/admin/depuracion"   icon={Trash2}         label="Depuración de Datos" active={location.pathname === '/admin/depuracion'} />
                             </>
                         )}
 
