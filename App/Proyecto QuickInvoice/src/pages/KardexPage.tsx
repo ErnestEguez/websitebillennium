@@ -13,14 +13,16 @@ export function KardexPage() {
     const { empresa } = useAuth()
     const printRef = useRef<HTMLDivElement>(null)
 
-    const [productos,            _setProductos]           = useState<any[]>([])
+    const [_productos,           _setProductos]           = useState<any[]>([])
     const [bodegas,              setBodegas]              = useState<Bodega[]>([])
     const [productoSeleccionado, setProductoSeleccionado] = useState('')
-    const [productoNombre,       setProductoNombre]       = useState('')   // nombre visible en el buscador
+    const [productoNombre,       setProductoNombre]       = useState('')
     const [searchText,           setSearchText]           = useState('')
     const [searchResults,        setSearchResults]        = useState<any[]>([])
     const [searchOpen,           setSearchOpen]           = useState(false)
     const [searching,            setSearching]            = useState(false)
+    // productoActual se guarda en estado para evitar zona muerta temporal con useReactToPrint
+    const [productoActual,       setProductoActual]       = useState<any>(null)
     const [bodegaSeleccionada,   setBodegaSeleccionada]   = useState('')   // '' = todas
     const [movimientos,          setMovimientos]          = useState<KardexConProducto[]>([])
     const [saldoInicial,         setSaldoInicial]         = useState(0)
@@ -141,8 +143,7 @@ export function KardexPage() {
     }
 
     const rows         = movimientos.length > 0 ? buildRows() : []
-    const productoActual = searchResults.find(p => p.id === productoSeleccionado) ?? productos.find(p => p.id === productoSeleccionado)
-    const bodegaActual   = bodegas.find(b => b.id === bodegaSeleccionada)
+    const bodegaActual = bodegas.find(b => b.id === bodegaSeleccionada)
 
     const totalEntradas = rows.filter(r => r.tipo_movimiento === 'ENTRADA').reduce((s, r) => s + Number(r.cantidad), 0)
     const totalSalidas  = rows.filter(r => r.tipo_movimiento === 'SALIDA' ).reduce((s, r) => s + Number(r.cantidad), 0)
@@ -214,7 +215,7 @@ export function KardexPage() {
                             />
                             {searching && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />}
                             {productoSeleccionado && !searching && (
-                                <button onMouseDown={e => { e.preventDefault(); setProductoSeleccionado(''); setProductoNombre(''); setSearchText(''); setSearchResults([]); setMovimientos([]) }}
+                                <button onMouseDown={e => { e.preventDefault(); setProductoSeleccionado(''); setProductoNombre(''); setSearchText(''); setSearchResults([]); setMovimientos([]); setProductoActual(null) }}
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                                     <X className="w-4 h-4" />
                                 </button>
@@ -230,6 +231,7 @@ export function KardexPage() {
                                         onMouseDown={e => {
                                             e.preventDefault()
                                             setProductoSeleccionado(p.id)
+                                            setProductoActual(p)
                                             setProductoNombre(`${p.codigo ? p.codigo + ' — ' : ''}${p.nombre}`)
                                             setSearchText(`${p.codigo ? p.codigo + ' — ' : ''}${p.nombre}`)
                                             setSearchResults([])

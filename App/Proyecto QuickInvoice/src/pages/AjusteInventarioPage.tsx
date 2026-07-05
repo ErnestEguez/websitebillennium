@@ -405,23 +405,32 @@ export function AjusteInventarioPage() {
                             && Number(linea.cantidad) > stockDisp
 
                         return (
-                            <div key={linea.id}
-                                className={cn(
-                                    'grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_2fr_auto] gap-2 px-4 py-3 items-start',
-                                    excede && 'bg-red-50',
-                                    idx % 2 === 0 ? '' : 'bg-slate-50/40',
-                                )}>
-
-                                {/* Producto */}
-                                <div className="space-y-1">
-                                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Producto</label>
+                            <div key={linea.id} className={cn(
+                                'px-4 py-3 space-y-2',
+                                excede && 'bg-red-50',
+                                idx % 2 === 0 ? '' : 'bg-slate-50/40',
+                            )}>
+                                {/* FILA 1: Descripción del producto (ancho completo) */}
+                                <div className="relative">
                                     {linea.producto_id ? (
-                                        <div className="flex items-center gap-1">
-                                            <span className="flex-1 text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 truncate">
-                                                {linea.producto_codigo ? `[${linea.producto_codigo}] ` : ''}{linea.producto_nombre}
-                                            </span>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-slate-800 leading-tight">
+                                                    {linea.producto_codigo && <span className="font-mono text-xs text-slate-400 mr-2">[{linea.producto_codigo}]</span>}
+                                                    {linea.producto_nombre}
+                                                </p>
+                                                {linea.producto_id && stockDisp !== null && (
+                                                    <p className={cn('text-[11px] flex items-center gap-1 mt-0.5', excede ? 'text-red-600 font-bold' : 'text-slate-400')}>
+                                                        <Package className="w-3 h-3" />
+                                                        Stock actual: <span className="font-bold">{stockDisp}</span>
+                                                        {excede && ' — insuficiente'}
+                                                    </p>
+                                                )}
+                                            </div>
                                             <button type="button" onClick={() => actualizarLinea(idx, 'producto_id', '')}
-                                                className="p-2 text-slate-400 hover:text-red-500">✕</button>
+                                                className="shrink-0 text-xs text-slate-400 hover:text-red-500 px-2 py-1 border border-slate-200 rounded-lg hover:border-red-200">
+                                                Cambiar
+                                            </button>
                                         </div>
                                     ) : (
                                         <BuscadorProducto
@@ -434,108 +443,43 @@ export function AjusteInventarioPage() {
                                             }}
                                         />
                                     )}
-                                    {/* Stock disponible */}
-                                    {linea.producto_id && stockDisp !== null && (
-                                        <p className={cn(
-                                            'text-[11px] flex items-center gap-1',
-                                            excede ? 'text-red-600 font-bold' : 'text-slate-400'
-                                        )}>
-                                            <Package className="w-3 h-3" />
-                                            Stock actual: <span className="font-bold">{stockDisp}</span>
-                                            {excede && ' — insuficiente'}
-                                        </p>
-                                    )}
                                 </div>
 
-                                {/* Tipo INGRESO / EGRESO */}
-                                <div className="space-y-1">
-                                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Tipo</label>
-                                    <div className="flex rounded-xl border border-slate-200 overflow-hidden text-xs font-bold">
-                                        <button
-                                            type="button"
-                                            onClick={() => actualizarLinea(idx, 'tipo', 'INGRESO')}
-                                            className={cn(
-                                                'flex-1 py-2 flex items-center justify-center gap-1 transition-colors',
-                                                linea.tipo === 'INGRESO'
-                                                    ? 'bg-green-500 text-white'
-                                                    : 'bg-white text-slate-500 hover:bg-green-50'
-                                            )}
-                                        >
+                                {/* FILA 2: Tipo | Cantidad | Costo | Observación | Eliminar */}
+                                <div className="grid grid-cols-[auto_1fr_1fr_2fr_auto] gap-2 items-center">
+                                    {/* Tipo */}
+                                    <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs font-bold">
+                                        <button type="button" onClick={() => actualizarLinea(idx, 'tipo', 'INGRESO')}
+                                            className={cn('px-3 py-1.5 flex items-center gap-1 transition-colors',
+                                                linea.tipo === 'INGRESO' ? 'bg-green-500 text-white' : 'bg-white text-slate-500 hover:bg-green-50')}>
                                             <TrendingUp className="w-3.5 h-3.5" /> Ingreso
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => actualizarLinea(idx, 'tipo', 'EGRESO')}
-                                            className={cn(
-                                                'flex-1 py-2 flex items-center justify-center gap-1 transition-colors',
-                                                linea.tipo === 'EGRESO'
-                                                    ? 'bg-red-500 text-white'
-                                                    : 'bg-white text-slate-500 hover:bg-red-50'
-                                            )}
-                                        >
+                                        <button type="button" onClick={() => actualizarLinea(idx, 'tipo', 'EGRESO')}
+                                            className={cn('px-3 py-1.5 flex items-center gap-1 transition-colors',
+                                                linea.tipo === 'EGRESO' ? 'bg-red-500 text-white' : 'bg-white text-slate-500 hover:bg-red-50')}>
                                             <TrendingDown className="w-3.5 h-3.5" /> Egreso
                                         </button>
                                     </div>
-                                </div>
-
-                                {/* Cantidad */}
-                                <div className="space-y-1">
-                                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Cantidad</label>
-                                    <input
-                                        type="number"
-                                        min="0.001"
-                                        step="0.001"
-                                        placeholder="0"
-                                        className={cn(inp, 'text-right', excede && 'border-red-300 bg-red-50')}
+                                    {/* Cantidad */}
+                                    <input type="number" min="0.001" step="0.001" placeholder="Cant."
+                                        className={cn(inp, 'text-right text-sm', excede && 'border-red-300 bg-red-50')}
                                         value={linea.cantidad}
-                                        onChange={e => actualizarLinea(idx, 'cantidad', e.target.value === '' ? '' : Number(e.target.value))}
-                                    />
-                                </div>
-
-                                {/* Costo unitario */}
-                                <div className="space-y-1">
-                                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">
-                                        Costo Unit. {linea.tipo === 'INGRESO' && <span className="text-slate-300">(opc.)</span>}
-                                    </label>
+                                        onChange={e => actualizarLinea(idx, 'cantidad', e.target.value === '' ? '' : Number(e.target.value))} />
+                                    {/* Costo */}
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.0001"
-                                            placeholder="0.00"
-                                            className={cn(inp, 'pl-7 text-right', linea.tipo === 'EGRESO' && 'opacity-40 pointer-events-none')}
-                                            value={linea.costo_unitario}
-                                            disabled={linea.tipo === 'EGRESO'}
-                                            title={linea.tipo === 'EGRESO' ? 'El costo no aplica en egresos' : 'Costo de compra o valoración para actualizar costo promedio'}
-                                            onChange={e => actualizarLinea(idx, 'costo_unitario', e.target.value === '' ? '' : Number(e.target.value))}
-                                        />
+                                        <input type="number" min="0" step="0.0001" placeholder="Costo"
+                                            className={cn(inp, 'pl-7 text-right text-sm', linea.tipo === 'EGRESO' && 'opacity-40 pointer-events-none')}
+                                            value={linea.costo_unitario} disabled={linea.tipo === 'EGRESO'}
+                                            onChange={e => actualizarLinea(idx, 'costo_unitario', e.target.value === '' ? '' : Number(e.target.value))} />
                                     </div>
-                                    {linea.tipo === 'INGRESO' && linea.costo_unitario === '' && (
-                                        <p className="text-[10px] text-slate-300">Usa costo promedio actual</p>
-                                    )}
-                                    {linea.tipo === 'INGRESO' && linea.costo_unitario !== '' && (
-                                        <p className="text-[10px] text-amber-500">Actualiza costo promedio</p>
-                                    )}
-                                </div>
-
-                                {/* Observación */}
-                                <div className="space-y-1">
-                                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Observación</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Observación específica de esta línea (opcional)"
-                                        className={cn(inp, 'text-xs')}
+                                    {/* Observación */}
+                                    <input type="text" placeholder="Observación (opcional)"
+                                        className={cn(inp, 'text-sm')}
                                         value={linea.observacion}
-                                        onChange={e => actualizarLinea(idx, 'observacion', e.target.value)}
-                                    />
-                                </div>
-
-                                {/* Eliminar */}
-                                <div className="flex items-center justify-end">
-                                    <button
-                                        type="button"
-                                        onClick={() => eliminarLinea(idx)}
+                                        onChange={e => actualizarLinea(idx, 'observacion', e.target.value)} />
+                                    {/* Eliminar */}
+                                    <button type="button" onClick={() => eliminarLinea(idx)}
                                         disabled={lineas.length === 1}
                                         title="Eliminar línea"
                                         className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"

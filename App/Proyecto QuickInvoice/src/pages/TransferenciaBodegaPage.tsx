@@ -458,23 +458,27 @@ export function TransferenciaBodegaPage() {
                             const excede    = stockDisp !== null && Number(linea.cantidad) > 0 && Number(linea.cantidad) > stockDisp
 
                             return (
-                                <div
-                                    key={linea.id}
-                                    className={cn(
-                                        'grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_2fr_auto] gap-2 px-4 py-3 items-start',
-                                        excede ? 'bg-red-50' : idx % 2 !== 0 ? 'bg-slate-50/40' : '',
-                                    )}
-                                >
-                                    {/* Producto */}
-                                    <div className="space-y-1">
-                                        <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Producto</label>
+                                <div key={linea.id} className={cn(
+                                    'px-4 py-3 space-y-2',
+                                    excede ? 'bg-red-50' : idx % 2 !== 0 ? 'bg-slate-50/40' : '',
+                                )}>
+                                    {/* FILA 1: Producto (ancho completo) */}
+                                    <div className="relative">
                                         {linea.producto_id ? (
-                                            <div className="flex items-center gap-1">
-                                                <span className="flex-1 text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 truncate">
-                                                    {linea.producto_codigo ? `[${linea.producto_codigo}] ` : ''}{linea.producto_nombre}
-                                                </span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-slate-800">
+                                                        {linea.producto_codigo && <span className="font-mono text-xs text-slate-400 mr-2">[{linea.producto_codigo}]</span>}
+                                                        {linea.producto_nombre}
+                                                    </p>
+                                                    {linea.costo_promedio > 0 && (
+                                                        <p className="text-[11px] text-slate-400">Costo promedio: <span className="font-bold">${linea.costo_promedio.toFixed(4)}</span></p>
+                                                    )}
+                                                </div>
                                                 <button type="button" onClick={() => actualizarLinea(idx, 'producto_id', '')}
-                                                    className="p-2 text-slate-400 hover:text-red-500">✕</button>
+                                                    className="shrink-0 text-xs text-slate-400 hover:text-red-500 px-2 py-1 border border-slate-200 rounded-lg hover:border-red-200">
+                                                    Cambiar
+                                                </button>
                                             </div>
                                         ) : (
                                             <BuscadorProducto
@@ -487,75 +491,41 @@ export function TransferenciaBodegaPage() {
                                                 }}
                                             />
                                         )}
-                                        {/* Costo promedio informativo */}
-                                        {linea.producto_id && linea.costo_promedio > 0 && (
-                                            <p className="text-[11px] text-slate-400">
-                                                Costo promedio: <span className="font-bold">${linea.costo_promedio.toFixed(4)}</span>
-                                            </p>
-                                        )}
                                     </div>
 
-                                    {/* Stock disponible en origen */}
-                                    <div className="space-y-1">
-                                        <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Stock en Origen</label>
+                                    {/* FILA 2: Stock origen | Cantidad | Observación | Eliminar */}
+                                    <div className="grid grid-cols-[auto_1fr_2fr_auto] gap-2 items-center">
+                                        {/* Stock en origen */}
                                         <div className={cn(
-                                            'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-bold',
-                                            stockDisp === null
-                                                ? 'bg-slate-50 border-slate-200 text-slate-300'
-                                                : stockDisp === 0
-                                                    ? 'bg-red-50 border-red-200 text-red-500'
-                                                    : excede
-                                                        ? 'bg-red-50 border-red-300 text-red-600'
-                                                        : 'bg-emerald-50 border-emerald-200 text-emerald-700',
+                                            'flex items-center gap-1 px-3 py-2 rounded-lg border text-sm font-bold whitespace-nowrap',
+                                            stockDisp === null ? 'bg-slate-50 border-slate-200 text-slate-300'
+                                                : stockDisp === 0 ? 'bg-red-50 border-red-200 text-red-500'
+                                                : excede ? 'bg-red-50 border-red-300 text-red-600'
+                                                : 'bg-emerald-50 border-emerald-200 text-emerald-700',
                                         )}>
-                                            <Package className="w-3.5 h-3.5 shrink-0" />
-                                            {stockDisp === null ? '—' : stockDisp}
+                                            <Package className="w-3.5 h-3.5" />
+                                            <span>Stock: {stockDisp ?? '—'}</span>
+                                            {excede && <span className="text-xs ml-1">⚠ insuficiente</span>}
                                         </div>
-                                        {excede && (
-                                            <p className="text-[10px] text-red-600 font-bold">Insuficiente</p>
-                                        )}
-                                    </div>
-
-                                    {/* Cantidad */}
-                                    <div className="space-y-1">
-                                        <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Cantidad</label>
-                                        <input
-                                            type="number"
-                                            min="0.001"
-                                            step="0.001"
-                                            placeholder="0"
-                                            className={cn(inp, 'text-right font-bold', excede && 'border-red-300 bg-red-50')}
-                                            value={linea.cantidad}
-                                            onChange={e => actualizarLinea(idx, 'cantidad', e.target.value === '' ? '' : Number(e.target.value))}
-                                        />
-                                        {stockDisp !== null && Number(linea.cantidad) > 0 && !excede && (
-                                            <p className="text-[10px] text-emerald-600">
-                                                Quedará: {(stockDisp - Number(linea.cantidad)).toFixed(3)} en origen
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {/* Observación de línea */}
-                                    <div className="space-y-1">
-                                        <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Observación</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Nota específica (opcional)"
-                                            className={cn(inp, 'text-xs')}
+                                        {/* Cantidad */}
+                                        <div>
+                                            <input type="number" min="0.001" step="0.001" placeholder="Cantidad"
+                                                className={cn(inp, 'text-right font-bold text-sm', excede && 'border-red-300 bg-red-50')}
+                                                value={linea.cantidad}
+                                                onChange={e => actualizarLinea(idx, 'cantidad', e.target.value === '' ? '' : Number(e.target.value))} />
+                                            {stockDisp !== null && Number(linea.cantidad) > 0 && !excede && (
+                                                <p className="text-[10px] text-emerald-600 mt-0.5">Quedará: {(stockDisp - Number(linea.cantidad)).toFixed(3)} en origen</p>
+                                            )}
+                                        </div>
+                                        {/* Observación */}
+                                        <input type="text" placeholder="Nota (opcional)"
+                                            className={cn(inp, 'text-sm')}
                                             value={linea.observacion}
-                                            onChange={e => actualizarLinea(idx, 'observacion', e.target.value)}
-                                        />
-                                    </div>
-
-                                    {/* Eliminar */}
-                                    <div className="flex items-center justify-end">
-                                        <button
-                                            type="button"
-                                            onClick={() => setLineas(prev => prev.filter((_, i) => i !== idx))}
+                                            onChange={e => actualizarLinea(idx, 'observacion', e.target.value)} />
+                                        {/* Eliminar */}
+                                        <button type="button" onClick={() => setLineas(prev => prev.filter((_, i) => i !== idx))}
                                             disabled={lineas.length === 1}
-                                            title="Eliminar línea"
-                                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-                                        >
+                                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 disabled:opacity-20 disabled:cursor-not-allowed">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
