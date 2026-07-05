@@ -187,7 +187,7 @@ export function ImportarArticulosPage() {
                         activo:         true,
                         maneja_stock:   true,
                         codigo:         row.codigo,
-                        stock:          0,
+                        stock:          row.stock,   // stock inicial visible en inventario valorado
                     })
                     rowsWithIds.push({ row, id })
                 }
