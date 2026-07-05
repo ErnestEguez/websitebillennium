@@ -189,13 +189,10 @@ export function FacturaDirectaPage() {
                 setSelectedBodegaId(principal.id)
             }
 
-            // Consumidor final: buscar en la lista (forzar refresh si no está en caché)
-            let consumidor = clientsList.find((c: any) => c.identificacion === '9999999999999') ?? null
-            if (!consumidor && isOnline) {
-                const fresh = await catalogCacheService.forceRefreshClientes(empresa!.id)
-                setClientes(fresh)
-                consumidor = fresh.find((c: any) => c.identificacion === '9999999999999') ?? null
-            }
+            // Consumidor final: garantizar que exista (lo crea automáticamente si fue eliminado)
+            const consumidor = isOnline
+                ? await facturacionService.ensureConsumidorFinal(empresa!.id)
+                : (clientsList.find((c: any) => c.identificacion === '9999999999999') ?? null)
             if (consumidor) setSelectedCliente(consumidor)
         } catch (e) {
             console.error('Error cargando datos:', e)

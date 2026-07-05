@@ -275,7 +275,7 @@ export function ProductsPage() {
     const { empresa } = useAuth()
     const [productos, setProductos] = useState<any[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(false)  // sin carga inicial
     const [search, setSearch] = useState('')
     const [selectedCategoria, setSelectedCategoria] = useState<string>('')
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -378,7 +378,7 @@ export function ProductsPage() {
     // Ya viene filtrado del servidor
     const filtered = productos
 
-    if (loading) return <div className="p-12 text-center">Cargando productos...</div>
+    // No bloquear la pantalla — el spinner va dentro del botón Buscar
 
     return (
         <div className="space-y-6">

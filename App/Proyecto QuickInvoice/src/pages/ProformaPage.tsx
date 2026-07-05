@@ -351,11 +351,11 @@ export function ProformaPage() {
         setVendedores(vends)
         setCuentasBancarias(cuentas.filter((c: CuentaBancaria) => c.estado === 'activa'))
         if (vends.length === 1) setSelectedVendedorId(vends[0].id)
-        // Pre-seleccionar consumidor final desde DB (solo 1 registro)
-        const { data: cf } = await supabase
-            .from('clientes').select('id, nombre, identificacion')
-            .eq('empresa_id', empresa!.id).eq('identificacion', '9999999999999').maybeSingle()
-        if (cf) setSelectedCliente(cf)
+        // Garantizar que el Consumidor Final exista (lo crea si fue eliminado)
+        try {
+            const cf = await facturacionService.ensureConsumidorFinal(empresa!.id)
+            if (cf) setSelectedCliente(cf)
+        } catch { /* sin conexión, continuar sin CF */ }
     }
 
     // Búsqueda de clientes: solo al presionar Enter o botón Buscar

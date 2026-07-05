@@ -54,6 +54,35 @@ export const facturacionService = {
         return data as Cliente
     },
 
+    // Garantiza que el Consumidor Final exista. Lo crea automáticamente si fue eliminado.
+    async ensureConsumidorFinal(empresaId: string): Promise<Cliente> {
+        const { data } = await supabase
+            .from('clientes')
+            .select('*')
+            .eq('empresa_id', empresaId)
+            .eq('identificacion', '9999999999999')
+            .maybeSingle()
+
+        if (data) return data as Cliente
+
+        // No existe → crearlo automáticamente
+        const { data: nuevo, error } = await supabase
+            .from('clientes')
+            .insert({
+                empresa_id:     empresaId,
+                identificacion: '9999999999999',
+                nombre:         'Consumidor Final',
+                email:          null,
+                direccion:      null,
+                telefono:       null,
+            })
+            .select()
+            .single()
+
+        if (error) throw error
+        return nuevo as Cliente
+    },
+
     async createCliente(cliente: Partial<Cliente>) {
         const { data, error } = await supabase
             .from('clientes')

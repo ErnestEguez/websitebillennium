@@ -114,7 +114,11 @@ export function ClientsPage() {
         }
     }
 
-    async function handleDelete(id: string) {
+    async function handleDelete(id: string, identificacion: string) {
+        if (identificacion === '9999999999999') {
+            alert('El Consumidor Final no puede eliminarse.')
+            return
+        }
         if (!confirm('¿Estás seguro de eliminar este cliente?')) return
         try {
             await facturacionService.deleteCliente(id)
@@ -122,6 +126,17 @@ export function ClientsPage() {
         } catch (error: any) {
             console.error('Error deleting client:', error)
             alert(`Error al eliminar el cliente: ${error.message}`)
+        }
+    }
+
+    async function crearConsumidorFinal() {
+        if (!empresa?.id) return
+        try {
+            await facturacionService.ensureConsumidorFinal(empresa.id)
+            alert('✓ Consumidor Final creado correctamente.')
+            await buscarClientes()
+        } catch (e: any) {
+            alert('Error: ' + e.message)
         }
     }
 
@@ -136,6 +151,15 @@ export function ClientsPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Maestro de Clientes</h1>
                     <p className="text-slate-500">Administra la base de datos de tus clientes para facturación</p>
                 </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={crearConsumidorFinal}
+                        className="btn btn-secondary flex items-center gap-2 text-sm text-amber-700 border-amber-200 hover:bg-amber-50"
+                        title="Crea el cliente Consumidor Final si fue eliminado accidentalmente"
+                    >
+                        <User className="w-4 h-4" />
+                        Consumidor Final
+                    </button>
                 <button
                     onClick={() => {
                         setEditingCliente({ identificacion: '', nombre: '', email: '', direccion: '' })
@@ -146,6 +170,7 @@ export function ClientsPage() {
                     <Plus className="w-4 h-4" />
                     Nuevo Cliente
                 </button>
+                </div>
             </div>
 
             <div className="flex gap-2">
@@ -214,10 +239,10 @@ export function ClientsPage() {
                                                 <Edit2 className="w-4 h-4" />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(cliente.id)}
-                                                className="p-2 hover:bg-white border border-transparent hover:border-red-100 rounded-lg text-slate-400 hover:text-red-600 transition-all"
+                                                onClick={() => handleDelete(cliente.id, cliente.identificacion)}
+                                                className="p-2 hover:bg-white border border-transparent hover:border-red-100 rounded-lg text-slate-400 hover:text-red-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                                                 disabled={cliente.identificacion === '9999999999999'}
-                                                title={cliente.identificacion === '9999999999999' ? 'Consumidor Final no se puede eliminar' : ''}
+                                                title={cliente.identificacion === '9999999999999' ? 'El Consumidor Final no puede eliminarse' : 'Eliminar'}
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
