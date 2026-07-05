@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { kardexService } from '../services/kardexService'
 import { formatCurrency } from '../lib/utils'
 import {
     Search, AlertTriangle, CheckCircle2, Copy, Check,
@@ -185,6 +186,44 @@ export function AnulacionFacturasPage() {
                     .from('cartera_cxc')
                     .update({ estado: 'anulada', updated_at: new Date().toISOString() })
                     .eq('id', f.cartera.id)
+            }
+
+            // 3. Revertir el kardex: crear ENTRADA por cada producto de la factura
+            //    para restaurar el stock que la venta descontó.
+            const { data: comprobante } = await supabase
+                .from('comprobantes')
+                .select('bodega_id')
+                .eq('id', anulandoId)
+                .single()
+
+            const { data: detalles } = await supabase
+                .from('comprobante_detalles')
+                .select('producto_id, cantidad')
+                .eq('comprobante_id', anulandoId)
+
+            const bodegaId = comprobante?.bodega_id ?? undefined
+            const hoy = new Date().toISOString().split('T')[0]
+
+            for (const det of (detalles ?? [])) {
+                if (!det.producto_id || Number(det.cantidad) <= 0) continue
+                // Verificar que el producto controla stock antes de revertir
+                const { data: prod } = await supabase
+                    .from('productos')
+                    .select('maneja_stock')
+                    .eq('id', det.producto_id)
+                    .single()
+                if (!prod?.maneja_stock) continue
+
+                await kardexService.registrarMovimiento({
+                    empresa_id:          empresa!.id,
+                    producto_id:         det.producto_id,
+                    bodega_id:           bodegaId,
+                    tipo_movimiento:     'ENTRADA',
+                    motivo:              `Reversión anulación factura ${f.secuencial}`,
+                    documento_referencia: anulandoId,
+                    cantidad:            Number(det.cantidad),
+                    fecha:               hoy,
+                })
             }
 
             setAnulandoId(null)
