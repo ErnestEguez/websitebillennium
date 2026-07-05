@@ -4,6 +4,7 @@ import type { Producto, Categoria } from '../services/productoService'
 import { subproductoService, type Subproducto } from '../services/subproductoService'
 import { contableConfigService, type CuentaLP } from '../services/contableConfigService'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/utils'
 import { PrecioVolumenModal } from '../components/PrecioVolumenModal'
 import {
@@ -282,37 +283,77 @@ export function ProductsPage() {
     const [precioVolumenProducto, setPrecioVolumenProducto] = useState<any>(null)
     const [cuentasLP, setCuentasLP] = useState<CuentaLP[]>([])
 
+    // Cargar solo categorías y cuentas al montar (para los filtros del modal)
     useEffect(() => {
-        if (empresa?.id) {
-            loadData()
-        }
+        if (!empresa?.id) return
+        Promise.all([
+            productoService.getCategorias(empresa.id),
+            contableConfigService.getCuentas((empresa as any)?.ruc),
+        ]).then(([catData, cuentas]) => {
+            setCategorias(catData)
+            setCuentasLP(cuentas)
+        }).catch(console.error)
     }, [empresa?.id])
 
-    async function loadData() {
-        try {
+    // Búsqueda server-side: solo se lanza cuando hay texto + debounce 300ms
+    useEffect(() => {
+        if (!empresa?.id) return
+        if (!search.trim() && !selectedCategoria) {
+            setProductos([])
+            setLoading(false)
+            return
+        }
+        const timer = setTimeout(async () => {
             setLoading(true)
-            const [prodData, catData, cuentas] = await Promise.all([
-                productoService.getProductos(empresa!.id),
-                productoService.getCategorias(empresa!.id),
-                contableConfigService.getCuentas((empresa as any)?.ruc),
-            ])
-            setCuentasLP(cuentas)
-            // Enriquecer productos con nombre de categoría desde el array local
-            // (fallback por si el join RLS devuelve null)
-            const catMap: Record<string, string> = {}
-            for (const c of catData) catMap[c.id] = c.nombre
+            try {
+                let q = supabase
+                    .from('productos')
+                    .select('*, categorias(nombre)')
+                    .eq('empresa_id', empresa.id)
+                    .order('nombre')
+                if (search.trim()) {
+                    const sq = '%' + search.trim().replace(/\*/g, '%') + '%'
+                    q = q.or(`nombre.ilike.${sq},codigo.ilike.${sq}`)
+                }
+                if (selectedCategoria) {
+                    q = q.eq('categoria_id', selectedCategoria)
+                }
+                const { data } = await q
+                const catMap: Record<string, string> = {}
+                for (const c of categorias) catMap[c.id] = c.nombre
+                const enriched = (data || []).map((p: any) => ({
+                    ...p,
+                    categorias: p.categorias || (p.categoria_id ? { nombre: catMap[p.categoria_id] || '' } : null)
+                }))
+                setProductos(enriched)
+            } catch (e) { console.error(e) } finally { setLoading(false) }
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [search, selectedCategoria, empresa?.id])
 
-            const enriched = (prodData || []).map((p: any) => ({
+    async function loadData() {
+        // Llamado desde guardar/eliminar para refrescar la lista actual
+        if (!search.trim() && !selectedCategoria) return
+        setLoading(true)
+        try {
+            let q = supabase
+                .from('productos')
+                .select('*, categorias(nombre)')
+                .eq('empresa_id', empresa!.id)
+                .order('nombre')
+            if (search.trim()) {
+                const sq = '%' + search.trim().replace(/\*/g, '%') + '%'
+                q = q.or(`nombre.ilike.${sq},codigo.ilike.${sq}`)
+            }
+            if (selectedCategoria) q = q.eq('categoria_id', selectedCategoria)
+            const { data } = await q
+            const catMap: Record<string, string> = {}
+            for (const c of categorias) catMap[c.id] = c.nombre
+            setProductos((data || []).map((p: any) => ({
                 ...p,
                 categorias: p.categorias || (p.categoria_id ? { nombre: catMap[p.categoria_id] || '' } : null)
-            }))
-            setProductos(enriched)
-            setCategorias(catData)
-        } catch (error) {
-            console.error('Error loading products:', error)
-        } finally {
-            setLoading(false)
-        }
+            })))
+        } finally { setLoading(false) }
     }
 
     async function handleSubmit(e: React.FormEvent) {
@@ -367,12 +408,8 @@ export function ProductsPage() {
         }
     }
 
-    const filtered = productos.filter(p => {
-        const q = search.toLowerCase()
-        const matchesSearch = p.nombre.toLowerCase().includes(q) || (p.codigo ?? '').toLowerCase().includes(q)
-        const matchesCat = !selectedCategoria || p.categoria_id === selectedCategoria
-        return matchesSearch && matchesCat
-    })
+    // Ya viene filtrado del servidor
+    const filtered = productos
 
     if (loading) return <div className="p-12 text-center">Cargando productos...</div>
 
@@ -521,7 +558,9 @@ export function ProductsPage() {
                             {filtered.length === 0 && (
                                 <tr>
                                     <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                                        No se encontraron productos.
+                                        {!search.trim() && !selectedCategoria
+                                            ? 'Escribe un nombre o código para buscar productos.'
+                                            : 'No se encontraron productos con ese criterio.'}
                                     </td>
                                 </tr>
                             )}

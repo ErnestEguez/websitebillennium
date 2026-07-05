@@ -44,8 +44,8 @@ export function ValorizacionInventarioPage() {
 
     useEffect(() => {
         if (empresa?.id) {
+            // Solo carga bodegas y categorías al montar — datos solo al presionar Actualizar/Aplicar
             bodegaService.listar(empresa.id).then(setBodegas).catch(console.error)
-            cargar()
         }
     }, [empresa?.id])
 
@@ -365,7 +365,10 @@ export function ValorizacionInventarioPage() {
                 ) : filtrados.length === 0 ? (
                     <div className="py-16 text-center text-slate-400">
                         <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p>No hay artículos con inventario activo</p>
+                        <p>{items.length === 0
+                            ? 'Presiona el botón Actualizar o Aplicar para consultar el inventario.'
+                            : 'No hay artículos con inventario activo para los filtros seleccionados.'
+                        }</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
