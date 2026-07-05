@@ -718,7 +718,7 @@ export function NuevaCompraInventarioPage() {
                     </div>
                 ) : (
                     <>
-                        <div className="overflow-x-auto">
+                        <div className="overflow-visible">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="text-xs text-slate-500 border-b">
@@ -764,7 +764,7 @@ export function NuevaCompraInventarioPage() {
                                                 </td>
 
                                                 {/* Producto */}
-                                                <td className="py-2 pr-3">
+                                                <td className="py-2 pr-3 relative" style={{ minWidth: 260 }}>
                                                     {isOcr ? (
                                                         <input
                                                             className={cn('w-full border border-slate-200 rounded px-2 py-1.5 text-sm bg-transparent focus:bg-white focus:border-primary-400 outline-none font-medium', textColor)}

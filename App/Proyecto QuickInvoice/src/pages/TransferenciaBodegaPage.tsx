@@ -419,7 +419,7 @@ export function TransferenciaBodegaPage() {
             </div>
 
             {/* ── Detalle de productos ──────────────────────────────────────── */}
-            <div className="card overflow-hidden">
+            <div className="card overflow-visible">
                 <div className="bg-slate-700 text-white px-4 py-3 flex items-center justify-between">
                     <span className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
                         <FileText className="w-4 h-4" /> Productos a Transferir

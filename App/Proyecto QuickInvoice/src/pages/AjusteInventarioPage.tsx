@@ -373,7 +373,7 @@ export function AjusteInventarioPage() {
             </div>
 
             {/* ── Detalle de líneas ──────────────────────────────────────────── */}
-            <div className="card overflow-hidden">
+            <div className="card overflow-visible">
                 {/* Header tabla */}
                 <div className="bg-slate-700 text-white px-4 py-3 flex items-center justify-between">
                     <span className="text-sm font-bold uppercase tracking-wider">Detalle de Productos</span>

@@ -4,10 +4,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { ocService, proveedorService } from '../../services/vendorService'
 import { bodegaService } from '../../services/bodegaService'
-import { supabase } from '../../lib/supabase'
 import type { Proveedor, EstadoOC, Bodega } from '../../types/vendors'
 import { ArrowLeft, Plus, Trash2, Save, Send } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { BuscadorProducto, type ProductoResultado } from '../../components/BuscadorProducto'
 
 const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white'
 const HOY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guayaquil' })
@@ -30,7 +30,7 @@ export function NuevaOrdenCompraPage() {
     const modoEdicion = !!ocId
 
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
-    const [productos,   setProductos]   = useState<ProductoOpc[]>([])
+    const [_productos,  _setProductos]  = useState<ProductoOpc[]>([])
     const [bodegas,     setBodegas]     = useState<Bodega[]>([])
     const [loading,     setLoading]     = useState(true)
     const [saving,      setSaving]      = useState(false)
@@ -66,17 +66,11 @@ export function NuevaOrdenCompraPage() {
     async function cargar() {
         try {
             setLoading(true)
-            const [provs, { data: prods }, bods] = await Promise.all([
+            const [provs, bods] = await Promise.all([
                 proveedorService.listar(empresa!.id),
-                supabase.from('productos')
-                    .select('id, nombre, codigo, costo_promedio')
-                    .eq('empresa_id', empresa!.id)
-                    .eq('activo', true)
-                    .order('nombre'),
                 bodegaService.listar(empresa!.id),
             ])
             setProveedores(provs.filter(p => p.estado === 'ACTIVO'))
-            setProductos((prods ?? []) as ProductoOpc[])
             setBodegas(bods)
             if (bods.length > 0 && !bodegaId) {
                 const principal = bods.find(b => b.es_principal) ?? bods[0]
@@ -121,11 +115,8 @@ export function NuevaOrdenCompraPage() {
         setLineas(prev => prev.map((l, j) => {
             if (j !== i) return l
             const updated = { ...l, [campo]: val }
-            if (campo === 'producto_id') {
-                const prod = productos.find(p => p.id === val)
-                updated.descripcion    = prod?.nombre ?? ''
-                updated.costo_unitario = prod?.costo_promedio ?? 0
-            }
+            // producto_id se actualiza desde BuscadorProducto directamente en onSelect
+            if (campo === 'descripcion' || campo === 'producto_id') { /* sin autocompletar */ }
             if (campo === 'cantidad_solicitada' || campo === 'costo_unitario') {
                 updated.subtotal = Math.round(
                     (campo === 'cantidad_solicitada' ? (val as number) : updated.cantidad_solicitada) *
@@ -268,7 +259,7 @@ export function NuevaOrdenCompraPage() {
                     </div>
                 ) : (
                     <>
-                        <div className="overflow-x-auto">
+                        <div className="overflow-visible">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="text-xs text-slate-500 border-b">
@@ -284,23 +275,39 @@ export function NuevaOrdenCompraPage() {
                                 <tbody className="divide-y divide-slate-100">
                                     {lineas.map((l, i) => (
                                         <tr key={i}>
-                                            <td className="py-2 pr-2">
-                                                <select className={cn(inp, 'text-xs')} disabled={soloLectura}
-                                                    value={l.producto_id}
-                                                    onChange={e => updLinea(i, 'producto_id', e.target.value)}>
-                                                    <option value="">Libre / manual</option>
-                                                    {productos.map(p => (
-                                                        <option key={p.id} value={p.id}>
-                                                            {p.codigo ? `[${p.codigo}] ` : ''}{p.nombre}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                            <td className="py-2 pr-2 relative" style={{ minWidth: 280 }}>
+                                                {!soloLectura && !l.producto_id ? (
+                                                    <BuscadorProducto
+                                                        empresaId={empresa!.id}
+                                                        placeholder="Buscar producto (Enter o Buscar)…"
+                                                        onSelect={(p: ProductoResultado) => {
+                                                            setLineas(prev => prev.map((l2, j) => j !== i ? l2 : {
+                                                                ...l2,
+                                                                producto_id: p.id,
+                                                                descripcion: p.nombre,
+                                                                costo_unitario: p.costo_promedio ?? 0,
+                                                                subtotal: Math.round((l2.cantidad_solicitada || 1) * (p.costo_promedio ?? 0) * 100) / 100,
+                                                            }))
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="flex-1 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 truncate">
+                                                            {l.descripcion || 'Sin producto'}
+                                                        </span>
+                                                        {!soloLectura && (
+                                                            <button type="button"
+                                                                onClick={() => setLineas(prev => prev.map((l2, j) => j !== i ? l2 : { ...l2, producto_id: '', descripcion: '', costo_unitario: 0 }))}
+                                                                className="text-xs text-slate-400 hover:text-red-500 px-1">✕</button>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="py-2 px-2">
-                                                <input className={inp} disabled={soloLectura}
+                                                <input className={cn(inp, 'text-xs')} disabled={soloLectura}
                                                     value={l.descripcion}
                                                     onChange={e => updLinea(i, 'descripcion', e.target.value)}
-                                                    placeholder="Descripción del ítem" />
+                                                    placeholder="Descripción libre (editable)" />
                                             </td>
                                             <td className="py-2 px-2">
                                                 <input type="number" min={0} step={0.01}
