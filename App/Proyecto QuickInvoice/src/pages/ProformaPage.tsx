@@ -287,7 +287,7 @@ export function ProformaPage() {
 
     // ── Datos maestros ────────────────────────────────────────────────────────
     const [clientes, setClientes]       = useState<any[]>([])
-    const [_productos, setProductos]    = useState<any[]>([])
+    const [_productos, _setProductos]   = useState<any[]>([])
     const [vendedores, setVendedores]   = useState<Vendedor[]>([])
     const [, setCuentasBancarias] = useState<CuentaBancaria[]>([])
 
@@ -342,19 +342,19 @@ export function ProformaPage() {
     }, [empresa?.id])
 
     async function loadDatos() {
-        const [clientsList, prodList, vends, cuentas] = await Promise.all([
-            catalogCacheService.getClientes(empresa!.id).catch(() => []),
-            catalogCacheService.getProductos(empresa!.id).catch(() => []),
+        // Solo carga datos livianos: vendedores y cuentas bancarias.
+        // Clientes y productos se buscan bajo demanda con BuscadorProducto/buscarClientes.
+        const [vends, cuentas] = await Promise.all([
             vendedorService.getVendedoresActivos(empresa!.id).catch(() => []),
             cuentasBancariasService.listar(empresa!.id).catch(() => []),
         ])
-        setClientes(clientsList)
-        setProductos(prodList)
         setVendedores(vends)
         setCuentasBancarias(cuentas.filter((c: CuentaBancaria) => c.estado === 'activa'))
         if (vends.length === 1) setSelectedVendedorId(vends[0].id)
-        // Pre-seleccionar consumidor final
-        const cf = clientsList.find((c: any) => c.identificacion === '9999999999999')
+        // Pre-seleccionar consumidor final desde DB (solo 1 registro)
+        const { data: cf } = await supabase
+            .from('clientes').select('id, nombre, identificacion')
+            .eq('empresa_id', empresa!.id).eq('identificacion', '9999999999999').maybeSingle()
         if (cf) setSelectedCliente(cf)
     }
 

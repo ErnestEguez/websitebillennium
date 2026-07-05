@@ -43,22 +43,12 @@ export function ClientsPage() {
         } finally { setLoading(false) }
     }
 
-    useEffect(() => {
-        if (empresa?.id) {
-            loadData()
-        }
-    }, [empresa?.id])
+    // Sin carga inicial — el usuario busca con el botón Buscar o Enter
+    useEffect(() => { if (empresa?.id) setLoading(false) }, [empresa?.id])
 
     async function loadData() {
-        try {
-            setLoading(true)
-            const data = await facturacionService.getClientes(empresa!.id)
-            setClientes(data)
-        } catch (error) {
-            console.error('Error loading clients:', error)
-        } finally {
-            setLoading(false)
-        }
+        // Solo se llama después de guardar/eliminar para refrescar el resultado actual
+        if (search.trim()) await buscarClientes()
     }
 
     async function lookupSRI() {
@@ -238,7 +228,9 @@ export function ClientsPage() {
                             {filtered.length === 0 && (
                                 <tr>
                                     <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
-                                        No se encontraron clientes.
+                                        {!search.trim()
+                                            ? 'Escribe un nombre o RUC/cédula y presiona Buscar.'
+                                            : 'No se encontraron clientes con ese criterio.'}
                                     </td>
                                 </tr>
                             )}
