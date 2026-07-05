@@ -614,9 +614,11 @@ export function CarteraCxcPage() {
     }, [cartera])
 
     const clientesFiltrados = multiCliente
-        ? clientesUnicos.filter(c =>
-            c.nombre.toLowerCase().includes(multiCliente.toLowerCase()) ||
-            c.identificacion.includes(multiCliente))
+        ? (() => {
+            const q = multiCliente.replace(/\*/g, '.*').toLowerCase()
+            const re = new RegExp(q, 'i')
+            return clientesUnicos.filter(c => re.test(c.nombre) || re.test(c.identificacion))
+          })()
         : clientesUnicos
 
     if (loading) {

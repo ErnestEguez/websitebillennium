@@ -25,6 +25,25 @@ export function ClientsPage() {
     const [editingCliente, setEditingCliente] = useState<Partial<Cliente> | null>(null)
     const [isSearchingSRI, setIsSearchingSRI] = useState(false)
 
+    // Búsqueda server-side con debounce
+    useEffect(() => {
+        if (!empresa?.id) return
+        if (search.trim().length < 2) { loadData(); return }
+        const timer = setTimeout(async () => {
+            setLoading(true)
+            try {
+                const q = '%' + search.trim().replace(/\*/g, '%') + '%'
+                const { data } = await supabase
+                    .from('clientes').select('*')
+                    .eq('empresa_id', empresa.id)
+                    .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
+                    .order('nombre').limit(200)
+                setClientes(data as Cliente[] ?? [])
+            } finally { setLoading(false) }
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [search, empresa?.id])
+
     useEffect(() => {
         if (empresa?.id) {
             loadData()
@@ -117,10 +136,7 @@ export function ClientsPage() {
         }
     }
 
-    const filtered = clientes.filter(c =>
-        c.nombre.toLowerCase().includes(search.toLowerCase()) ||
-        c.identificacion.includes(search)
-    )
+    const filtered = clientes  // ya viene filtrado del servidor
 
     if (loading) return <div className="p-12 text-center">Cargando clientes...</div>
 

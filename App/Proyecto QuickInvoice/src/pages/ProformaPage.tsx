@@ -12,6 +12,7 @@ import {
 import { proformaService, type Proforma, type EstadoProforma } from '../services/proformaService'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { catalogCacheService } from '../services/catalogCacheService'
+import { supabase } from '../lib/supabase'
 import { cuentasBancariasService } from '../services/finance/bancosService'
 import { precioVolumenService } from '../services/precioVolumenService'
 import type { CuentaBancaria } from '../types/finance'
@@ -286,7 +287,7 @@ export function ProformaPage() {
 
     // ── Datos maestros ────────────────────────────────────────────────────────
     const [clientes, setClientes]       = useState<any[]>([])
-    const [productos, setProductos]     = useState<any[]>([])
+    const [_productos, setProductos]    = useState<any[]>([])
     const [vendedores, setVendedores]   = useState<Vendedor[]>([])
     const [, setCuentasBancarias] = useState<CuentaBancaria[]>([])
 
@@ -302,6 +303,8 @@ export function ProformaPage() {
     const [proformaEditando, setProformaEditando] = useState<Proforma | null>(null) // null = nueva
     const [searchCliente,    setSearchCliente]    = useState('')
     const [selectedCliente,  setSelectedCliente]  = useState<any>(null)
+    const [clienteResults,   setClienteResults]   = useState<any[]>([])
+    const [clienteOpen,      setClienteOpen]      = useState(false)
     const [isClientFormOpen, setIsClientFormOpen] = useState(false)
     const [newClient, setNewClient] = useState({ identificacion: '', nombre: '', email: '', direccion: '', telefono: '' })
     const [isSavingClient, setIsSavingClient]     = useState(false)
@@ -313,6 +316,7 @@ export function ProformaPage() {
     const [vendedorCollapsed, setVendedorCollapsed] = useState(false)
     const [searchProducto, setSearchProducto]     = useState<Record<number, string>>({})
     const [productDropdown, setProductDropdown]   = useState<number | null>(null)
+    const [searchResults,  setSearchResults]      = useState<any[]>([])
     const [saving, setSaving]                     = useState(false)
     const [savedProforma, setSavedProforma]       = useState<Proforma | null>(null)
 
@@ -353,6 +357,39 @@ export function ProformaPage() {
         const cf = clientsList.find((c: any) => c.identificacion === '9999999999999')
         if (cf) setSelectedCliente(cf)
     }
+
+    // Búsqueda server-side de clientes (ILIKE, soporta *)
+    useEffect(() => {
+        if (!empresa?.id || selectedCliente || searchCliente.trim().length < 2) { setClienteResults([]); return }
+        const timer = setTimeout(async () => {
+            const q = '%' + searchCliente.trim().replace(/\*/g, '%') + '%'
+            const { data } = await supabase
+                .from('clientes').select('id, nombre, identificacion')
+                .eq('empresa_id', empresa.id)
+                .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
+                .order('nombre').limit(50)
+            setClienteResults(data ?? [])
+            setClienteOpen(true)
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [searchCliente, empresa?.id, selectedCliente])
+
+    // Búsqueda server-side de productos por línea (ILIKE, soporta *)
+    useEffect(() => {
+        if (productDropdown === null || !empresa?.id) { setSearchResults([]); return }
+        const texto = (searchProducto[productDropdown] || '').trim()
+        if (texto.length < 2) { setSearchResults([]); return }
+        const timer = setTimeout(async () => {
+            const q = '%' + texto.replace(/\*/g, '%') + '%'
+            const { data } = await supabase
+                .from('productos').select('*, subproductos(*)')
+                .eq('empresa_id', empresa.id).eq('activo', true)
+                .or(`nombre.ilike.${q},codigo.ilike.${q}`)
+                .order('nombre').limit(50)
+            setSearchResults(data ?? [])
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [searchProducto, productDropdown, empresa?.id])
 
     async function buscarProformas() {
         if (!empresa?.id) return
@@ -581,10 +618,7 @@ export function ProformaPage() {
     const tieneEfectivo  = pagos.some(p => p.metodo === 'efectivo')
     const vuelto         = tieneEfectivo ? Math.max(0, montoRecibido - (convertModal.proforma?.total ?? 0)) : 0
 
-    const filteredClientes = clientes.filter(c =>
-        c.nombre?.toLowerCase().includes(searchCliente.toLowerCase()) ||
-        c.identificacion?.includes(searchCliente)
-    )
+    // filteredClientes reemplazado por clienteResults (server-side)
 
     // ─────────────────────────────────────────────────────────────────────────
     // RENDER
@@ -938,12 +972,12 @@ export function ProformaPage() {
                                                         value={searchCliente}
                                                         onChange={e => setSearchCliente(e.target.value)} />
                                                 </div>
-                                                {searchCliente && (
-                                                    <div className="absolute z-20 w-full max-w-lg bg-white border border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto">
-                                                        {filteredClientes.map(c => (
+                                                {clienteOpen && clienteResults.length > 0 && !selectedCliente && (
+                                                    <div className="absolute z-20 w-full max-w-lg bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto">
+                                                        {clienteResults.map(c => (
                                                             <button key={c.id}
                                                                 className="w-full px-4 py-3 text-left hover:bg-slate-50 flex justify-between items-center border-b border-slate-50 last:border-0 text-sm"
-                                                                onClick={() => { setSelectedCliente(c); setSearchCliente(''); setClienteCollapsed(true) }}>
+                                                                onMouseDown={e => { e.preventDefault(); setSelectedCliente(c); setSearchCliente(c.nombre); setClienteOpen(false); setClienteCollapsed(true) }}>
                                                                 <div>
                                                                     <p className="font-bold text-slate-900">{c.nombre}</p>
                                                                     <p className="text-xs text-slate-500">{c.identificacion}</p>
@@ -951,9 +985,6 @@ export function ProformaPage() {
                                                                 <User className="w-4 h-4 text-slate-300" />
                                                             </button>
                                                         ))}
-                                                        {filteredClientes.length === 0 && (
-                                                            <div className="px-4 py-3 text-sm text-slate-400">No se encontraron clientes</div>
-                                                        )}
                                                     </div>
                                                 )}
                                                 {selectedCliente && (
@@ -1059,10 +1090,8 @@ export function ProformaPage() {
                                 <div className="space-y-2">
                                     {detalles.map((det, idx) => {
                                         const lin  = calcularLinea(det)
-                                        const prods = esModoServicio ? [] : productos.filter(p => {
-                                            const q = (searchProducto[idx] || '').toLowerCase()
-                                            return !q || p.nombre?.toLowerCase().includes(q) || p.codigo?.toLowerCase().includes(q)
-                                        }).slice(0, 20)
+                                        // Productos: server-side ILIKE, resultados en searchResults
+                                        const prods = esModoServicio ? [] : (productDropdown === idx ? searchResults : [])
 
                                         return (
                                             <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-slate-50/50 rounded-xl p-2 border border-slate-100">

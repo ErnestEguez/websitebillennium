@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { carteraCxcService } from '../services/carteraCxcService'
 import { formatCurrency } from '../lib/utils'
-import { Search, Printer, ChevronDown, ChevronUp, User, X } from 'lucide-react'
+import { Search, Printer, ChevronDown, ChevronUp, User, X, Loader2 } from 'lucide-react'
+import { supabase } from '../lib/supabase'
 
 const ESTADO_BADGE: Record<string, string> = {
     pendiente: 'bg-yellow-100 text-yellow-800',
@@ -21,21 +22,24 @@ export function EstadoCuentaClientePage() {
     const [loadingClientes, setLoadingClientes] = useState(false)
     const [expandidos, setExpandidos]   = useState<Record<string, boolean>>({})
 
+    // Búsqueda server-side con debounce (ILIKE, soporta *)
     useEffect(() => {
-        if (empresa?.id) cargarClientes()
-    }, [empresa?.id])
-
-    async function cargarClientes() {
-        setLoadingClientes(true)
-        try {
-            const data = await carteraCxcService.getClientesConCartera(empresa!.id)
-            setClientes(data)
-        } catch (e) {
-            console.error(e)
-        } finally {
-            setLoadingClientes(false)
-        }
-    }
+        if (!empresa?.id || clienteSel) return
+        if (busqueda.trim().length < 2) { setClientes([]); return }
+        const timer = setTimeout(async () => {
+            setLoadingClientes(true)
+            try {
+                const q = '%' + busqueda.trim().replace(/\*/g, '%') + '%'
+                const { data } = await supabase
+                    .from('clientes').select('id, nombre, identificacion')
+                    .eq('empresa_id', empresa.id)
+                    .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
+                    .order('nombre').limit(50)
+                setClientes(data ?? [])
+            } finally { setLoadingClientes(false) }
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [busqueda, empresa?.id, clienteSel])
 
     async function seleccionarCliente(cliente: any) {
         setClienteSel(cliente)
@@ -59,11 +63,8 @@ export function EstadoCuentaClientePage() {
         setClienteSel(null); setBusqueda(''); setCuenta([])
     }
 
-    const clientesFiltrados = busqueda && !clienteSel
-        ? clientes.filter(c =>
-            c.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-            c.identificacion?.includes(busqueda))
-        : []
+    // clientes ya viene filtrado del servidor (server-side ILIKE)
+    const clientesFiltrados = busqueda && !clienteSel ? clientes : []
 
     // Totales
     const totalOriginal = cuenta.reduce((s, c) => s + Number(c.valor_original), 0)
@@ -195,8 +196,9 @@ export function EstadoCuentaClientePage() {
                 </div>
 
                 {/* Lista desplegable de clientes */}
+                {loadingClientes && <p className="text-xs text-slate-400 mt-1 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Buscando...</p>}
                 {!clienteSel && clientesFiltrados.length > 0 && (
-                    <div className="mt-2 max-w-md border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-48 overflow-y-auto shadow-md">
+                    <div className="mt-2 max-w-md border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-64 overflow-y-auto shadow-md">
                         {clientesFiltrados.map(c => (
                             <button
                                 key={c.id}

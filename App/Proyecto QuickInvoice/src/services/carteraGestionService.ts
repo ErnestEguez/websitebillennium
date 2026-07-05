@@ -219,7 +219,8 @@ export const carteraGestionService = {
             .order('fecha_vencimiento', { ascending: true })
 
         if (clienteQ) {
-            q = q.or(`clientes.nombre.ilike.%${clienteQ}%,clientes.identificacion.ilike.%${clienteQ}%`)
+            const cq = '%' + clienteQ.replace(/\*/g, '%') + '%'
+            q = q.or(`clientes.nombre.ilike.${cq},clientes.identificacion.ilike.${cq}`)
         }
 
         const { data, error } = await q

@@ -97,14 +97,14 @@ export function VentasClientePage() {
         const timer = setTimeout(async () => {
             setBuscandoCli(true)
             try {
-                const q = `%${searchCliente.trim()}%`
+                const q = '%' + searchCliente.trim().replace(/\*/g, '%') + '%'
                 const { data } = await supabase
                     .from('clientes')
                     .select('id, nombre, identificacion')
                     .eq('empresa_id', empresa.id)
                     .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
                     .order('nombre')
-                    .limit(20)
+                    .limit(50)
                 setClienteResults((data ?? []) as ClienteMini[])
             } finally {
                 setBuscandoCli(false)
