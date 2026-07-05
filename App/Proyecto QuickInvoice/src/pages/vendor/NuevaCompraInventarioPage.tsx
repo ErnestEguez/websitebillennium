@@ -21,6 +21,7 @@ import {
     ScanLine, Upload, Loader2,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { BuscadorProducto, type ProductoResultado } from '../../components/BuscadorProducto'
 
 const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white'
 
@@ -143,11 +144,8 @@ export function NuevaCompraInventarioPage() {
     async function load() {
         try {
             const { data: prodsData } = await supabase
-                .from('productos')
-                .select('id, codigo, nombre')
-                .eq('empresa_id', empresa!.id)
-                .eq('activo', true)
-                .order('nombre')
+                .from('productos').select('id, codigo, nombre')
+                .eq('empresa_id', empresa!.id).eq('activo', true).order('nombre')
             const [provs, ocs, bods, cats] = await Promise.all([
                 proveedorService.listar(empresa!.id),
                 ocService.listar(empresa!.id),
@@ -773,12 +771,21 @@ export function NuevaCompraInventarioPage() {
                                                             value={d.nombre}
                                                             onChange={e => updLinea(i, 'nombre', e.target.value)}
                                                         />
+                                                    ) : d.producto_id ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 truncate">{d.nombre || d.producto_id}</span>
+                                                            <button type="button" onClick={() => updLinea(i, 'producto_id', '')}
+                                                                className="text-slate-400 hover:text-red-500 text-xs px-1">✕</button>
+                                                        </div>
                                                     ) : (
-                                                        <select className={cn(inp, 'text-sm')} value={d.producto_id}
-                                                            onChange={e => updLinea(i, 'producto_id', e.target.value)}>
-                                                            <option value="">Seleccionar...</option>
-                                                            {productosSimple.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                                                        </select>
+                                                        <BuscadorProducto
+                                                            empresaId={empresa!.id}
+                                                            placeholder="Buscar (Enter o Buscar)…"
+                                                            onSelect={(p: ProductoResultado) => {
+                                                                setDetalle(prev => prev.map((d2, j) => j !== i ? d2
+                                                                    : { ...d2, producto_id: p.id, nombre: p.nombre, codigo: p.codigo ?? '' }))
+                                                            }}
+                                                        />
                                                     )}
                                                 </td>
 

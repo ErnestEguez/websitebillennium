@@ -20,6 +20,7 @@ import {
     MoveRight,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { BuscadorProducto, type ProductoResultado } from '../components/BuscadorProducto'
 
 interface LineaTransferencia {
     id: string
@@ -61,7 +62,7 @@ export function TransferenciaBodegaPage() {
 
     // Catálogos
     const [bodegas,   setBodegas]   = useState<Bodega[]>([])
-    const [productos, setProductos] = useState<any[]>([])
+    const [productos, _setProductos] = useState<any[]>([])
 
     // Cabecera
     const [referencia,  setReferencia]  = useState(generarReferencia)
@@ -116,18 +117,8 @@ export function TransferenciaBodegaPage() {
 
     async function cargarCatalogos() {
         try {
-            const [bods, { data: prods }] = await Promise.all([
-                bodegaService.listar(empresa!.id),
-                supabase
-                    .from('productos')
-                    .select('id, codigo, nombre, stock, costo_promedio, maneja_stock')
-                    .eq('empresa_id', empresa!.id)
-                    .eq('activo', true)
-                    .eq('maneja_stock', true)
-                    .order('nombre'),
-            ])
+            const bods = await bodegaService.listar(empresa!.id)
             setBodegas(bods)
-            setProductos(prods ?? [])
 
             const principal = bods.find(b => b.es_principal)
             if (principal && !bodegaOrigen) setBodegaOrigen(principal.id)
@@ -273,10 +264,9 @@ export function TransferenciaBodegaPage() {
     const bodDestino = bodegas.find(b => b.id === bodegaDestino)
     const totalUnidades = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0), 0)
 
-    // Productos disponibles (con stock > 0 en bodega origen, si hay bodega origen)
-    const productosOrigen = bodegaOrigen
-        ? productos.filter(p => (stockOrigenMap[p.id]?.cantidad ?? 0) > 0)
-        : productos
+    // productosOrigen ya no se usa (reemplazado por BuscadorProducto)
+    const _productosOrigen = [] as any[]
+    void _productosOrigen
 
     return (
         <div className="space-y-6 max-w-6xl">
@@ -478,29 +468,25 @@ export function TransferenciaBodegaPage() {
                                     {/* Producto */}
                                     <div className="space-y-1">
                                         <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Producto</label>
-                                        <select
-                                            className={cn(inp, excede && 'border-red-300')}
-                                            value={linea.producto_id}
-                                            onChange={e => actualizarLinea(idx, 'producto_id', e.target.value)}
-                                        >
-                                            <option value="">Seleccionar producto...</option>
-                                            {/* Primero los que tienen stock en origen, luego el resto con indicación */}
-                                            {productosOrigen.map(p => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.codigo ? `[${p.codigo}] ` : ''}{p.nombre}
-                                                </option>
-                                            ))}
-                                            {productos.filter(p => !productosOrigen.find(po => po.id === p.id)).length > 0 && (
-                                                <>
-                                                    <option disabled>── Sin stock en esta bodega ──</option>
-                                                    {productos.filter(p => !productosOrigen.find(po => po.id === p.id)).map(p => (
-                                                        <option key={p.id} value={p.id} style={{ color: '#9ca3af' }}>
-                                                            {p.codigo ? `[${p.codigo}] ` : ''}{p.nombre} (sin stock)
-                                                        </option>
-                                                    ))}
-                                                </>
-                                            )}
-                                        </select>
+                                        {linea.producto_id ? (
+                                            <div className="flex items-center gap-1">
+                                                <span className="flex-1 text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 truncate">
+                                                    {linea.producto_codigo ? `[${linea.producto_codigo}] ` : ''}{linea.producto_nombre}
+                                                </span>
+                                                <button type="button" onClick={() => actualizarLinea(idx, 'producto_id', '')}
+                                                    className="p-2 text-slate-400 hover:text-red-500">✕</button>
+                                            </div>
+                                        ) : (
+                                            <BuscadorProducto
+                                                empresaId={empresa!.id}
+                                                placeholder="Buscar producto (Enter o Buscar)…"
+                                                onSelect={(p: ProductoResultado) => {
+                                                    setLineas(prev => prev.map((l, i) => i === idx
+                                                        ? { ...l, producto_id: p.id, producto_nombre: p.nombre, producto_codigo: p.codigo ?? '' }
+                                                        : l))
+                                                }}
+                                            />
+                                        )}
                                         {/* Costo promedio informativo */}
                                         {linea.producto_id && linea.costo_promedio > 0 && (
                                             <p className="text-[11px] text-slate-400">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { carteraCxcService } from '../services/carteraCxcService'
 import { formatCurrency } from '../lib/utils'
@@ -22,24 +22,19 @@ export function EstadoCuentaClientePage() {
     const [loadingClientes, setLoadingClientes] = useState(false)
     const [expandidos, setExpandidos]   = useState<Record<string, boolean>>({})
 
-    // Búsqueda server-side con debounce (ILIKE, soporta *)
-    useEffect(() => {
-        if (!empresa?.id || clienteSel) return
-        if (busqueda.trim().length < 2) { setClientes([]); return }
-        const timer = setTimeout(async () => {
-            setLoadingClientes(true)
-            try {
-                const q = '%' + busqueda.trim().replace(/\*/g, '%') + '%'
-                const { data } = await supabase
-                    .from('clientes').select('id, nombre, identificacion')
-                    .eq('empresa_id', empresa.id)
-                    .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
-                    .order('nombre').limit(50)
-                setClientes(data ?? [])
-            } finally { setLoadingClientes(false) }
-        }, 300)
-        return () => clearTimeout(timer)
-    }, [busqueda, empresa?.id, clienteSel])
+    async function buscarCliente() {
+        if (!empresa?.id || clienteSel || !busqueda.trim()) return
+        setLoadingClientes(true)
+        try {
+            const q = '%' + busqueda.trim().replace(/\*/g, '%') + '%'
+            const { data } = await supabase
+                .from('clientes').select('id, nombre, identificacion')
+                .eq('empresa_id', empresa.id)
+                .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
+                .order('nombre').limit(50)
+            setClientes(data ?? [])
+        } finally { setLoadingClientes(false) }
+    }
 
     async function seleccionarCliente(cliente: any) {
         setClienteSel(cliente)
@@ -183,9 +178,10 @@ export function EstadoCuentaClientePage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Buscar por nombre o identificación..."
+                        placeholder="Nombre o RUC/Cédula — Enter o Buscar (use * como comodín)"
                         value={busqueda}
-                        onChange={e => { setBusqueda(e.target.value); if (clienteSel) limpiar() }}
+                        onChange={e => { setBusqueda(e.target.value); if (clienteSel) limpiar(); setClientes([]) }}
+                        onKeyDown={e => { if (e.key === 'Enter') buscarCliente() }}
                         className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500 outline-none"
                     />
                     {(busqueda || clienteSel) && (
@@ -194,6 +190,11 @@ export function EstadoCuentaClientePage() {
                         </button>
                     )}
                 </div>
+                <button onClick={buscarCliente} disabled={loadingClientes || !busqueda.trim()}
+                    className="flex items-center gap-1.5 px-4 py-2.5 text-sm bg-primary-600 text-white rounded-xl hover:bg-primary-700 disabled:opacity-50">
+                    {loadingClientes ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    Buscar
+                </button>
 
                 {/* Lista desplegable de clientes */}
                 {loadingClientes && <p className="text-xs text-slate-400 mt-1 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Buscando...</p>}

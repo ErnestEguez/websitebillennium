@@ -20,6 +20,7 @@ import {
     ToggleRight,
     TrendingUp,
     BookOpen,
+    Loader2,
 } from 'lucide-react'
 
 // ─── Modal de Subproductos ────────────────────────────────────────────────────
@@ -295,52 +296,15 @@ export function ProductsPage() {
         }).catch(console.error)
     }, [empresa?.id])
 
-    // Búsqueda server-side: solo se lanza cuando hay texto + debounce 300ms
-    useEffect(() => {
+    // Búsqueda server-side: se ejecuta solo al presionar Buscar o Enter
+    async function ejecutarBusqueda() {
         if (!empresa?.id) return
-        if (!search.trim() && !selectedCategoria) {
-            setProductos([])
-            setLoading(false)
-            return
-        }
-        const timer = setTimeout(async () => {
-            setLoading(true)
-            try {
-                let q = supabase
-                    .from('productos')
-                    .select('*, categorias(nombre)')
-                    .eq('empresa_id', empresa.id)
-                    .order('nombre')
-                if (search.trim()) {
-                    const sq = '%' + search.trim().replace(/\*/g, '%') + '%'
-                    q = q.or(`nombre.ilike.${sq},codigo.ilike.${sq}`)
-                }
-                if (selectedCategoria) {
-                    q = q.eq('categoria_id', selectedCategoria)
-                }
-                const { data } = await q
-                const catMap: Record<string, string> = {}
-                for (const c of categorias) catMap[c.id] = c.nombre
-                const enriched = (data || []).map((p: any) => ({
-                    ...p,
-                    categorias: p.categorias || (p.categoria_id ? { nombre: catMap[p.categoria_id] || '' } : null)
-                }))
-                setProductos(enriched)
-            } catch (e) { console.error(e) } finally { setLoading(false) }
-        }, 300)
-        return () => clearTimeout(timer)
-    }, [search, selectedCategoria, empresa?.id])
-
-    async function loadData() {
-        // Llamado desde guardar/eliminar para refrescar la lista actual
-        if (!search.trim() && !selectedCategoria) return
+        if (!search.trim() && !selectedCategoria) { setProductos([]); return }
         setLoading(true)
         try {
             let q = supabase
-                .from('productos')
-                .select('*, categorias(nombre)')
-                .eq('empresa_id', empresa!.id)
-                .order('nombre')
+                .from('productos').select('*, categorias(nombre)')
+                .eq('empresa_id', empresa.id).order('nombre')
             if (search.trim()) {
                 const sq = '%' + search.trim().replace(/\*/g, '%') + '%'
                 q = q.or(`nombre.ilike.${sq},codigo.ilike.${sq}`)
@@ -353,8 +317,11 @@ export function ProductsPage() {
                 ...p,
                 categorias: p.categorias || (p.categoria_id ? { nombre: catMap[p.categoria_id] || '' } : null)
             })))
-        } finally { setLoading(false) }
+        } catch (e) { console.error(e) } finally { setLoading(false) }
     }
+
+    // Recarga la lista con el criterio actual (después de guardar/eliminar)
+    async function loadData() { await ejecutarBusqueda() }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -450,10 +417,11 @@ export function ProductsPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                         type="text"
-                        placeholder="Buscar por nombre..."
+                        placeholder="Nombre o código — presiona Enter o Buscar (use * como comodín)"
                         className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') ejecutarBusqueda() }}
                     />
                 </div>
                 <select
@@ -466,6 +434,11 @@ export function ProductsPage() {
                         <option key={cat.id} value={cat.id}>{cat.nombre}</option>
                     ))}
                 </select>
+                <button onClick={ejecutarBusqueda} disabled={loading}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    Buscar
+                </button>
             </div>
 
             <div className="card overflow-hidden">

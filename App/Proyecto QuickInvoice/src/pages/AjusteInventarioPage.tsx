@@ -20,6 +20,7 @@ import {
     Info,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { BuscadorProducto, type ProductoResultado } from '../components/BuscadorProducto'
 
 interface LineaAjuste {
     id: string                      // uuid local para key de React
@@ -64,7 +65,7 @@ export function AjusteInventarioPage() {
 
     // ── Catálogos
     const [bodegas,   setBodegas]   = useState<Bodega[]>([])
-    const [productos, setProductos] = useState<any[]>([])
+    const [productos, _setProductos] = useState<any[]>([])
 
     // ── Cabecera
     const [referencia,   setReferencia]   = useState(generarReferencia)
@@ -106,18 +107,8 @@ export function AjusteInventarioPage() {
 
     async function cargarCatalogos() {
         try {
-            const [bods, { data: prods }] = await Promise.all([
-                bodegaService.listar(empresa!.id),
-                supabase
-                    .from('productos')
-                    .select('id, codigo, nombre, stock, costo_promedio, maneja_stock')
-                    .eq('empresa_id', empresa!.id)
-                    .eq('activo', true)
-                    .eq('maneja_stock', true)
-                    .order('nombre'),
-            ])
+            const bods = await bodegaService.listar(empresa!.id)
             setBodegas(bods)
-            setProductos(prods ?? [])
 
             // Auto-seleccionar bodega principal
             const principal = bods.find(b => b.es_principal)
@@ -424,18 +415,25 @@ export function AjusteInventarioPage() {
                                 {/* Producto */}
                                 <div className="space-y-1">
                                     <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase">Producto</label>
-                                    <select
-                                        className={cn(inp, excede && 'border-red-300')}
-                                        value={linea.producto_id}
-                                        onChange={e => actualizarLinea(idx, 'producto_id', e.target.value)}
-                                    >
-                                        <option value="">Seleccionar producto...</option>
-                                        {productos.map(p => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.codigo ? `[${p.codigo}] ` : ''}{p.nombre}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    {linea.producto_id ? (
+                                        <div className="flex items-center gap-1">
+                                            <span className="flex-1 text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 truncate">
+                                                {linea.producto_codigo ? `[${linea.producto_codigo}] ` : ''}{linea.producto_nombre}
+                                            </span>
+                                            <button type="button" onClick={() => actualizarLinea(idx, 'producto_id', '')}
+                                                className="p-2 text-slate-400 hover:text-red-500">✕</button>
+                                        </div>
+                                    ) : (
+                                        <BuscadorProducto
+                                            empresaId={empresa!.id}
+                                            placeholder="Buscar producto (Enter o Buscar)…"
+                                            onSelect={(p: ProductoResultado) => {
+                                                setLineas(prev => prev.map((l, i) => i === idx
+                                                    ? { ...l, producto_id: p.id, producto_nombre: p.nombre, producto_codigo: p.codigo ?? '', costo_unitario: (p.costo_promedio || 0) }
+                                                    : l))
+                                            }}
+                                        />
+                                    )}
                                     {/* Stock disponible */}
                                     {linea.producto_id && stockDisp !== null && (
                                         <p className={cn(

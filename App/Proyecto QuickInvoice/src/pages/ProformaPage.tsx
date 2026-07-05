@@ -358,38 +358,32 @@ export function ProformaPage() {
         if (cf) setSelectedCliente(cf)
     }
 
-    // Búsqueda server-side de clientes (ILIKE, soporta *)
-    useEffect(() => {
-        if (!empresa?.id || selectedCliente || searchCliente.trim().length < 2) { setClienteResults([]); return }
-        const timer = setTimeout(async () => {
-            const q = '%' + searchCliente.trim().replace(/\*/g, '%') + '%'
-            const { data } = await supabase
-                .from('clientes').select('id, nombre, identificacion')
-                .eq('empresa_id', empresa.id)
-                .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
-                .order('nombre').limit(50)
-            setClienteResults(data ?? [])
-            setClienteOpen(true)
-        }, 300)
-        return () => clearTimeout(timer)
-    }, [searchCliente, empresa?.id, selectedCliente])
+    // Búsqueda de clientes: solo al presionar Enter o botón Buscar
+    async function buscarClientes() {
+        if (!empresa?.id || selectedCliente || !searchCliente.trim()) return
+        const q = '%' + searchCliente.trim().replace(/\*/g, '%') + '%'
+        const { data } = await supabase
+            .from('clientes').select('id, nombre, identificacion')
+            .eq('empresa_id', empresa.id)
+            .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
+            .order('nombre').limit(50)
+        setClienteResults(data ?? [])
+        setClienteOpen(true)
+    }
 
-    // Búsqueda server-side de productos por línea (ILIKE, soporta *)
-    useEffect(() => {
-        if (productDropdown === null || !empresa?.id) { setSearchResults([]); return }
-        const texto = (searchProducto[productDropdown] || '').trim()
-        if (texto.length < 2) { setSearchResults([]); return }
-        const timer = setTimeout(async () => {
-            const q = '%' + texto.replace(/\*/g, '%') + '%'
-            const { data } = await supabase
-                .from('productos').select('*, subproductos(*)')
-                .eq('empresa_id', empresa.id).eq('activo', true)
-                .or(`nombre.ilike.${q},codigo.ilike.${q}`)
-                .order('nombre').limit(50)
-            setSearchResults(data ?? [])
-        }, 300)
-        return () => clearTimeout(timer)
-    }, [searchProducto, productDropdown, empresa?.id])
+    // Búsqueda de productos por línea: solo al presionar Enter o botón Buscar
+    async function buscarProductoLinea(idx: number) {
+        const texto = (searchProducto[idx] || '').trim()
+        if (!empresa?.id || !texto) { setSearchResults([]); return }
+        const q = '%' + texto.replace(/\*/g, '%') + '%'
+        const { data } = await supabase
+            .from('productos').select('*, subproductos(*)')
+            .eq('empresa_id', empresa.id).eq('activo', true)
+            .or(`nombre.ilike.${q},codigo.ilike.${q}`)
+            .order('nombre').limit(50)
+        setSearchResults(data ?? [])
+        setProductDropdown(idx)
+    }
 
     async function buscarProformas() {
         if (!empresa?.id) return
@@ -967,11 +961,16 @@ export function ProformaPage() {
                                                 <div className="relative">
                                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                                     <input type="text"
-                                                        placeholder="Buscar cliente por nombre o identificación…"
+                                                        placeholder="Nombre o RUC — Enter o Buscar (use * como comodín)"
                                                         className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-violet-400 outline-none text-sm"
                                                         value={searchCliente}
-                                                        onChange={e => setSearchCliente(e.target.value)} />
+                                                        onChange={e => { setSearchCliente(e.target.value); setClienteOpen(false) }}
+                                                        onKeyDown={e => { if (e.key === 'Enter') buscarClientes() }} />
                                                 </div>
+                                                <button type="button" onClick={buscarClientes}
+                                                    className="px-3 py-2 text-sm bg-violet-600 text-white rounded-xl hover:bg-violet-700">
+                                                    Buscar
+                                                </button>
                                                 {clienteOpen && clienteResults.length > 0 && !selectedCliente && (
                                                     <div className="absolute z-20 w-full max-w-lg bg-white border border-slate-200 rounded-xl shadow-2xl max-h-64 overflow-y-auto">
                                                         {clienteResults.map(c => (
@@ -1099,17 +1098,17 @@ export function ProformaPage() {
                                                 <div className={cn('relative', esModoServicio ? 'col-span-5' : 'col-span-3')}>
                                                     <input
                                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-violet-400"
-                                                        placeholder={esModoServicio ? 'Descripción del servicio' : 'Buscar producto…'}
+                                                        placeholder={esModoServicio ? 'Descripción del servicio' : 'Código/nombre + Enter o Buscar (usa *)'}
                                                         value={esModoServicio ? det.nombre_producto : (searchProducto[idx] ?? det.nombre_producto)}
                                                         onChange={e => {
                                                             if (esModoServicio) {
                                                                 updateLinea(idx, 'nombre_producto', e.target.value)
                                                             } else {
                                                                 setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
-                                                                setProductDropdown(idx)
+                                                                setSearchResults([])
                                                             }
                                                         }}
-                                                        onFocus={() => !esModoServicio && setProductDropdown(idx)}
+                                                        onKeyDown={e => { if (e.key === 'Enter' && !esModoServicio) { e.preventDefault(); buscarProductoLinea(idx) } }}
                                                         onBlur={() => setTimeout(() => setProductDropdown(null), 200)}
                                                     />
                                                     {/* Dropdown productos */}

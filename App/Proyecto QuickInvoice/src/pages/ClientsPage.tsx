@@ -25,24 +25,23 @@ export function ClientsPage() {
     const [editingCliente, setEditingCliente] = useState<Partial<Cliente> | null>(null)
     const [isSearchingSRI, setIsSearchingSRI] = useState(false)
 
-    // Búsqueda server-side con debounce
-    useEffect(() => {
+    // Búsqueda solo al presionar Enter o botón Buscar
+    async function buscarClientes() {
         if (!empresa?.id) return
-        if (search.trim().length < 2) { loadData(); return }
-        const timer = setTimeout(async () => {
-            setLoading(true)
-            try {
-                const q = '%' + search.trim().replace(/\*/g, '%') + '%'
-                const { data } = await supabase
-                    .from('clientes').select('*')
-                    .eq('empresa_id', empresa.id)
-                    .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
-                    .order('nombre').limit(200)
-                setClientes(data as Cliente[] ?? [])
-            } finally { setLoading(false) }
-        }, 300)
-        return () => clearTimeout(timer)
-    }, [search, empresa?.id])
+        setLoading(true)
+        try {
+            if (!search.trim()) {
+                await loadData(); return
+            }
+            const q = '%' + search.trim().replace(/\*/g, '%') + '%'
+            const { data } = await supabase
+                .from('clientes').select('*')
+                .eq('empresa_id', empresa.id)
+                .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
+                .order('nombre').limit(200)
+            setClientes(data as Cliente[] ?? [])
+        } finally { setLoading(false) }
+    }
 
     useEffect(() => {
         if (empresa?.id) {
@@ -159,15 +158,23 @@ export function ClientsPage() {
                 </button>
             </div>
 
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                    type="text"
-                    placeholder="Buscar por nombre o RUC/Cédula..."
-                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
+            <div className="flex gap-2">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                        type="text"
+                        placeholder="Nombre o RUC/Cédula — Enter o Buscar (use * como comodín)"
+                        className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') buscarClientes() }}
+                    />
+                </div>
+                <button onClick={buscarClientes} disabled={loading}
+                    className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <SearchIcon className="w-4 h-4" />}
+                    Buscar
+                </button>
             </div>
 
             <div className="card overflow-hidden">
