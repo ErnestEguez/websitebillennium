@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { kardexService, type KardexConProducto } from '../services/kardexService'
 import { bodegaService } from '../services/bodegaService'
 import type { Bodega } from '../types/vendors'
-import { TrendingUp, TrendingDown, Package, Printer, Download, Warehouse } from 'lucide-react'
+import { TrendingUp, TrendingDown, Package, Printer, Download, Warehouse, Search, X } from 'lucide-react'
 import { formatCurrency } from '../lib/utils'
 import { supabase } from '../lib/supabase'
 
@@ -13,9 +13,14 @@ export function KardexPage() {
     const { empresa } = useAuth()
     const printRef = useRef<HTMLDivElement>(null)
 
-    const [productos,            setProductos]            = useState<any[]>([])
+    const [productos,            _setProductos]           = useState<any[]>([])
     const [bodegas,              setBodegas]              = useState<Bodega[]>([])
     const [productoSeleccionado, setProductoSeleccionado] = useState('')
+    const [productoNombre,       setProductoNombre]       = useState('')   // nombre visible en el buscador
+    const [searchText,           setSearchText]           = useState('')
+    const [searchResults,        setSearchResults]        = useState<any[]>([])
+    const [searchOpen,           setSearchOpen]           = useState(false)
+    const [searching,            setSearching]            = useState(false)
     const [bodegaSeleccionada,   setBodegaSeleccionada]   = useState('')   // '' = todas
     const [movimientos,          setMovimientos]          = useState<KardexConProducto[]>([])
     const [saldoInicial,         setSaldoInicial]         = useState(0)
@@ -33,7 +38,7 @@ export function KardexPage() {
     })
 
     function productoActualNombre() {
-        return productos.find(p => p.id === productoSeleccionado)?.nombre ?? 'producto'
+        return productoActual?.nombre ?? 'producto'
     }
 
     useEffect(() => {
@@ -42,16 +47,37 @@ export function KardexPage() {
 
     async function cargarCatalogos() {
         try {
-            const [stock, bods] = await Promise.all([
-                kardexService.getResumenStock(empresa!.id),
-                bodegaService.listar(empresa!.id),
-            ])
-            setProductos(stock)
+            const bods = await bodegaService.listar(empresa!.id)
             setBodegas(bods)
         } catch (e) {
             console.error('Error cargando catálogos:', e)
         }
     }
+
+    // Búsqueda server-side con ILIKE (código o nombre)
+    useEffect(() => {
+        if (!empresa?.id || searchText.trim().length < 2) { setSearchResults([]); return }
+        const timer = setTimeout(async () => {
+            setSearching(true)
+            try {
+                const q = `%${searchText.trim()}%`
+                const { data } = await supabase
+                    .from('productos')
+                    .select('id, codigo, nombre, stock, costo_promedio')
+                    .eq('empresa_id', empresa.id)
+                    .eq('activo', true)
+                    .eq('maneja_stock', true)
+                    .or(`nombre.ilike.${q},codigo.ilike.${q}`)
+                    .order('nombre')
+                    .limit(30)
+                setSearchResults(data ?? [])
+                setSearchOpen(true)
+            } finally {
+                setSearching(false)
+            }
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [searchText, empresa?.id])
 
     async function loadKardex() {
         if (!productoSeleccionado) { alert('Selecciona un producto'); return }
@@ -93,7 +119,7 @@ export function KardexPage() {
                     .maybeSingle()
                 setStockBodega(data ? { cantidad: Number(data.cantidad), costo_promedio: Number(data.costo_promedio) } : { cantidad: 0, costo_promedio: 0 })
             } else {
-                const prod = productos.find(p => p.id === productoSeleccionado)
+                const prod = productoActual
                 setStockBodega(prod ? { cantidad: Number(prod.stock ?? 0), costo_promedio: Number(prod.costo_promedio ?? 0) } : null)
             }
         } catch (e) {
@@ -115,7 +141,7 @@ export function KardexPage() {
     }
 
     const rows         = movimientos.length > 0 ? buildRows() : []
-    const productoActual = productos.find(p => p.id === productoSeleccionado)
+    const productoActual = searchResults.find(p => p.id === productoSeleccionado) ?? productos.find(p => p.id === productoSeleccionado)
     const bodegaActual   = bodegas.find(b => b.id === bodegaSeleccionada)
 
     const totalEntradas = rows.filter(r => r.tipo_movimiento === 'ENTRADA').reduce((s, r) => s + Number(r.cantidad), 0)
@@ -172,15 +198,53 @@ export function KardexPage() {
             {/* Filtros */}
             <div className="card p-6 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Producto</label>
-                        <select value={productoSeleccionado} onChange={e => setProductoSeleccionado(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500">
-                            <option value="">Seleccionar producto...</option>
-                            {productos.map(p => (
-                                <option key={p.id} value={p.id}>{p.nombre} — Stock: {p.stock}</option>
-                            ))}
-                        </select>
+                    <div className="md:col-span-2 relative">
+                        <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Producto <span className="text-slate-400 font-normal">(busca por código o nombre)</span>
+                        </label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                type="text"
+                                className="w-full pl-9 pr-8 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                                placeholder="Escribe código o descripción..."
+                                value={searchText}
+                                onChange={e => { setSearchText(e.target.value); setSearchOpen(true) }}
+                                onFocus={() => setSearchOpen(true)}
+                            />
+                            {searching && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />}
+                            {productoSeleccionado && !searching && (
+                                <button onMouseDown={e => { e.preventDefault(); setProductoSeleccionado(''); setProductoNombre(''); setSearchText(''); setSearchResults([]); setMovimientos([]) }}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                        {productoSeleccionado && (
+                            <p className="text-xs text-primary-600 mt-1 font-medium">✓ {productoNombre}</p>
+                        )}
+                        {searchOpen && searchResults.length > 0 && !productoSeleccionado && (
+                            <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-white rounded-xl border border-slate-200 shadow-xl max-h-64 overflow-y-auto">
+                                {searchResults.map(p => (
+                                    <button key={p.id} type="button"
+                                        onMouseDown={e => {
+                                            e.preventDefault()
+                                            setProductoSeleccionado(p.id)
+                                            setProductoNombre(`${p.codigo ? p.codigo + ' — ' : ''}${p.nombre}`)
+                                            setSearchText(`${p.codigo ? p.codigo + ' — ' : ''}${p.nombre}`)
+                                            setSearchResults([])
+                                            setSearchOpen(false)
+                                        }}
+                                        className="w-full text-left px-4 py-2.5 hover:bg-primary-50 flex items-center gap-3 text-sm border-b border-slate-100 last:border-0">
+                                        <div>
+                                            {p.codigo && <span className="font-mono text-xs text-slate-400 mr-2">{p.codigo}</span>}
+                                            <span className="text-slate-800 font-medium">{p.nombre}</span>
+                                        </div>
+                                        <span className="ml-auto text-xs text-slate-400 shrink-0">Stock: {p.stock ?? 0}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">

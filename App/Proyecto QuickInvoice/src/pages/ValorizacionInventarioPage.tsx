@@ -57,26 +57,37 @@ export function ValorizacionInventarioPage() {
 
         setLoading(true)
         try {
-            const [{ data: prods }, { data: cats }] = await Promise.all([
-                supabase
+            // Paginar productos para superar el límite de 1000 de Supabase
+            const PAGE = 1000
+            let allProds: any[] = []
+            let from = 0
+            while (true) {
+                const { data, error } = await supabase
                     .from('productos')
                     .select('id, codigo, nombre, stock, costo_promedio, categoria_id, maneja_stock')
                     .eq('empresa_id', empresa.id)
                     .eq('activo', true)
                     .eq('maneja_stock', true)
-                    .order('nombre'),
-                supabase
+                    .order('nombre')
+                    .range(from, from + PAGE - 1)
+                if (error) throw error
+                allProds = allProds.concat(data ?? [])
+                if (!data || data.length < PAGE) break
+                from += PAGE
+            }
+            const prods = allProds
+
+            const { data: cats } = await supabase
                     .from('categorias')
                     .select('id, nombre')
                     .eq('empresa_id', empresa.id)
-                    .order('nombre'),
-            ])
+                    .order('nombre')
 
             const catMap: Record<string, string> = {}
             for (const c of (cats ?? [])) catMap[c.id] = c.nombre
             setCategorias(cats ?? [])
 
-            const prodIds = (prods ?? []).map(p => p.id)
+            const prodIds = prods.map(p => p.id)
 
             // Mapa de stock y costo para bodega específica
             const stockBodegaMap: Record<string, { cantidad: number; costo_promedio: number }> = {}
@@ -98,21 +109,34 @@ export function ValorizacionInventarioPage() {
             const stockCorteMap:  Record<string, number> = {}
 
             if (prodIds.length > 0) {
-                let kardexQuery = supabase
-                    .from('kardex')
-                    .select('producto_id, tipo_movimiento, cantidad, costo_unitario, fecha, created_at')
-                    .eq('empresa_id', empresa.id)
-                    .in('producto_id', prodIds)
-                    .lte('fecha', fechaUso)
-                    .order('created_at', { ascending: false })
-
-                if (bodegaFiltro) {
-                    kardexQuery = (kardexQuery as any).eq('bodega_id', bodegaFiltro)
+                // Paginar kardex para no perder movimientos cuando hay muchos productos
+                const KP = 1000
+                let kardexAll: any[] = []
+                let kFrom = 0
+                // Procesar en lotes de producto_ids para el .in()
+                const ID_BATCH = 200
+                for (let b = 0; b < prodIds.length; b += ID_BATCH) {
+                    const batchIds = prodIds.slice(b, b + ID_BATCH)
+                    let kfrom2 = 0
+                    while (true) {
+                        let q = supabase
+                            .from('kardex')
+                            .select('producto_id, tipo_movimiento, cantidad, costo_unitario, fecha, created_at')
+                            .eq('empresa_id', empresa.id)
+                            .in('producto_id', batchIds)
+                            .lte('fecha', fechaUso)
+                            .order('created_at', { ascending: false })
+                            .range(kfrom2, kfrom2 + KP - 1)
+                        if (bodegaFiltro) q = (q as any).eq('bodega_id', bodegaFiltro)
+                        const { data: chunk } = await q
+                        kardexAll = kardexAll.concat(chunk ?? [])
+                        if (!chunk || chunk.length < KP) break
+                        kfrom2 += KP
+                    }
                 }
+                void kFrom  // unused
 
-                const { data: kardexAll } = await kardexQuery
-
-                for (const k of (kardexAll ?? [])) {
+                for (const k of kardexAll) {
                     const delta = k.tipo_movimiento === 'ENTRADA'
                         ? Number(k.cantidad)
                         : -Number(k.cantidad)
@@ -125,7 +149,7 @@ export function ValorizacionInventarioPage() {
             }
 
             setItems(
-                (prods ?? []).map(p => {
+                prods.map(p => {
                     let stockVal: number
                     let costoPromedioVal: number
 
