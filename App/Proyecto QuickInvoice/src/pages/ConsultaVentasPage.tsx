@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../lib/utils'
-import { FileText, Download, Printer, Search } from 'lucide-react'
+import { FileText, Download, Printer, Search, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
 
 interface FilaVenta {
     id: string
@@ -41,6 +41,9 @@ export function ConsultaVentasPage() {
     const [vendedores, setVendedores] = useState<any[]>([])
     const [filas, setFilas] = useState<FilaVenta[]>([])
     const [loading, setLoading] = useState(false)
+    const [expandedId, setExpandedId] = useState<string | null>(null)
+    const [detalleCache, setDetalleCache] = useState<Record<string, { productos: any[]; pagos: any[] }>>({})
+    const [loadingDetalle, setLoadingDetalle] = useState<string | null>(null)
 
     const handlePrint = useReactToPrint({ contentRef: printRef, documentTitle: 'Consulta_Ventas' })
 
@@ -56,6 +59,23 @@ export function ConsultaVentasPage() {
             .eq('estado', 'activo')
             .order('nombre')
         setVendedores(data || [])
+    }
+
+    async function toggleDetalle(id: string) {
+        if (expandedId === id) { setExpandedId(null); return }
+        setExpandedId(id)
+        if (detalleCache[id]) return
+        setLoadingDetalle(id)
+        try {
+            const [{ data: prods }, { data: pagos }] = await Promise.all([
+                supabase.from('comprobante_detalles')
+                    .select('nombre_producto, cantidad, precio_unitario, descuento, subtotal, iva_porcentaje, iva_valor, total')
+                    .eq('comprobante_id', id).order('id'),
+                supabase.from('comprobante_pagos')
+                    .select('metodo_pago, valor').eq('comprobante_id', id),
+            ])
+            setDetalleCache(prev => ({ ...prev, [id]: { productos: prods ?? [], pagos: pagos ?? [] } }))
+        } finally { setLoadingDetalle(null) }
     }
 
     async function consultar() {
@@ -235,6 +255,7 @@ export function ConsultaVentasPage() {
                             <table className="w-full text-xs">
                                 <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
                                     <tr>
+                                        <th className="w-6 px-2 py-3"></th>
                                         <th className="px-3 py-3 text-left font-semibold text-slate-600">Nro Factura</th>
                                         <th className="px-3 py-3 text-left font-semibold text-slate-600">Fecha</th>
                                         <th className="px-3 py-3 text-left font-semibold text-slate-600">Cliente</th>
@@ -255,9 +276,22 @@ export function ConsultaVentasPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {filas.map(f => {
-                                        const anulada = f.estado_sistema === 'ANULADA'
+                                        const anulada   = f.estado_sistema === 'ANULADA'
+                                        const expanded  = expandedId === f.id
+                                        const detalle   = detalleCache[f.id]
+                                        const cargando  = loadingDetalle === f.id
                                         return (
-                                        <tr key={f.id} className={`hover:bg-slate-50 ${anulada ? 'opacity-50 bg-red-50/30' : ''}`}>
+                                        <>
+                                        <tr key={f.id}
+                                            className={`hover:bg-slate-50 cursor-pointer ${anulada ? 'opacity-50 bg-red-50/30' : ''} ${expanded ? 'bg-primary-50/30' : ''}`}
+                                            onClick={() => toggleDetalle(f.id)}>
+                                            <td className="px-2 py-2 text-slate-400">
+                                                {cargando
+                                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    : expanded
+                                                        ? <ChevronDown className="w-3.5 h-3.5 text-primary-500" />
+                                                        : <ChevronRight className="w-3.5 h-3.5" />}
+                                            </td>
                                             <td className="px-3 py-2 font-mono text-slate-700">
                                                 {anulada
                                                     ? <span className="line-through text-red-400">{f.secuencial}</span>
@@ -294,13 +328,68 @@ export function ConsultaVentasPage() {
                                                       }`}>{f.estado_sri}</span>}
                                             </td>
                                         </tr>
+                                        {/* Fila de detalle expandible */}
+                                        {expanded && (
+                                            <tr key={f.id + '_det'} className="bg-slate-50/80 print:hidden">
+                                                <td colSpan={17} className="px-6 py-3">
+                                                    {!detalle ? (
+                                                        <div className="flex items-center gap-2 text-slate-400 text-xs py-2">
+                                                            <Loader2 className="w-4 h-4 animate-spin" /> Cargando detalle...
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            {/* Productos */}
+                                                            <table className="w-full text-xs border-collapse">
+                                                                <thead>
+                                                                    <tr className="text-slate-500 border-b border-slate-200">
+                                                                        <th className="text-left py-1.5 font-semibold">Producto</th>
+                                                                        <th className="text-right py-1.5 font-semibold w-16">Cant.</th>
+                                                                        <th className="text-right py-1.5 font-semibold w-20">P. Unit.</th>
+                                                                        <th className="text-right py-1.5 font-semibold w-16">Desc.</th>
+                                                                        <th className="text-right py-1.5 font-semibold w-20">Subtotal</th>
+                                                                        <th className="text-right py-1.5 font-semibold w-14">IVA%</th>
+                                                                        <th className="text-right py-1.5 font-semibold w-20">IVA $</th>
+                                                                        <th className="text-right py-1.5 font-semibold w-20">Total</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {detalle.productos.map((p, i) => (
+                                                                        <tr key={i} className="border-b border-slate-100 last:border-0">
+                                                                            <td className="py-1.5 text-slate-700 font-medium">{p.nombre_producto}</td>
+                                                                            <td className="py-1.5 text-right font-mono">{p.cantidad}</td>
+                                                                            <td className="py-1.5 text-right font-mono">{formatCurrency(p.precio_unitario)}</td>
+                                                                            <td className="py-1.5 text-right font-mono text-slate-400">{p.descuento > 0 ? formatCurrency(p.descuento) : '—'}</td>
+                                                                            <td className="py-1.5 text-right font-mono">{formatCurrency(p.subtotal)}</td>
+                                                                            <td className="py-1.5 text-right font-mono">{p.iva_porcentaje}%</td>
+                                                                            <td className="py-1.5 text-right font-mono">{formatCurrency(p.iva_valor)}</td>
+                                                                            <td className="py-1.5 text-right font-mono font-bold text-slate-800">{formatCurrency(p.total)}</td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                            {/* Pagos */}
+                                                            {detalle.pagos.length > 0 && (
+                                                                <div className="flex gap-2 flex-wrap">
+                                                                    {detalle.pagos.map((p, i) => (
+                                                                        <span key={i} className="text-xs px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-slate-600">
+                                                                            <span className="font-semibold uppercase">{p.metodo_pago.replace('_', ' ')}</span>: {formatCurrency(p.valor)}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )}
+                                        </>
                                         )
                                     })}
                                 </tbody>
                                 {/* Totales */}
                                 <tfoot className="bg-slate-900 text-white">
                                     <tr>
-                                        <td className="px-3 py-3 font-black text-xs" colSpan={4}>TOTALES ({filas.length} facturas)</td>
+                                        <td className="px-3 py-3 font-black text-xs" colSpan={5}>TOTALES ({filas.length} facturas)</td>
                                         <td className="px-3 py-3 text-right font-bold text-xs">{formatCurrency(tot.base_iva)}</td>
                                         <td className="px-3 py-3 text-right font-bold text-xs">{formatCurrency(tot.base_cero)}</td>
                                         <td className="px-3 py-3 text-right font-bold text-xs">{formatCurrency(tot.suma_bases)}</td>
