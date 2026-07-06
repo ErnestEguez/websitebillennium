@@ -225,8 +225,40 @@ async function firmarXmlXadesBes(
 
     if (!privateKeyBag?.key || !certBag?.cert) throw new Error("Credenciales inválidas en .p12");
 
+    // Diagnóstico: mostrar todos los certs del .p12
+    const allCertBags = certBags[forge.pki.oids.certBag] || [];
+    console.log(`[P12 DIAG] Total cert bags: ${allCertBags.length}`);
+    allCertBags.forEach((b: any, i: number) => {
+        if (b.cert) {
+            console.log(`[P12 DIAG] Cert ${i}: Subject=${b.cert.subject.getField('CN')?.value ?? '?'}, Issuer=${b.cert.issuer.getField('CN')?.value ?? '?'}, Valid=${b.cert.validity.notBefore.toISOString()}→${b.cert.validity.notAfter.toISOString()}`);
+        }
+    });
+
     const privateKey = privateKeyBag.key;
-    const cert = certBag.cert;
+    // Seleccionar el cert que coincide con la clave privada
+    let cert = certBag.cert;
+    for (const bag of allCertBags) {
+        if (bag.cert?.publicKey) {
+            try {
+                const pubN = (bag.cert.publicKey as any).n?.toString(16);
+                const privN = (privateKey as any).n?.toString(16);
+                if (pubN && privN && pubN === privN) {
+                    cert = bag.cert;
+                    console.log(`[P12 DIAG] Matched cert to private key: ${cert.subject.getField('CN')?.value}`);
+                    break;
+                }
+            } catch { /* skip */ }
+        }
+    }
+
+    // Construir cadena de certificados (signing cert + CA chain)
+    const allCertsB64: string[] = [];
+    for (const bag of allCertBags) {
+        if (bag.cert) {
+            const derBytes = forge.asn1.toDer(forge.pki.certificateToAsn1(bag.cert)).getBytes();
+            allCertsB64.push(btoa(derBytes));
+        }
+    }
 
     const certDerBytes = forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes();
     const certB64 = btoa(certDerBytes);
@@ -259,7 +291,8 @@ async function firmarXmlXadesBes(
     const signedPropertiesToHash = `<xades:SignedProperties xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Id="${signedPropertiesId}">${spContent}</xades:SignedProperties>`;
     const digestSP = await sha1b64(new TextEncoder().encode(signedPropertiesToHash));
 
-    const keyInfoContent = `<ds:X509Data><ds:X509Certificate>${certB64}</ds:X509Certificate></ds:X509Data><ds:KeyValue><ds:RSAKeyValue><ds:Modulus>${modulusB64}</ds:Modulus><ds:Exponent>${exponentB64}</ds:Exponent></ds:RSAKeyValue></ds:KeyValue>`;
+    const x509Chain = allCertsB64.map(c => `<ds:X509Certificate>${c}</ds:X509Certificate>`).join('');
+    const keyInfoContent = `<ds:X509Data>${x509Chain}</ds:X509Data><ds:KeyValue><ds:RSAKeyValue><ds:Modulus>${modulusB64}</ds:Modulus><ds:Exponent>${exponentB64}</ds:Exponent></ds:RSAKeyValue></ds:KeyValue>`;
     const keyInfoToHash = `<ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="${keyInfoId}">${keyInfoContent}</ds:KeyInfo>`;
     const digestKI = await sha1b64(new TextEncoder().encode(keyInfoToHash));
 
@@ -413,19 +446,24 @@ serve(async (req) => {
 
         await supabase.from("comprobantes").update(updateData).eq("id", comprobante_id);
 
-        // ─── PASO 4: NOTIFICACIÓN POR CORREO ───
+        // ─── PASO 4: NOTIFICACIÓN POR CORREO (SMTP) ───
         if (autorizado && comprobante.clientes?.email) {
             try {
-                const resendApiKey = Deno.env.get("RESEND_API_KEY");
-                const nombreCliente = (comprobante.clientes?.nombre || "CONSUMIDOR FINAL").toUpperCase();
-                const identificacionCliente = comprobante.clientes?.identificacion || "9999999999999";
-                // Fecha en hora Ecuador (UTC-5)
-                const fechaRaw = new Date(comprobante.created_at);
-                const fechaEcuador = new Date(fechaRaw.getTime() - 5 * 60 * 60 * 1000);
-                const fechaFormat = fechaEcuador.toLocaleDateString("es-EC");
-                const nombreEmpresa = (comprobante.empresas?.nombre || comprobante.empresas?.razon_social || "La Empresa").toUpperCase();
+                const mailHost = configSri.mail_host as string | undefined;
+                const mailUser = configSri.mail_user as string | undefined;
+                const mailPass = configSri.mail_pass as string | undefined;
 
-                const emailHtml = `<div style="font-family: Arial, sans-serif; padding: 20px;">
+                if (!mailHost || !mailUser || !mailPass) {
+                    console.log("[EMAIL] SMTP no configurado en config_sri — saltando envío");
+                } else {
+                    const nombreCliente = (comprobante.clientes?.nombre || "CONSUMIDOR FINAL").toUpperCase();
+                    const identificacionCliente = comprobante.clientes?.identificacion || "9999999999999";
+                    const fechaRaw = new Date(comprobante.created_at);
+                    const fechaEcuador = new Date(fechaRaw.getTime() - 5 * 60 * 60 * 1000);
+                    const fechaFormat = fechaEcuador.toLocaleDateString("es-EC");
+                    const nombreEmpresa = (comprobante.empresas?.nombre || comprobante.empresas?.razon_social || "La Empresa").toUpperCase();
+
+                    const emailHtml = `<div style="font-family: Arial, sans-serif; padding: 20px;">
   <h2>Factura Electrónica Autorizada</h2>
   <p>Estimado/a <strong>${nombreCliente}</strong>,</p>
   <p>Su factura <strong>${comprobante.secuencial}</strong> del ${fechaFormat} fue <strong style="color:green">AUTORIZADA</strong> por el SRI.</p>
@@ -434,57 +472,53 @@ serve(async (req) => {
   <p>Atentamente,<br><strong>${nombreEmpresa}</strong></p>
 </div>`;
 
-                // ── Generar PDF ──
-                let pdfB64: string | null = null;
-                try {
-                    const ridePdfBytes = await generarRidePdf(comprobante);
-                    let pdfBin = '';
-                    const chunkPdf = 8192;
-                    for (let i = 0; i < ridePdfBytes.length; i += chunkPdf) {
-                        pdfBin += String.fromCharCode(...ridePdfBytes.subarray(i, Math.min(i + chunkPdf, ridePdfBytes.length)));
+                    // ── Generar PDF ──
+                    let pdfB64: string | null = null;
+                    try {
+                        const ridePdfBytes = await generarRidePdf(comprobante);
+                        let pdfBin = '';
+                        const chunkPdf = 8192;
+                        for (let i = 0; i < ridePdfBytes.length; i += chunkPdf) {
+                            pdfBin += String.fromCharCode(...ridePdfBytes.subarray(i, Math.min(i + chunkPdf, ridePdfBytes.length)));
+                        }
+                        pdfB64 = btoa(pdfBin);
+                        console.log("[EMAIL] PDF generado, tamaño base64:", pdfB64.length);
+                    } catch (pdfErr) {
+                        console.error("[EMAIL] Error generando PDF:", pdfErr);
                     }
-                    pdfB64 = btoa(pdfBin);
-                    console.log("[EMAIL] PDF generado, tamaño base64:", pdfB64.length);
-                } catch (pdfErr) {
-                    console.error("[EMAIL] Error generando PDF:", pdfErr);
-                }
 
-                // ── Codificar XML ──
-                let xmlB64: string;
-                try {
-                    xmlB64 = btoa(unescape(encodeURIComponent(xmlFirmado || '')));
-                } catch {
-                    xmlB64 = btoa(xmlFirmado || '');
-                }
+                    const attachments: any[] = [];
+                    if (pdfB64) {
+                        attachments.push({
+                            filename: `RIDE_${comprobante.secuencial}.pdf`,
+                            content: pdfB64,
+                            encoding: 'base64',
+                            contentType: 'application/pdf',
+                        });
+                    }
+                    attachments.push({
+                        filename: `${comprobante.secuencial}.xml`,
+                        content: xmlFirmado || '',
+                        contentType: 'application/xml; charset=utf-8',
+                    });
 
-                const attachments: { filename: string; content: string }[] = [];
-                if (pdfB64) attachments.push({ filename: `RIDE_${comprobante.secuencial}.pdf`, content: pdfB64 });
-                attachments.push({ filename: `${comprobante.secuencial}.xml`, content: xmlB64 });
-
-                const resendFrom = configSri.resend_from
-                    ? `Facturación ${nombreEmpresa} <${configSri.resend_from}>`
-                    : "Facturación <onboarding@resend.dev>";
-
-                const resendResponse = await fetch("https://api.resend.com/emails", {
-                    method: "POST",
-                    headers: {
-                        "Authorization": `Bearer ${resendApiKey}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        from: resendFrom,
+                    // ── Enviar vía SMTP (nodemailer) ──
+                    const nodemailer = (await import("npm:nodemailer@6.9.13")).default;
+                    const transporter = nodemailer.createTransport({
+                        host: mailHost,
+                        port: Number(configSri.mail_port) || 587,
+                        secure: configSri.mail_ssl === true,
+                        auth: { user: mailUser, pass: mailPass },
+                        tls: { rejectUnauthorized: false },
+                    });
+                    await transporter.sendMail({
+                        from: `Facturación ${nombreEmpresa} <${mailUser}>`,
                         to: comprobante.clientes.email,
                         subject: `Factura Autorizada ${comprobante.secuencial} - ${nombreEmpresa}`,
                         html: emailHtml,
                         attachments,
-                    }),
-                });
-
-                const resendResult = await resendResponse.json();
-                if (!resendResponse.ok) {
-                    console.error("[EMAIL] Error Resend:", JSON.stringify(resendResult));
-                } else {
-                    console.log("[EMAIL] Enviado. ID:", resendResult.id);
+                    });
+                    console.log("[EMAIL] Enviado via SMTP a:", comprobante.clientes.email);
                 }
             } catch (emailErr) {
                 console.error("[EMAIL] Error general:", emailErr);

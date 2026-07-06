@@ -36,6 +36,7 @@ export function InvoicingPage() {
     const [offlineQueue, setOfflineQueue] = useState<SyncQueueItem[]>([])
     const [loading, setLoading] = useState(true)
     const [anulando, setAnulando] = useState<string | null>(null)
+    const [resendingEmail, setResendingEmail] = useState<string | null>(null)
     const [search, setSearch] = useState('')
     const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
     const [sriConfig, setSriConfig] = useState<Partial<SriConfig>>({})
@@ -120,6 +121,22 @@ export function InvoicingPage() {
             alert('Error al anular: ' + e.message)
         } finally {
             setAnulando(null)
+        }
+    }
+
+    async function handleResendEmail(doc: Comprobante) {
+        try {
+            setResendingEmail(doc.id)
+            const { data, error } = await supabase.functions.invoke('resend-factura-email', {
+                body: { comprobante_id: doc.id }
+            })
+            if (error) throw new Error(error.message)
+            if (data?.error) throw new Error(data.error)
+            alert('Correo reenviado correctamente a: ' + (data?.message || 'cliente'))
+        } catch (e: any) {
+            alert('Error al reenviar correo: ' + e.message)
+        } finally {
+            setResendingEmail(null)
         }
     }
 
@@ -425,6 +442,19 @@ export function InvoicingPage() {
                                             >
                                                 <Key className="w-4 h-4" />
                                             </button>
+                                            {doc.estado_sri === 'AUTORIZADO' && (
+                                                <button
+                                                    onClick={() => handleResendEmail(doc)}
+                                                    disabled={resendingEmail === doc.id}
+                                                    title="Reenviar correo al cliente"
+                                                    className="p-2 hover:bg-blue-50 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
+                                                >
+                                                    {resendingEmail === doc.id
+                                                        ? <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                                        : <Mail className="w-4 h-4" />
+                                                    }
+                                                </button>
+                                            )}
                                             <Link to={`/comprobante/${doc.id}/print`} title="Ver RIDE PDF" className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors">
                                                 <FileText className="w-4 h-4" />
                                             </Link>
@@ -645,6 +675,17 @@ export function InvoicingPage() {
                                         />
                                     </div>
                                 </div>
+                                <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded border-slate-300 accent-primary-600"
+                                        checked={sriConfig.mail_ssl === true}
+                                        onChange={e => setSriConfig({ ...sriConfig, mail_ssl: e.target.checked })}
+                                    />
+                                    <span className="text-xs text-slate-600 font-medium">
+                                        <b>SSL/TLS</b> (puerto 465) — desactivar para usar STARTTLS con puerto 587
+                                    </span>
+                                </label>
                             </div>
 
                             <div className="pt-6 flex gap-4 mt-6">
