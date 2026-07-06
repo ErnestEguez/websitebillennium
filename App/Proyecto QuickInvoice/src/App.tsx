@@ -59,6 +59,7 @@ import { ConsultaComprasPage }                    from './pages/vendor/reportes/
 import { ConsultaCxPPage }                        from './pages/vendor/reportes/ConsultaCxPPage'
 import { EstadoCuentaProveedorPage }              from './pages/vendor/reportes/EstadoCuentaProveedorPage'
 import { ComprobantesRetencionPage }              from './pages/vendor/ComprobantesRetencionPage'
+import { RetencionRidePage }                       from './pages/vendor/RetencionRidePage'
 // ── Módulo Contabilidad (LedgerPro) ──────────────────────────
 import { ContabilidadProvider }                   from './contexts/contabilidad/ContabilidadContext'
 import { DashboardPage as ContaDashboard }        from './pages/contabilidad/DashboardPage'
@@ -566,6 +567,7 @@ function App() {
             <Route path="/cxp" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><CxPPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
             <Route path="/ajustes" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><AjustesPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
             <Route path="/retenciones" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><ComprobantesRetencionPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
+            <Route path="/retenciones/:compra_id/ride" element={<RetencionRidePage />} />
             <Route path="/reportes/compras" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><ConsultaComprasPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
             <Route path="/reportes/cxp" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><ConsultaCxPPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
             <Route path="/reportes/estado-cuenta" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><EstadoCuentaProveedorPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />

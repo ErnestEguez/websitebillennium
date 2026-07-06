@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { proveedorService } from '../../services/vendorService'
@@ -518,6 +519,12 @@ export function ComprobantesRetencionPage() {
                                                         <Download className="w-3.5 h-3.5" /> Descargar XML
                                                     </button>
                                                 )}
+                                                <Link
+                                                    to={`/retenciones/${doc.compra_id}/ride`}
+                                                    className="btn btn-secondary text-xs flex items-center gap-1.5"
+                                                >
+                                                    <FileText className="w-3.5 h-3.5" /> Ver RIDE
+                                                </Link>
                                                 {doc.estado_sri === 'RECHAZADO' && (
                                                     <button
                                                         onClick={() => autorizarSRI(doc)}
