@@ -10,13 +10,22 @@ const TTL_CLIENTES = 15    // minutes
 const TTL_PRODUCTOS = 45   // minutes
 
 async function fetchClientes(empresaId: string): Promise<any[]> {
-    const { data, error } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('empresa_id', empresaId)
-        .order('nombre', { ascending: true })
-    if (error) throw error
-    return data ?? []
+    const PAGE = 1000
+    let all: any[] = []
+    let from = 0
+    while (true) {
+        const { data, error } = await supabase
+            .from('clientes')
+            .select('*')
+            .eq('empresa_id', empresaId)
+            .order('nombre', { ascending: true })
+            .range(from, from + PAGE - 1)
+        if (error) throw error
+        all = all.concat(data ?? [])
+        if (!data || data.length < PAGE) break
+        from += PAGE
+    }
+    return all
 }
 
 async function fetchProductos(empresaId: string): Promise<any[]> {
