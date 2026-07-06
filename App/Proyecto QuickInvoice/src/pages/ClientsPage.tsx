@@ -129,17 +129,6 @@ export function ClientsPage() {
         }
     }
 
-    async function crearConsumidorFinal() {
-        if (!empresa?.id) return
-        try {
-            await facturacionService.ensureConsumidorFinal(empresa.id)
-            alert('✓ Consumidor Final creado correctamente.')
-            await buscarClientes()
-        } catch (e: any) {
-            alert('Error: ' + e.message)
-        }
-    }
-
     const filtered = clientes  // ya viene filtrado del servidor
 
     if (loading) return <div className="p-12 text-center">Cargando clientes...</div>
@@ -152,14 +141,6 @@ export function ClientsPage() {
                     <p className="text-slate-500">Administra la base de datos de tus clientes para facturación</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={crearConsumidorFinal}
-                        className="btn btn-secondary flex items-center gap-2 text-sm text-amber-700 border-amber-200 hover:bg-amber-50"
-                        title="Crea el cliente Consumidor Final si fue eliminado accidentalmente"
-                    >
-                        <User className="w-4 h-4" />
-                        Consumidor Final
-                    </button>
                 <button
                     onClick={() => {
                         setEditingCliente({ identificacion: '', nombre: '', email: '', direccion: '' })
