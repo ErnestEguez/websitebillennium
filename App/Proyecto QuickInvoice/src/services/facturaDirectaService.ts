@@ -252,35 +252,52 @@ export const facturaDirectaService = {
                 .eq('id', empresa_id)
         }
 
-        // 8. Salida de Kardex para productos con inventario
-        // Si el detalle tiene factor_conversion (subproducto), la cantidad en Kardex
-        // es cantidad_vendida × factor (fracción del producto maestro descontada).
+        // 8. Firmar y autorizar en SRI — se espera primero para tener el nro de autorización en la impresión
         try {
-            const kardexDetalles = detalles
-                .filter(d => d.producto_id && d.cantidad > 0)
-                .map(d => {
-                    const factor = Number(d.factor_conversion || 1)
-                    return {
-                        producto_id: d.producto_id,
-                        cantidad: d.cantidad * factor,
-                        precio_unitario: d.precio_unitario,
-                        subtotal: calcularLinea(d).subtotal_neto,
-                        productos: { nombre: d.nombre_producto, maneja_stock: true }
-                    }
-                })
-
-            if (kardexDetalles.length > 0) {
-                await kardexService.generarSalidaVenta(empresa_id, factura.id, kardexDetalles, bodega_id ?? undefined)
-            }
-        } catch (kardexErr) {
-            console.error('Error al registrar salida en Kardex:', kardexErr)
+            const { data: sriResult, error: sriErr } = await supabase.functions.invoke('sri-signer', {
+                body: { comprobante_id: factura.id }
+            })
+            if (sriErr) console.error('[sri-signer] Error:', sriErr)
+            else         console.log('[sri-signer] Resultado:', sriResult)
+        } catch (edgeFnErr) {
+            console.error('[sri-signer] Excepción:', edgeFnErr)
         }
 
-        // 9a. Asiento contable automático (si contabilidad en línea activa)
-        try {
-            const contaConfig = await contableConfigService.getConfig(empresa_id)
-            if (contaConfig?.contabilidad_en_linea) {
-                // Obtener costo_promedio y cuenta_costo_id por producto para el COGS
+        // 9. Leer comprobante actualizado (ya con nro de autorización) y retornar para imprimir
+        const { data: facturaFinal } = await supabase
+            .from('comprobantes')
+            .select('*')
+            .eq('id', factura.id)
+            .single()
+
+        // 10. Kardex en background — no bloquea la impresión
+        // Si el detalle tiene factor_conversion (subproducto), la cantidad en Kardex
+        // es cantidad_vendida × factor (fracción del producto maestro descontada).
+        const kardexDetalles = detalles
+            .filter(d => d.producto_id && d.cantidad > 0)
+            .map(d => {
+                const factor = Number(d.factor_conversion || 1)
+                return {
+                    producto_id: d.producto_id,
+                    cantidad: d.cantidad * factor,
+                    precio_unitario: d.precio_unitario,
+                    subtotal: calcularLinea(d).subtotal_neto,
+                    productos: { nombre: d.nombre_producto, maneja_stock: true }
+                }
+            })
+
+        if (kardexDetalles.length > 0) {
+            kardexService
+                .generarSalidaVenta(empresa_id, factura.id, kardexDetalles, bodega_id ?? undefined)
+                .catch(err => console.error('[kardex] Error en background:', err))
+        }
+
+        // 11. Asiento contable en background — no bloquea la impresión
+        ;(async () => {
+            try {
+                const contaConfig = await contableConfigService.getConfig(empresa_id)
+                if (!contaConfig?.contabilidad_en_linea) return
+
                 const prodIds = detalles.filter(d => d.producto_id).map(d => d.producto_id!)
                 let prodCostoMap: Record<string, { costo_promedio: number; cuenta_costo_id: string | null }> = {}
                 if (prodIds.length > 0) {
@@ -330,32 +347,10 @@ export const facturaDirectaService = {
                         cuenta_bancaria_contable_id:  p.cuenta_bancaria_contable_id ?? null,
                     })),
                 })
+            } catch (contaErr) {
+                console.error('[asientoVenta] Error en background:', contaErr)
             }
-        } catch (contaErr) {
-            console.error('[asientoVenta] Error (no bloquea factura):', contaErr)
-        }
-
-        // 9. Invocar Edge Function sri-signer
-        try {
-            const { data: sriResult, error: sriErr } = await supabase.functions.invoke('sri-signer', {
-                body: { comprobante_id: factura.id }
-            })
-
-            if (sriErr) {
-                console.error('[sri-signer] Error:', sriErr)
-            } else {
-                console.log('[sri-signer] Resultado:', sriResult)
-            }
-        } catch (edgeFnErr) {
-            console.error('[sri-signer] Excepción:', edgeFnErr)
-        }
-
-        // 10. Retornar comprobante actualizado
-        const { data: facturaFinal } = await supabase
-            .from('comprobantes')
-            .select('*')
-            .eq('id', factura.id)
-            .single()
+        })()
 
         return facturaFinal || factura
     },
