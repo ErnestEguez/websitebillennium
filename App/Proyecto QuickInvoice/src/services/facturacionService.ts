@@ -27,6 +27,7 @@ export interface SriConfig {
     mail_user?: string
     mail_pass?: string
     mail_ssl?: boolean
+    mail_cc?: string
     obligado_contabilidad?: 'SI' | 'NO'
     regimen_rimpe?: boolean
 }

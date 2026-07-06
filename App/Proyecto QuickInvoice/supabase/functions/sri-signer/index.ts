@@ -43,6 +43,60 @@ function hexToB64(hex: string): string {
     return btoa(binary);
 }
 
+// ─── Email HTML Builder ──────────────────────────────
+
+function buildEmailHtml(opts: {
+    tipo: string; nombreCliente: string; identificacionCliente: string;
+    nombreEmpresa: string; ruc: string; logoUrl?: string | null;
+    secuencial: string; fechaFormat: string; total: string;
+    extraRows?: string; accentBg?: string; accentBorder?: string;
+}): string {
+    const logoHtml = opts.logoUrl
+        ? `<img src="${opts.logoUrl}" alt="" style="max-height:55px;max-width:180px;display:block;margin:0 auto;">`
+        : `<span style="color:#fff;font-weight:800;font-size:18px;">${opts.nombreEmpresa}</span>`;
+    const bg = opts.accentBg ?? "#f8faff";
+    const border = opts.accentBorder ?? "#dbeafe";
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:24px 0;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.14);">
+<tr><td style="background:linear-gradient(135deg,#1e4db8 0%,#2563eb 100%);padding:28px 32px;text-align:center;">${logoHtml}</td></tr>
+<tr><td style="background:#fff;padding:28px 32px 16px;text-align:center;">
+  <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Estimado/a</p>
+  <h2 style="margin:0 0 8px;color:#111827;font-size:20px;font-weight:700;">${opts.nombreCliente}</h2>
+  <p style="margin:0;color:#6b7280;font-size:13px;">Ha recibido un documento electr&#243;nico de</p>
+  <p style="margin:6px 0 0;color:#1e4db8;font-size:15px;font-weight:700;">${opts.nombreEmpresa}</p>
+</td></tr>
+<tr><td style="background:#fff;padding:0 32px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"></td></tr>
+<tr><td style="background:#fff;padding:10px 32px 0;text-align:center;">
+  <span style="font-size:11px;font-weight:700;padding:4px 14px;border-radius:99px;letter-spacing:1px;color:#1e40af;background:#dbeafe;">${opts.tipo}</span>
+</td></tr>
+<tr><td style="background:#fff;padding:12px 32px 16px;">
+  <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
+    <tr style="border-bottom:1px solid #f3f4f6;"><td style="color:#6b7280;">N&#176; Comprobante</td><td align="right" style="font-weight:700;color:#111827;">${opts.secuencial}</td></tr>
+    <tr style="border-bottom:1px solid #f3f4f6;"><td style="color:#6b7280;">Identificaci&#243;n</td><td align="right" style="color:#374151;">${opts.identificacionCliente}</td></tr>
+    <tr${opts.extraRows ? ' style="border-bottom:1px solid #f3f4f6;"' : ""}><td style="color:#6b7280;">Fecha</td><td align="right" style="color:#374151;">${opts.fechaFormat}</td></tr>
+    ${opts.extraRows ?? ""}
+  </table>
+</td></tr>
+<tr><td style="background:${bg};padding:22px 32px;text-align:center;border-top:2px solid ${border};border-bottom:2px solid ${border};">
+  <p style="margin:0 0 4px;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">Valor Total</p>
+  <p style="margin:0;color:#111827;font-size:46px;font-weight:900;line-height:1.1;">$${opts.total}</p>
+</td></tr>
+<tr><td style="background:#fff;padding:16px 32px;text-align:center;">
+  <p style="margin:0;color:#6b7280;font-size:12px;">&#128206; Se adjuntan el <strong>RIDE en PDF</strong> y el <strong>XML autorizado</strong> por el SRI</p>
+</td></tr>
+<tr><td style="background:#1e3a8a;padding:18px 32px;text-align:center;">
+  <p style="margin:0 0 4px;color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;">${opts.nombreEmpresa} &nbsp;&middot;&nbsp; RUC: ${opts.ruc}</p>
+  <p style="margin:0;color:rgba(255,255,255,0.55);font-size:10px;">Powered by QuickInvoice &nbsp;&middot;&nbsp; www.billenniumsystem.com</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+
 // ─── RIDE PDF Generator (jsPDF) ────────────────────
 
 async function generarRidePdf(comprobante: any): Promise<Uint8Array> {
@@ -143,7 +197,6 @@ async function generarRidePdf(comprobante: any): Promise<Uint8Array> {
     doc.setTextColor(0, 0, 0);
     y += 8;
 
-    let subtotalBase = 0, totalIva = 0;
     detalles.forEach((d: any, i: number) => {
         if (i % 2 === 0) { doc.setFillColor(248, 250, 252); doc.rect(10, y - 2, 190, 6, 'F'); }
         doc.setFont('helvetica', 'normal');
@@ -157,51 +210,84 @@ async function generarRidePdf(comprobante: any): Promise<Uint8Array> {
         doc.text(`$${subtotalLinea.toFixed(2)}`, 155, y + 2, { align: 'right' });
         doc.text(`$${ivaLinea.toFixed(2)}`, 175, y + 2, { align: 'right' });
         doc.text(`$${totalLinea.toFixed(2)}`, 200, y + 2, { align: 'right' });
-        subtotalBase += subtotalLinea;
-        totalIva += ivaLinea;
         y += 6;
         if (y > 265) { doc.addPage(); y = 15; }
     });
 
     y += 3;
+    doc.setDrawColor(180);
     doc.line(140, y, 200, y);
     y += 5;
 
-    // === TOTALES ===
+    // === DESGLOSE IVA POR TARIFA ===
+    const ivaMap = new Map<number, { base: number; iva: number }>();
+    detalles.forEach((d: any) => {
+        const rate = Math.round(Number(d.iva_porcentaje ?? 0));
+        const prev = ivaMap.get(rate) ?? { base: 0, iva: 0 };
+        ivaMap.set(rate, { base: prev.base + Number(d.subtotal ?? 0), iva: prev.iva + Number(d.iva_valor ?? 0) });
+    });
+    const ratesConIva = [...ivaMap.keys()].filter(r => r > 0).sort((a, b) => a - b);
+    const base0 = ivaMap.get(0)?.base ?? 0;
+    const subtotalSinImp = [...ivaMap.values()].reduce((s, v) => s + v.base, 0);
+
     doc.setFontSize(8);
-    doc.text(`Subtotal sin IVA:`, 141, y);
-    doc.text(`$${subtotalBase.toFixed(2)}`, 200, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    ratesConIva.forEach(rate => {
+        const e = ivaMap.get(rate)!;
+        doc.text(`Subtotal Base IVA ${rate}%:`, 141, y);
+        doc.text(`$${e.base.toFixed(2)}`, 200, y, { align: 'right' });
+        y += 5;
+    });
+    if (base0 > 0 || ratesConIva.length === 0) {
+        doc.text(`Subtotal Base 0%:`, 141, y);
+        doc.text(`$${base0.toFixed(2)}`, 200, y, { align: 'right' });
+        y += 5;
+    }
+    doc.text(`Subtotal sin Impuestos:`, 141, y);
+    doc.text(`$${subtotalSinImp.toFixed(2)}`, 200, y, { align: 'right' });
     y += 5;
-    doc.text(`IVA:`, 141, y);
-    doc.text(`$${totalIva.toFixed(2)}`, 200, y, { align: 'right' });
-    y += 5;
-    doc.setFontSize(11);
+    ratesConIva.forEach(rate => {
+        const e = ivaMap.get(rate)!;
+        doc.text(`IVA ${rate}%:`, 141, y);
+        doc.text(`$${e.iva.toFixed(2)}`, 200, y, { align: 'right' });
+        y += 5;
+    });
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text(`TOTAL:`, 141, y);
-    doc.text(`$${Number(comprobante.total).toFixed(2)}`, 200, y, { align: 'right' });
-    y += 8;
+    doc.setFillColor(30, 77, 184);
+    doc.rect(139, y - 3, 62, 9, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.text(`VALOR TOTAL:`, 141, y + 3);
+    doc.text(`$${Number(comprobante.total).toFixed(2)}`, 199, y + 3, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+    y += 12;
 
     // === PAGOS ===
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     if (pagos.length > 0) {
-        const pagoTexto = pagos.map((p: any) => `${(p.metodo_pago || '').replace('_', ' ')} $${Number(p.valor).toFixed(2)}`).join(' | ');
+        const pagoTexto = pagos.map((p: any) => `${(p.metodo_pago || '').replace(/_/g, ' ')} $${Number(p.valor).toFixed(2)}`).join(' | ');
         doc.text(`Forma de Pago: ${pagoTexto}`, 10, y);
         y += 8;
     }
 
     // === AUTORIZACIÓN ===
+    doc.setDrawColor(180);
     doc.line(10, y, 200, y);
-    y += 5;
+    y += 4;
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('Nº AUTORIZACIÓN:', 10, y);
+    doc.text('Nº AUTORIZACIÓN SRI:', 10, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(comprobante.autorizacion_numero || '', 10, y + 4);
-    y += 12;
+    doc.text(comprobante.autorizacion_numero || '—', 10, y + 5);
+    y += 14;
     doc.setFontSize(7);
-    doc.setTextColor(120);
-    doc.text('Este documento es una representación impresa de un Comprobante Electrónico (RIDE)', 10, y, { maxWidth: 190 });
+    doc.setTextColor(100);
+    doc.text('Este documento es una representación impresa de un Comprobante Electrónico (RIDE).', 105, y, { align: 'center', maxWidth: 190 });
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 77, 184);
+    doc.text('www.billenniumsystem.com', 105, y, { align: 'center' });
 
     return new Uint8Array(doc.output('arraybuffer'));
 }
@@ -463,14 +549,17 @@ serve(async (req) => {
                     const fechaFormat = fechaEcuador.toLocaleDateString("es-EC");
                     const nombreEmpresa = (comprobante.empresas?.nombre || comprobante.empresas?.razon_social || "La Empresa").toUpperCase();
 
-                    const emailHtml = `<div style="font-family: Arial, sans-serif; padding: 20px;">
-  <h2>Factura Electrónica Autorizada</h2>
-  <p>Estimado/a <strong>${nombreCliente}</strong>,</p>
-  <p>Su factura <strong>${comprobante.secuencial}</strong> del ${fechaFormat} fue <strong style="color:green">AUTORIZADA</strong> por el SRI.</p>
-  <p><b>Identificación:</b> ${identificacionCliente}<br><b>Total:</b> $${Number(comprobante.total).toFixed(2)}</p>
-  <p>Se adjuntan el RIDE (PDF) y el XML firmado autorizado por el SRI.</p>
-  <p>Atentamente,<br><strong>${nombreEmpresa}</strong></p>
-</div>`;
+                    const emailHtml = buildEmailHtml({
+                        tipo: "FACTURA ELECTRÓNICA",
+                        nombreCliente,
+                        identificacionCliente,
+                        nombreEmpresa,
+                        ruc: comprobante.empresas?.ruc || "",
+                        logoUrl: comprobante.empresas?.logo_url || null,
+                        secuencial: comprobante.secuencial,
+                        fechaFormat,
+                        total: Number(comprobante.total).toFixed(2),
+                    });
 
                     // ── Generar PDF ──
                     let pdfB64: string | null = null;
@@ -514,6 +603,7 @@ serve(async (req) => {
                     await transporter.sendMail({
                         from: `Facturación ${nombreEmpresa} <${mailUser}>`,
                         to: comprobante.clientes.email,
+                        cc: (configSri.mail_cc as string | undefined) || undefined,
                         subject: `Factura Autorizada ${comprobante.secuencial} - ${nombreEmpresa}`,
                         html: emailHtml,
                         attachments,

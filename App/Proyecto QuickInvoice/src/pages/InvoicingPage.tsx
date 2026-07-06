@@ -686,6 +686,16 @@ export function InvoicingPage() {
                                         <b>SSL/TLS</b> (puerto 465) — desactivar para usar STARTTLS con puerto 587
                                     </span>
                                 </label>
+                                <div className="mt-3">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Copia del correo (CC)</label>
+                                    <input
+                                        type="email"
+                                        placeholder="contabilidad@empresa.com"
+                                        className="w-full px-3 py-2 rounded border border-slate-200 text-xs outline-none"
+                                        value={sriConfig.mail_cc || ''}
+                                        onChange={e => setSriConfig({ ...sriConfig, mail_cc: e.target.value })}
+                                    />
+                                </div>
                             </div>
 
                             <div className="pt-6 flex gap-4 mt-6">
