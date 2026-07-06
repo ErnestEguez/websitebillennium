@@ -5,8 +5,24 @@ import { kardexService } from '../services/kardexService'
 import { formatCurrency } from '../lib/utils'
 import {
     Search, AlertTriangle, CheckCircle2, Copy, Check,
-    ChevronDown, ChevronUp, Trash2, FileX,
+    ChevronDown, ChevronUp, Trash2, FileX, Calendar,
 } from 'lucide-react'
+
+function hoyISO() {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+function ayerISO() {
+    const d = new Date(); d.setDate(d.getDate() - 1)
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+}
+// Ecuador = UTC-5: midnight local = 05:00 UTC
+function utcStart(iso: string) { return `${iso}T05:00:00.000Z` }
+function utcEnd(iso: string) {
+    const d = new Date(`${iso}T05:00:00.000Z`)
+    d.setUTCDate(d.getUTCDate() + 1)
+    return new Date(d.getTime() - 1).toISOString()
+}
 
 interface Factura {
     id: string
@@ -48,6 +64,8 @@ function CopyButton({ text }: { text: string }) {
     )
 }
 
+type Periodo = 'hoy' | 'ayer' | 'periodo'
+
 export function AnulacionFacturasPage() {
     const { empresa } = useAuth()
     const [facturas, setFacturas]       = useState<Factura[]>([])
@@ -55,6 +73,11 @@ export function AnulacionFacturasPage() {
     const [busqueda, setBusqueda]       = useState('')
     const [filtro, setFiltro]           = useState<'VIGENTE' | 'ANULADA' | 'todas'>('VIGENTE')
     const [expandedId, setExpandedId]   = useState<string | null>(null)
+
+    // Período
+    const [periodo, setPeriodo]         = useState<Periodo>('hoy')
+    const [fechaDesde, setFechaDesde]   = useState(hoyISO())
+    const [fechaHasta, setFechaHasta]   = useState(hoyISO())
 
     // Modal anulación
     const [anulandoId, setAnulandoId]   = useState<string | null>(null)
@@ -64,13 +87,23 @@ export function AnulacionFacturasPage() {
     // Revertir pago
     const [revirtiendoPago, setRevirtiendoPago] = useState<string | null>(null)
 
-    useEffect(() => {
-        if (empresa?.id) cargar()
-    }, [empresa?.id, filtro])
+    function cambiarPeriodo(p: Periodo) {
+        setPeriodo(p)
+        if (p === 'hoy')  { setFechaDesde(hoyISO());  setFechaHasta(hoyISO()) }
+        if (p === 'ayer') { setFechaDesde(ayerISO()); setFechaHasta(ayerISO()) }
+    }
 
-    async function cargar() {
+    useEffect(() => {
+        if (empresa?.id && periodo !== 'periodo') cargar()
+    }, [empresa?.id, filtro, periodo])
+
+    // Para período personalizado solo carga cuando el usuario hace clic en Buscar
+
+    async function cargar(desdeOverride?: string, hastaOverride?: string) {
         if (!empresa?.id) return
         setLoading(true)
+        const desde = desdeOverride ?? fechaDesde
+        const hasta = hastaOverride ?? fechaHasta
         try {
             let query = supabase
                 .from('comprobantes')
@@ -82,6 +115,8 @@ export function AnulacionFacturasPage() {
                 `)
                 .eq('empresa_id', empresa.id)
                 .eq('tipo_comprobante', 'FACTURA')
+                .gte('created_at', utcStart(desde))
+                .lte('created_at', utcEnd(hasta))
                 .order('created_at', { ascending: false })
 
             if (filtro !== 'todas') {
@@ -252,6 +287,62 @@ export function AnulacionFacturasPage() {
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">Anulación de Facturas</h1>
                 <p className="text-slate-600 mt-1">Gestión de facturas anuladas. Las facturas anuladas se excluyen de los totales de ventas.</p>
+            </div>
+
+            {/* Selector de período */}
+            <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex gap-2">
+                    {([
+                        { value: 'hoy',     label: 'Hoy' },
+                        { value: 'ayer',    label: 'Ayer' },
+                        { value: 'periodo', label: 'Período' },
+                    ] as const).map(p => (
+                        <button
+                            key={p.value}
+                            onClick={() => cambiarPeriodo(p.value)}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                periodo === p.value
+                                    ? 'bg-primary-600 text-white'
+                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
+                        >
+                            {p.value === 'periodo' && <Calendar className="w-3.5 h-3.5" />}
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+
+                {periodo === 'periodo' && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                            type="date"
+                            value={fechaDesde}
+                            onChange={e => setFechaDesde(e.target.value)}
+                            className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                        />
+                        <span className="text-slate-400 text-sm">—</span>
+                        <input
+                            type="date"
+                            value={fechaHasta}
+                            min={fechaDesde}
+                            onChange={e => setFechaHasta(e.target.value)}
+                            className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                        />
+                        <button
+                            onClick={() => cargar()}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold hover:bg-primary-700 transition-colors"
+                        >
+                            Buscar
+                        </button>
+                    </div>
+                )}
+
+                {periodo !== 'periodo' && (
+                    <span className="text-sm text-slate-500 font-medium">
+                        {periodo === 'hoy'  && new Date().toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        {periodo === 'ayer' && (() => { const d = new Date(); d.setDate(d.getDate()-1); return d.toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long' }) })()}
+                    </span>
+                )}
             </div>
 
             {/* Filtros + búsqueda */}
