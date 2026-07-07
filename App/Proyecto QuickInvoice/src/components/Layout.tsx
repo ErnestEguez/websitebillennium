@@ -265,13 +265,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('facturacion')}
                             onToggle={() => toggleGroup('facturacion')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/nueva-factura','/proformas','/facturacion','/vendedores','/notas-credito','/anulacion-facturas','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/nueva-factura','/proformas','/facturacion','/vendedores','/notas-credito','/anulacion-facturas','/guias-remision','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/nueva-factura"      icon={FilePlus}        label="Nueva Factura"      active={location.pathname === '/nueva-factura'} sub disabled={!p.perm_nueva_factura} />
                             <SidebarItem to="/proformas"          icon={FileText}        label="Proformas"          active={location.pathname.startsWith('/proformas')} sub disabled={!p.perm_nueva_factura} />
                             <SidebarItem to="/facturacion"        icon={FileText}        label="Comprobantes"       active={location.pathname === '/facturacion'} sub disabled={!p.perm_comprobantes} />
                             <SidebarItem to="/notas-credito"      icon={FileMinus}       label="Notas de Crédito"   active={location.pathname === '/notas-credito'} sub disabled={!p.perm_notas_credito} />
                             <SidebarItem to="/anulacion-facturas" icon={Ban}             label="Anulación Facturas" active={location.pathname === '/anulacion-facturas'} sub disabled={!p.perm_anulacion_facturas} />
+                            <SidebarItem to="/guias-remision"    icon={Truck}           label="Guías de Remisión"  active={location.pathname.startsWith('/guias-remision')} sub disabled={!p.perm_comprobantes} />
                             <SidebarItem to="/cierres"            icon={BookOpen}        label="Cierres de Caja"    active={location.pathname === '/cierres'} sub disabled={!p.perm_cierres_caja} />
                             <SidebarItem to="/consultas/ventas"         icon={Search}    label="Consulta Ventas"      active={location.pathname === '/consultas/ventas'} sub disabled={!p.perm_consulta_ventas} />
                             <SidebarItem to="/consultas/ventas-cliente" icon={User}      label="Ventas por Cliente"   active={location.pathname === '/consultas/ventas-cliente'} sub disabled={!p.perm_consulta_ventas} />

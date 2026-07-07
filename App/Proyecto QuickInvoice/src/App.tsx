@@ -39,6 +39,8 @@ import { GestionCarteraPage }        from './pages/clientes/GestionCarteraPage'
 import { ConsultaCarteraClientesPage } from './pages/ConsultaCarteraClientesPage'
 import { EstadoCuentaClientePage } from './pages/EstadoCuentaClientePage'
 import { AnulacionFacturasPage } from './pages/AnulacionFacturasPage'
+import GuiasRemisionPage from './pages/GuiasRemisionPage'
+import { GuiaRemisionRidePage } from './pages/GuiaRemisionRidePage'
 import { NotasCreditoPage } from './pages/NotasCreditoPage'
 import { NuevaNcPage } from './pages/NuevaNcPage'
 import { NcRidePage } from './pages/NcRidePage'
@@ -529,6 +531,26 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <AnulacionFacturasPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/guias-remision" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <GuiasRemisionPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/guias-remision/:id/ride" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <GuiaRemisionRidePage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>
