@@ -360,58 +360,101 @@ export function ComprobantesRetencionPage() {
 
                         return (
                             <div key={idx} className="card overflow-hidden">
-                                {/* Cabecera */}
-                                <button
-                                    onClick={() => setExpandido(abierto ? null : clave)}
-                                    className="w-full flex items-center gap-4 p-4 hover:bg-slate-50 transition-colors text-left"
-                                >
-                                    <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                                        autorizado ? 'bg-green-100' : 'bg-amber-100')}>
-                                        {autorizado
-                                            ? <CheckCircle2 className="w-5 h-5 text-green-600" />
-                                            : <Clock className="w-5 h-5 text-amber-600" />
-                                        }
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-bold text-slate-900">
-                                                {doc.numero_retencion
-                                                    ? <span className="font-mono">{doc.numero_retencion}</span>
-                                                    : <span className="text-slate-400 italic">Sin número</span>
-                                                }
-                                            </span>
-                                            <span className={cn('text-xs px-2 py-0.5 rounded-full font-semibold', sriBadge.cls)}>
-                                                {sriBadge.label}
-                                            </span>
-                                            {doc.estado === 'ANULADO' && (
-                                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-600">
-                                                    ANULADA
+                                {/* Cabecera con botones siempre visibles */}
+                                <div className="flex items-center">
+                                    {/* Área clickable de info */}
+                                    <div
+                                        onClick={() => setExpandido(abierto ? null : clave)}
+                                        className="flex-1 flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors cursor-pointer min-w-0"
+                                    >
+                                        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
+                                            autorizado ? 'bg-green-100' : 'bg-amber-100')}>
+                                            {autorizado
+                                                ? <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                                : <Clock className="w-4 h-4 text-amber-600" />
+                                            }
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bold text-slate-900 text-sm">
+                                                    {doc.numero_retencion
+                                                        ? <span className="font-mono">{doc.numero_retencion}</span>
+                                                        : <span className="text-slate-400 italic text-xs">Sin número</span>
+                                                    }
                                                 </span>
+                                                <span className={cn('text-xs px-2 py-0.5 rounded-full font-semibold', sriBadge.cls)}>
+                                                    {sriBadge.label}
+                                                </span>
+                                                {doc.estado === 'ANULADO' && (
+                                                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-600">ANULADA</span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-slate-600 mt-0.5 truncate">
+                                                {doc.proveedor_nombre}
+                                                <span className="text-slate-400 ml-2">{doc.proveedor_ruc}</span>
+                                            </p>
+                                            {doc.factura_numero && (
+                                                <p className="text-xs text-slate-400 font-mono">Fact: {doc.factura_numero}</p>
                                             )}
                                         </div>
-                                        <p className="text-sm text-slate-600 mt-0.5 truncate">
-                                            {doc.proveedor_nombre}
-                                            <span className="text-slate-400 ml-2 text-xs">{doc.proveedor_ruc}</span>
-                                        </p>
-                                        {doc.factura_numero && (
-                                            <p className="text-xs text-slate-400 font-mono">
-                                                Fact. relacionada: {doc.factura_numero}
-                                            </p>
-                                        )}
+                                        <div className="text-right shrink-0 hidden sm:block">
+                                            <p className="text-xs text-slate-400">{fmtF(doc.fecha_emision)}</p>
+                                            <p className="font-bold text-amber-700 font-mono text-sm">{fmt(doc.total)}</p>
+                                            <p className="text-xs text-slate-400">{doc.lineas.length} línea(s)</p>
+                                        </div>
                                     </div>
 
-                                    <div className="text-right shrink-0">
-                                        <p className="text-xs text-slate-400">{fmtF(doc.fecha_emision)}</p>
-                                        <p className="font-bold text-amber-700 font-mono">{fmt(doc.total)}</p>
-                                        <p className="text-xs text-slate-400">{doc.lineas.length} línea(s)</p>
-                                    </div>
+                                    {/* Acciones siempre visibles */}
+                                    {doc.estado !== 'ANULADO' && (
+                                        <div className="flex items-center gap-1.5 px-2 shrink-0">
+                                            {!autorizado && (
+                                                <button
+                                                    onClick={() => autorizarSRI(doc)}
+                                                    disabled={procesando}
+                                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 font-medium disabled:opacity-50 whitespace-nowrap"
+                                                >
+                                                    {procesando
+                                                        ? <><Loader2 className="w-3 h-3 animate-spin" /> Procesando</>
+                                                        : <><Send className="w-3 h-3" /> Autorizar</>
+                                                    }
+                                                </button>
+                                            )}
+                                            {doc.xml_firmado && (
+                                                <button
+                                                    onClick={() => descargarXml(doc)}
+                                                    className="flex items-center gap-1 px-2.5 py-1.5 border border-slate-200 text-slate-600 text-xs rounded-lg hover:bg-slate-50"
+                                                    title="Descargar XML"
+                                                >
+                                                    <Download className="w-3 h-3" /> XML
+                                                </button>
+                                            )}
+                                            <Link
+                                                to={`/retenciones/${doc.compra_id}/ride`}
+                                                className="flex items-center gap-1 px-2.5 py-1.5 border border-slate-200 text-slate-600 text-xs rounded-lg hover:bg-slate-50"
+                                                title="Ver RIDE"
+                                            >
+                                                <FileText className="w-3 h-3" /> RIDE
+                                            </Link>
+                                            {doc.estado_sri === 'RECHAZADO' && (
+                                                <button
+                                                    onClick={() => autorizarSRI(doc)}
+                                                    disabled={procesando}
+                                                    className="flex items-center gap-1 px-2.5 py-1.5 border border-orange-200 text-orange-700 text-xs rounded-lg hover:bg-orange-50"
+                                                >
+                                                    <Send className="w-3 h-3" /> Reintentar
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
 
-                                    {abierto
-                                        ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
-                                        : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                                    }
-                                </button>
+                                    {/* Chevron toggle */}
+                                    <button
+                                        onClick={() => setExpandido(abierto ? null : clave)}
+                                        className="p-4 text-slate-400 hover:text-slate-600 shrink-0"
+                                    >
+                                        {abierto ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                    </button>
+                                </div>
 
                                 {/* Detalle expandido */}
                                 {abierto && (
@@ -424,14 +467,10 @@ export function ComprobantesRetencionPage() {
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-semibold text-green-800">Autorizada por SRI</p>
                                                     {doc.numero_autorizacion && (
-                                                        <p className="font-mono text-green-700 break-all mt-0.5">
-                                                            Nº {doc.numero_autorizacion}
-                                                        </p>
+                                                        <p className="font-mono text-green-700 break-all mt-0.5">Nº {doc.numero_autorizacion}</p>
                                                     )}
                                                     {doc.fecha_autorizacion && (
-                                                        <p className="text-green-600 mt-0.5">
-                                                            {new Date(doc.fecha_autorizacion).toLocaleString('es-EC')}
-                                                        </p>
+                                                        <p className="text-green-600 mt-0.5">{new Date(doc.fecha_autorizacion).toLocaleString('es-EC')}</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -440,20 +479,13 @@ export function ComprobantesRetencionPage() {
                                                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                                                 <div>
                                                     <p className="font-semibold">Rechazada por SRI</p>
-                                                    {doc.observaciones_sri && (
-                                                        <p className="mt-0.5 break-words">{doc.observaciones_sri}</p>
-                                                    )}
+                                                    {doc.observaciones_sri && <p className="mt-0.5 break-words">{doc.observaciones_sri}</p>}
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl text-xs text-amber-700">
                                                 <AlertCircle className="w-4 h-4 shrink-0" />
-                                                <p className="flex-1">
-                                                    {doc.estado_sri === 'ENVIADO'
-                                                        ? 'Enviada al SRI — pendiente de autorización'
-                                                        : 'Pendiente de firma electrónica SRI'
-                                                    }
-                                                </p>
+                                                <p>{doc.estado_sri === 'ENVIADO' ? 'Enviada al SRI — pendiente de autorización' : 'Pendiente de firma electrónica SRI'}</p>
                                             </div>
                                         )}
 
@@ -479,9 +511,7 @@ export function ComprobantesRetencionPage() {
                                                             </span>
                                                         </td>
                                                         <td className="py-2 pr-3 font-mono font-bold">{l.codigo_retencion}</td>
-                                                        <td className="py-2 pr-3 text-slate-600 max-w-xs truncate" title={l.descripcion}>
-                                                            {l.descripcion}
-                                                        </td>
+                                                        <td className="py-2 pr-3 text-slate-600 max-w-xs truncate" title={l.descripcion}>{l.descripcion}</td>
                                                         <td className="py-2 px-3 text-right font-mono">{fmt(l.base_imponible)}</td>
                                                         <td className="py-2 px-3 text-right font-mono">{l.porcentaje}%</td>
                                                         <td className="py-2 pl-3 text-right font-mono font-bold text-amber-700">{fmt(l.valor)}</td>
@@ -495,50 +525,6 @@ export function ComprobantesRetencionPage() {
                                                 </tr>
                                             </tfoot>
                                         </table>
-
-                                        {/* Acciones SRI */}
-                                        {doc.estado !== 'ANULADO' && (
-                                            <div className="flex gap-2 pt-1">
-                                                {!autorizado && (
-                                                    <button
-                                                        onClick={() => autorizarSRI(doc)}
-                                                        disabled={procesando}
-                                                        className="btn btn-primary text-xs flex items-center gap-1.5"
-                                                    >
-                                                        {procesando
-                                                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Procesando...</>
-                                                            : <><Send className="w-3.5 h-3.5" /> Autorizar SRI</>
-                                                        }
-                                                    </button>
-                                                )}
-                                                {doc.xml_firmado && (
-                                                    <button
-                                                        onClick={() => descargarXml(doc)}
-                                                        className="btn btn-secondary text-xs flex items-center gap-1.5"
-                                                    >
-                                                        <Download className="w-3.5 h-3.5" /> Descargar XML
-                                                    </button>
-                                                )}
-                                                <Link
-                                                    to={`/retenciones/${doc.compra_id}/ride`}
-                                                    className="btn btn-secondary text-xs flex items-center gap-1.5"
-                                                >
-                                                    <FileText className="w-3.5 h-3.5" /> Ver RIDE
-                                                </Link>
-                                                {doc.estado_sri === 'RECHAZADO' && (
-                                                    <button
-                                                        onClick={() => autorizarSRI(doc)}
-                                                        disabled={procesando}
-                                                        className="btn btn-secondary text-xs flex items-center gap-1.5"
-                                                    >
-                                                        {procesando
-                                                            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reintentando...</>
-                                                            : <><Send className="w-3.5 h-3.5" /> Reintentar SRI</>
-                                                        }
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
                                     </div>
                                 )}
                             </div>

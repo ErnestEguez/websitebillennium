@@ -91,6 +91,8 @@ export function NuevaCompraInventarioPage() {
     const [baseIva5,  setBaseIva5]  = useState(0)
     const [baseIva15, setBaseIva15] = useState(0)
     const [usarIvaManual, setUsarIvaManual] = useState(false)
+    // Estado raw para inputs decimales (evita que el punto se pierda al re-renderizar)
+    const [rawInputs, setRawInputs] = useState<Record<string, string>>({})
 
     // Retenciones
     const [numeroRetencion, setNumeroRetencion] = useState('')
@@ -352,6 +354,21 @@ export function NuevaCompraInventarioPage() {
     const nNew = detalle.filter(d => d.status === 'new').length
 
     // ── Funciones de detalle ──────────────────────────────────────────────────
+    // Helpers para inputs decimales controlados
+    function numVal(key: string, n: number): string | number {
+        return key in rawInputs ? rawInputs[key] : (n === 0 ? '' : n)
+    }
+    function numChange(key: string, val: string, setter: (n: number) => void) {
+        if (!/^\d*\.?\d*$/.test(val) && val !== '') return
+        setRawInputs(prev => ({ ...prev, [key]: val }))
+        const n = parseFloat(val)
+        if (!isNaN(n)) setter(n)
+    }
+    function numBlur(key: string, setter: (n: number) => void) {
+        setter(parseFloat(rawInputs[key] ?? '') || 0)
+        setRawInputs(prev => { const next = { ...prev }; delete next[key]; return next })
+    }
+
     function addLinea() {
         setDetalle(prev => [...prev, { producto_id: '', codigo: '', nombre: '', cantidad: 1, costo_unitario: 0 }])
     }
@@ -501,6 +518,13 @@ export function NuevaCompraInventarioPage() {
             } catch (contabErr: any) {
                 console.error('[asientoCompra] Error:', contabErr)
                 alert(`⚠️ Compra guardada correctamente.\nEl asiento contable no se generó:\n${contabErr?.message ?? contabErr}`)
+            }
+
+            // Auto-autorizar retención electrónica en background (no bloquea la navegación)
+            if (retsParaGuardar.length > 0 && compraGuardada?.id) {
+                supabase.functions.invoke('sri-retencion', {
+                    body: { compra_id: compraGuardada.id, empresa_id: empresa!.id }
+                }).catch(err => console.error('[sri-retencion] Auto-autorización error:', err))
             }
 
             clearDraft()
@@ -791,18 +815,20 @@ export function NuevaCompraInventarioPage() {
 
                                                 {/* Cantidad */}
                                                 <td className="py-2 px-3">
-                                                    <input type="number" min={0} step={0.01}
+                                                    <input type="text" inputMode="decimal"
                                                         className={cn(inp, 'text-sm text-right')}
-                                                        value={d.cantidad || ''}
-                                                        onChange={e => updLinea(i, 'cantidad', parseFloat(e.target.value) || 0)} />
+                                                        value={numVal(`cant_${i}`, d.cantidad)}
+                                                        onChange={e => numChange(`cant_${i}`, e.target.value, v => updLinea(i, 'cantidad', v))}
+                                                        onBlur={() => numBlur(`cant_${i}`, v => updLinea(i, 'cantidad', v))} />
                                                 </td>
 
                                                 {/* Costo */}
                                                 <td className="py-2 px-3">
-                                                    <input type="number" min={0} step={0.01}
+                                                    <input type="text" inputMode="decimal"
                                                         className={cn(inp, 'text-sm text-right')}
-                                                        value={d.costo_unitario || ''}
-                                                        onChange={e => updLinea(i, 'costo_unitario', parseFloat(e.target.value) || 0)} />
+                                                        value={numVal(`costo_${i}`, d.costo_unitario)}
+                                                        onChange={e => numChange(`costo_${i}`, e.target.value, v => updLinea(i, 'costo_unitario', v))}
+                                                        onBlur={() => numBlur(`costo_${i}`, v => updLinea(i, 'costo_unitario', v))} />
                                                 </td>
 
                                                 {/* Subtotal */}
@@ -847,18 +873,24 @@ export function NuevaCompraInventarioPage() {
                                 <div className="grid grid-cols-3 gap-3">
                                     <div>
                                         <label className="label text-xs">Base IVA 0%</label>
-                                        <input type="number" step={0.01} className={cn(inp, 'text-right')}
-                                            value={baseIva0 || ''} onChange={e => setBaseIva0(parseFloat(e.target.value) || 0)} />
+                                        <input type="text" inputMode="decimal" className={cn(inp, 'text-right')}
+                                            value={numVal('iva0', baseIva0)}
+                                            onChange={e => numChange('iva0', e.target.value, setBaseIva0)}
+                                            onBlur={() => numBlur('iva0', setBaseIva0)} />
                                     </div>
                                     <div>
                                         <label className="label text-xs">Base IVA 5%</label>
-                                        <input type="number" step={0.01} className={cn(inp, 'text-right')}
-                                            value={baseIva5 || ''} onChange={e => setBaseIva5(parseFloat(e.target.value) || 0)} />
+                                        <input type="text" inputMode="decimal" className={cn(inp, 'text-right')}
+                                            value={numVal('iva5', baseIva5)}
+                                            onChange={e => numChange('iva5', e.target.value, setBaseIva5)}
+                                            onBlur={() => numBlur('iva5', setBaseIva5)} />
                                     </div>
                                     <div>
                                         <label className="label text-xs">Base IVA 15%</label>
-                                        <input type="number" step={0.01} className={cn(inp, 'text-right')}
-                                            value={baseIva15 || ''} onChange={e => setBaseIva15(parseFloat(e.target.value) || 0)} />
+                                        <input type="text" inputMode="decimal" className={cn(inp, 'text-right')}
+                                            value={numVal('iva15', baseIva15)}
+                                            onChange={e => numChange('iva15', e.target.value, setBaseIva15)}
+                                            onBlur={() => numBlur('iva15', setBaseIva15)} />
                                     </div>
                                 </div>
                             ) : (
