@@ -49,6 +49,7 @@ function buildEmailHtml(opts: {
     tipo: string; nombreCliente: string; identificacionCliente: string;
     nombreEmpresa: string; ruc: string; logoUrl?: string | null;
     secuencial: string; fechaFormat: string; total: string;
+    ambiente?: string;
     extraRows?: string; accentBg?: string; accentBorder?: string;
 }): string {
     const logoHtml = opts.logoUrl
@@ -56,15 +57,22 @@ function buildEmailHtml(opts: {
         : `<span style="color:#fff;font-weight:800;font-size:18px;">${opts.nombreEmpresa}</span>`;
     const bg = opts.accentBg ?? "#f8faff";
     const border = opts.accentBorder ?? "#dbeafe";
+    const esPrueba = (opts.ambiente ?? 'PRUEBAS') !== 'PRODUCCION';
+    const ambienteBadge = esPrueba
+        ? `<span style="display:inline-block;margin-top:12px;background:#f59e0b;color:#fff;padding:4px 16px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:1.5px;">&#9888; AMBIENTE DE PRUEBAS</span>`
+        : `<span style="display:inline-block;margin-top:12px;background:#10b981;color:#fff;padding:4px 16px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:1.5px;">&#10003; PRODUCCI&#211;N</span>`;
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:24px 0;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.14);">
-<tr><td style="background:linear-gradient(135deg,#1e4db8 0%,#2563eb 100%);padding:28px 32px;text-align:center;">${logoHtml}</td></tr>
-<tr><td style="background:#fff;padding:28px 32px 16px;text-align:center;">
-  <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Estimado/a</p>
-  <h2 style="margin:0 0 8px;color:#111827;font-size:20px;font-weight:700;">${opts.nombreCliente}</h2>
+<tr><td style="background:linear-gradient(135deg,#1e4db8 0%,#2563eb 100%);padding:24px 32px 20px;text-align:center;">
+  ${logoHtml}
+  <p style="margin:14px 0 4px;color:rgba(255,255,255,0.75);font-size:11px;letter-spacing:0.5px;text-transform:uppercase;">Documento electr&#243;nico para</p>
+  <p style="margin:0;color:#ffffff;font-size:17px;font-weight:700;">${opts.nombreCliente}</p>
+  ${ambienteBadge}
+</td></tr>
+<tr><td style="background:#fff;padding:20px 32px 16px;text-align:center;">
   <p style="margin:0;color:#6b7280;font-size:13px;">Ha recibido un documento electr&#243;nico de</p>
   <p style="margin:6px 0 0;color:#1e4db8;font-size:15px;font-weight:700;">${opts.nombreEmpresa}</p>
 </td></tr>
@@ -586,77 +594,88 @@ serve(async (req) => {
         const cleanMsg = (txt: string) => txt.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
         // ─── PASO 1: CONSULTAR SI YA ESTÁ AUTORIZADO ───
+        // Saltamos el pre-check para facturas PENDIENTE/RECHAZADO: el SRI aún no las conoce,
+        // así que el round-trip es innecesario. Solo consultamos primero cuando el comprobante
+        // ya fue enviado al SRI (ENVIADO/AUTORIZADO) o cuando es consulta manual.
         const soapAutorizacion = `<?xml version="1.0" encoding="UTF-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ns2:autorizacionComprobante xmlns:ns2="http://ec.gob.sri.ws.autorizacion"><claveAccesoComprobante>${comprobante.clave_acceso}</claveAccesoComprobante></ns2:autorizacionComprobante></soap:Body></soap:Envelope>`;
-        const resAutPrev = await fetch(endpoints.autorizacion, { method: "POST", body: soapAutorizacion, headers: { "Content-Type": "text/xml" } });
-        const textAutPrev = await resAutPrev.text();
-        console.log("[SRI DEBUG] CLAVE:", comprobante.clave_acceso);
-        console.log("[SRI DEBUG] AUT PREV:", textAutPrev.substring(0, 800));
+        const necesitaPreCheck = solo_consulta || estado_sri === "ENVIADO" || estado_sri === "AUTORIZADO";
+        let yaRegistradaEnSri = false;
 
-        autorizado = textAutPrev.includes("<estado>AUTORIZADO</estado>");
+        if (necesitaPreCheck) {
+            const resAutPrev = await fetch(endpoints.autorizacion, { method: "POST", body: soapAutorizacion, headers: { "Content-Type": "text/xml" } });
+            const textAutPrev = await resAutPrev.text();
+            console.log("[SRI DEBUG] CLAVE:", comprobante.clave_acceso);
+            console.log("[SRI DEBUG] AUT PREV:", textAutPrev.substring(0, 800));
 
-        if (autorizado) {
-            estado_sri = "AUTORIZADO";
-            numAuth = textAutPrev.match(/<numeroAutorizacion>(.*?)<\/numeroAutorizacion>/s)?.[1];
-            fechaAuth = textAutPrev.match(/<fechaAutorizacion>(.*?)<\/fechaAutorizacion>/s)?.[1];
-        } else {
-            const rawMensaje = textAutPrev.match(/<mensaje>(.*?)<\/mensaje>/s)?.[1] || "";
-            const rawInfo = textAutPrev.match(/<informacionAdicional>(.*?)<\/informacionAdicional>/s)?.[1] || "";
-            msgSri = cleanMsg(`${rawMensaje} ${rawInfo}`);
-            console.log("[SRI DEBUG] MSG PREV:", msgSri);
+            autorizado = textAutPrev.includes("<estado>AUTORIZADO</estado>");
 
-            if (msgSri.includes("CLAVE ACCESO REGISTRADA") || msgSri.includes("EN PROCESAMIENTO") || msgSri.includes("PROCESAMIENTO")) {
-                estado_sri = "ENVIADO";
-                msgSri = `SRI (CLAVE YA REGISTRADA): ${msgSri}`;
-            } else if (!solo_consulta) {
-                // ─── PASO 2: FIRMAR Y ENVIAR ───
-                const { data: firmaBlob } = await supabase.storage.from("firmas_electronicas").download(configSri.firma_path);
-                if (!firmaBlob) throw new Error("Firma no encontrada. Suba el .p12 en Configuración.");
+            if (autorizado) {
+                estado_sri = "AUTORIZADO";
+                numAuth = textAutPrev.match(/<numeroAutorizacion>(.*?)<\/numeroAutorizacion>/s)?.[1];
+                fechaAuth = textAutPrev.match(/<fechaAutorizacion>(.*?)<\/fechaAutorizacion>/s)?.[1];
+            } else {
+                const rawMensaje = textAutPrev.match(/<mensaje>(.*?)<\/mensaje>/s)?.[1] || "";
+                const rawInfo = textAutPrev.match(/<informacionAdicional>(.*?)<\/informacionAdicional>/s)?.[1] || "";
+                msgSri = cleanMsg(`${rawMensaje} ${rawInfo}`);
+                console.log("[SRI DEBUG] MSG PREV:", msgSri);
 
-                const firmaB64 = toBase64(await firmaBlob.arrayBuffer());
-                const xmlSinFirma = generarXml(comprobante);
-                xmlFirmado = await firmarXmlXadesBes(xmlSinFirma, firmaB64, configSri.firma_password);
-
-                const xmlB64 = btoa(unescape(encodeURIComponent(xmlFirmado)));
-                const soapRecepcion = `<?xml version="1.0" encoding="UTF-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ns2:validarComprobante xmlns:ns2="http://ec.gob.sri.ws.recepcion"><xml>${xmlB64}</xml></ns2:validarComprobante></soap:Body></soap:Envelope>`;
-
-                const resRec = await fetch(endpoints.recepcion, { method: "POST", body: soapRecepcion, headers: { "Content-Type": "text/xml" } });
-                const textRec = await resRec.text();
-                console.log("[SRI DEBUG] RECEPCION:", textRec.substring(0, 800));
-
-                if (textRec.includes("RECIBIDA")) {
+                if (msgSri.includes("CLAVE ACCESO REGISTRADA") || msgSri.includes("EN PROCESAMIENTO") || msgSri.includes("PROCESAMIENTO")) {
                     estado_sri = "ENVIADO";
-                    msgSri = "RECIBIDA POR SRI";
-                    await new Promise(r => setTimeout(r, 4000));
-                } else {
-                    const recMensaje = textRec.match(/<mensaje>(.*?)<\/mensaje>/s)?.[1] || "";
-                    const recInfo = textRec.match(/<informacionAdicional>(.*?)<\/informacionAdicional>/s)?.[1] || "";
-                    msgSri = `REC:${cleanMsg(`${recMensaje} ${recInfo}`)}`;
-
-                    if (msgSri.includes("CLAVE ACCESO REGISTRADA") || msgSri.includes("EN PROCESAMIENTO")) {
-                        estado_sri = "ENVIADO";
-                    } else {
-                        estado_sri = "RECHAZADO";
-                        msgSri = msgSri || "Error en recepción del comprobante.";
-                    }
+                    yaRegistradaEnSri = true;
+                    msgSri = `SRI (CLAVE YA REGISTRADA): ${msgSri}`;
                 }
+            }
+        }
 
-                if (estado_sri === "ENVIADO") {
-                    const resAutPost = await fetch(endpoints.autorizacion, { method: "POST", body: soapAutorizacion, headers: { "Content-Type": "text/xml" } });
-                    const textAutPost = await resAutPost.text();
-                    console.log("[SRI DEBUG] AUT POST:", textAutPost.substring(0, 800));
-                    autorizado = textAutPost.includes("<estado>AUTORIZADO</estado>");
+        if (!autorizado && !solo_consulta && !yaRegistradaEnSri) {
+            // ─── PASO 2: FIRMAR Y ENVIAR ───
+            const { data: firmaBlob } = await supabase.storage.from("firmas_electronicas").download(configSri.firma_path);
+            if (!firmaBlob) throw new Error("Firma no encontrada. Suba el .p12 en Configuración.");
 
-                    if (autorizado) {
-                        estado_sri = "AUTORIZADO";
-                        numAuth = textAutPost.match(/<numeroAutorizacion>(.*?)<\/numeroAutorizacion>/s)?.[1];
-                        fechaAuth = textAutPost.match(/<fechaAutorizacion>(.*?)<\/fechaAutorizacion>/s)?.[1];
-                        msgSri = "OK";
-                    } else {
-                        const autMsg = textAutPost.match(/<mensaje>(.*?)<\/mensaje>/s)?.[1] || "";
-                        const autInfo = textAutPost.match(/<informacionAdicional>(.*?)<\/informacionAdicional>/s)?.[1] || "";
-                        const fullAutMsg = cleanMsg(`${autMsg} ${autInfo}`);
-                        msgSri = `AUT:${fullAutMsg || textAutPost.substring(0, 300)}`;
-                    }
+            const firmaB64 = toBase64(await firmaBlob.arrayBuffer());
+            const xmlSinFirma = generarXml(comprobante);
+            xmlFirmado = await firmarXmlXadesBes(xmlSinFirma, firmaB64, configSri.firma_password);
+
+            const xmlB64 = btoa(unescape(encodeURIComponent(xmlFirmado)));
+            const soapRecepcion = `<?xml version="1.0" encoding="UTF-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ns2:validarComprobante xmlns:ns2="http://ec.gob.sri.ws.recepcion"><xml>${xmlB64}</xml></ns2:validarComprobante></soap:Body></soap:Envelope>`;
+
+            const resRec = await fetch(endpoints.recepcion, { method: "POST", body: soapRecepcion, headers: { "Content-Type": "text/xml" } });
+            const textRec = await resRec.text();
+            console.log("[SRI DEBUG] RECEPCION:", textRec.substring(0, 800));
+
+            if (textRec.includes("RECIBIDA")) {
+                estado_sri = "ENVIADO";
+                msgSri = "RECIBIDA POR SRI";
+                await new Promise(r => setTimeout(r, 1500));
+            } else {
+                const recMensaje = textRec.match(/<mensaje>(.*?)<\/mensaje>/s)?.[1] || "";
+                const recInfo = textRec.match(/<informacionAdicional>(.*?)<\/informacionAdicional>/s)?.[1] || "";
+                msgSri = `REC:${cleanMsg(`${recMensaje} ${recInfo}`)}`;
+
+                if (msgSri.includes("CLAVE ACCESO REGISTRADA") || msgSri.includes("EN PROCESAMIENTO")) {
+                    estado_sri = "ENVIADO";
+                } else {
+                    estado_sri = "RECHAZADO";
+                    msgSri = msgSri || "Error en recepción del comprobante.";
+                }
+            }
+
+            if (estado_sri === "ENVIADO") {
+                const resAutPost = await fetch(endpoints.autorizacion, { method: "POST", body: soapAutorizacion, headers: { "Content-Type": "text/xml" } });
+                const textAutPost = await resAutPost.text();
+                console.log("[SRI DEBUG] AUT POST:", textAutPost.substring(0, 800));
+                autorizado = textAutPost.includes("<estado>AUTORIZADO</estado>");
+
+                if (autorizado) {
+                    estado_sri = "AUTORIZADO";
+                    numAuth = textAutPost.match(/<numeroAutorizacion>(.*?)<\/numeroAutorizacion>/s)?.[1];
+                    fechaAuth = textAutPost.match(/<fechaAutorizacion>(.*?)<\/fechaAutorizacion>/s)?.[1];
+                    msgSri = "OK";
+                } else {
+                    const autMsg = textAutPost.match(/<mensaje>(.*?)<\/mensaje>/s)?.[1] || "";
+                    const autInfo = textAutPost.match(/<informacionAdicional>(.*?)<\/informacionAdicional>/s)?.[1] || "";
+                    const fullAutMsg = cleanMsg(`${autMsg} ${autInfo}`);
+                    msgSri = `AUT:${fullAutMsg || textAutPost.substring(0, 300)}`;
                 }
             }
         }
@@ -675,8 +694,9 @@ serve(async (req) => {
 
         await supabase.from("comprobantes").update(updateData).eq("id", comprobante_id);
 
-        // ─── PASO 4: NOTIFICACIÓN POR CORREO (SMTP) ───
-        if (autorizado && comprobante.clientes?.email) {
+        // ─── PASO 4: NOTIFICACIÓN POR CORREO (background, no bloquea la respuesta) ───
+        const emailTask = (async () => {
+            if (!autorizado || !comprobante.clientes?.email) return;
             try {
                 const mailHost = configSri.mail_host as string | undefined;
                 const mailUser = configSri.mail_user as string | undefined;
@@ -684,79 +704,84 @@ serve(async (req) => {
 
                 if (!mailHost || !mailUser || !mailPass) {
                     console.log("[EMAIL] SMTP no configurado en config_sri — saltando envío");
-                } else {
-                    const nombreCliente = (comprobante.clientes?.nombre || "CONSUMIDOR FINAL").toUpperCase();
-                    const identificacionCliente = comprobante.clientes?.identificacion || "9999999999999";
-                    const fechaRaw = new Date(comprobante.created_at);
-                    const fechaEcuador = new Date(fechaRaw.getTime() - 5 * 60 * 60 * 1000);
-                    const fechaFormat = fechaEcuador.toLocaleDateString("es-EC");
-                    const nombreEmpresa = (comprobante.empresas?.nombre || comprobante.empresas?.razon_social || "La Empresa").toUpperCase();
-
-                    const emailHtml = buildEmailHtml({
-                        tipo: "FACTURA ELECTRÓNICA",
-                        nombreCliente,
-                        identificacionCliente,
-                        nombreEmpresa,
-                        ruc: comprobante.empresas?.ruc || "",
-                        logoUrl: comprobante.empresas?.logo_url || null,
-                        secuencial: comprobante.secuencial,
-                        fechaFormat,
-                        total: Number(comprobante.total).toFixed(2),
-                    });
-
-                    // ── Generar PDF ──
-                    let pdfB64: string | null = null;
-                    try {
-                        const ridePdfBytes = await generarRidePdf(comprobante);
-                        let pdfBin = '';
-                        const chunkPdf = 8192;
-                        for (let i = 0; i < ridePdfBytes.length; i += chunkPdf) {
-                            pdfBin += String.fromCharCode(...ridePdfBytes.subarray(i, Math.min(i + chunkPdf, ridePdfBytes.length)));
-                        }
-                        pdfB64 = btoa(pdfBin);
-                        console.log("[EMAIL] PDF generado, tamaño base64:", pdfB64.length);
-                    } catch (pdfErr) {
-                        console.error("[EMAIL] Error generando PDF:", pdfErr);
-                    }
-
-                    const attachments: any[] = [];
-                    if (pdfB64) {
-                        attachments.push({
-                            filename: `RIDE_${comprobante.secuencial}.pdf`,
-                            content: pdfB64,
-                            encoding: 'base64',
-                            contentType: 'application/pdf',
-                        });
-                    }
-                    attachments.push({
-                        filename: `${comprobante.secuencial}.xml`,
-                        content: xmlFirmado || '',
-                        contentType: 'application/xml; charset=utf-8',
-                    });
-
-                    // ── Enviar vía SMTP (nodemailer) ──
-                    const nodemailer = (await import("npm:nodemailer@6.9.13")).default;
-                    const transporter = nodemailer.createTransport({
-                        host: mailHost,
-                        port: Number(configSri.mail_port) || 587,
-                        secure: configSri.mail_ssl === true,
-                        auth: { user: mailUser, pass: mailPass },
-                        tls: { rejectUnauthorized: false },
-                    });
-                    await transporter.sendMail({
-                        from: `Facturación ${nombreEmpresa} <${mailUser}>`,
-                        to: comprobante.clientes.email,
-                        cc: (configSri.mail_cc as string | undefined) || undefined,
-                        subject: `Factura Autorizada ${comprobante.secuencial} - ${nombreEmpresa}`,
-                        html: emailHtml,
-                        attachments,
-                    });
-                    console.log("[EMAIL] Enviado via SMTP a:", comprobante.clientes.email);
+                    return;
                 }
+
+                const nombreCliente = (comprobante.clientes?.nombre || "CONSUMIDOR FINAL").toUpperCase();
+                const identificacionCliente = comprobante.clientes?.identificacion || "9999999999999";
+                const fechaRaw = new Date(comprobante.created_at);
+                const fechaEcuador = new Date(fechaRaw.getTime() - 5 * 60 * 60 * 1000);
+                const fechaFormat = fechaEcuador.toLocaleDateString("es-EC");
+                const nombreEmpresa = (comprobante.empresas?.nombre || comprobante.empresas?.razon_social || "La Empresa").toUpperCase();
+
+                const emailHtml = buildEmailHtml({
+                    tipo: "FACTURA ELECTRÓNICA",
+                    nombreCliente,
+                    identificacionCliente,
+                    nombreEmpresa,
+                    ruc: comprobante.empresas?.ruc || "",
+                    logoUrl: comprobante.empresas?.logo_url || null,
+                    secuencial: comprobante.secuencial,
+                    fechaFormat,
+                    total: Number(comprobante.total).toFixed(2),
+                    ambiente,
+                });
+
+                // ── Generar PDF ──
+                let pdfB64: string | null = null;
+                try {
+                    const ridePdfBytes = await generarRidePdf(comprobante);
+                    let pdfBin = '';
+                    const chunkPdf = 8192;
+                    for (let i = 0; i < ridePdfBytes.length; i += chunkPdf) {
+                        pdfBin += String.fromCharCode(...ridePdfBytes.subarray(i, Math.min(i + chunkPdf, ridePdfBytes.length)));
+                    }
+                    pdfB64 = btoa(pdfBin);
+                    console.log("[EMAIL] PDF generado, tamaño base64:", pdfB64.length);
+                } catch (pdfErr) {
+                    console.error("[EMAIL] Error generando PDF:", pdfErr);
+                }
+
+                const attachments: any[] = [];
+                if (pdfB64) {
+                    attachments.push({
+                        filename: `RIDE_${comprobante.secuencial}.pdf`,
+                        content: pdfB64,
+                        encoding: 'base64',
+                        contentType: 'application/pdf',
+                    });
+                }
+                attachments.push({
+                    filename: `${comprobante.secuencial}.xml`,
+                    content: xmlFirmado || '',
+                    contentType: 'application/xml; charset=utf-8',
+                });
+
+                // ── Enviar vía SMTP (nodemailer) ──
+                const nodemailer = (await import("npm:nodemailer@6.9.13")).default;
+                const transporter = nodemailer.createTransport({
+                    host: mailHost,
+                    port: Number(configSri.mail_port) || 587,
+                    secure: configSri.mail_ssl === true,
+                    auth: { user: mailUser, pass: mailPass },
+                    tls: { rejectUnauthorized: false },
+                });
+                await transporter.sendMail({
+                    from: `Facturación ${nombreEmpresa} <${mailUser}>`,
+                    to: comprobante.clientes.email,
+                    cc: (configSri.mail_cc as string | undefined) || undefined,
+                    subject: `Factura Autorizada ${comprobante.secuencial} - ${nombreEmpresa}`,
+                    html: emailHtml,
+                    attachments,
+                });
+                console.log("[EMAIL] Enviado via SMTP a:", comprobante.clientes.email);
             } catch (emailErr) {
                 console.error("[EMAIL] Error general:", emailErr);
             }
-        }
+        })();
+
+        // Mantiene la función viva para completar el email aunque la respuesta ya se entregó
+        (globalThis as any).EdgeRuntime?.waitUntil?.(emailTask);
 
         return new Response(JSON.stringify({
             success: true,
