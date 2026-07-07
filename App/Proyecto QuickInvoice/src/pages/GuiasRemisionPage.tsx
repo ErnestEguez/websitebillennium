@@ -192,10 +192,14 @@ export default function GuiasRemisionPage() {
 
     async function iniciarPaso3() {
         if (!empresa) return
-        const ts = await transportistasService.listar(empresa.id)
-        setTransportistas(ts)
-        const { data: emp } = await supabase.from('empresas').select('direccion').eq('id', empresa.id).single()
-        setDirSalida(emp?.direccion || '')
+        try {
+            const ts = await transportistasService.listar(empresa.id)
+            setTransportistas(ts)
+        } catch { /* tabla puede no existir aún */ }
+        try {
+            const { data: emp } = await supabase.from('empresas').select('direccion').eq('id', empresa.id).single()
+            setDirSalida(emp?.direccion || '')
+        } catch { /* ignorar */ }
     }
 
     async function iniciarPaso4() {
@@ -569,16 +573,17 @@ export default function GuiasRemisionPage() {
                             {/* ── PASO 1: Productos ── */}
                             {paso === 1 && (
                                 <div className="space-y-2">
-                                    <p className="text-sm text-slate-600">Marque los productos que se van a transportar y ajuste las cantidades.</p>
+                                    <p className="text-sm text-slate-600">Marque los productos que se van a transportar y ajuste la cantidad si es necesario.</p>
                                     <table className="w-full text-xs border-collapse">
                                         <thead>
                                             <tr className="bg-slate-100">
-                                                <th className="p-2 w-8"><input type="checkbox"
-                                                    checked={lineas.every(l => l._include)}
-                                                    onChange={e => setLineas(prev => prev.map(l => ({ ...l, _include: e.target.checked })))} /></th>
+                                                <th className="p-2 w-8">
+                                                    <input type="checkbox"
+                                                        checked={lineas.every(l => l._include)}
+                                                        onChange={e => setLineas(prev => prev.map(l => ({ ...l, _include: e.target.checked })))} />
+                                                </th>
                                                 <th className="text-left p-2">Descripción</th>
-                                                <th className="text-right p-2 w-20">Cantidad</th>
-                                                <th className="text-right p-2 w-20">Total</th>
+                                                <th className="text-right p-2 w-24">Cantidad</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -591,13 +596,11 @@ export default function GuiasRemisionPage() {
                                                     <td className="p-2">{l.descripcion}</td>
                                                     <td className="p-2">
                                                         <input type="number" min="0.01" step="0.01" value={l.cantidad}
-                                                            onChange={e => setLineas(prev => prev.map((x, xi) => xi === i ? {
-                                                                ...x, cantidad: parseFloat(e.target.value) || 0,
-                                                                total: (parseFloat(e.target.value) || 0) * x.precio_unitario
-                                                            } : x))}
+                                                            onChange={e => setLineas(prev => prev.map((x, xi) => xi === i
+                                                                ? { ...x, cantidad: parseFloat(e.target.value) || 0 }
+                                                                : x))}
                                                             className="w-full border border-slate-300 rounded px-1 py-0.5 text-right text-xs" />
                                                     </td>
-                                                    <td className="p-2 text-right">${Number(l.total).toFixed(2)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
