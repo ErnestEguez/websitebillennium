@@ -1100,8 +1100,17 @@ export function FacturaDirectaPage() {
                                                 value={p.nota_credito_id ?? ''}
                                                 onChange={e => {
                                                     const nc = notasCredito.find(n => n.id === e.target.value)
-                                                    updatePago(i, 'nota_credito_id', e.target.value || null)
-                                                    if (nc && p.valor === 0) updatePago(i, 'valor', nc.saldo_nc)
+                                                    setPagos(prev => prev.map((pg, j) => {
+                                                        if (j !== i) return pg
+                                                        if (!nc) return { ...pg, nota_credito_id: null }
+                                                        const otrosPagos = prev.reduce((s, p2, k) => k !== i ? s + Number(p2.valor || 0) : s, 0)
+                                                        const restante = Math.max(0, totales.total - otrosPagos)
+                                                        return {
+                                                            ...pg,
+                                                            nota_credito_id: nc.id,
+                                                            valor: Math.round(Math.min(nc.saldo_nc, restante || nc.saldo_nc) * 100) / 100,
+                                                        }
+                                                    }))
                                                 }}
                                             >
                                                 <option value="">🔖 Seleccionar N/C…</option>
