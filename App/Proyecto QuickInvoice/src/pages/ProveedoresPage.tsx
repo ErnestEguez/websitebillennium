@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { proveedorService } from '../services/vendorService'
 import type { Proveedor } from '../types/vendors'
 import { REGIMEN_LABELS } from '../types/vendors'
-import { codigoRetencionService, type CodigoRetencion } from '../services/codigoRetencionService'
+import { CODIGOS_SRI_DEFAULT } from '../services/codigoRetencionService'
 import {
     Building2, Plus, Edit2, Save, X, Search,
     Phone, Mail, MapPin, AlertCircle,
@@ -49,24 +49,9 @@ export function ProveedoresPage() {
     const [editando, setEditando] = useState<Partial<Proveedor>>(PROVEEDOR_VACIO)
     const [tabForm, setTabForm] = useState<'basico' | 'tributario' | 'pago'>('basico')
     const [saving, setSaving] = useState(false)
-    const [codsRet, setCodsRet] = useState<CodigoRetencion[]>([])
+    const codsRet = CODIGOS_SRI_DEFAULT
 
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
-    useEffect(() => {
-        if (!empresa?.id) return
-        codigoRetencionService.listar(empresa.id).then(async (lista) => {
-            if (lista.length === 0) {
-                await codigoRetencionService.sembrarDefaults(empresa!.id)
-                const seeded = await codigoRetencionService.listar(empresa!.id)
-                setCodsRet(seeded)
-            } else {
-                setCodsRet(lista)
-            }
-        }).catch((err) => {
-            console.error('Error cargando códigos de retención:', err?.message || err)
-            setCodsRet([])
-        })
-    }, [empresa?.id])
 
     async function load() {
         try {
@@ -469,7 +454,7 @@ export function ProveedoresPage() {
                                                     }}>
                                                     <option value="">— Sin retención —</option>
                                                     {codsRet.filter(c => c.tipo === 'FUENTE' && c.activo).map(c => (
-                                                        <option key={c.id} value={c.codigo}>{c.codigo} — {c.porcentaje}% — {c.descripcion.slice(0, 50)}</option>
+                                                        <option key={c.codigo} value={c.codigo}>{c.codigo} — {c.porcentaje}% — {c.descripcion.slice(0, 50)}</option>
                                                     ))}
                                                 </select>
                                             </div>
@@ -484,7 +469,7 @@ export function ProveedoresPage() {
                                                     }}>
                                                     <option value="">— Sin retención —</option>
                                                     {codsRet.filter(c => c.tipo === 'IVA' && c.activo).map(c => (
-                                                        <option key={c.id} value={c.codigo}>{c.codigo} — {c.porcentaje}% — {c.descripcion.slice(0, 50)}</option>
+                                                        <option key={c.codigo} value={c.codigo}>{c.codigo} — {c.porcentaje}% — {c.descripcion.slice(0, 50)}</option>
                                                     ))}
                                                 </select>
                                             </div>
