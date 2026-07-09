@@ -11,7 +11,11 @@ import {
     X,
     Save,
     Loader2,
-    Search as SearchIcon
+    Search as SearchIcon,
+    RotateCcw,
+    EyeOff,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { validateIdentificacion } from '../lib/utils'
@@ -24,6 +28,10 @@ export function ClientsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingCliente, setEditingCliente] = useState<Partial<Cliente> | null>(null)
     const [isSearchingSRI, setIsSearchingSRI] = useState(false)
+    const [showBaja, setShowBaja] = useState(false)
+    const [clientesBaja, setClientesBaja] = useState<Cliente[]>([])
+    const [loadingBaja, setLoadingBaja] = useState(false)
+    const [restorandoId, setRestorandoId] = useState<string | null>(null)
 
     // Búsqueda solo al presionar Enter o botón Buscar
     async function buscarClientes() {
@@ -37,6 +45,7 @@ export function ClientsPage() {
             const { data } = await supabase
                 .from('clientes').select('*')
                 .eq('empresa_id', empresa.id)
+                .eq('activo', true)
                 .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
                 .order('nombre').limit(200)
             setClientes(data as Cliente[] ?? [])
@@ -49,6 +58,33 @@ export function ClientsPage() {
     async function loadData() {
         // Solo se llama después de guardar/eliminar para refrescar el resultado actual
         if (search.trim()) await buscarClientes()
+    }
+
+    async function cargarClientesBaja() {
+        if (!empresa?.id) return
+        setLoadingBaja(true)
+        try {
+            const { data } = await supabase
+                .from('clientes').select('*')
+                .eq('empresa_id', empresa.id)
+                .eq('activo', false)
+                .order('nombre')
+            setClientesBaja(data as Cliente[] ?? [])
+        } finally {
+            setLoadingBaja(false)
+        }
+    }
+
+    async function restaurarCliente(id: string) {
+        setRestorandoId(id)
+        try {
+            await facturacionService.restaurarCliente(id)
+            setClientesBaja(prev => prev.filter(c => c.id !== id))
+        } catch (e: any) {
+            alert('Error al restaurar: ' + e.message)
+        } finally {
+            setRestorandoId(null)
+        }
     }
 
     async function lookupSRI() {
@@ -116,16 +152,16 @@ export function ClientsPage() {
 
     async function handleDelete(id: string, identificacion: string) {
         if (identificacion === '9999999999999') {
-            alert('El Consumidor Final no puede eliminarse.')
+            alert('El Consumidor Final no puede darse de baja.')
             return
         }
-        if (!confirm('¿Estás seguro de eliminar este cliente?')) return
+        if (!confirm('¿Dar de baja este cliente? Podrás restaurarlo después desde "Ver Dados de Baja".')) return
         try {
             await facturacionService.deleteCliente(id)
             loadData()
         } catch (error: any) {
-            console.error('Error deleting client:', error)
-            alert(`Error al eliminar el cliente: ${error.message}`)
+            console.error('Error dando de baja al cliente:', error)
+            alert(`Error: ${error.message}`)
         }
     }
 
@@ -141,16 +177,28 @@ export function ClientsPage() {
                     <p className="text-slate-500">Administra la base de datos de tus clientes para facturación</p>
                 </div>
                 <div className="flex items-center gap-2">
-                <button
-                    onClick={() => {
-                        setEditingCliente({ identificacion: '', nombre: '', email: '', direccion: '' })
-                        setIsModalOpen(true)
-                    }}
-                    className="btn btn-primary flex items-center gap-2"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nuevo Cliente
-                </button>
+                    <button
+                        onClick={() => {
+                            const next = !showBaja
+                            setShowBaja(next)
+                            if (next && clientesBaja.length === 0) cargarClientesBaja()
+                        }}
+                        className="btn btn-secondary flex items-center gap-2"
+                    >
+                        <EyeOff className="w-4 h-4" />
+                        {showBaja ? 'Ocultar Dados de Baja' : 'Ver Dados de Baja'}
+                        {showBaja ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                    <button
+                        onClick={() => {
+                            setEditingCliente({ identificacion: '', nombre: '', email: '', direccion: '' })
+                            setIsModalOpen(true)
+                        }}
+                        className="btn btn-primary flex items-center gap-2"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nuevo Cliente
+                    </button>
                 </div>
             </div>
 
@@ -244,6 +292,73 @@ export function ClientsPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Sección Dados de Baja */}
+            {showBaja && (
+                <div className="card overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-slate-100 border-b border-slate-200">
+                        <div className="flex items-center gap-2">
+                            <EyeOff className="w-4 h-4 text-slate-500" />
+                            <span className="font-bold text-slate-600 text-sm uppercase tracking-wide">Clientes Dados de Baja</span>
+                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-semibold">{clientesBaja.length}</span>
+                        </div>
+                        {loadingBaja && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                                    <th className="px-6 py-3 font-medium">Cliente</th>
+                                    <th className="px-6 py-3 font-medium">Identificación</th>
+                                    <th className="px-6 py-3 font-medium">Email</th>
+                                    <th className="px-6 py-3 font-medium">Teléfono</th>
+                                    <th className="px-6 py-3 font-medium text-right">Restaurar</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {clientesBaja.map(c => (
+                                    <tr key={c.id} className="hover:bg-slate-50 opacity-70">
+                                        <td className="px-6 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400">
+                                                    <User className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-slate-500">{c.nombre}</p>
+                                                    <p className="text-xs text-slate-400">{c.direccion || 'Sin dirección'}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-3 font-mono text-sm text-slate-500">{c.identificacion}</td>
+                                        <td className="px-6 py-3 text-sm text-slate-400">{c.email || '—'}</td>
+                                        <td className="px-6 py-3 text-sm text-slate-400">{c.telefono || '—'}</td>
+                                        <td className="px-6 py-3 text-right">
+                                            <button
+                                                onClick={() => restaurarCliente(c.id)}
+                                                disabled={restorandoId === c.id}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
+                                            >
+                                                {restorandoId === c.id
+                                                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                    : <RotateCcw className="w-3 h-3" />
+                                                }
+                                                Restaurar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {!loadingBaja && clientesBaja.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">
+                                            No hay clientes dados de baja.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {/* Modal */}
             {isModalOpen && (

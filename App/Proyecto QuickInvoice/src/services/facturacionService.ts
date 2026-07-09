@@ -12,6 +12,7 @@ export interface Cliente {
     email: string
     direccion: string
     telefono?: string
+    activo?: boolean
 }
 
 export interface SriConfig {
@@ -109,11 +110,19 @@ export const facturacionService = {
     },
 
     async deleteCliente(id: string) {
-        // En lugar de eliminar, podríamos marcar como inactivo si tuviéramos esa columna.
-        // Por ahora eliminamos físicamente para el prototipo.
         const { error } = await supabase
             .from('clientes')
-            .delete()
+            .update({ activo: false })
+            .eq('id', id)
+
+        if (error) throw error
+        return true
+    },
+
+    async restaurarCliente(id: string) {
+        const { error } = await supabase
+            .from('clientes')
+            .update({ activo: true })
             .eq('id', id)
 
         if (error) throw error
