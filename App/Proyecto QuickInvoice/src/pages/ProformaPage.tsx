@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { preparacionPinturaService } from '../services/preparacionPinturaService'
 import { useAuth } from '../contexts/AuthContext'
 import { facturacionService } from '../services/facturacionService'
 import {
@@ -280,6 +281,8 @@ const ESTADO_LABEL: Record<EstadoProforma, string> = {
 // ─── Componente principal ────────────────────────────────────────────────────
 
 export function ProformaPage() {
+    const [searchParams] = useSearchParams()
+    const prepId = searchParams.get('prep_id')
     const { empresa, cajaSesion } = useAuth()
 
     // Vista: 'lista' | 'form'
@@ -340,6 +343,36 @@ export function ProformaPage() {
             buscarProformas()
         }
     }, [empresa?.id])
+
+    // Pre-carga desde preparación de pintura
+    useEffect(() => {
+        if (!prepId || !empresa?.id) return
+        ;(async () => {
+            try {
+                const prep = await preparacionPinturaService.getCompleta(prepId)
+                const { data: prod } = await (await import('../lib/supabase')).supabase
+                    .from('productos')
+                    .select('id, nombre, iva_porcentaje')
+                    .eq('empresa_id', empresa!.id)
+                    .ilike('codigo', prep.codigo_producto)
+                    .eq('activo', true)
+                    .maybeSingle()
+                setDetalles([{
+                    producto_id:       prod?.id ?? null,
+                    nombre_producto:   prep.descripcion,
+                    cantidad:          1,
+                    precio_unitario:   prep.precio_sin_iva ?? 0,
+                    descuento:         0,
+                    iva_porcentaje:    prep.iva_porcentaje,
+                    subproducto_id:    null,
+                    factor_conversion: 1,
+                }])
+                setVista('form')
+            } catch (e) {
+                console.error('Error cargando preparación en proforma:', e)
+            }
+        })()
+    }, [prepId, empresa?.id])
 
     async function loadDatos() {
         // Solo carga datos livianos: vendedores y cuentas bancarias.
@@ -500,6 +533,9 @@ export function ProformaPage() {
             setSavedProforma(saved)
             setProformaEditando(saved)
             await buscarProformas()
+            if (prepId) {
+                preparacionPinturaService.vincularProforma(prepId, saved.id).catch(console.error)
+            }
         } catch (e: any) {
             alert('Error al guardar proforma: ' + e.message)
         } finally {

@@ -42,6 +42,7 @@ import {
     TrendingUp,
     Trash2,
     Receipt,
+    Palette,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -298,11 +299,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('inventario')}
                             onToggle={() => toggleGroup('inventario')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/preparaciones-pintura','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub />
                             <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub />
                             <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub />
+                            <SidebarItem to="/preparaciones-pintura"    icon={Palette}           label="Prep. Pinturas"        active={location.pathname.startsWith('/preparaciones-pintura')} sub />
                             <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub />
                             <SidebarItem to="/transferencia-bodega"     icon={ArrowLeftRight}    label="Transfer. Bodegas"     active={location.pathname === '/transferencia-bodega'} sub />
                             <SidebarItem to="/inventario-valorizado"    icon={BarChart3}         label="Inventario Valorado"   active={location.pathname === '/inventario-valorizado'} sub />

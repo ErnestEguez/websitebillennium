@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { preparacionPinturaService } from '../services/preparacionPinturaService'
 import { useFormDraft } from '../hooks/useFormDraft'
 import { useReactToPrint } from 'react-to-print'
 import { supabase } from '../lib/supabase'
@@ -61,6 +62,8 @@ const DETALLE_VACIO: DetalleFacturaDirecta = {
 }
 
 export function FacturaDirectaPage() {
+    const [searchParams] = useSearchParams()
+    const prepId = searchParams.get('prep_id')
     const { empresa, cajaSesion, profile } = useAuth()
     const { isOnline } = useNetworkStatus()
     const [offlineSaved, setOfflineSaved] = useState(false)
@@ -144,6 +147,35 @@ export function FacturaDirectaPage() {
     useEffect(() => {
         if (empresa?.id) loadData()
     }, [empresa?.id])
+
+    // Pre-carga desde preparación de pintura
+    useEffect(() => {
+        if (!prepId || !empresa?.id) return
+        ;(async () => {
+            try {
+                const prep = await preparacionPinturaService.getCompleta(prepId)
+                const { data: prod } = await supabase
+                    .from('productos')
+                    .select('id, nombre, iva_porcentaje')
+                    .eq('empresa_id', empresa!.id)
+                    .ilike('codigo', prep.codigo_producto)
+                    .eq('activo', true)
+                    .maybeSingle()
+                setDetalles([{
+                    producto_id:      prod?.id ?? null,
+                    nombre_producto:  prep.descripcion,
+                    cantidad:         1,
+                    precio_unitario:  prep.precio_sin_iva ?? 0,
+                    descuento:        0,
+                    iva_porcentaje:   prep.iva_porcentaje,
+                    subproducto_id:   null,
+                    factor_conversion: 1,
+                }])
+            } catch (e) {
+                console.error('Error cargando preparación:', e)
+            }
+        })()
+    }, [prepId, empresa?.id])
 
     // Búsqueda en servidor con debounce
     useEffect(() => {
@@ -447,6 +479,9 @@ export function FacturaDirectaPage() {
             const facturaCompleta = await facturaDirectaService.getComprobanteCompleto(factura.id)
             clearDraft()
             setFacturaFinal(facturaCompleta)
+            if (prepId) {
+                preparacionPinturaService.vincularComprobante(prepId, factura.id).catch(console.error)
+            }
         } catch (e: any) {
             alert('Error al generar factura: ' + e.message)
         } finally {

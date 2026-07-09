@@ -41,6 +41,66 @@ import type { PuntoEmision } from '../types/puntosEmision'
 import { cn } from '../lib/utils'
 import { getPuntoEmisionDispositivo, setPuntoEmisionDispositivo } from '../lib/dispositivoPuntoEmision'
 
+// ── Campo verificador de código de artículo para preparaciones ───────────────
+function PrepPinturaCodeField({
+    value,
+    empresaId,
+    onChange,
+}: { value: string; empresaId: string; onChange: (v: string) => void }) {
+    const [verifying, setVerifying] = useState(false)
+    const [found, setFound] = useState<string | null>(null)
+    const [notFound, setNotFound] = useState(false)
+
+    async function verify() {
+        if (!value.trim() || !empresaId) return
+        setVerifying(true)
+        setFound(null)
+        setNotFound(false)
+        const { data } = await supabase
+            .from('productos')
+            .select('nombre, iva_porcentaje')
+            .eq('empresa_id', empresaId)
+            .ilike('codigo', value.trim())
+            .eq('activo', true)
+            .maybeSingle()
+        setVerifying(false)
+        if (data) setFound(`${data.nombre} (IVA ${data.iva_porcentaje}%)`)
+        else setNotFound(true)
+    }
+
+    return (
+        <div className="space-y-2">
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    placeholder="Ej: PREP-PINTURA"
+                    className="flex-1 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 uppercase"
+                    value={value}
+                    onChange={e => { onChange(e.target.value.toUpperCase()); setFound(null); setNotFound(false) }}
+                />
+                <button
+                    type="button"
+                    onClick={verify}
+                    disabled={verifying || !value.trim()}
+                    className="px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-colors disabled:opacity-50"
+                >
+                    {verifying ? 'Verificando…' : 'Verificar'}
+                </button>
+            </div>
+            {found && (
+                <p className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                    <span>✓</span> {found}
+                </p>
+            )}
+            {notFound && (
+                <p className="text-xs text-red-500 font-semibold">
+                    No se encontró ningún artículo activo con ese código. Créalo primero en el catálogo.
+                </p>
+            )}
+        </div>
+    )
+}
+
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
     const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'lineas' | 'subcategorias' | 'bodegas' | 'puntos_emision' | 'plataforma' | 'contabilidad' | 'talento_nominas'>('empresa')
@@ -364,6 +424,7 @@ export function ConfigurationPage() {
                     usar_vendor_management: companyData.usar_vendor_management ?? false,
                     tope_consumidor_final: companyData.tope_consumidor_final ?? null,
                     glosa_factura: companyData.glosa_factura || null,
+                    codigo_prep_pintura: companyData.codigo_prep_pintura || null,
                 })
                 .eq('id', empresa!.id)
             if (error) throw error
@@ -1005,6 +1066,19 @@ export function ConfigurationPage() {
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 resize-none"
                                     value={companyData.glosa_factura || ''}
                                     onChange={e => setCompanyData({ ...companyData, glosa_factura: e.target.value })}
+                                />
+                            </div>
+
+                            {/* Código artículo preparación de pinturas */}
+                            <div className="space-y-1">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Tag className="w-3 h-3" /> Código Artículo — Preparación de Pinturas
+                                    <span className="normal-case font-normal text-[10px] text-slate-400">el artículo debe existir previamente en el catálogo</span>
+                                </label>
+                                <PrepPinturaCodeField
+                                    value={companyData.codigo_prep_pintura || ''}
+                                    empresaId={empresa?.id || ''}
+                                    onChange={v => setCompanyData({ ...companyData, codigo_prep_pintura: v })}
                                 />
                             </div>
 

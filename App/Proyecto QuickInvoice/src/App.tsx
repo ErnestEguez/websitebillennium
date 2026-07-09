@@ -29,7 +29,9 @@ import { TransferenciaBodegaPage } from './pages/TransferenciaBodegaPage'
 import { CodigosRetencionPage } from './pages/CodigosRetencionPage'
 import { CierresPage } from './pages/CierresPage'
 import { FacturaDirectaPage } from './pages/FacturaDirectaPage'
-import { ProformaPage }       from './pages/ProformaPage'
+import { ProformaPage }                 from './pages/ProformaPage'
+import { PreparacionesPinturaPage }    from './pages/PreparacionesPinturaPage'
+import { NuevaPreparacionPinturaPage } from './pages/NuevaPreparacionPinturaPage'
 import { VendedoresPage } from './pages/VendedoresPage'
 import { CarteraCxcPage } from './pages/CarteraCxcPage'
 import { ConsultaVentasPage }    from './pages/ConsultaVentasPage'
@@ -230,6 +232,26 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <ProformaPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/preparaciones-pintura" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <PreparacionesPinturaPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/preparaciones-pintura/nueva" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <NuevaPreparacionPinturaPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>
