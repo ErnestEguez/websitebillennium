@@ -45,6 +45,8 @@ export function BillingModal({ isOpen, onClose, pedido, onSuccess }: BillingModa
     })
     const [isSearchingSRI, setIsSearchingSRI] = useState(false)
     const [facturaFinal, setFacturaFinal] = useState<any>(null)
+    const [montoSnapshot, setMontoSnapshot] = useState(0)
+    const [vueltoSnapshot, setVueltoSnapshot] = useState(0)
     const printRef = useRef<HTMLDivElement>(null)
 
     const handlePrint = useReactToPrint({
@@ -194,8 +196,12 @@ export function BillingModal({ isOpen, onClose, pedido, onSuccess }: BillingModa
                 dias_plazo_credito: diasPlazoCredito,
             })
 
+            const cambio = Math.max(0, totalPagado - pedido.total)
+            setMontoSnapshot(totalPagado)
+            setVueltoSnapshot(cambio)
+
             // Abrir el formato de ticket en una nueva ventana (comportamiento solicitado)
-            window.open(`/comprobante/${factura.id}/ticket?auto=true`, '_blank')
+            window.open(`/comprobante/${factura.id}/ticket?auto=true&monto=${totalPagado}&vuelto=${cambio}`, '_blank')
 
             // Guardar para vista previa y botón de imprimir manual en caso de bloqueo de popup
             const facturaCompleta = await facturacionService.getComprobanteCompleto(factura.id)
@@ -541,7 +547,12 @@ export function BillingModal({ isOpen, onClose, pedido, onSuccess }: BillingModa
                         <div className="bg-slate-50 rounded-2xl p-6 flex flex-col items-center">
                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Previsualización de Ticket</p>
                             <div className="bg-white shadow-lg p-4 rounded border border-slate-100 max-h-96 overflow-y-auto w-full max-w-[80mm] mx-auto scale-90 origin-top">
-                                <InvoiceTicketPOS ref={printRef} factura={facturaFinal} />
+                                <InvoiceTicketPOS
+                                    ref={printRef}
+                                    factura={facturaFinal}
+                                    montoRecibido={montoSnapshot > 0 ? montoSnapshot : undefined}
+                                    vuelto={vueltoSnapshot}
+                                />
                             </div>
                         </div>
 

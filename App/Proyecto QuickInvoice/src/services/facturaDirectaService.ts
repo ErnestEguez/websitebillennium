@@ -199,12 +199,17 @@ export const facturaDirectaService = {
         }
 
         // 6. Insertar pagos
-        const pagosFormateados = pagos.map(p => ({
-            comprobante_id: factura.id,
-            metodo_pago: p.metodo,
-            valor: p.valor,
-            referencia: p.referencia || null
-        }))
+        const pagosFormateados = pagos.map(p => {
+            let ref = p.referencia || null
+            if (p.numero_documento) ref = ref ? `${ref} | N° ${p.numero_documento}` : `N° ${p.numero_documento}`
+            if (p.observaciones)    ref = ref ? `${ref} | ${p.observaciones}` : p.observaciones || null
+            return {
+                comprobante_id: factura.id,
+                metodo_pago: p.metodo,
+                valor: p.valor,
+                referencia: ref,
+            }
+        })
 
         if (pagosFormateados.length > 0) {
             const { error: errorPagos } = await supabase

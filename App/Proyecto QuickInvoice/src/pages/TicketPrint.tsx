@@ -34,6 +34,9 @@ export function TicketPrint() {
         }
     }
 
+    const montoUrl  = parseFloat(searchParams.get('monto')  || '0')
+    const vueltoUrl = parseFloat(searchParams.get('vuelto') || '0')
+
     if (loading) return <div className="p-12 text-center animate-pulse">Generando Ticket...</div>
     if (!factura) return <div className="p-12 text-center text-red-500">No se encontró el comprobante.</div>
 
@@ -129,6 +132,40 @@ export function TicketPrint() {
                         <span>{formatCurrency(factura.total)}</span>
                     </div>
                 </div>
+
+                {/* Formas de pago */}
+                {factura.comprobante_pagos && factura.comprobante_pagos.length > 0 && (
+                    <div className="mt-4 border-t border-dashed border-black pt-2 space-y-1">
+                        <p className="font-bold">FORMAS DE PAGO:</p>
+                        {factura.comprobante_pagos.map((p: any, idx: number) => (
+                            <div key={idx} className="space-y-0.5">
+                                <div className="flex justify-between">
+                                    <span className="uppercase">{p.metodo_pago.replace(/_/g, ' ')}:</span>
+                                    <span>{formatCurrency(p.valor)}</span>
+                                </div>
+                                {p.referencia && (
+                                    <div className="text-[8px] pl-2 opacity-75">
+                                        {p.metodo_pago === 'transferencia' ? `Banco: ${p.referencia}` : `Ref: ${p.referencia}`}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Efectivo recibido / vuelto (desde params de URL) */}
+                {montoUrl > 0 && (
+                    <div className="mt-2 border-t border-dashed border-black pt-2 space-y-1">
+                        <div className="flex justify-between">
+                            <span className="font-bold">EFECTIVO RECIBIDO:</span>
+                            <span>{formatCurrency(montoUrl)}</span>
+                        </div>
+                        <div className="flex justify-between font-black">
+                            <span>VUELTO / CAMBIO:</span>
+                            <span>{formatCurrency(vueltoUrl)}</span>
+                        </div>
+                    </div>
+                )}
 
                 <div className="mt-6 space-y-2 text-[8px]">
                     <p className="font-bold uppercase border-t border-black pt-2">Información SRI:</p>

@@ -334,6 +334,10 @@ export function FacturaDirectaPage() {
     // Vuelto solo aplica si hay pago en efectivo
     const tieneEfectivo = pagos.some(p => p.metodo === 'efectivo')
     const vuelto = tieneEfectivo ? Math.max(0, montoRecibido - totales.total) : 0
+    // Para el ticket: si no ingresaron monto recibido, usar la suma del pago en efectivo
+    const efectivoSum = pagos.filter(p => p.metodo === 'efectivo').reduce((s, p) => s + Number(p.valor), 0)
+    const montoRecibidoTicket = tieneEfectivo ? (montoRecibido > 0 ? montoRecibido : efectivoSum) : undefined
+    const vueltoTicket = tieneEfectivo ? Math.max(0, (montoRecibidoTicket ?? 0) - totales.total) : undefined
 
     const autoCompletarPago = () => {
         if (pagos.length === 1) {
@@ -1252,8 +1256,8 @@ export function FacturaDirectaPage() {
                     <div ref={printRef}>
                         <InvoiceTicketPOS
                             factura={facturaFinal}
-                            montoRecibido={tieneEfectivo ? montoRecibido : undefined}
-                            vuelto={tieneEfectivo ? vuelto : undefined}
+                            montoRecibido={montoRecibidoTicket}
+                            vuelto={vueltoTicket}
                         />
                     </div>
                 )}
