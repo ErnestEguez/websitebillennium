@@ -145,6 +145,16 @@ export function NuevaCompraServicioPage() {
     const total    = subtotalLineas + ivaCalc
     const totalRet = retenciones.reduce((s, r) => s + r.valor, 0)
 
+    useEffect(() => {
+        if (retenciones.length === 0) return
+        setRetenciones(prev => prev.map(r => {
+            if (!r.codigo || r.pct <= 0) return r
+            const base  = r.tipo === 'FUENTE' ? subtotalLineas : ivaCalc
+            const valor = Math.round(base * r.pct / 100 * 100) / 100
+            return { ...r, base, valor }
+        }))
+    }, [subtotalLineas, ivaCalc])
+
     function handleScanAplicar(data: FacturaEscaneada) {
         setEstab(data.estab ?? '')
         setPtoEmi(data.pto_emi ?? '')
@@ -191,6 +201,24 @@ export function NuevaCompraServicioPage() {
         const validas = detalle.filter(d => d.descripcion.trim() && d.precio_unitario > 0)
         if (!validas.length) { alert('Agrega al menos un servicio con descripción y precio'); return }
         if (formaPago === 'CREDITO' && !fechaVenc) { alert('Ingresa la fecha de vencimiento'); return }
+
+        const retsValidas = retenciones.filter(r => r.codigo && r.valor > 0)
+        if (retsValidas.length > 0) {
+            const totalRetConfirm = retsValidas.reduce((s, r) => s + r.valor, 0)
+            const cxpFinal = Math.max(total - totalRetConfirm, 0)
+            const lineas = retsValidas.map(r =>
+                `  • Ret. ${r.tipo} ${r.codigo} (${r.pct}%): base $${r.base.toFixed(2)} → $${r.valor.toFixed(2)}`
+            ).join('\n')
+            const ok = window.confirm(
+                `Se registrará el comprobante de retención No. ${numeroRetencion || '(sin número)'}\n\n` +
+                lineas + '\n\n' +
+                `Total retenciones: $${totalRetConfirm.toFixed(2)}\n` +
+                `Valor a Cuentas por Pagar: $${cxpFinal.toFixed(2)}\n\n` +
+                `¿Confirmar el registro?`
+            )
+            if (!ok) return
+        }
+
         try {
             setSaving(true)
             const prov = proveedores.find(p => p.id === proveedorId)
@@ -321,7 +349,12 @@ export function NuevaCompraServicioPage() {
                                 autoRets.push({ tipo: 'IVA', codigo: prov.ret_iva_codigo, descripcion: desc, base: 0, pct: prov.ret_iva_porcentaje!, valor: 0 })
                             }
                             if (autoRets.length > 0) {
-                                setRetenciones(autoRets)
+                                const retsCalculadas = autoRets.map(r => {
+                                    const base  = r.tipo === 'FUENTE' ? subtotalLineas : ivaCalc
+                                    const valor = Math.round(base * r.pct / 100 * 100) / 100
+                                    return { ...r, base, valor }
+                                })
+                                setRetenciones(retsCalculadas)
                                 setRetSeccion(true)
                             }
                         }}>
