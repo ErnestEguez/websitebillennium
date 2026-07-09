@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import {
     carteraCxcService,
@@ -608,8 +608,12 @@ export function CarteraCxcPage() {
         return diff >= 0 ? diff : null
     }
 
-    const totalVencido    = carteraFiltrada.filter(c => diasVencido(c.fecha_vencimiento) !== null).reduce((s, c) => s + Number(c.saldo), 0)
-    const totalPorVencer  = carteraFiltrada.filter(c => diasPorVencer(c.fecha_vencimiento) !== null).reduce((s, c) => s + Number(c.saldo), 0)
+    const carteraVencida   = carteraFiltrada.filter(c => diasVencido(c.fecha_vencimiento) !== null)
+    const carteraPorVencer = carteraFiltrada.filter(c => diasPorVencer(c.fecha_vencimiento) !== null)
+    const carteraSinFecha  = carteraFiltrada.filter(c => !c.fecha_vencimiento)
+
+    const totalVencido    = carteraVencida.reduce((s, c) => s + Number(c.saldo), 0)
+    const totalPorVencer  = carteraPorVencer.reduce((s, c) => s + Number(c.saldo), 0)
 
     // Lista única de clientes en la cartera activa (para el selector del modal multi)
     const clientesUnicos = useMemo(() => {
@@ -763,166 +767,416 @@ export function CarteraCxcPage() {
                 </div>
             </div>
 
-            {/* Tabla */}
-            <div className="card overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-slate-50 border-b border-slate-200">
-                        <tr>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Factura</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Cliente</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Emisión</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Vencimiento</th>
-                            <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Días Vencido</th>
-                            <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Días Por Vencer</th>
-                            <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Original</th>
-                            <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Saldo</th>
-                            <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Estado</th>
-                            <th className="px-4 py-3" />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {carteraFiltrada.map(c => {
-                            const vencidoDias   = diasVencido(c.fecha_vencimiento)
-                            const porVencerDias = diasPorVencer(c.fecha_vencimiento)
-                            const isExpanded    = expandedId === c.id
-                            return (
-                                <>
-                                    <tr
-                                        key={c.id}
-                                        className={`border-b border-slate-100 hover:bg-slate-50 cursor-pointer ${vencidoDias ? 'bg-red-50/30' : ''}`}
-                                        onClick={() => toggleDetalle(c.id)}
-                                    >
-                                        <td className="px-4 py-3 font-mono text-sm text-slate-700">{c.comprobantes?.secuencial || '—'}</td>
-                                        <td className="px-4 py-3">
-                                            <div className="font-medium text-slate-900 text-sm">{c.clientes?.nombre || '—'}</div>
-                                            <div className="text-xs text-slate-500">{c.clientes?.identificacion}</div>
-                                        </td>
-                                        <td className="px-4 py-3 text-sm text-slate-600">{c.fecha_emision}</td>
-                                        <td className="px-4 py-3 text-sm text-slate-600">{c.fecha_vencimiento || '—'}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            {vencidoDias != null
-                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">{vencidoDias}d</span>
-                                                : <span className="text-slate-300 text-xs">—</span>
-                                            }
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {porVencerDias != null
-                                                ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${porVencerDias <= 7 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>{porVencerDias}d</span>
-                                                : <span className="text-slate-300 text-xs">—</span>
-                                            }
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-sm text-slate-600">{formatCurrency(c.valor_original)}</td>
-                                        <td className="px-4 py-3 text-right font-semibold text-sm text-red-600">{formatCurrency(c.saldo)}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ESTADO_BADGE[c.estado] || ''}`}>
-                                                {c.estado}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                                            <div className="flex gap-1 justify-end items-center">
-                                                {(c.estado === 'pendiente' || c.estado === 'parcial') && (
-                                                    <button
-                                                        onClick={() => { setPagoModal(c); setPagoValor(String(c.saldo)) }}
-                                                        className="px-3 py-1.5 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 font-medium"
-                                                    >
-                                                        Abonar
-                                                    </button>
-                                                )}
-                                                <button className="p-1.5 text-slate-400">
-                                                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+            {carteraFiltrada.length === 0 && (
+                <div className="card text-center py-12">
+                    <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-500">
+                        {filtroCliente ? `Sin resultados para "${filtroCliente}"` : `No hay facturas con estado "${filtroEstado}"`}
+                    </p>
+                </div>
+            )}
 
-                                    {isExpanded && (
-                                        <tr key={`${c.id}-detail`} className="bg-slate-50">
-                                            <td colSpan={10} className="px-6 py-4">
-                                                <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Historial de pagos</p>
-                                                {(pagosDetalle[c.id] || []).length === 0 ? (
-                                                    <p className="text-sm text-slate-400">Sin pagos registrados</p>
-                                                ) : (
-                                                    <table className="w-full text-sm">
-                                                        <thead>
-                                                            <tr className="text-xs text-slate-500">
-                                                                <th className="text-left pb-1">Fecha</th>
-                                                                <th className="text-left pb-1">Método</th>
-                                                                <th className="text-left pb-1">Referencia</th>
-                                                                <th className="text-right pb-1">Valor</th>
-                                                                <th className="text-center pb-1">Asiento</th>
-                                                                <th className="text-right pb-1">Acciones</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-200">
-                                                            {pagosDetalle[c.id].map(p => (
-                                                                <tr key={p.id}>
-                                                                    <td className="py-1 text-slate-600">{p.fecha_pago}</td>
-                                                                    <td className="py-1 text-slate-600 capitalize">{p.metodo_pago.replace('_', ' ')}</td>
-                                                                    <td className="py-1 text-slate-500">{p.referencia || '—'}</td>
-                                                                    <td className={`py-1 text-right font-medium ${p.estado === 'reversado' ? 'text-slate-400 line-through' : 'text-green-700'}`}>
-                                                                        {formatCurrency(p.valor)}
-                                                                    </td>
-                                                                    <td className="py-1 text-center">
-                                                                        {p.estado === 'reversado' ? (
-                                                                            <span
-                                                                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600"
-                                                                                title={[p.reversado_at && `Reversado: ${p.reversado_at}`, p.motivo_reversa].filter(Boolean).join(' — ')}
-                                                                            >
-                                                                                Reversado
-                                                                            </span>
-                                                                        ) : p.lp_comprobante_id ? (
-                                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                                                Contabilizado
-                                                                            </span>
-                                                                        ) : (
-                                                                            <div className="flex items-center justify-center gap-1.5">
-                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                                                                                    Sin asiento
-                                                                                </span>
-                                                                                <button
-                                                                                    onClick={() => handleGenerarAsiento(p, c)}
-                                                                                    disabled={accionandoPagoId === p.id}
-                                                                                    className="text-xs text-primary-600 hover:underline disabled:opacity-50"
-                                                                                >
-                                                                                    Generar
-                                                                                </button>
-                                                                            </div>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="py-1 text-right">
-                                                                        {p.estado === 'activo' && (
-                                                                            <button
-                                                                                onClick={() => handleReversarPago(p, c)}
-                                                                                disabled={accionandoPagoId === p.id}
-                                                                                className="text-xs text-red-600 hover:underline disabled:opacity-50"
-                                                                            >
-                                                                                Reversar
-                                                                            </button>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                )}
+            {/* ── Sección VENCIDAS ── */}
+            {(carteraVencida.length > 0 || carteraFiltrada.length > 0) && (
+                <div className="card overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-red-50 border-b border-red-200">
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-red-500" />
+                            <h3 className="font-bold text-red-800 text-sm uppercase tracking-wide">Facturas Vencidas</h3>
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">{carteraVencida.length}</span>
+                        </div>
+                        <span className="text-sm font-bold text-red-700">Total: {formatCurrency(totalVencido)}</span>
+                    </div>
+                    <table className="w-full">
+                        <thead className="bg-red-50/50 border-b border-red-100">
+                            <tr>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-red-500 uppercase">Factura</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-red-500 uppercase">Cliente</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-red-500 uppercase">Emisión</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-red-500 uppercase">Vencimiento</th>
+                                <th className="text-center px-4 py-3 text-xs font-semibold text-red-500 uppercase">Días Vencidos</th>
+                                <th className="text-right px-4 py-3 text-xs font-semibold text-red-500 uppercase">Original</th>
+                                <th className="text-right px-4 py-3 text-xs font-semibold text-red-500 uppercase">Saldo</th>
+                                <th className="text-center px-4 py-3 text-xs font-semibold text-red-500 uppercase">Estado</th>
+                                <th className="px-4 py-3" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {carteraVencida.map(c => {
+                                const vencidoDias = diasVencido(c.fecha_vencimiento)!
+                                const isExpanded  = expandedId === c.id
+                                return (
+                                    <Fragment key={c.id}>
+                                        <tr
+                                            className="border-b border-slate-100 hover:bg-red-50/40 cursor-pointer bg-red-50/20"
+                                            onClick={() => toggleDetalle(c.id)}
+                                        >
+                                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{c.comprobantes?.secuencial || '—'}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium text-slate-900 text-sm">{c.clientes?.nombre || '—'}</div>
+                                                <div className="text-xs text-slate-500">{c.clientes?.identificacion}</div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-600">{c.fecha_emision}</td>
+                                            <td className="px-4 py-3 text-sm text-red-600 font-medium">{c.fecha_vencimiento || '—'}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                                                    {vencidoDias} {vencidoDias === 1 ? 'día' : 'días'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-sm text-slate-600">{formatCurrency(c.valor_original)}</td>
+                                            <td className="px-4 py-3 text-right font-bold text-sm text-red-600">{formatCurrency(c.saldo)}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ESTADO_BADGE[c.estado] || ''}`}>
+                                                    {c.estado}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                                                <div className="flex gap-1 justify-end items-center">
+                                                    {(c.estado === 'pendiente' || c.estado === 'parcial') && (
+                                                        <button
+                                                            onClick={() => { setPagoModal(c); setPagoValor(String(c.saldo)) }}
+                                                            className="px-3 py-1.5 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 font-medium"
+                                                        >
+                                                            Abonar
+                                                        </button>
+                                                    )}
+                                                    <button className="p-1.5 text-slate-400">
+                                                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
-                                    )}
-                                </>
-                            )
-                        })}
-                    </tbody>
-                </table>
+                                        {isExpanded && (
+                                            <tr className="bg-slate-50">
+                                                <td colSpan={9} className="px-6 py-4">
+                                                    <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Historial de pagos</p>
+                                                    {(pagosDetalle[c.id] || []).length === 0 ? (
+                                                        <p className="text-sm text-slate-400">Sin pagos registrados</p>
+                                                    ) : (
+                                                        <table className="w-full text-sm">
+                                                            <thead>
+                                                                <tr className="text-xs text-slate-500">
+                                                                    <th className="text-left pb-1">Fecha</th>
+                                                                    <th className="text-left pb-1">Método</th>
+                                                                    <th className="text-left pb-1">Referencia</th>
+                                                                    <th className="text-right pb-1">Valor</th>
+                                                                    <th className="text-center pb-1">Asiento</th>
+                                                                    <th className="text-right pb-1">Acciones</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-200">
+                                                                {pagosDetalle[c.id].map(p => (
+                                                                    <tr key={p.id}>
+                                                                        <td className="py-1 text-slate-600">{p.fecha_pago}</td>
+                                                                        <td className="py-1 text-slate-600 capitalize">{p.metodo_pago.replace('_', ' ')}</td>
+                                                                        <td className="py-1 text-slate-500">{p.referencia || '—'}</td>
+                                                                        <td className={`py-1 text-right font-medium ${p.estado === 'reversado' ? 'text-slate-400 line-through' : 'text-green-700'}`}>
+                                                                            {formatCurrency(p.valor)}
+                                                                        </td>
+                                                                        <td className="py-1 text-center">
+                                                                            {p.estado === 'reversado' ? (
+                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600"
+                                                                                    title={[p.reversado_at && `Reversado: ${p.reversado_at}`, p.motivo_reversa].filter(Boolean).join(' — ')}>
+                                                                                    Reversado
+                                                                                </span>
+                                                                            ) : p.lp_comprobante_id ? (
+                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Contabilizado</span>
+                                                                            ) : (
+                                                                                <div className="flex items-center justify-center gap-1.5">
+                                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Sin asiento</span>
+                                                                                    <button onClick={() => handleGenerarAsiento(p, c)} disabled={accionandoPagoId === p.id} className="text-xs text-primary-600 hover:underline disabled:opacity-50">Generar</button>
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="py-1 text-right">
+                                                                            {p.estado === 'activo' && (
+                                                                                <button onClick={() => handleReversarPago(p, c)} disabled={accionandoPagoId === p.id} className="text-xs text-red-600 hover:underline disabled:opacity-50">Reversar</button>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                    {carteraVencida.length === 0 && (
+                        <div className="text-center py-8">
+                            <CheckCircle2 className="w-10 h-10 text-green-300 mx-auto mb-2" />
+                            <p className="text-slate-500 text-sm">Sin facturas vencidas</p>
+                        </div>
+                    )}
+                </div>
+            )}
 
-                {carteraFiltrada.length === 0 && (
-                    <div className="text-center py-12">
-                        <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-slate-500">
-                            {filtroCliente ? `Sin resultados para "${filtroCliente}"` : `No hay facturas con estado "${filtroEstado}"`}
-                        </p>
+            {/* ── Sección POR VENCER ── */}
+            {(carteraPorVencer.length > 0 || carteraFiltrada.length > 0) && (
+                <div className="card overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-amber-50 border-b border-amber-200">
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-amber-400" />
+                            <h3 className="font-bold text-amber-800 text-sm uppercase tracking-wide">Por Vencer</h3>
+                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">{carteraPorVencer.length}</span>
+                        </div>
+                        <span className="text-sm font-bold text-amber-700">Total: {formatCurrency(totalPorVencer)}</span>
                     </div>
-                )}
-            </div>
+                    <table className="w-full">
+                        <thead className="bg-amber-50/50 border-b border-amber-100">
+                            <tr>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-amber-600 uppercase">Factura</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-amber-600 uppercase">Cliente</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-amber-600 uppercase">Emisión</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-amber-600 uppercase">Vencimiento</th>
+                                <th className="text-center px-4 py-3 text-xs font-semibold text-amber-600 uppercase">Días x Vencer</th>
+                                <th className="text-right px-4 py-3 text-xs font-semibold text-amber-600 uppercase">Original</th>
+                                <th className="text-right px-4 py-3 text-xs font-semibold text-amber-600 uppercase">Saldo</th>
+                                <th className="text-center px-4 py-3 text-xs font-semibold text-amber-600 uppercase">Estado</th>
+                                <th className="px-4 py-3" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {carteraPorVencer.map(c => {
+                                const porVencerDias = diasPorVencer(c.fecha_vencimiento)!
+                                const isExpanded    = expandedId === c.id
+                                return (
+                                    <Fragment key={c.id}>
+                                        <tr
+                                            className="border-b border-slate-100 hover:bg-amber-50/40 cursor-pointer"
+                                            onClick={() => toggleDetalle(c.id)}
+                                        >
+                                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{c.comprobantes?.secuencial || '—'}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium text-slate-900 text-sm">{c.clientes?.nombre || '—'}</div>
+                                                <div className="text-xs text-slate-500">{c.clientes?.identificacion}</div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-600">{c.fecha_emision}</td>
+                                            <td className="px-4 py-3 text-sm text-slate-600">{c.fecha_vencimiento || '—'}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${porVencerDias <= 7 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                                                    {porVencerDias} {porVencerDias === 1 ? 'día' : 'días'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-sm text-slate-600">{formatCurrency(c.valor_original)}</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-sm text-slate-700">{formatCurrency(c.saldo)}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ESTADO_BADGE[c.estado] || ''}`}>
+                                                    {c.estado}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                                                <div className="flex gap-1 justify-end items-center">
+                                                    {(c.estado === 'pendiente' || c.estado === 'parcial') && (
+                                                        <button
+                                                            onClick={() => { setPagoModal(c); setPagoValor(String(c.saldo)) }}
+                                                            className="px-3 py-1.5 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 font-medium"
+                                                        >
+                                                            Abonar
+                                                        </button>
+                                                    )}
+                                                    <button className="p-1.5 text-slate-400">
+                                                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {isExpanded && (
+                                            <tr className="bg-slate-50">
+                                                <td colSpan={9} className="px-6 py-4">
+                                                    <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Historial de pagos</p>
+                                                    {(pagosDetalle[c.id] || []).length === 0 ? (
+                                                        <p className="text-sm text-slate-400">Sin pagos registrados</p>
+                                                    ) : (
+                                                        <table className="w-full text-sm">
+                                                            <thead>
+                                                                <tr className="text-xs text-slate-500">
+                                                                    <th className="text-left pb-1">Fecha</th>
+                                                                    <th className="text-left pb-1">Método</th>
+                                                                    <th className="text-left pb-1">Referencia</th>
+                                                                    <th className="text-right pb-1">Valor</th>
+                                                                    <th className="text-center pb-1">Asiento</th>
+                                                                    <th className="text-right pb-1">Acciones</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-200">
+                                                                {pagosDetalle[c.id].map(p => (
+                                                                    <tr key={p.id}>
+                                                                        <td className="py-1 text-slate-600">{p.fecha_pago}</td>
+                                                                        <td className="py-1 text-slate-600 capitalize">{p.metodo_pago.replace('_', ' ')}</td>
+                                                                        <td className="py-1 text-slate-500">{p.referencia || '—'}</td>
+                                                                        <td className={`py-1 text-right font-medium ${p.estado === 'reversado' ? 'text-slate-400 line-through' : 'text-green-700'}`}>
+                                                                            {formatCurrency(p.valor)}
+                                                                        </td>
+                                                                        <td className="py-1 text-center">
+                                                                            {p.estado === 'reversado' ? (
+                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600"
+                                                                                    title={[p.reversado_at && `Reversado: ${p.reversado_at}`, p.motivo_reversa].filter(Boolean).join(' — ')}>
+                                                                                    Reversado
+                                                                                </span>
+                                                                            ) : p.lp_comprobante_id ? (
+                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Contabilizado</span>
+                                                                            ) : (
+                                                                                <div className="flex items-center justify-center gap-1.5">
+                                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Sin asiento</span>
+                                                                                    <button onClick={() => handleGenerarAsiento(p, c)} disabled={accionandoPagoId === p.id} className="text-xs text-primary-600 hover:underline disabled:opacity-50">Generar</button>
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="py-1 text-right">
+                                                                            {p.estado === 'activo' && (
+                                                                                <button onClick={() => handleReversarPago(p, c)} disabled={accionandoPagoId === p.id} className="text-xs text-red-600 hover:underline disabled:opacity-50">Reversar</button>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                    {carteraPorVencer.length === 0 && (
+                        <div className="text-center py-8">
+                            <CheckCircle2 className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                            <p className="text-slate-500 text-sm">Sin facturas por vencer</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── Sección SIN FECHA (crédito sin plazo definido) ── */}
+            {carteraSinFecha.length > 0 && (
+                <div className="card overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+                        <div className="flex items-center gap-3">
+                            <div className="w-3 h-3 rounded-full bg-slate-400" />
+                            <h3 className="font-bold text-slate-600 text-sm uppercase tracking-wide">Sin Fecha de Vencimiento</h3>
+                            <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-semibold">{carteraSinFecha.length}</span>
+                        </div>
+                        <span className="text-sm font-bold text-slate-600">Total: {formatCurrency(carteraSinFecha.reduce((s, c) => s + Number(c.saldo), 0))}</span>
+                    </div>
+                    <table className="w-full">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Factura</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Cliente</th>
+                                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Emisión</th>
+                                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Original</th>
+                                <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Saldo</th>
+                                <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Estado</th>
+                                <th className="px-4 py-3" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {carteraSinFecha.map(c => {
+                                const isExpanded = expandedId === c.id
+                                return (
+                                    <Fragment key={c.id}>
+                                        <tr
+                                            className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer"
+                                            onClick={() => toggleDetalle(c.id)}
+                                        >
+                                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{c.comprobantes?.secuencial || '—'}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium text-slate-900 text-sm">{c.clientes?.nombre || '—'}</div>
+                                                <div className="text-xs text-slate-500">{c.clientes?.identificacion}</div>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm text-slate-600">{c.fecha_emision}</td>
+                                            <td className="px-4 py-3 text-right text-sm text-slate-600">{formatCurrency(c.valor_original)}</td>
+                                            <td className="px-4 py-3 text-right font-semibold text-sm text-slate-700">{formatCurrency(c.saldo)}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${ESTADO_BADGE[c.estado] || ''}`}>
+                                                    {c.estado}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                                                <div className="flex gap-1 justify-end items-center">
+                                                    {(c.estado === 'pendiente' || c.estado === 'parcial') && (
+                                                        <button
+                                                            onClick={() => { setPagoModal(c); setPagoValor(String(c.saldo)) }}
+                                                            className="px-3 py-1.5 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 font-medium"
+                                                        >
+                                                            Abonar
+                                                        </button>
+                                                    )}
+                                                    <button className="p-1.5 text-slate-400">
+                                                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {isExpanded && (
+                                            <tr className="bg-slate-50">
+                                                <td colSpan={7} className="px-6 py-4">
+                                                    <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Historial de pagos</p>
+                                                    {(pagosDetalle[c.id] || []).length === 0 ? (
+                                                        <p className="text-sm text-slate-400">Sin pagos registrados</p>
+                                                    ) : (
+                                                        <table className="w-full text-sm">
+                                                            <thead>
+                                                                <tr className="text-xs text-slate-500">
+                                                                    <th className="text-left pb-1">Fecha</th>
+                                                                    <th className="text-left pb-1">Método</th>
+                                                                    <th className="text-left pb-1">Referencia</th>
+                                                                    <th className="text-right pb-1">Valor</th>
+                                                                    <th className="text-center pb-1">Asiento</th>
+                                                                    <th className="text-right pb-1">Acciones</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-200">
+                                                                {pagosDetalle[c.id].map(p => (
+                                                                    <tr key={p.id}>
+                                                                        <td className="py-1 text-slate-600">{p.fecha_pago}</td>
+                                                                        <td className="py-1 text-slate-600 capitalize">{p.metodo_pago.replace('_', ' ')}</td>
+                                                                        <td className="py-1 text-slate-500">{p.referencia || '—'}</td>
+                                                                        <td className={`py-1 text-right font-medium ${p.estado === 'reversado' ? 'text-slate-400 line-through' : 'text-green-700'}`}>
+                                                                            {formatCurrency(p.valor)}
+                                                                        </td>
+                                                                        <td className="py-1 text-center">
+                                                                            {p.estado === 'reversado' ? (
+                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-600"
+                                                                                    title={[p.reversado_at && `Reversado: ${p.reversado_at}`, p.motivo_reversa].filter(Boolean).join(' — ')}>
+                                                                                    Reversado
+                                                                                </span>
+                                                                            ) : p.lp_comprobante_id ? (
+                                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Contabilizado</span>
+                                                                            ) : (
+                                                                                <div className="flex items-center justify-center gap-1.5">
+                                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Sin asiento</span>
+                                                                                    <button onClick={() => handleGenerarAsiento(p, c)} disabled={accionandoPagoId === p.id} className="text-xs text-primary-600 hover:underline disabled:opacity-50">Generar</button>
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="py-1 text-right">
+                                                                            {p.estado === 'activo' && (
+                                                                                <button onClick={() => handleReversarPago(p, c)} disabled={accionandoPagoId === p.id} className="text-xs text-red-600 hover:underline disabled:opacity-50">Reversar</button>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {/* ═══════════════════════════════════════════════════
                 MODAL PAGO INDIVIDUAL
