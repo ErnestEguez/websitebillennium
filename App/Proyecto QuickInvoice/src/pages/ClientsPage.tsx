@@ -45,7 +45,6 @@ export function ClientsPage() {
             const { data } = await supabase
                 .from('clientes').select('*')
                 .eq('empresa_id', empresa.id)
-                .neq('activo', false)
                 .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
                 .order('nombre').limit(200)
             setClientes(data as Cliente[] ?? [])
