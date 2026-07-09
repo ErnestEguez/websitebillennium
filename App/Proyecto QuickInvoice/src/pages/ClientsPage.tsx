@@ -29,56 +29,53 @@ export function ClientsPage() {
     const [editingCliente, setEditingCliente] = useState<Partial<Cliente> | null>(null)
     const [isSearchingSRI, setIsSearchingSRI] = useState(false)
     const [showBaja, setShowBaja] = useState(false)
-    const [clientesBaja, setClientesBaja] = useState<Cliente[]>([])
-    const [loadingBaja, setLoadingBaja] = useState(false)
     const [restorandoId, setRestorandoId] = useState<string | null>(null)
 
-    // Búsqueda solo al presionar Enter o botón Buscar
+    // Búsqueda con filtro activo (modo normal)
     async function buscarClientes() {
         if (!empresa?.id) return
         setLoading(true)
         try {
             if (!search.trim()) {
-                await loadData(); return
+                setClientes([]); return
             }
             const q = '%' + search.trim().replace(/\*/g, '%') + '%'
             const { data } = await supabase
                 .from('clientes').select('*')
                 .eq('empresa_id', empresa.id)
+                .eq('activo', true)
                 .or(`nombre.ilike.${q},identificacion.ilike.${q}`)
                 .order('nombre').limit(200)
             setClientes(data as Cliente[] ?? [])
         } finally { setLoading(false) }
     }
 
-    // Sin carga inicial — el usuario busca con el botón Buscar o Enter
-    useEffect(() => { if (empresa?.id) setLoading(false) }, [empresa?.id])
-
-    async function loadData() {
-        // Solo se llama después de guardar/eliminar para refrescar el resultado actual
-        if (search.trim()) await buscarClientes()
-    }
-
-    async function cargarClientesBaja() {
+    // Carga todos (activos + inactivos) sin filtro
+    async function cargarTodos() {
         if (!empresa?.id) return
-        setLoadingBaja(true)
+        setLoading(true)
         try {
             const { data } = await supabase
                 .from('clientes').select('*')
                 .eq('empresa_id', empresa.id)
-                .eq('activo', false)
-                .order('nombre')
-            setClientesBaja(data as Cliente[] ?? [])
-        } finally {
-            setLoadingBaja(false)
-        }
+                .order('nombre').limit(1000)
+            setClientes(data as Cliente[] ?? [])
+        } finally { setLoading(false) }
+    }
+
+    useEffect(() => { if (empresa?.id) setLoading(false) }, [empresa?.id])
+
+    async function loadData() {
+        if (showBaja) await cargarTodos()
+        else if (search.trim()) await buscarClientes()
     }
 
     async function restaurarCliente(id: string) {
         setRestorandoId(id)
         try {
             await facturacionService.restaurarCliente(id)
-            setClientesBaja(prev => prev.filter(c => c.id !== id))
+            // Refresca la lista completa para que el cliente vuelva a verse activo
+            await cargarTodos()
         } catch (e: any) {
             alert('Error al restaurar: ' + e.message)
         } finally {
@@ -180,7 +177,12 @@ export function ClientsPage() {
                         onClick={() => {
                             const next = !showBaja
                             setShowBaja(next)
-                            if (next && clientesBaja.length === 0) cargarClientesBaja()
+                            if (next) {
+                                cargarTodos()
+                            } else {
+                                setClientes([])
+                                setSearch('')
+                            }
                         }}
                         className="btn btn-secondary flex items-center gap-2"
                     >
@@ -233,57 +235,77 @@ export function ClientsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {filtered.map(cliente => (
-                                <tr key={cliente.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
-                                                <User className="w-5 h-5" />
+                            {filtered.map(cliente => {
+                                const inactivo = cliente.activo === false
+                                return (
+                                    <tr key={cliente.id} className={`hover:bg-slate-50 transition-colors ${inactivo ? 'opacity-60 bg-slate-50/50' : ''}`}>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${inactivo ? 'bg-slate-200 text-slate-400' : 'bg-slate-100 text-slate-400'}`}>
+                                                    <User className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className={`font-bold ${inactivo ? 'text-slate-400' : 'text-slate-900'}`}>{cliente.nombre}</p>
+                                                        {inactivo && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-semibold">BAJA</span>}
+                                                    </div>
+                                                    <p className="text-xs text-slate-400">{cliente.direccion || 'Sin dirección'}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-bold text-slate-900">{cliente.nombre}</p>
-                                                <p className="text-xs text-slate-400">{cliente.direccion || 'Sin dirección'}</p>
+                                        </td>
+                                        <td className="px-6 py-4 font-mono text-sm text-slate-600">
+                                            {cliente.identificacion}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-slate-500">
+                                            {cliente.email || '-'}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-slate-500">
+                                            {cliente.telefono || '-'}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex justify-end gap-2">
+                                                {inactivo ? (
+                                                    <button
+                                                        onClick={() => restaurarCliente(cliente.id)}
+                                                        disabled={restorandoId === cliente.id}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
+                                                    >
+                                                        {restorandoId === cliente.id
+                                                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                            : <RotateCcw className="w-3 h-3" />}
+                                                        Restaurar
+                                                    </button>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={() => { setEditingCliente(cliente); setIsModalOpen(true) }}
+                                                            className="p-2 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg text-slate-400 hover:text-primary-600 transition-all"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(cliente.id, cliente.identificacion)}
+                                                            className="p-2 hover:bg-white border border-transparent hover:border-red-100 rounded-lg text-slate-400 hover:text-red-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                            disabled={cliente.identificacion === '9999999999999'}
+                                                            title={cliente.identificacion === '9999999999999' ? 'El Consumidor Final no puede darse de baja' : 'Dar de baja'}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 font-mono text-sm text-slate-600">
-                                        {cliente.identificacion}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-500">
-                                        {cliente.email || '-'}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-500">
-                                        {cliente.telefono || '-'}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    setEditingCliente(cliente)
-                                                    setIsModalOpen(true)
-                                                }}
-                                                className="p-2 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg text-slate-400 hover:text-primary-600 transition-all"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(cliente.id, cliente.identificacion)}
-                                                className="p-2 hover:bg-white border border-transparent hover:border-red-100 rounded-lg text-slate-400 hover:text-red-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                                                disabled={cliente.identificacion === '9999999999999'}
-                                                title={cliente.identificacion === '9999999999999' ? 'El Consumidor Final no puede eliminarse' : 'Eliminar'}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
                             {filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
-                                        {!search.trim()
-                                            ? 'Escribe un nombre o RUC/cédula y presiona Buscar.'
-                                            : 'No se encontraron clientes con ese criterio.'}
+                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                                        {showBaja
+                                            ? 'Cargando...'
+                                            : !search.trim()
+                                                ? 'Escribe un nombre o RUC/cédula y presiona Buscar.'
+                                                : 'No se encontraron clientes con ese criterio.'}
                                     </td>
                                 </tr>
                             )}
@@ -291,73 +313,6 @@ export function ClientsPage() {
                     </table>
                 </div>
             </div>
-
-            {/* Sección Dados de Baja */}
-            {showBaja && (
-                <div className="card overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-3 bg-slate-100 border-b border-slate-200">
-                        <div className="flex items-center gap-2">
-                            <EyeOff className="w-4 h-4 text-slate-500" />
-                            <span className="font-bold text-slate-600 text-sm uppercase tracking-wide">Clientes Dados de Baja</span>
-                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-semibold">{clientesBaja.length}</span>
-                        </div>
-                        {loadingBaja && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
-                                    <th className="px-6 py-3 font-medium">Cliente</th>
-                                    <th className="px-6 py-3 font-medium">Identificación</th>
-                                    <th className="px-6 py-3 font-medium">Email</th>
-                                    <th className="px-6 py-3 font-medium">Teléfono</th>
-                                    <th className="px-6 py-3 font-medium text-right">Restaurar</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {clientesBaja.map(c => (
-                                    <tr key={c.id} className="hover:bg-slate-50 opacity-70">
-                                        <td className="px-6 py-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400">
-                                                    <User className="w-4 h-4" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-slate-500">{c.nombre}</p>
-                                                    <p className="text-xs text-slate-400">{c.direccion || 'Sin dirección'}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-3 font-mono text-sm text-slate-500">{c.identificacion}</td>
-                                        <td className="px-6 py-3 text-sm text-slate-400">{c.email || '—'}</td>
-                                        <td className="px-6 py-3 text-sm text-slate-400">{c.telefono || '—'}</td>
-                                        <td className="px-6 py-3 text-right">
-                                            <button
-                                                onClick={() => restaurarCliente(c.id)}
-                                                disabled={restorandoId === c.id}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
-                                            >
-                                                {restorandoId === c.id
-                                                    ? <Loader2 className="w-3 h-3 animate-spin" />
-                                                    : <RotateCcw className="w-3 h-3" />
-                                                }
-                                                Restaurar
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {!loadingBaja && clientesBaja.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">
-                                            No hay clientes dados de baja.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
 
             {/* Modal */}
             {isModalOpen && (
