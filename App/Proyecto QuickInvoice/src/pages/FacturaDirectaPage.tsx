@@ -37,15 +37,17 @@ import { VoiceAssistant, type VoiceResult } from '../components/VoiceAssistant'
 // ─────────────────────────────────────────────────────
 // TIPOS DE PAGO (incluye Tarjeta D/C)
 // ─────────────────────────────────────────────────────
-const METODOS_PAGO: { value: PagoFactura['metodo']; label: string }[] = [
+const METODOS_PAGO: { value: PagoFactura['metodo']; label: string; cfBlocked?: boolean }[] = [
     { value: 'efectivo',     label: '💵 Efectivo' },
     { value: 'tarjeta',      label: '💳 Tarjeta D/C' },
     { value: 'transferencia',label: '🏦 Transferencia' },
-    { value: 'credito',      label: '📄 Crédito' },
+    { value: 'credito',      label: '📄 Crédito', cfBlocked: true },
+    { value: 'nota_credito', label: '🔖 Nota de Crédito' },
     { value: 'cheque',       label: '✏️ Cheque al día' },
     { value: 'cheque_fecha', label: '📅 Cheque a fecha' },
     { value: 'otros',        label: '🔄 Otros' },
 ]
+
 
 const DETALLE_VACIO: DetalleFacturaDirecta = {
     producto_id: null,
@@ -103,6 +105,7 @@ export function FacturaDirectaPage() {
     const [pagos, setPagos] = useState<PagoFactura[]>([{ metodo: 'efectivo', valor: 0, referencia: '' }])
     const [montoRecibido, setMontoRecibido] = useState<number>(0)
     const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([])
+    const [notasCredito, setNotasCredito] = useState<any[]>([])
 
     // Estado: proceso
     const [saving, setSaving] = useState(false)
@@ -198,6 +201,22 @@ export function FacturaDirectaPage() {
             console.error('Error cargando datos:', e)
         }
     }
+
+    // Cargar N/C disponibles cuando cambia el cliente
+    useEffect(() => {
+        if (!selectedCliente?.id || !empresa?.id) { setNotasCredito([]); return }
+        const q = supabase
+            .from('notas_credito')
+            .select('id, numero, saldo_nc, created_at')
+            .eq('empresa_id', empresa.id)
+            .eq('cliente_id', selectedCliente.id)
+            .gt('saldo_nc', 0)
+            .eq('estado', 'AUTORIZADO')
+            .order('created_at', { ascending: false })
+        Promise.resolve(q)
+            .then(({ data }) => setNotasCredito(data ?? []))
+            .catch(() => setNotasCredito([]))
+    }, [selectedCliente?.id, empresa?.id])
 
     // ─── CLIENTE ──────────────────────────────────────────
     const filteredClientes = clientes.filter(c =>
@@ -329,8 +348,32 @@ export function FacturaDirectaPage() {
         // Permitir sin caja si está offline (se usará la caja cacheada al sincronizar)
         if (!cajaSesion && isOnline) return alert('No hay una caja abierta. Por favor abra caja primero.')
 
+        const esCF = selectedCliente.identificacion === '9999999999999'
+
+        // Bloquear crédito para Consumidor Final
+        if (esCF && pagos.some(p => p.metodo === 'credito')) {
+            return alert('No se puede facturar a Crédito para Consumidor Final. Cambie la forma de pago.')
+        }
+
+        // Bloquear tope consumidor final
+        const topeEmpresa = (empresa as any)?.tope_consumidor_final
+        if (esCF && topeEmpresa && totales.total > topeEmpresa) {
+            return alert(
+                `El total ${formatCurrency(totales.total)} supera el tope de Consumidor Final ` +
+                `(${formatCurrency(topeEmpresa)}).\n\nSolicite la identificación del cliente.`
+            )
+        }
+
         const detallesValidos = detalles.filter(d => d.nombre_producto && d.cantidad > 0 && d.precio_unitario > 0)
         if (detallesValidos.length === 0) return alert('Agregue al menos un producto o servicio con cantidad y precio')
+
+        // Validar N/C: no exceder saldo disponible
+        for (const p of pagos.filter(pg => pg.metodo === 'nota_credito' && pg.nota_credito_id)) {
+            const nc = notasCredito.find(n => n.id === p.nota_credito_id)
+            if (nc && p.valor > nc.saldo_nc) {
+                return alert(`El monto de N/C (${formatCurrency(p.valor)}) supera el saldo disponible (${formatCurrency(nc.saldo_nc)}).`)
+            }
+        }
 
         if (totalPagado < totales.total - 0.01) {
             return alert(
@@ -403,7 +446,7 @@ export function FacturaDirectaPage() {
         setMontoRecibido(0)
         setSearchCliente('')
         setSearchProducto({})
-        setSelectedVendedorId('')
+        // Mantener vendedor seleccionado entre facturas
         setDiasPlazoCredito(30)
         const cf = clientes.find(c => c.identificacion === '9999999999999')
         setSelectedCliente(cf || null)
@@ -983,8 +1026,11 @@ export function FacturaDirectaPage() {
                                         <select
                                             className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white"
                                             value={p.metodo}
-                                            onChange={e => updatePago(i, 'metodo', e.target.value as PagoFactura['metodo'])}>
-                                            {METODOS_PAGO.map(m => (
+                                            onChange={e => {
+                                                updatePago(i, 'metodo', e.target.value as PagoFactura['metodo'])
+                                                if (e.target.value !== 'nota_credito') updatePago(i, 'nota_credito_id', null)
+                                            }}>
+                                            {METODOS_PAGO.filter(m => !m.cfBlocked || selectedCliente?.identificacion !== '9999999999999').map(m => (
                                                 <option key={m.value} value={m.value}>{m.label}</option>
                                             ))}
                                         </select>
@@ -1028,6 +1074,47 @@ export function FacturaDirectaPage() {
                                             value={p.referencia ?? ''}
                                             onChange={e => updatePago(i, 'referencia', e.target.value)}
                                         />
+                                    )}
+                                    {/* Transferencia: N° de comprobante y observaciones */}
+                                    {p.metodo === 'transferencia' && (
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            <input type="text"
+                                                placeholder="N° comprobante transferencia"
+                                                className="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-xs outline-none focus:ring-2 focus:ring-blue-400 text-blue-900"
+                                                value={p.numero_documento ?? ''}
+                                                onChange={e => updatePago(i, 'numero_documento', e.target.value || null)}
+                                            />
+                                            <input type="text"
+                                                placeholder="Observaciones"
+                                                className="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-xs outline-none focus:ring-2 focus:ring-blue-400 text-blue-900"
+                                                value={p.observaciones ?? ''}
+                                                onChange={e => updatePago(i, 'observaciones', e.target.value || null)}
+                                            />
+                                        </div>
+                                    )}
+                                    {/* Nota de Crédito: selector de NC disponibles */}
+                                    {p.metodo === 'nota_credito' && (
+                                        <div className="space-y-1">
+                                            <select
+                                                className="w-full px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 text-xs outline-none focus:ring-2 focus:ring-violet-400 text-violet-900"
+                                                value={p.nota_credito_id ?? ''}
+                                                onChange={e => {
+                                                    const nc = notasCredito.find(n => n.id === e.target.value)
+                                                    updatePago(i, 'nota_credito_id', e.target.value || null)
+                                                    if (nc && p.valor === 0) updatePago(i, 'valor', nc.saldo_nc)
+                                                }}
+                                            >
+                                                <option value="">🔖 Seleccionar N/C…</option>
+                                                {notasCredito.map(nc => (
+                                                    <option key={nc.id} value={nc.id}>
+                                                        {nc.numero} — Saldo: {formatCurrency(nc.saldo_nc)}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {notasCredito.length === 0 && (
+                                                <p className="text-[10px] text-violet-500">No hay Notas de Crédito con saldo disponible para este cliente.</p>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             ))}

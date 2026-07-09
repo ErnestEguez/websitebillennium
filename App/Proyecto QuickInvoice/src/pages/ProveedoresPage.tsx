@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { proveedorService } from '../services/vendorService'
 import type { Proveedor } from '../types/vendors'
 import { REGIMEN_LABELS } from '../types/vendors'
+import { codigoRetencionService, type CodigoRetencion } from '../services/codigoRetencionService'
 import {
     Building2, Plus, Edit2, Save, X, Search,
     Phone, Mail, MapPin, AlertCircle,
@@ -48,8 +49,14 @@ export function ProveedoresPage() {
     const [editando, setEditando] = useState<Partial<Proveedor>>(PROVEEDOR_VACIO)
     const [tabForm, setTabForm] = useState<'basico' | 'tributario' | 'pago'>('basico')
     const [saving, setSaving] = useState(false)
+    const [codsRet, setCodsRet] = useState<CodigoRetencion[]>([])
 
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
+    useEffect(() => {
+        if (empresa?.id) {
+            codigoRetencionService.listar(empresa.id).then(setCodsRet).catch(() => setCodsRet([]))
+        }
+    }, [empresa?.id])
 
     async function load() {
         try {
@@ -434,6 +441,44 @@ export function ProveedoresPage() {
                                                 <p className="text-xs text-slate-400">Está obligado a retener impuestos en la fuente</p>
                                             </div>
                                         </label>
+                                    </div>
+
+                                    {/* Retenciones automáticas predeterminadas */}
+                                    <div className="border-t border-slate-100 pt-4 space-y-3">
+                                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Retenciones automáticas (predeterminadas)</p>
+                                        <p className="text-[11px] text-slate-400">Se sugieren automáticamente al registrar compras de este proveedor.</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="label text-xs">Ret. Fuente — Código SRI</label>
+                                                <select className="input text-sm"
+                                                    value={editando.ret_fuente_codigo ?? ''}
+                                                    onChange={e => {
+                                                        const cod = codsRet.find(c => c.codigo === e.target.value && c.tipo === 'FUENTE')
+                                                        set('ret_fuente_codigo', e.target.value || null)
+                                                        set('ret_fuente_porcentaje', cod?.porcentaje ?? null)
+                                                    }}>
+                                                    <option value="">— Sin retención —</option>
+                                                    {codsRet.filter(c => c.tipo === 'FUENTE' && c.activo).map(c => (
+                                                        <option key={c.id} value={c.codigo}>{c.codigo} — {c.porcentaje}% — {c.descripcion.slice(0, 50)}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="label text-xs">Ret. IVA — Código SRI</label>
+                                                <select className="input text-sm"
+                                                    value={editando.ret_iva_codigo ?? ''}
+                                                    onChange={e => {
+                                                        const cod = codsRet.find(c => c.codigo === e.target.value && c.tipo === 'IVA')
+                                                        set('ret_iva_codigo', e.target.value || null)
+                                                        set('ret_iva_porcentaje', cod?.porcentaje ?? null)
+                                                    }}>
+                                                    <option value="">— Sin retención —</option>
+                                                    {codsRet.filter(c => c.tipo === 'IVA' && c.activo).map(c => (
+                                                        <option key={c.id} value={c.codigo}>{c.codigo} — {c.porcentaje}% — {c.descripcion.slice(0, 50)}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 flex gap-3">

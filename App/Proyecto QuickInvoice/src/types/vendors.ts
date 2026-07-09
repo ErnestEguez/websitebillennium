@@ -59,6 +59,11 @@ export interface Proveedor {
     contribuyente_especial: boolean
     agente_retencion:     boolean
     tipo_regimen:         TipoRegimen
+    // Retenciones automáticas predeterminadas
+    ret_fuente_codigo?:      string | null
+    ret_fuente_porcentaje?:  number | null
+    ret_iva_codigo?:         string | null
+    ret_iva_porcentaje?:     number | null
     created_at?: string
     updated_at?: string
 }

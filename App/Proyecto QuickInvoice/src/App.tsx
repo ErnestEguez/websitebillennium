@@ -81,6 +81,7 @@ import { IntegracionSRIPage }                     from './pages/contabilidad/int
 import { IntegracionExcelVentasPage }             from './pages/contabilidad/integracion/IntegracionExcelVentasPage'
 import { ConsultaComprasPage as ContaCompras }    from './pages/contabilidad/tributario/ConsultaComprasPage'
 import { ConsultaRetencionesPage }                from './pages/contabilidad/tributario/ConsultaRetencionesPage'
+import { ConsultaFacturasVentasPage }             from './pages/contabilidad/tributario/ConsultaFacturasVentasPage'
 import { ConsultaNcNdPage }                       from './pages/contabilidad/tributario/ConsultaNcNdPage'
 import { AtsPage }                                from './pages/contabilidad/tributario/AtsPage'
 import { Formulario104Page }                      from './pages/contabilidad/tributario/Formulario104Page'
@@ -646,6 +647,7 @@ function App() {
                         <Route path="integracion/excel"              element={<IntegracionExcelVentasPage />} />
                         <Route path="tributario/compras"             element={<ContaCompras />} />
                         <Route path="tributario/retenciones"         element={<ConsultaRetencionesPage />} />
+                        <Route path="tributario/facturas-ventas"     element={<ConsultaFacturasVentasPage />} />
                         <Route path="tributario/nc-nd"               element={<ConsultaNcNdPage />} />
                         <Route path="tributario/ats"                 element={<AtsPage />} />
                         <Route path="tributario/104"                 element={<Formulario104Page />} />

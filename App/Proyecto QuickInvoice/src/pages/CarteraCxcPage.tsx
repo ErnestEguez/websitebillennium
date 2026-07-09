@@ -598,9 +598,18 @@ export function CarteraCxcPage() {
 
     const diasVencido = (fechaVenc: string | null) => {
         if (!fechaVenc) return null
-        const diff = Math.floor((Date.now() - new Date(fechaVenc).getTime()) / 86400000)
+        const diff = Math.floor((Date.now() - new Date(fechaVenc + 'T00:00:00').getTime()) / 86400000)
         return diff > 0 ? diff : null
     }
+
+    const diasPorVencer = (fechaVenc: string | null) => {
+        if (!fechaVenc) return null
+        const diff = Math.floor((new Date(fechaVenc + 'T00:00:00').getTime() - Date.now()) / 86400000)
+        return diff >= 0 ? diff : null
+    }
+
+    const totalVencido    = carteraFiltrada.filter(c => diasVencido(c.fecha_vencimiento) !== null).reduce((s, c) => s + Number(c.saldo), 0)
+    const totalPorVencer  = carteraFiltrada.filter(c => diasPorVencer(c.fecha_vencimiento) !== null).reduce((s, c) => s + Number(c.saldo), 0)
 
     // Lista única de clientes en la cartera activa (para el selector del modal multi)
     const clientesUnicos = useMemo(() => {
@@ -666,13 +675,13 @@ export function CarteraCxcPage() {
             </div>
 
             {/* Resumen */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                 <div className="card p-5 flex items-center gap-4">
                     <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
                         <CreditCard className="w-6 h-6 text-yellow-600" />
                     </div>
                     <div>
-                        <p className="text-sm text-slate-500">Facturas en vista</p>
+                        <p className="text-sm text-slate-500">Facturas</p>
                         <p className="text-2xl font-bold text-slate-900">{carteraFiltrada.length}</p>
                     </div>
                 </div>
@@ -682,7 +691,7 @@ export function CarteraCxcPage() {
                     </div>
                     <div>
                         <p className="text-sm text-slate-500">Valor original</p>
-                        <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalOriginal)}</p>
+                        <p className="text-xl font-bold text-slate-900">{formatCurrency(totalOriginal)}</p>
                     </div>
                 </div>
                 <div className="card p-5 flex items-center gap-4">
@@ -691,7 +700,25 @@ export function CarteraCxcPage() {
                     </div>
                     <div>
                         <p className="text-sm text-slate-500">Saldo pendiente</p>
-                        <p className="text-2xl font-bold text-red-600">{formatCurrency(totalSaldo)}</p>
+                        <p className="text-xl font-bold text-red-600">{formatCurrency(totalSaldo)}</p>
+                    </div>
+                </div>
+                <div className="card p-5 flex items-center gap-4 border-l-4 border-red-500">
+                    <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+                        <AlertCircle className="w-6 h-6 text-red-500" />
+                    </div>
+                    <div>
+                        <p className="text-sm text-slate-500">Vencidas</p>
+                        <p className="text-xl font-bold text-red-600">{formatCurrency(totalVencido)}</p>
+                    </div>
+                </div>
+                <div className="card p-5 flex items-center gap-4 border-l-4 border-amber-400">
+                    <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                        <DollarSign className="w-6 h-6 text-amber-500" />
+                    </div>
+                    <div>
+                        <p className="text-sm text-slate-500">Por Vencer</p>
+                        <p className="text-xl font-bold text-amber-600">{formatCurrency(totalPorVencer)}</p>
                     </div>
                 </div>
             </div>
@@ -745,6 +772,8 @@ export function CarteraCxcPage() {
                             <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Cliente</th>
                             <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Emisión</th>
                             <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Vencimiento</th>
+                            <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Días Vencido</th>
+                            <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Días Por Vencer</th>
                             <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Original</th>
                             <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Saldo</th>
                             <th className="text-center px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Estado</th>
@@ -753,8 +782,9 @@ export function CarteraCxcPage() {
                     </thead>
                     <tbody>
                         {carteraFiltrada.map(c => {
-                            const vencidoDias = diasVencido(c.fecha_vencimiento)
-                            const isExpanded  = expandedId === c.id
+                            const vencidoDias   = diasVencido(c.fecha_vencimiento)
+                            const porVencerDias = diasPorVencer(c.fecha_vencimiento)
+                            const isExpanded    = expandedId === c.id
                             return (
                                 <>
                                     <tr
@@ -768,13 +798,18 @@ export function CarteraCxcPage() {
                                             <div className="text-xs text-slate-500">{c.clientes?.identificacion}</div>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-slate-600">{c.fecha_emision}</td>
-                                        <td className="px-4 py-3 text-sm">
-                                            {c.fecha_vencimiento ? (
-                                                <span className={vencidoDias ? 'text-red-600 font-semibold' : 'text-slate-600'}>
-                                                    {c.fecha_vencimiento}
-                                                    {vencidoDias && <span className="ml-1 text-xs">({vencidoDias}d vencido)</span>}
-                                                </span>
-                                            ) : '—'}
+                                        <td className="px-4 py-3 text-sm text-slate-600">{c.fecha_vencimiento || '—'}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            {vencidoDias != null
+                                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">{vencidoDias}d</span>
+                                                : <span className="text-slate-300 text-xs">—</span>
+                                            }
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
+                                            {porVencerDias != null
+                                                ? <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${porVencerDias <= 7 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>{porVencerDias}d</span>
+                                                : <span className="text-slate-300 text-xs">—</span>
+                                            }
                                         </td>
                                         <td className="px-4 py-3 text-right text-sm text-slate-600">{formatCurrency(c.valor_original)}</td>
                                         <td className="px-4 py-3 text-right font-semibold text-sm text-red-600">{formatCurrency(c.saldo)}</td>
@@ -802,7 +837,7 @@ export function CarteraCxcPage() {
 
                                     {isExpanded && (
                                         <tr key={`${c.id}-detail`} className="bg-slate-50">
-                                            <td colSpan={8} className="px-6 py-4">
+                                            <td colSpan={10} className="px-6 py-4">
                                                 <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Historial de pagos</p>
                                                 {(pagosDetalle[c.id] || []).length === 0 ? (
                                                     <p className="text-sm text-slate-400">Sin pagos registrados</p>

@@ -3,6 +3,7 @@ import { useFormDraft } from '../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { compraService, proveedorService, retencionService } from '../../services/vendorService'
+import { CODIGOS_SRI_DEFAULT } from '../../services/codigoRetencionService'
 import { contableConfigService } from '../../services/contableConfigService'
 import { contabilidadComprasService } from '../../services/contabilidadComprasService'
 import type { Proveedor, DetalleServicio, TipoGasto } from '../../types/vendors'
@@ -198,7 +199,15 @@ export function NuevaCompraServicioPage() {
                 const d = new Date(); d.setDate(d.getDate() + prov.dias_credito)
                 fechaVencFinal = d.toISOString().split('T')[0]
             }
-            const retsParaGuardar = retenciones.filter(r => r.codigo && r.valor > 0).map(r => ({
+            // Auto-completar base=0 con los totales actuales
+            const retsConBase = retenciones.map(r => {
+                if (r.base > 0 || !r.codigo) return r
+                const base  = r.tipo === 'FUENTE' ? subtotalLineas : ivaCalc
+                const valor = Math.round(base * r.pct / 100 * 100) / 100
+                return { ...r, base, valor }
+            })
+
+            const retsParaGuardar = retsConBase.filter(r => r.codigo && r.valor > 0).map(r => ({
                 empresa_id: empresa!.id, proveedor_id: proveedorId,
                 numero_retencion: numeroRetencion || undefined,
                 fecha_emision: HOY, tipo: r.tipo,
@@ -298,6 +307,22 @@ export function NuevaCompraServicioPage() {
                                     const d = new Date(); d.setDate(d.getDate() + prov.dias_credito)
                                     setFechaVenc(d.toLocaleDateString('en-CA', { timeZone: 'America/Guayaquil' }))
                                 }
+                            }
+                            // Auto-retenciones del proveedor
+                            const autoRets: RetLine[] = []
+                            if (prov?.ret_fuente_codigo && prov.ret_fuente_porcentaje != null) {
+                                const desc = CODIGOS_SRI_DEFAULT.find(c => c.codigo === prov.ret_fuente_codigo && c.tipo === 'FUENTE')?.descripcion
+                                    ?? `Ret. Fuente ${prov.ret_fuente_codigo}`
+                                autoRets.push({ tipo: 'FUENTE', codigo: prov.ret_fuente_codigo, descripcion: desc, base: 0, pct: prov.ret_fuente_porcentaje!, valor: 0 })
+                            }
+                            if (prov?.ret_iva_codigo && prov.ret_iva_porcentaje != null) {
+                                const desc = CODIGOS_SRI_DEFAULT.find(c => c.codigo === prov.ret_iva_codigo && c.tipo === 'IVA')?.descripcion
+                                    ?? `Ret. IVA ${prov.ret_iva_codigo}`
+                                autoRets.push({ tipo: 'IVA', codigo: prov.ret_iva_codigo, descripcion: desc, base: 0, pct: prov.ret_iva_porcentaje!, valor: 0 })
+                            }
+                            if (autoRets.length > 0) {
+                                setRetenciones(autoRets)
+                                setRetSeccion(true)
                             }
                         }}>
                             <option value="">Seleccionar proveedor...</option>

@@ -225,6 +225,7 @@ export function AtsPage() {
     const [error, setError]             = useState('')
     const [ok, setOk]                   = useState('')
 
+    const [excluirVentas, setExcluirVentas] = useState(false)
     const [tabVista, setTabVista] = useState<'compras' | 'ventas' | 'retenciones'>('compras')
     const [expandido, setExpandido] = useState<string | null>(null)
 
@@ -336,13 +337,15 @@ export function AtsPage() {
         const rucDeclarante = empresaActiva?.ruc ?? empresa?.ruc ?? '9999999999999'
         const razon = empresaActiva?.razon_social ?? empresaActiva?.nombre ?? empresa?.nombre ?? ''
 
+        const ventasParaXml = excluirVentas ? [] : ventasAts
+
         const xml = generarXmlAts({
             ruc: rucDeclarante,
             razonSocial: razon,
             año,
             mes,
             compras,
-            ventas: ventasAts,
+            ventas: ventasParaXml,
         })
 
         const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' })
@@ -352,7 +355,7 @@ export function AtsPage() {
         a.download = `ATS_${rucDeclarante}_${año}${String(mes).padStart(2, '0')}.xml`
         a.click()
         URL.revokeObjectURL(url)
-        setOk(`ATS generado: ${compras.length} compra(s), ${ventasAts.reduce((s, v) => s + v.cantidad, 0)} venta(s)`)
+        setOk(`ATS generado: ${compras.length} compra(s)${excluirVentas ? ' (ventas excluidas)' : `, ${ventasAts.reduce((s, v) => s + v.cantidad, 0)} venta(s)`}`)
     }
 
     // ── Totales ────────────────────────────────────────────────────────────
@@ -413,6 +416,15 @@ export function AtsPage() {
                             ))}
                         </select>
                     </div>
+                    <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-700 pb-1">
+                        <input
+                            type="checkbox"
+                            checked={excluirVentas}
+                            onChange={e => setExcluirVentas(e.target.checked)}
+                            className="w-4 h-4 rounded border-slate-300 text-primary-600"
+                        />
+                        Excluir ventas del ATS
+                    </label>
                     <div className="flex-1" />
                     <button
                         onClick={descargarXml}

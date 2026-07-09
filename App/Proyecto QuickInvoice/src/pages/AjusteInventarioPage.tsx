@@ -18,6 +18,8 @@ import {
     Loader2,
     FileText,
     Info,
+    History,
+    Filter,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { BuscadorProducto, type ProductoResultado } from '../components/BuscadorProducto'
@@ -82,6 +84,13 @@ export function AjusteInventarioPage() {
     const [saving,    setSaving]    = useState(false)
     const [errores,   setErrores]   = useState<string[]>([])
 
+    // ── Historial
+    const [activeTab,    setActiveTab]    = useState<'nuevo' | 'consulta'>('nuevo')
+    const [histDesde,    setHistDesde]    = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] })
+    const [histHasta,    setHistHasta]    = useState(hoy)
+    const [histMovs,     setHistMovs]     = useState<any[]>([])
+    const [histLoading,  setHistLoading]  = useState(false)
+
     // ── Draft
     const clearDraft = useFormDraft(
         'draft_ajuste_inventario',
@@ -138,6 +147,28 @@ export function AjusteInventarioPage() {
             }
         } catch (e) {
             console.error('Error cargando stock:', e)
+        }
+    }
+
+    async function consultarHistorial() {
+        if (!empresa?.id) return
+        setHistLoading(true)
+        try {
+            const { data, error } = await supabase
+                .from('kardex')
+                .select('id, fecha, created_at, tipo_movimiento, motivo, documento_referencia, cantidad, costo_unitario, producto:productos(nombre, codigo), bodega:bodegas(nombre)')
+                .eq('empresa_id', empresa.id)
+                .like('documento_referencia', 'AJ-%')
+                .gte('fecha', histDesde)
+                .lte('fecha', histHasta)
+                .order('fecha', { ascending: false })
+                .order('created_at', { ascending: false })
+            if (error) throw error
+            setHistMovs(data ?? [])
+        } catch (e: any) {
+            alert('Error al consultar historial: ' + e.message)
+        } finally {
+            setHistLoading(false)
         }
     }
 
@@ -243,16 +274,27 @@ export function AjusteInventarioPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Ajuste de Inventario</h1>
                     <p className="text-slate-500 text-sm mt-0.5">Registra ingresos y egresos manuales de stock</p>
                 </div>
-                <button
-                    onClick={handleGuardar}
-                    disabled={saving}
-                    className="btn btn-primary gap-2 shrink-0"
-                >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    {saving ? 'Guardando...' : 'Guardar Ajuste'}
-                </button>
+                <div className="flex items-center gap-3">
+                    <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+                        <button onClick={() => setActiveTab('nuevo')}
+                            className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all', activeTab === 'nuevo' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500')}>
+                            <Plus className="w-4 h-4" /> Nuevo Ajuste
+                        </button>
+                        <button onClick={() => setActiveTab('consulta')}
+                            className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all', activeTab === 'consulta' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500')}>
+                            <History className="w-4 h-4" /> Consulta
+                        </button>
+                    </div>
+                    {activeTab === 'nuevo' && (
+                        <button onClick={handleGuardar} disabled={saving} className="btn btn-primary gap-2 shrink-0">
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            {saving ? 'Guardando...' : 'Guardar Ajuste'}
+                        </button>
+                    )}
+                </div>
             </div>
 
+            {activeTab === 'nuevo' && (<>
             {/* Errores */}
             {errores.length > 0 && (
                 <div className="rounded-2xl bg-red-50 border border-red-200 p-4 space-y-1">
@@ -524,6 +566,92 @@ export function AjusteInventarioPage() {
                     {saving ? 'Guardando...' : 'Guardar Ajuste'}
                 </button>
             </div>
+            </>)}
+
+            {activeTab === 'consulta' && (
+                <div className="space-y-4">
+                    {/* Filtros */}
+                    <div className="card p-4">
+                        <div className="flex flex-wrap items-end gap-3">
+                            <div className="space-y-1">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Desde</label>
+                                <input type="date" value={histDesde} onChange={e => setHistDesde(e.target.value)}
+                                    className="px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Hasta</label>
+                                <input type="date" value={histHasta} onChange={e => setHistHasta(e.target.value)}
+                                    className="px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <button onClick={consultarHistorial} disabled={histLoading}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-60">
+                                {histLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
+                                Consultar
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Resultados */}
+                    {histMovs.length === 0 && !histLoading && (
+                        <div className="card p-10 flex flex-col items-center gap-3 text-slate-400">
+                            <History className="w-10 h-10 opacity-30" />
+                            <p className="text-sm">No hay ajustes en el período seleccionado. Presiona <strong>Consultar</strong> para buscar.</p>
+                        </div>
+                    )}
+
+                    {histMovs.length > 0 && (
+                        <div className="card overflow-hidden">
+                            <div className="bg-slate-700 text-white px-4 py-3 flex items-center justify-between">
+                                <span className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                                    <History className="w-4 h-4" /> Historial de Ajustes
+                                </span>
+                                <span className="text-xs bg-white/10 px-2 py-1 rounded-lg">{histMovs.length} movimiento{histMovs.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-50 border-b border-slate-100">
+                                        <tr>
+                                            <th className="text-left px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha</th>
+                                            <th className="text-left px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-wider">Referencia</th>
+                                            <th className="text-left px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-wider">Producto</th>
+                                            <th className="text-left px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-wider">Bodega</th>
+                                            <th className="text-left px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-wider">Tipo</th>
+                                            <th className="text-right px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-wider">Cantidad</th>
+                                            <th className="text-right px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-wider">Costo Unit.</th>
+                                            <th className="text-left px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-wider">Motivo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {histMovs.map((m, i) => (
+                                            <tr key={m.id} className={cn('hover:bg-slate-50 transition-colors', i % 2 === 1 && 'bg-slate-50/40')}>
+                                                <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{m.fecha}</td>
+                                                <td className="px-4 py-2 font-mono text-xs text-indigo-700">{m.documento_referencia}</td>
+                                                <td className="px-4 py-2">
+                                                    <p className="font-semibold text-slate-800">{(m.producto as any)?.nombre ?? '—'}</p>
+                                                    <p className="text-[10px] text-slate-400">{(m.producto as any)?.codigo}</p>
+                                                </td>
+                                                <td className="px-4 py-2 text-slate-500 text-xs">{(m.bodega as any)?.nombre ?? '—'}</td>
+                                                <td className="px-4 py-2">
+                                                    <span className={cn('inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full',
+                                                        m.tipo_movimiento === 'ENTRADA' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
+                                                        {m.tipo_movimiento === 'ENTRADA'
+                                                            ? <TrendingUp className="w-3 h-3" />
+                                                            : <TrendingDown className="w-3 h-3" />}
+                                                        {m.tipo_movimiento}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-2 text-right font-bold text-slate-800">{Number(m.cantidad).toLocaleString('es-EC', { minimumFractionDigits: 0, maximumFractionDigits: 4 })}</td>
+                                                <td className="px-4 py-2 text-right text-slate-600">{m.costo_unitario != null ? `$${Number(m.costo_unitario).toFixed(4)}` : '—'}</td>
+                                                <td className="px-4 py-2 text-xs text-slate-500 max-w-xs truncate" title={m.motivo}>{m.motivo ?? '—'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     )
 }

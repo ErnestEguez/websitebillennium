@@ -6,12 +6,21 @@ export interface Producto {
     nombre: string
     descripcion: string | null
     precio_venta: number
+    precio2?: number | null
+    precio3?: number | null
+    precio4?: number | null
     categoria_id: string
+    linea_id?: string | null
+    subcategoria_id?: string | null
     imagen_url: string | null
     iva_porcentaje: number
     maneja_stock?: boolean
     stock?: number
     costo_promedio?: number
+    cod_proveedor?: string | null
+    unidades_x_presentacion?: number | null
+    minimo?: number | null
+    ubicacion?: string | null
     // Cuentas contables
     cuenta_ingreso_id?: string | null
     cuenta_ingreso_codigo?: string | null

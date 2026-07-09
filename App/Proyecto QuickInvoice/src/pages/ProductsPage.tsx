@@ -3,6 +3,8 @@ import { productoService } from '../services/productoService'
 import type { Producto, Categoria } from '../services/productoService'
 import { subproductoService, type Subproducto } from '../services/subproductoService'
 import { contableConfigService, type CuentaLP } from '../services/contableConfigService'
+import { lineaService, type Linea } from '../services/lineaService'
+import { subcategoriaService, type Subcategoria } from '../services/subcategoriaService'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/utils'
@@ -275,6 +277,8 @@ export function ProductsPage() {
     const { empresa } = useAuth()
     const [productos, setProductos] = useState<any[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
+    const [lineas, setLineas] = useState<Linea[]>([])
+    const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([])
     const [loading, setLoading] = useState(false)  // sin carga inicial
     const [search, setSearch] = useState('')
     const [selectedCategoria, setSelectedCategoria] = useState<string>('')
@@ -284,15 +288,19 @@ export function ProductsPage() {
     const [precioVolumenProducto, setPrecioVolumenProducto] = useState<any>(null)
     const [cuentasLP, setCuentasLP] = useState<CuentaLP[]>([])
 
-    // Cargar solo categorías y cuentas al montar (para los filtros del modal)
+    // Cargar categorías, líneas, subcategorías y cuentas al montar
     useEffect(() => {
         if (!empresa?.id) return
         Promise.all([
             productoService.getCategorias(empresa.id),
             contableConfigService.getCuentas((empresa as any)?.ruc),
-        ]).then(([catData, cuentas]) => {
+            lineaService.getLineas(empresa.id).catch(() => [] as Linea[]),
+            subcategoriaService.getSubcategorias(empresa.id).catch(() => [] as Subcategoria[]),
+        ]).then(([catData, cuentas, lineasData, subcatsData]) => {
             setCategorias(catData)
             setCuentasLP(cuentas)
+            setLineas(lineasData)
+            setSubcategorias(subcatsData)
         }).catch(console.error)
     }, [empresa?.id])
 
@@ -329,20 +337,29 @@ export function ProductsPage() {
 
         // Campos explícitos — excluye joins y campos calculados que Supabase rechaza
         const campos = {
-            codigo:                editingProduct.codigo               ?? null,
-            nombre:                editingProduct.nombre               ?? '',
-            descripcion:           editingProduct.descripcion          ?? null,
-            precio_venta:          editingProduct.precio_venta         ?? 0,
-            categoria_id:          editingProduct.categoria_id         ?? undefined,
-            iva_porcentaje:        editingProduct.iva_porcentaje       ?? 15,
-            maneja_stock:          editingProduct.maneja_stock         ?? true,
-            imagen_url:            editingProduct.imagen_url           ?? null,
-            cuenta_ingreso_id:     editingProduct.cuenta_ingreso_id    ?? null,
-            cuenta_ingreso_codigo: editingProduct.cuenta_ingreso_codigo ?? null,
-            cuenta_ingreso_nombre: editingProduct.cuenta_ingreso_nombre ?? null,
-            cuenta_costo_id:       editingProduct.cuenta_costo_id      ?? null,
-            cuenta_costo_codigo:   editingProduct.cuenta_costo_codigo  ?? null,
-            cuenta_costo_nombre:   editingProduct.cuenta_costo_nombre  ?? null,
+            codigo:                    editingProduct.codigo                    ?? null,
+            nombre:                    editingProduct.nombre                    ?? '',
+            descripcion:               editingProduct.descripcion               ?? null,
+            precio_venta:              editingProduct.precio_venta              ?? 0,
+            precio2:                   editingProduct.precio2                   ?? null,
+            precio3:                   editingProduct.precio3                   ?? null,
+            precio4:                   editingProduct.precio4                   ?? null,
+            categoria_id:              editingProduct.categoria_id              ?? undefined,
+            linea_id:                  editingProduct.linea_id                  ?? null,
+            subcategoria_id:           editingProduct.subcategoria_id           ?? null,
+            iva_porcentaje:            editingProduct.iva_porcentaje            ?? 15,
+            maneja_stock:              editingProduct.maneja_stock              ?? true,
+            imagen_url:                editingProduct.imagen_url                ?? null,
+            cod_proveedor:             editingProduct.cod_proveedor             ?? null,
+            unidades_x_presentacion:   editingProduct.unidades_x_presentacion  ?? null,
+            minimo:                    editingProduct.minimo                    ?? null,
+            ubicacion:                 editingProduct.ubicacion                 ?? null,
+            cuenta_ingreso_id:         editingProduct.cuenta_ingreso_id         ?? null,
+            cuenta_ingreso_codigo:     editingProduct.cuenta_ingreso_codigo     ?? null,
+            cuenta_ingreso_nombre:     editingProduct.cuenta_ingreso_nombre     ?? null,
+            cuenta_costo_id:           editingProduct.cuenta_costo_id           ?? null,
+            cuenta_costo_codigo:       editingProduct.cuenta_costo_codigo       ?? null,
+            cuenta_costo_nombre:       editingProduct.cuenta_costo_nombre       ?? null,
         }
 
         try {
@@ -608,6 +625,31 @@ export function ProductsPage() {
                                 </div>
                             </div>
 
+                            {/* Precios adicionales */}
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Precio 2</label>
+                                    <input type="number" step="0.0001" min="0" placeholder="0.0000"
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                                        value={editingProduct?.precio2 ?? ''}
+                                        onChange={e => setEditingProduct({ ...editingProduct, precio2: e.target.value ? parseFloat(e.target.value) : null })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Precio 3</label>
+                                    <input type="number" step="0.0001" min="0" placeholder="0.0000"
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                                        value={editingProduct?.precio3 ?? ''}
+                                        onChange={e => setEditingProduct({ ...editingProduct, precio3: e.target.value ? parseFloat(e.target.value) : null })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Precio 4</label>
+                                    <input type="number" step="0.0001" min="0" placeholder="0.0000"
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                                        value={editingProduct?.precio4 ?? ''}
+                                        onChange={e => setEditingProduct({ ...editingProduct, precio4: e.target.value ? parseFloat(e.target.value) : null })} />
+                                </div>
+                            </div>
+
                             <div className="flex items-center gap-2">
                                 <input
                                     type="checkbox"
@@ -634,6 +676,60 @@ export function ProductsPage() {
                                         <option key={cat.id} value={cat.id}>{cat.nombre}</option>
                                     ))}
                                 </select>
+                            </div>
+
+                            {/* Línea y SubCategoría */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Línea</label>
+                                    <select className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                                        value={editingProduct?.linea_id || ''}
+                                        onChange={e => setEditingProduct({ ...editingProduct, linea_id: e.target.value || null })}>
+                                        <option value="">— Sin línea —</option>
+                                        {lineas.map(l => <option key={l.id} value={l.id}>{l.nombre}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">SubCategoría</label>
+                                    <select className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                                        value={editingProduct?.subcategoria_id || ''}
+                                        onChange={e => setEditingProduct({ ...editingProduct, subcategoria_id: e.target.value || null })}>
+                                        <option value="">— Sin subcategoría —</option>
+                                        {subcategorias.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Campos adicionales */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Cód. Proveedor</label>
+                                    <input type="text" maxLength={50} placeholder="Código del proveedor"
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm font-mono"
+                                        value={editingProduct?.cod_proveedor || ''}
+                                        onChange={e => setEditingProduct({ ...editingProduct, cod_proveedor: e.target.value || null })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Unidades x Presentación</label>
+                                    <input type="number" step="0.01" min="1" placeholder="1"
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                                        value={editingProduct?.unidades_x_presentacion ?? ''}
+                                        onChange={e => setEditingProduct({ ...editingProduct, unidades_x_presentacion: e.target.value ? parseFloat(e.target.value) : null })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Stock Mínimo</label>
+                                    <input type="number" step="0.01" min="0" placeholder="0"
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                                        value={editingProduct?.minimo ?? ''}
+                                        onChange={e => setEditingProduct({ ...editingProduct, minimo: e.target.value ? parseFloat(e.target.value) : null })} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ubicación</label>
+                                    <input type="text" maxLength={100} placeholder="Pasillo, estante..."
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                                        value={editingProduct?.ubicacion || ''}
+                                        onChange={e => setEditingProduct({ ...editingProduct, ubicacion: e.target.value || null })} />
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Descripción</label>

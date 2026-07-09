@@ -41,6 +41,7 @@ import {
     User,
     TrendingUp,
     Trash2,
+    Receipt,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -497,8 +498,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             anyActive={location.pathname.startsWith('/conta/tributario')}
                         >
                             <SidebarItem to="/conta/tributario/compras"     icon={ShoppingCart} label="Compras SRI"    active={location.pathname === '/conta/tributario/compras'} sub />
-                            <SidebarItem to="/conta/tributario/retenciones" icon={FileText}     label="Retenciones"   active={location.pathname === '/conta/tributario/retenciones'} sub />
-                            <SidebarItem to="/conta/tributario/nc-nd"       icon={FileMinus}    label="N/C y N/D"     active={location.pathname === '/conta/tributario/nc-nd'} sub />
+                            <SidebarItem to="/conta/tributario/retenciones"     icon={FileText}  label="Retenciones"     active={location.pathname === '/conta/tributario/retenciones'} sub />
+                            <SidebarItem to="/conta/tributario/facturas-ventas" icon={Receipt}   label="Facturas Ventas" active={location.pathname === '/conta/tributario/facturas-ventas'} sub />
+                            <SidebarItem to="/conta/tributario/nc-nd"           icon={FileMinus} label="N/C y N/D"       active={location.pathname === '/conta/tributario/nc-nd'} sub />
                             <SidebarItem to="/conta/tributario/ats"         icon={FileText}     label="ATS"           active={location.pathname === '/conta/tributario/ats'} sub />
                             <SidebarItem to="/conta/tributario/104"         icon={BarChart3}    label="Form. 104 IVA" active={location.pathname === '/conta/tributario/104'} sub />
                         </ModuleSection>}

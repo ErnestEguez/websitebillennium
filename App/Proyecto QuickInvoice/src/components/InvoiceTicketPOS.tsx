@@ -138,6 +138,24 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                 <p className="mt-4 text-center border-t border-dashed border-black pt-2 italic">
                     Este documento es una representación impresa de un comprobante electrónico.
                 </p>
+                {(() => {
+                    const lim = new Date()
+                    let added = 0
+                    while (added < 5) {
+                        lim.setDate(lim.getDate() + 1)
+                        const dow = lim.getDay()
+                        if (dow !== 0 && dow !== 6) added++
+                    }
+                    const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+                    return (
+                        <p className="text-center text-[9px] mt-1">
+                            Aceptamos retenciones hasta {lim.getDate()}/{meses[lim.getMonth()]}/{lim.getFullYear()}
+                        </p>
+                    )
+                })()}
+                {factura.empresas?.glosa_factura && (
+                    <p className="text-center text-[9px] mt-1 italic">{factura.empresas.glosa_factura}</p>
+                )}
                 <p className="text-center font-bold">¡GRACIAS POR SU VISITA!</p>
             </div>
         </div>

@@ -18,11 +18,14 @@ export interface DetalleFacturaDirecta {
 }
 
 export interface PagoFactura {
-    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'cheque_fecha' | 'otros' | 'tarjeta'
+    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'cheque_fecha' | 'otros' | 'tarjeta' | 'nota_credito'
     valor: number
     referencia?: string
     cuenta_bancaria_id?: string | null           // solo para transferencia
     cuenta_bancaria_contable_id?: string | null  // cuenta_contable_id de la cuenta bancaria
+    nota_credito_id?: string | null              // solo para nota_credito
+    numero_documento?: string | null             // N° comprobante transferencia
+    observaciones?: string | null                // observaciones adicionales
 }
 
 export interface FacturaDirectaInput {
@@ -236,6 +239,21 @@ export const facturaDirectaService = {
                 // No bloquea la factura; se registra para revisión manual
                 console.error('[cartera_cxc] Error al crear registro de cartera:', errorCartera)
             }
+        }
+
+        // 6.2 Notas de Crédito como pago — descontar saldo_nc
+        const pagosNC = pagos.filter(p => p.metodo === 'nota_credito' && p.valor > 0 && p.nota_credito_id)
+        for (const pNC of pagosNC) {
+            const { data: nc } = await supabase
+                .from('notas_credito')
+                .select('saldo_nc')
+                .eq('id', pNC.nota_credito_id!)
+                .single()
+            const nuevoSaldo = Math.max(0, (nc?.saldo_nc ?? 0) - pNC.valor)
+            await supabase
+                .from('notas_credito')
+                .update({ saldo_nc: nuevoSaldo })
+                .eq('id', pNC.nota_credito_id!)
         }
 
         // 7. Actualizar secuencial en config_sri — solo en el fallback sin punto de emisión,

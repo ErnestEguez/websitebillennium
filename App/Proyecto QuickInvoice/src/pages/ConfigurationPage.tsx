@@ -26,10 +26,14 @@ import {
     Star,
     PowerOff,
     Printer,
+    AlignLeft,
+    FolderTree,
 } from 'lucide-react'
 import { ContabilidadConfigTab } from '../components/ContabilidadConfigTab'
 import { TalentoNominasConfigTab } from '../components/TalentoNominasConfigTab'
 import { categoriaService, type Categoria } from '../services/categoriaService'
+import { lineaService, type Linea } from '../services/lineaService'
+import { subcategoriaService, type Subcategoria } from '../services/subcategoriaService'
 import { bodegaService } from '../services/bodegaService'
 import { puntoEmisionService } from '../services/puntoEmisionService'
 import type { Bodega } from '../types/vendors'
@@ -39,7 +43,7 @@ import { getPuntoEmisionDispositivo, setPuntoEmisionDispositivo } from '../lib/d
 
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
-    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'bodegas' | 'puntos_emision' | 'plataforma' | 'contabilidad' | 'talento_nominas'>('empresa')
+    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'lineas' | 'subcategorias' | 'bodegas' | 'puntos_emision' | 'plataforma' | 'contabilidad' | 'talento_nominas'>('empresa')
     const [platformSubTab, setPlatformSubTab]   = useState<'empresas' | 'personal'>('empresas')
     const [mensajePlataforma, setMensajePlataforma] = useState('')
     const [savingMsg, setSavingMsg]               = useState(false)
@@ -70,6 +74,16 @@ export function ConfigurationPage() {
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [isCategoriaModalOpen, setIsCategoriaModalOpen] = useState(false)
     const [editingCategoria, setEditingCategoria] = useState<Partial<Categoria> | null>(null)
+
+    // Líneas State
+    const [lineas, setLineas] = useState<Linea[]>([])
+    const [isLineaModalOpen, setIsLineaModalOpen] = useState(false)
+    const [editingLinea, setEditingLinea] = useState<Partial<Linea> | null>(null)
+
+    // SubCategorías State
+    const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([])
+    const [isSubcategoriaModalOpen, setIsSubcategoriaModalOpen] = useState(false)
+    const [editingSubcategoria, setEditingSubcategoria] = useState<Partial<Subcategoria> | null>(null)
 
     // Bodegas State
     const [bodegas, setBodegas] = useState<Bodega[]>([])
@@ -242,6 +256,24 @@ export function ConfigurationPage() {
                     }
                 }
 
+                // ── Cargar líneas ──
+                try {
+                    const lineasData = await lineaService.getLineas(empresa!.id, true)
+                    setLineas(lineasData)
+                } catch (e) {
+                    console.error('Error cargando líneas:', e)
+                    setLineas([])
+                }
+
+                // ── Cargar subcategorías ──
+                try {
+                    const subcatsData = await subcategoriaService.getSubcategorias(empresa!.id, true)
+                    setSubcategorias(subcatsData)
+                } catch (e) {
+                    console.error('Error cargando subcategorías:', e)
+                    setSubcategorias([])
+                }
+
                 // ── Cargar bodegas ──
                 try {
                     const bodegasData = await bodegaService.listarTodas(empresa!.id)
@@ -329,7 +361,9 @@ export function ConfigurationPage() {
                     telefono: companyData.telefono || null,
                     logo_url: companyData.logo_url || null,
                     config_sri: companyData.config_sri || {},
-                    usar_vendor_management: companyData.usar_vendor_management ?? false
+                    usar_vendor_management: companyData.usar_vendor_management ?? false,
+                    tope_consumidor_final: companyData.tope_consumidor_final ?? null,
+                    glosa_factura: companyData.glosa_factura || null,
                 })
                 .eq('id', empresa!.id)
             if (error) throw error
@@ -661,6 +695,80 @@ export function ConfigurationPage() {
         }
     }
 
+    async function handleSaveLinea() {
+        try {
+            setSaving(true)
+            if (!editingLinea?.nombre?.trim()) {
+                alert('El nombre es obligatorio')
+                return
+            }
+            if (editingLinea.id) {
+                const { id, empresa_id, created_at, activo, ...updates } = editingLinea as any
+                await lineaService.updateLinea(editingLinea.id, updates)
+            } else {
+                await lineaService.createLinea({
+                    nombre: editingLinea.nombre,
+                    descripcion: editingLinea.descripcion || '',
+                    empresa_id: empresa!.id,
+                })
+            }
+            setIsLineaModalOpen(false)
+            setEditingLinea(null)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al guardar línea: ${error.message}`)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    async function handleBajaLinea(id: string, nombre: string) {
+        if (!confirm(`¿Dar de baja la línea "${nombre}"?`)) return
+        try {
+            await lineaService.darBajaLinea(id)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al dar de baja: ${error.message}`)
+        }
+    }
+
+    async function handleSaveSubcategoria() {
+        try {
+            setSaving(true)
+            if (!editingSubcategoria?.nombre?.trim()) {
+                alert('El nombre es obligatorio')
+                return
+            }
+            if (editingSubcategoria.id) {
+                const { id, empresa_id, created_at, activo, ...updates } = editingSubcategoria as any
+                await subcategoriaService.updateSubcategoria(editingSubcategoria.id, updates)
+            } else {
+                await subcategoriaService.createSubcategoria({
+                    nombre: editingSubcategoria.nombre,
+                    descripcion: editingSubcategoria.descripcion || '',
+                    empresa_id: empresa!.id,
+                })
+            }
+            setIsSubcategoriaModalOpen(false)
+            setEditingSubcategoria(null)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al guardar subcategoría: ${error.message}`)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    async function handleBajaSubcategoria(id: string, nombre: string) {
+        if (!confirm(`¿Dar de baja la subcategoría "${nombre}"?`)) return
+        try {
+            await subcategoriaService.darBajaSubcategoria(id)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al dar de baja: ${error.message}`)
+        }
+    }
+
     async function handleNuclearReset(id: string, nombre: string) {
         if (!confirm(`⚠️ ALERTA NUCLEAR ⚠️\n\n¿Estás seguro de borrar TODO el movimiento transaccional de "${nombre}"?\n\nEsto eliminará pedidos, facturas, kardex e inventario de prueba. Esta acción es IRREVERSIBLE.`)) return
 
@@ -747,6 +855,26 @@ export function ConfigurationPage() {
                     >
                         <Tag className="w-4 h-4" />
                         Categorías
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('lineas')}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
+                            activeTab === 'lineas' ? "bg-white text-teal-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                    >
+                        <AlignLeft className="w-4 h-4" />
+                        Líneas
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('subcategorias')}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
+                            activeTab === 'subcategorias' ? "bg-white text-orange-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                    >
+                        <FolderTree className="w-4 h-4" />
+                        SubCategorías
                     </button>
                     <button
                         onClick={() => setActiveTab('bodegas')}
@@ -848,6 +976,36 @@ export function ConfigurationPage() {
                                         onChange={e => setCompanyData({ ...companyData, telefono: e.target.value })}
                                     />
                                 </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Tope Consumidor Final
+                                        <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">máx $ a facturar sin RUC/cédula</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="Ej: 50.00"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
+                                        value={companyData.tope_consumidor_final ?? ''}
+                                        onChange={e => setCompanyData({ ...companyData, tope_consumidor_final: e.target.value ? parseFloat(e.target.value) : null })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                    Glosa / Mensaje en Facturas
+                                    <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">aparece en el pie de todas las facturas</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    maxLength={200}
+                                    placeholder="Ej: Gracias por su compra. No se aceptan devoluciones."
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
+                                    value={companyData.glosa_factura || ''}
+                                    onChange={e => setCompanyData({ ...companyData, glosa_factura: e.target.value })}
+                                />
                             </div>
 
                             {/* Logo */}
@@ -1162,6 +1320,178 @@ export function ConfigurationPage() {
                             </div>
                         )}
                     </div>
+                </div>
+            ) : activeTab === 'lineas' ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900">Líneas de Producto</h2>
+                            <p className="text-sm text-slate-500">Agrupa productos por línea comercial (ej: Lácteos, Bebidas, Limpieza)</p>
+                        </div>
+                        <button
+                            onClick={() => { setEditingLinea({ nombre: '', descripcion: '' }); setIsLineaModalOpen(true) }}
+                            className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" /> Nueva Línea
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {lineas.map(lin => (
+                            <div key={lin.id} className={cn(
+                                "card p-6 group relative hover:shadow-lg transition-all border-l-4",
+                                lin.activo === false ? "border-l-slate-300 opacity-60" : "border-l-teal-500"
+                            )}>
+                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button title="Editar" onClick={() => { setEditingLinea(lin); setIsLineaModalOpen(true) }}
+                                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-teal-600">
+                                        <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    {lin.activo !== false && (
+                                        <button title="Dar de baja" onClick={() => handleBajaLinea(lin.id, lin.nombre)}
+                                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="space-y-2 pt-1">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <h3 className="font-bold text-slate-900 text-base uppercase tracking-tight leading-tight">{lin.nombre}</h3>
+                                        {lin.activo === false && (
+                                            <span className="shrink-0 text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full uppercase">Inactiva</span>
+                                        )}
+                                    </div>
+                                    {lin.descripcion && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{lin.descripcion}</p>}
+                                </div>
+                            </div>
+                        ))}
+                        {lineas.length === 0 && (
+                            <div className="col-span-full py-16 text-center">
+                                <AlignLeft className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                                <p className="text-slate-400 font-medium">No hay líneas registradas.</p>
+                                <p className="text-slate-300 text-sm mt-1">Crea la primera línea con el botón de arriba.</p>
+                            </div>
+                        )}
+                    </div>
+                    {/* Modal Línea */}
+                    {isLineaModalOpen && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                                    <h2 className="text-lg font-bold text-slate-900">{editingLinea?.id ? 'Editar Línea' : 'Nueva Línea'}</h2>
+                                    <button onClick={() => { setIsLineaModalOpen(false); setEditingLinea(null) }} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-5 h-5" /></button>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Nombre *</label>
+                                        <input type="text" className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-teal-500"
+                                            value={editingLinea?.nombre || ''}
+                                            onChange={e => setEditingLinea(p => ({ ...p, nombre: e.target.value }))}
+                                            autoFocus />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Descripción</label>
+                                        <textarea className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-teal-500 resize-none h-20"
+                                            value={editingLinea?.descripcion || ''}
+                                            onChange={e => setEditingLinea(p => ({ ...p, descripcion: e.target.value }))} />
+                                    </div>
+                                    <div className="flex gap-3 pt-2">
+                                        <button onClick={() => { setIsLineaModalOpen(false); setEditingLinea(null) }}
+                                            className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Cancelar</button>
+                                        <button onClick={handleSaveLinea} disabled={saving}
+                                            className="flex-1 bg-teal-600 text-white rounded-xl px-4 py-2 font-bold hover:bg-teal-700 flex items-center justify-center gap-2 disabled:opacity-50">
+                                            <Save className="w-4 h-4" />{saving ? 'Guardando...' : 'Guardar'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ) : activeTab === 'subcategorias' ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900">SubCategorías de Producto</h2>
+                            <p className="text-sm text-slate-500">Clasificación secundaria de productos (ej: Quesos Frescos, Refrescos, Detergentes)</p>
+                        </div>
+                        <button
+                            onClick={() => { setEditingSubcategoria({ nombre: '', descripcion: '' }); setIsSubcategoriaModalOpen(true) }}
+                            className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" /> Nueva SubCategoría
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {subcategorias.map(sub => (
+                            <div key={sub.id} className={cn(
+                                "card p-6 group relative hover:shadow-lg transition-all border-l-4",
+                                sub.activo === false ? "border-l-slate-300 opacity-60" : "border-l-orange-500"
+                            )}>
+                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button title="Editar" onClick={() => { setEditingSubcategoria(sub); setIsSubcategoriaModalOpen(true) }}
+                                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-orange-600">
+                                        <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    {sub.activo !== false && (
+                                        <button title="Dar de baja" onClick={() => handleBajaSubcategoria(sub.id, sub.nombre)}
+                                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="space-y-2 pt-1">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <h3 className="font-bold text-slate-900 text-base uppercase tracking-tight leading-tight">{sub.nombre}</h3>
+                                        {sub.activo === false && (
+                                            <span className="shrink-0 text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full uppercase">Inactiva</span>
+                                        )}
+                                    </div>
+                                    {sub.descripcion && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{sub.descripcion}</p>}
+                                </div>
+                            </div>
+                        ))}
+                        {subcategorias.length === 0 && (
+                            <div className="col-span-full py-16 text-center">
+                                <FolderTree className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                                <p className="text-slate-400 font-medium">No hay subcategorías registradas.</p>
+                                <p className="text-slate-300 text-sm mt-1">Crea la primera subcategoría con el botón de arriba.</p>
+                            </div>
+                        )}
+                    </div>
+                    {/* Modal SubCategoría */}
+                    {isSubcategoriaModalOpen && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                                    <h2 className="text-lg font-bold text-slate-900">{editingSubcategoria?.id ? 'Editar SubCategoría' : 'Nueva SubCategoría'}</h2>
+                                    <button onClick={() => { setIsSubcategoriaModalOpen(false); setEditingSubcategoria(null) }} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-5 h-5" /></button>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Nombre *</label>
+                                        <input type="text" className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500"
+                                            value={editingSubcategoria?.nombre || ''}
+                                            onChange={e => setEditingSubcategoria(p => ({ ...p, nombre: e.target.value }))}
+                                            autoFocus />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Descripción</label>
+                                        <textarea className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 resize-none h-20"
+                                            value={editingSubcategoria?.descripcion || ''}
+                                            onChange={e => setEditingSubcategoria(p => ({ ...p, descripcion: e.target.value }))} />
+                                    </div>
+                                    <div className="flex gap-3 pt-2">
+                                        <button onClick={() => { setIsSubcategoriaModalOpen(false); setEditingSubcategoria(null) }}
+                                            className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Cancelar</button>
+                                        <button onClick={handleSaveSubcategoria} disabled={saving}
+                                            className="flex-1 bg-orange-500 text-white rounded-xl px-4 py-2 font-bold hover:bg-orange-600 flex items-center justify-center gap-2 disabled:opacity-50">
+                                            <Save className="w-4 h-4" />{saving ? 'Guardando...' : 'Guardar'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             ) : activeTab === 'bodegas' ? (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
