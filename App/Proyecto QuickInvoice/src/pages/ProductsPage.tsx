@@ -23,6 +23,8 @@ import {
     TrendingUp,
     BookOpen,
     Loader2,
+    RotateCcw,
+    EyeOff,
 } from 'lucide-react'
 
 // ─── Modal de Subproductos ────────────────────────────────────────────────────
@@ -287,6 +289,10 @@ export function ProductsPage() {
     const [subproductosProducto, setSubproductosProducto] = useState<(Producto & { id: string }) | null>(null)
     const [precioVolumenProducto, setPrecioVolumenProducto] = useState<any>(null)
     const [cuentasLP, setCuentasLP] = useState<CuentaLP[]>([])
+    const [showBaja, setShowBaja] = useState(false)
+    const [productosBaja, setProductosBaja] = useState<any[]>([])
+    const [loadingBaja, setLoadingBaja] = useState(false)
+    const [restoringId, setRestoringId] = useState<string | null>(null)
 
     // Cargar categorías, líneas, subcategorías y cuentas al montar
     useEffect(() => {
@@ -312,7 +318,7 @@ export function ProductsPage() {
         try {
             let q = supabase
                 .from('productos').select('*, categorias(nombre)')
-                .eq('empresa_id', empresa.id).order('nombre')
+                .eq('empresa_id', empresa.id).eq('activo', true).order('nombre')
             if (search.trim()) {
                 const sq = '%' + search.trim().replace(/\*/g, '%') + '%'
                 q = q.or(`nombre.ilike.${sq},codigo.ilike.${sq}`)
@@ -330,6 +336,34 @@ export function ProductsPage() {
 
     // Recarga la lista con el criterio actual (después de guardar/eliminar)
     async function loadData() { await ejecutarBusqueda() }
+
+    async function cargarProductosBaja() {
+        if (!empresa?.id) return
+        setLoadingBaja(true)
+        try {
+            const { data } = await supabase
+                .from('productos').select('*, categorias(nombre)')
+                .eq('empresa_id', empresa.id).eq('activo', false).order('nombre')
+            const catMap: Record<string, string> = {}
+            for (const c of categorias) catMap[c.id] = c.nombre
+            setProductosBaja((data || []).map((p: any) => ({
+                ...p,
+                categorias: p.categorias || (p.categoria_id ? { nombre: catMap[p.categoria_id] || '' } : null)
+            })))
+        } catch (e) { console.error(e) } finally { setLoadingBaja(false) }
+    }
+
+    async function restaurarProducto(id: string) {
+        setRestoringId(id)
+        try {
+            await productoService.updateProducto(id, { activo: true } as any)
+            setProductosBaja(prev => prev.filter(p => p.id !== id))
+        } catch (e: any) {
+            alert('Error al restaurar: ' + e.message)
+        } finally {
+            setRestoringId(null)
+        }
+    }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -404,29 +438,42 @@ export function ProductsPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Maestro de Productos</h1>
                     <p className="text-slate-500">Gestiona el catálogo de productos y sus presentaciones</p>
                 </div>
-                <button
-                    onClick={() => {
-                        setEditingProduct({
-                            codigo: '',
-                            nombre: '',
-                            precio_venta: 0,
-                            iva_porcentaje: 15,
-                            categoria_id: categorias[0]?.id,
-                            maneja_stock: true,
-                            cuenta_ingreso_id: cuentasLP[0]?.id || null,
-                            cuenta_ingreso_codigo: cuentasLP[0]?.codigo || null,
-                            cuenta_ingreso_nombre: cuentasLP[0]?.nombre || null,
-                            cuenta_costo_id: cuentasLP[0]?.id || null,
-                            cuenta_costo_codigo: cuentasLP[0]?.codigo || null,
-                            cuenta_costo_nombre: cuentasLP[0]?.nombre || null,
-                        })
-                        setIsModalOpen(true)
-                    }}
-                    className="btn btn-primary flex items-center gap-2"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nuevo Producto
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => {
+                            const next = !showBaja
+                            setShowBaja(next)
+                            if (next && productosBaja.length === 0) cargarProductosBaja()
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium"
+                    >
+                        <EyeOff className="w-4 h-4" />
+                        {showBaja ? 'Ocultar Baja' : 'Ver Dados de Baja'}
+                    </button>
+                    <button
+                        onClick={() => {
+                            setEditingProduct({
+                                codigo: '',
+                                nombre: '',
+                                precio_venta: 0,
+                                iva_porcentaje: 15,
+                                categoria_id: categorias[0]?.id,
+                                maneja_stock: true,
+                                cuenta_ingreso_id: cuentasLP[0]?.id || null,
+                                cuenta_ingreso_codigo: cuentasLP[0]?.codigo || null,
+                                cuenta_ingreso_nombre: cuentasLP[0]?.nombre || null,
+                                cuenta_costo_id: cuentasLP[0]?.id || null,
+                                cuenta_costo_codigo: cuentasLP[0]?.codigo || null,
+                                cuenta_costo_nombre: cuentasLP[0]?.nombre || null,
+                            })
+                            setIsModalOpen(true)
+                        }}
+                        className="btn btn-primary flex items-center gap-2"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nuevo Producto
+                    </button>
+                </div>
             </div>
 
             <div className="flex flex-col md:flex-row gap-4">
@@ -558,6 +605,70 @@ export function ProductsPage() {
                     </table>
                 </div>
             </div>
+
+            {/* Sección Productos Dados de Baja */}
+            {showBaja && (
+                <div className="card overflow-hidden border-amber-200">
+                    <div className="bg-amber-50 border-b border-amber-100 px-6 py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <EyeOff className="w-4 h-4 text-amber-600" />
+                            <span className="font-bold text-amber-800">Productos Dados de Baja</span>
+                            <span className="text-xs text-amber-600 bg-amber-100 rounded-full px-2 py-0.5">{productosBaja.length}</span>
+                        </div>
+                        <button onClick={cargarProductosBaja} disabled={loadingBaja}
+                            className="text-xs text-amber-600 hover:underline disabled:opacity-50">
+                            {loadingBaja ? 'Cargando...' : 'Actualizar'}
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="bg-amber-50 text-amber-700 text-xs uppercase tracking-wider">
+                                    <th className="px-6 py-3 font-medium">Código</th>
+                                    <th className="px-6 py-3 font-medium">Producto</th>
+                                    <th className="px-6 py-3 font-medium">Categoría</th>
+                                    <th className="px-6 py-3 font-medium text-right">Precio</th>
+                                    <th className="px-6 py-3 font-medium text-right">Restaurar</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-amber-50">
+                                {productosBaja.map(p => (
+                                    <tr key={p.id} className="hover:bg-amber-50/50 opacity-70">
+                                        <td className="px-6 py-3">
+                                            <span className="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{p.codigo || '—'}</span>
+                                        </td>
+                                        <td className="px-6 py-3">
+                                            <p className="font-medium text-slate-700 line-through">{p.nombre}</p>
+                                            <p className="text-xs text-slate-400">{p.descripcion || ''}</p>
+                                        </td>
+                                        <td className="px-6 py-3 text-xs text-slate-500">{p.categorias?.nombre || '—'}</td>
+                                        <td className="px-6 py-3 text-right font-bold text-slate-600">{formatCurrency(p.precio_venta)}</td>
+                                        <td className="px-6 py-3 text-right">
+                                            <button
+                                                onClick={() => restaurarProducto(p.id)}
+                                                disabled={restoringId === p.id}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50"
+                                            >
+                                                {restoringId === p.id
+                                                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                    : <RotateCcw className="w-3 h-3" />}
+                                                Restaurar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {productosBaja.length === 0 && !loadingBaja && (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400 text-sm">
+                                            No hay productos dados de baja.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {/* Modal editar/crear producto */}
             {isModalOpen && (

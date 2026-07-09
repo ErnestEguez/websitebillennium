@@ -182,7 +182,7 @@ export function NuevaNcPage() {
             // 1. Crear NC en BD
             const nc = await ncService.crearNotaCredito({
                 empresaId:           empresa.id,
-                empresaRuc:          (emp as any)?.ruc || '',
+                empresaRuc:          empresa?.ruc || (emp as any)?.ruc || '',
                 empresaAmbiente:     configSri.ambiente || 'PRUEBAS',
                 establecimiento:     configSri.establecimiento || '001',
                 puntoEmision:        configSri.punto_emision || '001',
@@ -211,7 +211,6 @@ export function NuevaNcPage() {
                                 motivo:               'DEVOLUCION_NC',
                                 documento_referencia: nc.secuencial,
                                 cantidad:             det.cantidad,
-                                costo_unitario:       det.precio_unitario,
                             })
                         } catch (kErr) {
                             console.error('Kardex NC error:', kErr)

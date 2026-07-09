@@ -1221,7 +1221,11 @@ export function FacturaDirectaPage() {
             <div className="hidden">
                 {facturaFinal && (
                     <div ref={printRef}>
-                        <InvoiceTicketPOS factura={facturaFinal} />
+                        <InvoiceTicketPOS
+                            factura={facturaFinal}
+                            montoRecibido={tieneEfectivo ? montoRecibido : undefined}
+                            vuelto={tieneEfectivo ? vuelto : undefined}
+                        />
                     </div>
                 )}
             </div>

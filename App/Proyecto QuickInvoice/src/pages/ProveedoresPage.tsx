@@ -54,7 +54,15 @@ export function ProveedoresPage() {
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
     useEffect(() => {
         if (empresa?.id) {
-            codigoRetencionService.listar(empresa.id).then(setCodsRet).catch(() => setCodsRet([]))
+            codigoRetencionService.listar(empresa.id).then(async (lista) => {
+                if (lista.length === 0) {
+                    await codigoRetencionService.sembrarDefaults(empresa!.id)
+                    const seeded = await codigoRetencionService.listar(empresa!.id)
+                    setCodsRet(seeded)
+                } else {
+                    setCodsRet(lista)
+                }
+            }).catch(() => setCodsRet([]))
         }
     }, [empresa?.id])
 

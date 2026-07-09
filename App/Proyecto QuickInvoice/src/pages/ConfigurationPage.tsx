@@ -998,11 +998,11 @@ export function ConfigurationPage() {
                                     Glosa / Mensaje en Facturas
                                     <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">aparece en el pie de todas las facturas</span>
                                 </label>
-                                <input
-                                    type="text"
-                                    maxLength={200}
+                                <textarea
+                                    rows={3}
+                                    maxLength={400}
                                     placeholder="Ej: Gracias por su compra. No se aceptan devoluciones."
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 resize-none"
                                     value={companyData.glosa_factura || ''}
                                     onChange={e => setCompanyData({ ...companyData, glosa_factura: e.target.value })}
                                 />

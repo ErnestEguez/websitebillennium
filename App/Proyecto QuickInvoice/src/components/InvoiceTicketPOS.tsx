@@ -4,9 +4,11 @@ import { format } from 'date-fns'
 
 interface InvoiceTicketPOSProps {
     factura: any
+    montoRecibido?: number
+    vuelto?: number
 }
 
-export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps>(({ factura }, ref) => {
+export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps>(({ factura, montoRecibido, vuelto }, ref) => {
     if (!factura) return null
 
     return (
@@ -117,6 +119,19 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                             )}
                         </div>
                     ))}
+                </div>
+            )}
+
+            {montoRecibido != null && montoRecibido > 0 && (
+                <div className="mt-2 border-t border-dashed border-black pt-2 space-y-1">
+                    <div className="flex justify-between text-[9px]">
+                        <span className="font-bold">EFECTIVO RECIBIDO:</span>
+                        <span>{formatCurrency(montoRecibido)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-black">
+                        <span>VUELTO / CAMBIO:</span>
+                        <span>{formatCurrency(vuelto ?? 0)}</span>
+                    </div>
                 </div>
             )}
 

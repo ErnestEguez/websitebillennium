@@ -18,6 +18,7 @@ async function fetchClientes(empresaId: string): Promise<any[]> {
             .from('clientes')
             .select('*')
             .eq('empresa_id', empresaId)
+            .eq('activo', true)
             .order('nombre', { ascending: true })
             .range(from, from + PAGE - 1)
         if (error) throw error
