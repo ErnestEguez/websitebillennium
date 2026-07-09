@@ -293,6 +293,13 @@ export function ProductsPage() {
     const [productosBaja, setProductosBaja] = useState<any[]>([])
     const [loadingBaja, setLoadingBaja] = useState(false)
     const [restoringId, setRestoringId] = useState<string | null>(null)
+    const [showConIva, setShowConIva] = useState(false)
+
+    const applyIva = (base: number | null | undefined, ivaPct: number) => {
+        if (!base || base === 0) return '—'
+        const val = showConIva ? Math.round(base * (1 + ivaPct / 100) * 100) / 100 : base
+        return formatCurrency(val)
+    }
 
     // Cargar categorías, líneas, subcategorías y cuentas al montar
     useEffect(() => {
@@ -503,6 +510,12 @@ export function ProductsPage() {
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                     Buscar
                 </button>
+                <button
+                    onClick={() => setShowConIva(v => !v)}
+                    className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border transition-colors ${showConIva ? 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                >
+                    {showConIva ? '💰 Con IVA' : '🏷️ Sin IVA'}
+                </button>
             </div>
 
             <div className="card overflow-hidden">
@@ -510,23 +523,28 @@ export function ProductsPage() {
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
-                                <th className="px-6 py-4 font-medium w-20">Código</th>
-                                <th className="px-6 py-4 font-medium">Producto</th>
-                                <th className="px-6 py-4 font-medium">Categoría</th>
-                                <th className="px-6 py-4 font-medium text-right">Precio</th>
-                                <th className="px-6 py-4 font-medium text-center">IVA</th>
-                                <th className="px-6 py-4 font-medium text-right">Acciones</th>
+                                <th className="px-4 py-4 font-medium w-20">Código</th>
+                                <th className="px-4 py-4 font-medium">Producto</th>
+                                <th className="px-4 py-4 font-medium">Categoría</th>
+                                <th className="px-3 py-4 font-medium text-right">
+                                    P1{showConIva ? <span className="ml-1 normal-case font-normal text-amber-500">+IVA</span> : ''}
+                                </th>
+                                <th className="px-3 py-4 font-medium text-right text-slate-400">P2</th>
+                                <th className="px-3 py-4 font-medium text-right text-slate-400">P3</th>
+                                <th className="px-3 py-4 font-medium text-right text-slate-400">P4</th>
+                                <th className="px-3 py-4 font-medium text-center">IVA</th>
+                                <th className="px-4 py-4 font-medium text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filtered.map(producto => (
                                 <tr key={producto.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-4">
                                         <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
                                             {producto.codigo || '—'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
                                                 {producto.imagen_url ? (
@@ -546,18 +564,27 @@ export function ProductsPage() {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-4">
                                         <span className="px-2 py-1 bg-primary-50 text-primary-700 rounded text-xs font-bold">
                                             {producto.categorias?.nombre || '—'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-right font-bold text-slate-900">
-                                        {formatCurrency(producto.precio_venta)}
+                                    <td className="px-3 py-4 text-right font-bold text-slate-900 text-sm">
+                                        {applyIva(producto.precio_venta, producto.iva_porcentaje ?? 15)}
                                     </td>
-                                    <td className="px-6 py-4 text-center text-sm text-slate-500">
+                                    <td className="px-3 py-4 text-right text-slate-500 text-sm">
+                                        {applyIva(producto.precio2, producto.iva_porcentaje ?? 15)}
+                                    </td>
+                                    <td className="px-3 py-4 text-right text-slate-500 text-sm">
+                                        {applyIva(producto.precio3, producto.iva_porcentaje ?? 15)}
+                                    </td>
+                                    <td className="px-3 py-4 text-right text-slate-500 text-sm">
+                                        {applyIva(producto.precio4, producto.iva_porcentaje ?? 15)}
+                                    </td>
+                                    <td className="px-3 py-4 text-center text-sm text-slate-500">
                                         {producto.iva_porcentaje}%
                                     </td>
-                                    <td className="px-6 py-4 text-right">
+                                    <td className="px-4 py-4 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button
                                                 onClick={() => setSubproductosProducto(producto)}
@@ -594,7 +621,7 @@ export function ProductsPage() {
                             ))}
                             {filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                                    <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
                                         {!search.trim() && !selectedCategoria
                                             ? 'Escribe un nombre o código para buscar productos.'
                                             : 'No se encontraron productos con ese criterio.'}
