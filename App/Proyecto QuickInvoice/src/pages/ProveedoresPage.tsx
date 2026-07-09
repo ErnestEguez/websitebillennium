@@ -53,17 +53,19 @@ export function ProveedoresPage() {
 
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
     useEffect(() => {
-        if (empresa?.id) {
-            codigoRetencionService.listar(empresa.id).then(async (lista) => {
-                if (lista.length === 0) {
-                    await codigoRetencionService.sembrarDefaults(empresa!.id)
-                    const seeded = await codigoRetencionService.listar(empresa!.id)
-                    setCodsRet(seeded)
-                } else {
-                    setCodsRet(lista)
-                }
-            }).catch(() => setCodsRet([]))
-        }
+        if (!empresa?.id) return
+        codigoRetencionService.listar(empresa.id).then(async (lista) => {
+            if (lista.length === 0) {
+                await codigoRetencionService.sembrarDefaults(empresa!.id)
+                const seeded = await codigoRetencionService.listar(empresa!.id)
+                setCodsRet(seeded)
+            } else {
+                setCodsRet(lista)
+            }
+        }).catch((err) => {
+            console.error('Error cargando códigos de retención:', err?.message || err)
+            setCodsRet([])
+        })
     }, [empresa?.id])
 
     async function load() {
