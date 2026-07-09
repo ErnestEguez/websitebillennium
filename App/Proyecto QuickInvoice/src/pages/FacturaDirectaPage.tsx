@@ -207,11 +207,11 @@ export function FacturaDirectaPage() {
         if (!selectedCliente?.id || !empresa?.id) { setNotasCredito([]); return }
         const q = supabase
             .from('notas_credito')
-            .select('id, numero, saldo_nc, created_at')
+            .select('id, secuencial, saldo_nc, created_at')
             .eq('empresa_id', empresa.id)
             .eq('cliente_id', selectedCliente.id)
             .gt('saldo_nc', 0)
-            .eq('estado', 'AUTORIZADO')
+            .eq('estado_sri', 'AUTORIZADO')
             .order('created_at', { ascending: false })
         Promise.resolve(q)
             .then(({ data }) => setNotasCredito(data ?? []))
@@ -1107,7 +1107,7 @@ export function FacturaDirectaPage() {
                                                 <option value="">🔖 Seleccionar N/C…</option>
                                                 {notasCredito.map(nc => (
                                                     <option key={nc.id} value={nc.id}>
-                                                        {nc.numero} — Saldo: {formatCurrency(nc.saldo_nc)}
+                                                        {nc.secuencial} — Saldo: {formatCurrency(nc.saldo_nc)}
                                                     </option>
                                                 ))}
                                             </select>
