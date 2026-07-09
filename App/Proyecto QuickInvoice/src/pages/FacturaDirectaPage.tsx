@@ -367,6 +367,18 @@ export function FacturaDirectaPage() {
         const detallesValidos = detalles.filter(d => d.nombre_producto && d.cantidad > 0 && d.precio_unitario > 0)
         if (detallesValidos.length === 0) return alert('Agregue al menos un producto o servicio con cantidad y precio')
 
+        // Fuera de modo Servicio, todos los ítems deben venir del catálogo
+        if (!esModoServicio) {
+            const sinCatalogo = detallesValidos.find(d => !d.producto_id)
+            if (sinCatalogo) {
+                return alert(
+                    `"${sinCatalogo.nombre_producto}" no está seleccionado del catálogo de artículos.\n\n` +
+                    `Busque y seleccione el artículo de la lista desplegable.\n` +
+                    `Si necesita facturar un servicio sin artículo, active el modo "Servicio".`
+                )
+            }
+        }
+
         // Validar N/C: no exceder saldo disponible
         for (const p of pagos.filter(pg => pg.metodo === 'nota_credito' && pg.nota_credito_id)) {
             const nc = notasCredito.find(n => n.id === p.nota_credito_id)
@@ -842,22 +854,30 @@ export function FacturaDirectaPage() {
                                                     <>
                                                     <input
                                                         placeholder="Buscar: riel*45*luxus ..."
-                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                        className={`w-full px-3 py-2 rounded-lg border text-sm bg-white outline-none focus:ring-2 ${
+                                                            det.nombre_producto && !det.producto_id
+                                                                ? 'border-red-400 focus:ring-red-400 bg-red-50'
+                                                                : det.producto_id
+                                                                    ? 'border-emerald-300 focus:ring-primary-400'
+                                                                    : 'border-slate-200 focus:ring-primary-400'
+                                                        }`}
                                                         value={searchProducto[idx] !== undefined ? searchProducto[idx] : det.nombre_producto}
                                                         onChange={e => {
                                                             setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
-                                                            updateLinea(idx, 'nombre_producto', e.target.value)
+                                                            // Resetear producto_id al escribir manualmente
+                                                            setDetalles(prev => prev.map((d, i) => i !== idx ? d : {
+                                                                ...d,
+                                                                nombre_producto: e.target.value,
+                                                                producto_id: null,
+                                                            }))
                                                             setProductDropdown(idx)
-
                                                         }}
                                                         onFocus={() => {
                                                             setSearchProducto(prev => ({ ...prev, [idx]: '' }))
                                                             setProductDropdown(idx)
-
                                                         }}
                                                         onBlur={() => setTimeout(() => {
                                                             setProductDropdown(null)
-
                                                             setSearchProducto(prev => {
                                                                 const updated = { ...prev }
                                                                 delete updated[idx]
