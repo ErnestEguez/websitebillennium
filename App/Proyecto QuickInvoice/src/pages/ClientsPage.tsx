@@ -50,7 +50,7 @@ export function ClientsPage() {
         } finally { setLoading(false) }
     }
 
-    // Carga todos (activos + inactivos) sin filtro
+    // Carga solo los dados de baja (activo = false)
     async function cargarTodos() {
         if (!empresa?.id) return
         setLoading(true)
@@ -58,6 +58,7 @@ export function ClientsPage() {
             const { data } = await supabase
                 .from('clientes').select('*')
                 .eq('empresa_id', empresa.id)
+                .eq('activo', false)
                 .order('nombre').limit(1000)
             setClientes(data as Cliente[] ?? [])
         } finally { setLoading(false) }
