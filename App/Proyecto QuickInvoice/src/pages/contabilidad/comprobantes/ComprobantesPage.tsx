@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { Link } from 'react-router-dom'
 import { Plus, Search, Eye, CheckCircle, Ban, Loader2, Filter, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
@@ -186,9 +187,12 @@ export function ComprobantesPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Diarios Contables</h1>
                     <p className="text-slate-500 text-sm mt-0.5">{ordenados.length} de {comprobantes.length} comprobantes</p>
                 </div>
-                <Link to="/comprobantes/nuevo" className="btn btn-primary gap-2 text-sm">
-                    <Plus className="w-4 h-4" /> Nuevo Asiento
-                </Link>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="diarios" />
+                    <Link to="/comprobantes/nuevo" className="btn btn-primary gap-2 text-sm">
+                        <Plus className="w-4 h-4" /> Nuevo Asiento
+                    </Link>
+                </div>
             </div>
 
             {/* Filtros */}

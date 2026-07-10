@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { CheckSquare, Loader2, AlertCircle, X, Download, Clock, Printer } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { chequeService } from '../../../services/finance/chequeService'
@@ -104,6 +105,7 @@ export function ChequesAFechaPage() {
                     <p className="text-slate-500 text-sm mt-0.5">Post-fechados pendientes de cobro</p>
                 </div>
                 <div className="flex gap-2">
+                    <HelpButton pageKey="cheques-a-fecha" />
                     <button onClick={imprimir} disabled={lista.length === 0} className="btn btn-secondary gap-2">
                         <Printer className="w-4 h-4" />Imprimir
                     </button>

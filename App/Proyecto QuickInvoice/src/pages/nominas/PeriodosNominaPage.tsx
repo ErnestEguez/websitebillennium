@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Loader2, Calendar, Lock, Trash2, Eye, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -111,6 +112,7 @@ export function PeriodosNominaPage() {
                     <p className="text-sm text-slate-500 mt-1">Crea y gestiona los períodos de liquidación</p>
                 </div>
                 <div className="flex gap-2">
+                    <HelpButton pageKey="periodos-nomina" />
                     <button onClick={cargar} className="p-2 text-slate-400 hover:text-slate-700 transition-colors">
                         <RefreshCw className="w-4 h-4" />
                     </button>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { cuentasNominaService } from '../../services/nominas/cuentasNominaService'
 import { supabaseContabilidad } from '../../lib/supabaseContabilidad'
@@ -149,11 +150,14 @@ export function CuentasNominaPage() {
 
     return (
         <div className="space-y-6 max-w-3xl">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Cuentas Contables de Nómina</h1>
-                <p className="text-sm text-slate-500 mt-1">
-                    Mapea las cuentas del plan contable para generar los asientos del rol de pagos
-                </p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Cuentas Contables de Nómina</h1>
+                    <p className="text-sm text-slate-500 mt-1">
+                        Mapea las cuentas del plan contable para generar los asientos del rol de pagos
+                    </p>
+                </div>
+                <HelpButton pageKey="cuentas-nomina" />
             </div>
 
             {sinLedger && (

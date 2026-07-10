@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../components/help/HelpButton'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -310,6 +311,7 @@ export function TransferenciaBodegaPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Transferencia entre Bodegas</h1>
                     <p className="text-slate-500 text-sm mt-0.5">Mueve stock de una bodega a otra sin afectar el inventario total</p>
                 </div>
+                <HelpButton pageKey="transferencia-bodega" />
                 <div className="flex items-center gap-3">
                     <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
                         <button onClick={() => setActiveTab('nuevo')}

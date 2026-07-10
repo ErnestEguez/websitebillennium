@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -586,6 +587,7 @@ export function NuevaCompraInventarioPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Nueva Compra de Inventario</h1>
                     <p className="text-slate-500 text-sm">Factura de proveedor con ingreso al kardex</p>
                 </div>
+                <HelpButton pageKey="compras-inventario" />
             </div>
 
             {/* ── OCR: cargar factura ───────────────────────────────────────────── */}

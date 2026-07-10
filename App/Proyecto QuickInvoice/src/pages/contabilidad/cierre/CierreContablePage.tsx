@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { Lock, Loader2, CheckCircle, AlertTriangle, ArrowRight, FileText, RefreshCw } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
@@ -264,10 +265,15 @@ export function CierreContablePage() {
     return (
         <div className="space-y-6 max-w-4xl">
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Cierre Contable</h1>
-                <p className="text-slate-500 text-sm mt-0.5">
-                    Zerifica cuentas de resultado, cierra el período y genera el asiento de apertura del siguiente
-                </p>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">Cierre Contable</h1>
+                        <p className="text-slate-500 text-sm mt-0.5">
+                            Zerifica cuentas de resultado, cierra el período y genera el asiento de apertura del siguiente
+                        </p>
+                    </div>
+                    <HelpButton pageKey="cierre-contable" />
+                </div>
             </div>
 
             {fase === 'completado' ? (

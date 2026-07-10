@@ -4,6 +4,7 @@
 // ============================================================
 
 import { useState, useEffect, useRef } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import * as XLSX from 'xlsx'
 import {
     Upload, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft,
@@ -580,6 +581,7 @@ export function IntegracionExcelVentasPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Integración de Ventas desde Excel</h1>
                     <p className="text-slate-500 text-sm">Importa ventas desde tu sistema de facturación y genera asientos contables automáticamente</p>
                 </div>
+                <HelpButton pageKey="excel-ventas" />
             </div>
 
             {/* Indicador de pasos */}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { plantillasChecklistService } from '../../services/nominas/plantillasChecklistService'
 import { estructuraOrganizativaService } from '../../services/nominas/estructuraOrganizativaService'
@@ -173,9 +174,12 @@ export function PlantillasChecklistPage() {
                     <h1 className="text-3xl font-bold text-slate-900">Plantillas de Checklist</h1>
                     <p className="text-slate-600 mt-1">Define tareas reutilizables para onboarding y offboarding</p>
                 </div>
-                <button onClick={abrirNueva} className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nueva Plantilla
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="plantillas-checklist" />
+                    <button onClick={abrirNueva} className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nueva Plantilla
+                    </button>
+                </div>
             </div>
 
             {/* Filtro tipo */}

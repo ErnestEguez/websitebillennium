@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { evaluacionDesempenoService } from '../../services/nominas/evaluacionDesempenoService'
 import { empleadosService } from '../../services/nominas/empleadosService'
@@ -184,9 +185,12 @@ export function EvaluacionDesempenoPage() {
                     <h1 className="text-3xl font-bold text-slate-900">Evaluación de Desempeño</h1>
                     <p className="text-slate-600 mt-1">Períodos y evaluaciones individuales por empleado</p>
                 </div>
-                <button onClick={abrirNuevoPeriodo} className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nuevo Período
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="evaluacion-desempeno" />
+                    <button onClick={abrirNuevoPeriodo} className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nuevo Período
+                    </button>
+                </div>
             </div>
 
             <div className={cn('grid gap-4', activo ? 'grid-cols-[300px,1fr]' : 'grid-cols-1')}>

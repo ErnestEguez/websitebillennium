@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { vacantesService } from '../../services/nominas/vacantesService'
 import { candidatosService } from '../../services/nominas/candidatosService'
@@ -526,9 +527,12 @@ export function VacantesPage() {
                     <h1 className="text-3xl font-bold text-slate-900">Reclutamiento</h1>
                     <p className="text-slate-600 mt-1">Vacantes, candidatos y flujo de selección</p>
                 </div>
-                <button onClick={abrirNuevaVacante} className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nueva Vacante
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="vacantes" />
+                    <button onClick={abrirNuevaVacante} className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nueva Vacante
+                    </button>
+                </div>
             </div>
 
             {/* Filtros de estado */}

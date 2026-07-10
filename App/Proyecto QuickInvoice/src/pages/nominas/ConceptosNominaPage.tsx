@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { conceptosNominaService } from '../../services/nominas/conceptosNominaService'
 import { contableConfigService, type CuentaLP } from '../../services/contableConfigService'
@@ -158,6 +159,7 @@ export function ConceptosNominaPage() {
                     <p className="text-slate-600 mt-1">Catálogo de rubros de ingreso y descuento para el rol de pagos</p>
                 </div>
                 <div className="flex gap-3">
+                    <HelpButton pageKey="conceptos-nomina" />
                     {conceptos.length === 0 && (
                         <button onClick={handleSembrar} disabled={sembrando}
                             className="btn btn-secondary flex items-center gap-2">

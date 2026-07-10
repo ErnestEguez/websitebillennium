@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { estructuraOrganizativaService } from '../../services/nominas/estructuraOrganizativaService'
 import type { SeccionNomina, CargoNomina } from '../../types/nominas'
@@ -141,9 +142,12 @@ export function EstructuraOrganizativaPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900">Estructura Organizativa</h1>
-                <p className="text-slate-600 mt-1">Secciones (departamentos) y cargos para Talento Humano y Nóminas</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900">Estructura Organizativa</h1>
+                    <p className="text-slate-600 mt-1">Secciones (departamentos) y cargos para Talento Humano y Nóminas</p>
+                </div>
+                <HelpButton pageKey="estructura" />
             </div>
 
             {/* Secciones */}

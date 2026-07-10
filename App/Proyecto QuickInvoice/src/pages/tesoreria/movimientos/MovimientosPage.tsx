@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { Plus, ArrowDownUp, Loader2, AlertCircle, X, Download, Trash2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -199,6 +200,7 @@ export function MovimientosPage() {
                     <p className="text-slate-500 text-sm mt-0.5">Depósitos, notas, comisiones y otros</p>
                 </div>
                 <div className="flex gap-2">
+                    <HelpButton pageKey="movimientos-bancos" />
                     <button onClick={exportarExcel} disabled={lista.length === 0} className="btn btn-secondary gap-2">
                         <Download className="w-4 h-4" />Excel
                     </button>

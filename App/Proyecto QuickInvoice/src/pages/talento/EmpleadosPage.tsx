@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { empleadosService } from '../../services/nominas/empleadosService'
 import { estructuraOrganizativaService } from '../../services/nominas/estructuraOrganizativaService'
@@ -285,9 +286,12 @@ export function EmpleadosPage() {
                     <h1 className="text-3xl font-bold text-slate-900">Empleados</h1>
                     <p className="text-slate-600 mt-1">Maestro de colaboradores de la empresa</p>
                 </div>
-                <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nuevo Empleado
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="empleados" />
+                    <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nuevo Empleado
+                    </button>
+                </div>
             </div>
 
             <div className="card overflow-hidden">

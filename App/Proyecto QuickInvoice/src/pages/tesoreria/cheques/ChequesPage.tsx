@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { CheckSquare, Loader2, AlertCircle, X, Download, Printer } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { chequeService } from '../../../services/finance/chequeService'
@@ -142,6 +143,7 @@ export function ChequesPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Cheques Emitidos</h1>
                     <p className="text-slate-500 text-sm mt-0.5">{lista.length} cheque{lista.length !== 1 ? 's' : ''}</p>
                 </div>
+                <HelpButton pageKey="cheques" />
                 <button onClick={imprimir} disabled={lista.length === 0} className="btn btn-secondary gap-2">
                     <Printer className="w-4 h-4" />Imprimir
                 </button>

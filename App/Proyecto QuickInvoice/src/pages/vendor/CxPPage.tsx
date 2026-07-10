@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { cxpService } from '../../services/vendorService'
@@ -70,9 +71,12 @@ export function CxPPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Cuentas por Pagar</h1>
                     <p className="text-slate-500 text-sm">Seguimiento de obligaciones con proveedores</p>
                 </div>
-                <Link to="/teso/egresos/nuevo" className="btn btn-primary gap-2 shrink-0">
-                    Registrar pago en Tesorería <ArrowRight className="w-4 h-4" />
-                </Link>
+                <div className="flex items-center gap-2 shrink-0">
+                    <HelpButton pageKey="cxp" />
+                    <Link to="/teso/egresos/nuevo" className="btn btn-primary gap-2">
+                        Registrar pago en Tesorería <ArrowRight className="w-4 h-4" />
+                    </Link>
+                </div>
             </div>
 
             <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-900">

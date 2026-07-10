@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { useNavigate } from 'react-router-dom'
 import { GitMerge, Plus, Loader2, AlertCircle, X, CheckCircle2, Clock } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -78,9 +79,12 @@ export function ConciliacionesPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Conciliación Bancaria</h1>
                     <p className="text-slate-500 text-sm mt-0.5">{lista.length} conciliación{lista.length !== 1 ? 'es' : ''}</p>
                 </div>
-                <button onClick={() => { setModal(true); setError('') }} className="btn btn-primary gap-2">
-                    <Plus className="w-4 h-4" />Nueva conciliación
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="conciliacion" />
+                    <button onClick={() => { setModal(true); setError('') }} className="btn btn-primary gap-2">
+                        <Plus className="w-4 h-4" />Nueva conciliación
+                    </button>
+                </div>
             </div>
 
             {error && !modal && (

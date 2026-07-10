@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { Loader2, Plus, X, AlertCircle, ToggleLeft, ToggleRight, ChevronDown, Pencil, Check, SlidersHorizontal } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { novedadesNominaService } from '../../services/nominas/novedadesNominaService'
@@ -272,13 +273,16 @@ export function NovedadesNominaPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Novedades / Descuentos</h1>
                     <p className="text-sm text-slate-500 mt-0.5">Descuentos fijos y préstamos que se aplican automáticamente en cada rol</p>
                 </div>
-                <button
-                    onClick={abrirModal}
-                    className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nueva Novedad
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="novedades-nomina" />
+                    <button
+                        onClick={abrirModal}
+                        className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nueva Novedad
+                    </button>
+                </div>
             </div>
 
             {error && (

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { parametrosNominaService } from '../../services/nominas/parametrosNominaService'
 import type { ParametrosNomina } from '../../types/nominas'
@@ -71,9 +72,12 @@ export function ParametrosNominaPage() {
 
     return (
         <div className="space-y-6 max-w-2xl">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900">Parámetros de Nómina</h1>
-                <p className="text-slate-600 mt-1">Configuración general para el cálculo del rol de pagos</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900">Parámetros de Nómina</h1>
+                    <p className="text-slate-600 mt-1">Configuración general para el cálculo del rol de pagos</p>
+                </div>
+                <HelpButton pageKey="parametros-nomina" />
             </div>
 
             <div className="card overflow-hidden">

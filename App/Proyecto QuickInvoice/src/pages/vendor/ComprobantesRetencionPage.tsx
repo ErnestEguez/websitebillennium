@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useReactToPrint } from 'react-to-print'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -262,8 +263,13 @@ export function ComprobantesRetencionPage() {
     return (
         <div className="space-y-5">
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Comprobantes de Retención</h1>
-                <p className="text-slate-500 text-sm">Retenciones emitidas a proveedores</p>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">Comprobantes de Retención</h1>
+                        <p className="text-slate-500 text-sm">Retenciones emitidas a proveedores</p>
+                    </div>
+                    <HelpButton pageKey="retenciones" />
+                </div>
             </div>
 
             {/* Banner SRI */}

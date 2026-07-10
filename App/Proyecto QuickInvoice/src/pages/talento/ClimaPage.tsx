@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { climaService } from '../../services/nominas/climaService'
 import { empleadosService } from '../../services/nominas/empleadosService'
@@ -151,10 +152,13 @@ export function ClimaPage() {
                     <h1 className="text-3xl font-bold text-slate-900">Clima Organizacional</h1>
                     <p className="text-slate-600 mt-1">Encuestas de satisfacción y métricas de retención</p>
                 </div>
-                <button onClick={() => { setFormE({ nombre: '', descripcion: '', fecha: hoy }); setModalE(true) }}
-                    className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nueva Encuesta
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="clima" />
+                    <button onClick={() => { setFormE({ nombre: '', descripcion: '', fecha: hoy }); setModalE(true) }}
+                        className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nueva Encuesta
+                    </button>
+                </div>
             </div>
 
             <div className={cn('grid gap-4', activa ? 'grid-cols-[300px,1fr]' : 'grid-cols-1')}>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { proveedorService } from '../../services/vendorService'
 import type { Proveedor } from '../../types/vendors'
@@ -138,9 +139,12 @@ export function ProveedoresPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Proveedores</h1>
                     <p className="text-slate-500 text-sm">{proveedores.filter(p => p.estado === 'ACTIVO').length} activos</p>
                 </div>
-                <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nuevo Proveedor
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="proveedores" />
+                    <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nuevo Proveedor
+                    </button>
+                </div>
             </div>
 
             {/* Filtros */}

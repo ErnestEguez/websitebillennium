@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { useNavigate } from 'react-router-dom'
 import {
     Upload, CheckCircle, AlertCircle, Loader2,
@@ -591,10 +592,15 @@ export function IntegracionSRIPage() {
     return (
         <div className="space-y-5 max-w-6xl">
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Integración SRI</h1>
-                <p className="text-slate-500 text-sm mt-0.5">
-                    Importa comprobantes del SRI y genera asientos contables automáticamente
-                </p>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">Integración SRI</h1>
+                        <p className="text-slate-500 text-sm mt-0.5">
+                            Importa comprobantes del SRI y genera asientos contables automáticamente
+                        </p>
+                    </div>
+                    <HelpButton pageKey="integracion-sri" />
+                </div>
             </div>
 
             {error && (

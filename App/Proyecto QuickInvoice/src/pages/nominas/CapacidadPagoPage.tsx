@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { Loader2, ChevronDown, TrendingUp, TrendingDown, Wallet, AlertCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { empleadosService } from '../../services/nominas/empleadosService'
@@ -154,11 +155,14 @@ export function CapacidadPagoPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Estado Económico del Empleado</h1>
-                <p className="text-sm text-slate-500 mt-0.5">
-                    Ingresos, descuentos y capacidad de pago — útil para evaluar préstamos y anticipos
-                </p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Estado Económico del Empleado</h1>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                        Ingresos, descuentos y capacidad de pago — útil para evaluar préstamos y anticipos
+                    </p>
+                </div>
+                <HelpButton pageKey="capacidad-pago" />
             </div>
 
             {error && (

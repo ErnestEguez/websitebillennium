@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { finiquitoService } from '../../services/nominas/finiquitoService'
 import { empleadosService } from '../../services/nominas/empleadosService'
@@ -419,9 +420,12 @@ export function FiniquitoPage() {
                     <h1 className="text-3xl font-bold text-slate-900">Finiquitos</h1>
                     <p className="text-slate-600 mt-1">Liquidación final y acta de finiquito</p>
                 </div>
-                <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nuevo Finiquito
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="finiquito" />
+                    <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nuevo Finiquito
+                    </button>
+                </div>
             </div>
 
             {/* Panel split */}

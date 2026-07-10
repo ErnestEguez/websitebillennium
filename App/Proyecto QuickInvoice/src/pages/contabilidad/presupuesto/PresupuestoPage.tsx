@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { Plus, Loader2, CheckCircle, Save } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
@@ -138,6 +139,7 @@ export function PresupuestoPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Presupuesto</h1>
                     <p className="text-slate-500 text-sm mt-0.5">Metas por cuenta y período</p>
                 </div>
+                <HelpButton pageKey="presupuesto" />
                 {presupuestoId && pendientes.size > 0 && (
                     <button onClick={guardarTodo} disabled={guardando} className="btn btn-primary gap-2">
                         {guardando ? <Loader2 className="w-4 h-4 animate-spin" /> :

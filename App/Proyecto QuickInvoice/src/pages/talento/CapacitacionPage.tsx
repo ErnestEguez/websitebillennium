@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { capacitacionService } from '../../services/nominas/capacitacionService'
 import { empleadosService } from '../../services/nominas/empleadosService'
@@ -144,9 +145,12 @@ export function CapacitacionPage() {
                     <h1 className="text-3xl font-bold text-slate-900">Capacitación y Desarrollo</h1>
                     <p className="text-slate-600 mt-1">Cursos internos y externos, inscripciones y certificaciones</p>
                 </div>
-                <button onClick={abrirNuevoCurso} className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nuevo Curso
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="capacitacion" />
+                    <button onClick={abrirNuevoCurso} className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nuevo Curso
+                    </button>
+                </div>
             </div>
 
             <div className={cn('grid gap-4', activo ? 'grid-cols-[320px,1fr]' : 'grid-cols-1')}>

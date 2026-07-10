@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { Link } from 'react-router-dom'
 import { Plus, FileText, Loader2, X, AlertCircle, Download, Printer } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -141,9 +142,12 @@ export function EgresosPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Comprobantes de Egreso</h1>
                     <p className="text-slate-500 text-sm mt-0.5">Pagos a proveedores</p>
                 </div>
-                <Link to="/egresos/nuevo" className="btn btn-primary gap-2">
-                    <Plus className="w-4 h-4" />Nuevo egreso
-                </Link>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="egresos" />
+                    <Link to="/egresos/nuevo" className="btn btn-primary gap-2">
+                        <Plus className="w-4 h-4" />Nuevo egreso
+                    </Link>
+                </div>
             </div>
 
             {error && (

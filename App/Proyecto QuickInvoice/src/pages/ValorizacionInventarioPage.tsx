@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { HelpButton } from '../components/help/HelpButton'
 import { useReactToPrint } from 'react-to-print'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
@@ -232,6 +233,9 @@ export function ValorizacionInventarioPage() {
 
             {/* Encabezado */}
             <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                    <HelpButton pageKey="inventario-valorizado" />
+                </div>
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Inventario Valorado</h1>
                     <p className="text-slate-500 text-sm">

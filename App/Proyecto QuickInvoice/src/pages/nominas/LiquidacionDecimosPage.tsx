@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { FileText, Calculator, Printer, AlertTriangle, Info } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -252,6 +253,7 @@ export function LiquidacionDecimosPage() {
             <div className="flex items-center gap-2">
                 <FileText className="w-6 h-6 text-cyan-600" />
                 <h1 className="text-xl font-bold text-gray-800">Liquidación de Décimos</h1>
+                <HelpButton pageKey="decimos" />
             </div>
 
             {/* ── Filtros ── */}

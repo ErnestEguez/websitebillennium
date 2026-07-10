@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import {
     Zap, Loader2, CheckCircle, AlertTriangle,
     RefreshCw, Settings, Eye, List, ChevronDown, ChevronUp,
@@ -531,10 +532,15 @@ export function IntegracionQIPage() {
     return (
         <div className="space-y-5 max-w-5xl">
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Integración QuickInvoice</h1>
-                <p className="text-slate-500 text-sm mt-0.5">
-                    Genera asientos contables desde las facturas de ventas de QuickInvoice
-                </p>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">Integración QuickInvoice</h1>
+                        <p className="text-slate-500 text-sm mt-0.5">
+                            Genera asientos contables desde las facturas de ventas de QuickInvoice
+                        </p>
+                    </div>
+                    <HelpButton pageKey="integracion-qi" />
+                </div>
             </div>
 
             {/* Tabs */}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useReactToPrint } from 'react-to-print'
 import {
     Search, RefreshCw, Download, Printer, Phone, Mail, MessageCircle,
@@ -473,6 +474,7 @@ export function GestionCarteraPage() {
                     <p className="text-slate-500 text-sm mt-0.5">Control de cuentas por cobrar y cobros</p>
                 </div>
                 <div className="flex gap-2 flex-wrap relative">
+                    <HelpButton pageKey="gestion-cartera" />
                     {/* Menú de Reportes */}
                     <div className="relative">
                         <button onClick={() => setShowReportes(r => !r)}

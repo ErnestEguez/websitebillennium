@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { Sun, Calculator, Printer, AlertTriangle, Info, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -236,6 +237,7 @@ export function LiquidacionVacacionesPage() {
             <div className="flex items-center gap-2">
                 <Sun className="w-6 h-6 text-amber-500" />
                 <h1 className="text-xl font-bold text-gray-800">Liquidación de Vacaciones</h1>
+                <HelpButton pageKey="vacaciones-nomina" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">

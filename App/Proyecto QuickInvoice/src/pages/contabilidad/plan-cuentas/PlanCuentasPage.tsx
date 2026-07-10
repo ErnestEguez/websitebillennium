@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { Plus, ChevronRight, ChevronDown, Search, Download, Upload, Edit2, Trash2, X, Loader2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
@@ -366,6 +367,7 @@ export function PlanCuentasPage() {
                     <p className="text-slate-500 text-sm mt-0.5">{cuentas.length} cuentas registradas</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <HelpButton pageKey="plan-cuentas" />
                     <button onClick={exportarCSV} className="btn btn-secondary gap-2 text-sm">
                         <Download className="w-4 h-4" /> Exportar
                     </button>

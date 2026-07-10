@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useAuth } from '../../contexts/AuthContext'
 import { checklistsEmpleadoService } from '../../services/nominas/checklistsEmpleadoService'
 import { plantillasChecklistService } from '../../services/nominas/plantillasChecklistService'
@@ -158,9 +159,12 @@ export function ChecklistsPage() {
                     <h1 className="text-3xl font-bold text-slate-900">Onboarding / Offboarding</h1>
                     <p className="text-slate-600 mt-1">Checklists de tareas por empleado</p>
                 </div>
-                <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nuevo Checklist
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="onboarding" />
+                    <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nuevo Checklist
+                    </button>
+                </div>
             </div>
 
             {/* Filtros */}

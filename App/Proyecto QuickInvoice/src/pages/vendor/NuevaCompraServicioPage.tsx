@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../../components/help/HelpButton'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -318,6 +319,7 @@ export function NuevaCompraServicioPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Nueva Compra de Servicio</h1>
                     <p className="text-slate-500 text-sm">Honorarios, arrend., servicios básicos, etc.</p>
                 </div>
+                <HelpButton pageKey="compras-servicios" />
                 <ScanFacturaButton onAplicar={handleScanAplicar} />
             </div>
 
