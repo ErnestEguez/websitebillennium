@@ -575,6 +575,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub />}
                                     {esOficina && <SidebarItem to="/importar-articulos" icon={Upload} label="Importar Artículos" active={location.pathname === '/importar-articulos'} sub />}
                                     {esOficina && <SidebarItem to="/importar-clientes"  icon={Users}  label="Clientes (Import/Export)" active={location.pathname === '/importar-clientes'} sub />}
+                                    {esOficina && <SidebarItem to="/migrar-cartera"     icon={Wallet} label="Migración Cartera"         active={location.pathname === '/migrar-cartera'} sub />}
                                     <button
                                         onClick={toggleDarkSidebar}
                                         className="flex items-center gap-3 w-full pl-8 pr-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors"

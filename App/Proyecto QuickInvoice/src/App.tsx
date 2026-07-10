@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage'
 import { Dashboard }  from './pages/Dashboard'
 import { HomePage }            from './pages/HomePage'
 import { ImportarClientesPage }   from './pages/ImportarClientesPage'
+import { MigrarCarteraPage }      from './pages/MigrarCarteraPage'
 import { AdminDepuracionPage }    from './pages/admin/AdminDepuracionPage'
 import { MesaGrid } from './pages/MesaGrid'
 import { OrderTake } from './pages/OrderTake'
@@ -406,6 +407,16 @@ function App() {
                 <RoleProtectedRoute allowedRoles={['oficina']}>
                   <Layout>
                     <ImportarClientesPage />
+                  </Layout>
+                </RoleProtectedRoute>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/migrar-cartera" element={
+              <ProtectedRoute>
+                <RoleProtectedRoute allowedRoles={['oficina']}>
+                  <Layout>
+                    <MigrarCarteraPage />
                   </Layout>
                 </RoleProtectedRoute>
               </ProtectedRoute>
