@@ -22,6 +22,7 @@ const MODULOS = [
             { field: 'perm_anulacion_facturas',  label: 'Anulación Facturas' },
             { field: 'perm_cierres_caja',        label: 'Cierres de Caja' },
             { field: 'perm_consulta_ventas',     label: 'Consulta Ventas' },
+            { field: 'perm_guias_remision',      label: 'Guías de Remisión' },
         ],
     },
     {
@@ -32,6 +33,12 @@ const MODULOS = [
             { field: 'perm_gestion_cartera',    label: 'Gestión de Cartera' },
             { field: 'perm_consulta_cartera',   label: 'Consulta Cartera' },
             { field: 'perm_estado_cuenta',      label: 'Estado de Cuenta' },
+        ],
+    },
+    {
+        key: 'inventario', label: 'Inventarios',
+        items: [
+            { field: 'perm_preparaciones_pintura', label: 'Preparaciones de Pintura' },
         ],
     },
     {
@@ -156,6 +163,8 @@ export function AdminPermisosPage() {
                     perm_th_nomina_parametros:  r.perm_th_nomina_parametros  ?? def.perm_th_nomina_parametros,
                     perm_th_conceptos_nomina:   r.perm_th_conceptos_nomina   ?? def.perm_th_conceptos_nomina,
                     perm_th_rol_nomina:         r.perm_th_rol_nomina         ?? def.perm_th_rol_nomina,
+                    perm_guias_remision:        r.perm_guias_remision        ?? def.perm_guias_remision,
+                    perm_preparaciones_pintura: r.perm_preparaciones_pintura ?? def.perm_preparaciones_pintura,
                 }
             })
 

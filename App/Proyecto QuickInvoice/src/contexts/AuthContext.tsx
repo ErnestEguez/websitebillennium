@@ -65,6 +65,8 @@ export interface Permisos {
     perm_th_nomina_parametros:  boolean
     perm_th_conceptos_nomina:   boolean
     perm_th_rol_nomina:         boolean
+    perm_guias_remision:        boolean
+    perm_preparaciones_pintura: boolean
 }
 
 interface AuthContextType {
@@ -130,6 +132,8 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_th_nomina_parametros:  true,
     perm_th_conceptos_nomina:   true,
     perm_th_rol_nomina:         true,
+    perm_guias_remision:        true,
+    perm_preparaciones_pintura: true,
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -275,6 +279,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_th_nomina_parametros:  permData.perm_th_nomina_parametros  ?? true,
                     perm_th_conceptos_nomina:   permData.perm_th_conceptos_nomina   ?? true,
                     perm_th_rol_nomina:         permData.perm_th_rol_nomina         ?? true,
+                    perm_guias_remision:        permData.perm_guias_remision        ?? true,
+                    perm_preparaciones_pintura: permData.perm_preparaciones_pintura ?? true,
                 } : DEFAULT_PERMISOS)
             }
         } catch {

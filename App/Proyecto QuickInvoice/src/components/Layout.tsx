@@ -274,7 +274,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/facturacion"        icon={FileText}        label="Comprobantes"       active={location.pathname === '/facturacion'} sub disabled={!p.perm_comprobantes} />
                             <SidebarItem to="/notas-credito"      icon={FileMinus}       label="Notas de Crédito"   active={location.pathname === '/notas-credito'} sub disabled={!p.perm_notas_credito} />
                             <SidebarItem to="/anulacion-facturas" icon={Ban}             label="Anulación Facturas" active={location.pathname === '/anulacion-facturas'} sub disabled={!p.perm_anulacion_facturas} />
-                            <SidebarItem to="/guias-remision"    icon={Truck}           label="Guías de Remisión"  active={location.pathname.startsWith('/guias-remision')} sub disabled={!p.perm_comprobantes} />
+                            <SidebarItem to="/guias-remision"    icon={Truck}           label="Guías de Remisión"  active={location.pathname.startsWith('/guias-remision')} sub disabled={!p.perm_guias_remision} />
                             <SidebarItem to="/cierres"            icon={BookOpen}        label="Cierres de Caja"    active={location.pathname === '/cierres'} sub disabled={!p.perm_cierres_caja} />
                             <SidebarItem to="/consultas/ventas"         icon={Search}    label="Consulta Ventas"      active={location.pathname === '/consultas/ventas'} sub disabled={!p.perm_consulta_ventas} />
                             <SidebarItem to="/consultas/ventas-cliente" icon={User}      label="Ventas por Cliente"   active={location.pathname === '/consultas/ventas-cliente'} sub disabled={!p.perm_consulta_ventas} />
@@ -304,7 +304,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub />
                             <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub />
                             <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub />
-                            <SidebarItem to="/preparaciones-pintura"    icon={Palette}           label="Prep. Pinturas"        active={location.pathname.startsWith('/preparaciones-pintura')} sub />
+                            <SidebarItem to="/preparaciones-pintura"    icon={Palette}           label="Prep. Pinturas"        active={location.pathname.startsWith('/preparaciones-pintura')} sub disabled={!p.perm_preparaciones_pintura} />
                             <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub />
                             <SidebarItem to="/transferencia-bodega"     icon={ArrowLeftRight}    label="Transfer. Bodegas"     active={location.pathname === '/transferencia-bodega'} sub />
                             <SidebarItem to="/inventario-valorizado"    icon={BarChart3}         label="Inventario Valorado"   active={location.pathname === '/inventario-valorizado'} sub />
