@@ -9,7 +9,7 @@ import {
 import { formatCurrency } from '../lib/utils'
 import {
     Plus, FlaskConical, RefreshCw, Loader2, Trash2,
-    FileText, ChevronDown, ChevronUp, Info,
+    FileText, ChevronDown, ChevronUp, Info, Calendar,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -27,6 +27,15 @@ const ESTADO_COLOR: Record<EstadoPrep, string> = {
     ANULADA:    'bg-slate-100 text-slate-500 line-through',
 }
 
+const hoy = () => new Date().toISOString().split('T')[0]
+const restarDias = (dias: number) => {
+    const d = new Date()
+    d.setDate(d.getDate() - dias)
+    return d.toISOString().split('T')[0]
+}
+
+type RangoRapido = 'hoy' | 'semana' | 'mes' | 'todo'
+
 export function PreparacionesPinturaPage() {
     const { empresa } = useAuth() as any
     const navigate = useNavigate()
@@ -38,20 +47,45 @@ export function PreparacionesPinturaPage() {
     const [loadingDetail, setLoadingDetail] = useState<string | null>(null)
     const [detailMap, setDetailMap] = useState<Record<string, PreparacionPintura>>({})
 
+    // Filtros de fecha — por defecto: hoy
+    const [desde, setDesde] = useState(hoy())
+    const [hasta, setHasta] = useState(hoy())
+    const [rangoActivo, setRangoActivo] = useState<RangoRapido>('hoy')
+
     useEffect(() => {
         if (empresa?.id) load()
-    }, [empresa?.id])
+    }, [empresa?.id, desde, hasta])
 
     async function load() {
         try {
             setLoading(true)
-            const data = await preparacionPinturaService.listar(empresa!.id)
+            const desdeParam = desde || undefined
+            const hastaParam = hasta || undefined
+            const data = await preparacionPinturaService.listar(empresa!.id, desdeParam, hastaParam)
             setPreps(data)
         } catch (e: any) {
             console.error(e)
         } finally {
             setLoading(false)
         }
+    }
+
+    function aplicarRango(rango: RangoRapido) {
+        setRangoActivo(rango)
+        if (rango === 'hoy')   { setDesde(hoy());         setHasta(hoy()) }
+        if (rango === 'semana'){ setDesde(restarDias(6));  setHasta(hoy()) }
+        if (rango === 'mes')   { setDesde(restarDias(29)); setHasta(hoy()) }
+        if (rango === 'todo')  { setDesde('');             setHasta('') }
+    }
+
+    function handleDesdeChange(v: string) {
+        setDesde(v)
+        setRangoActivo('todo')
+    }
+
+    function handleHastaChange(v: string) {
+        setHasta(v)
+        setRangoActivo('todo')
     }
 
     async function toggleExpand(prep: PreparacionPintura) {
@@ -138,7 +172,55 @@ export function PreparacionesPinturaPage() {
                 ))}
             </div>
 
-            {/* Filtro */}
+            {/* Filtros de fecha */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-wrap items-center gap-3">
+                <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                {/* Botones rápidos */}
+                {([
+                    { key: 'hoy',    label: 'Hoy'    },
+                    { key: 'semana', label: 'Semana' },
+                    { key: 'mes',    label: 'Mes'    },
+                    { key: 'todo',   label: 'Todo'   },
+                ] as const).map(r => (
+                    <button
+                        key={r.key}
+                        onClick={() => aplicarRango(r.key)}
+                        className={cn(
+                            'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors',
+                            rangoActivo === r.key
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                    >
+                        {r.label}
+                    </button>
+                ))}
+
+                {/* Separador */}
+                <div className="w-px h-5 bg-slate-200 hidden sm:block" />
+
+                {/* Calendarios */}
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">Desde</span>
+                    <input
+                        type="date"
+                        value={desde}
+                        onChange={e => handleDesdeChange(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">Hasta</span>
+                    <input
+                        type="date"
+                        value={hasta}
+                        onChange={e => handleHastaChange(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                </div>
+            </div>
+
+            {/* Filtro por estado */}
             <div className="flex gap-2 flex-wrap">
                 {(['', 'PENDIENTE', 'PROFORMADA', 'FACTURADA', 'ANULADA'] as const).map(e => (
                     <button
@@ -165,7 +247,11 @@ export function PreparacionesPinturaPage() {
                 <div className="text-center py-16 text-slate-400">
                     <FlaskConical className="w-12 h-12 mx-auto mb-3 opacity-30" />
                     <p className="font-semibold">No hay preparaciones</p>
-                    <p className="text-sm mt-1">Cree una nueva preparación de pintura para comenzar.</p>
+                    <p className="text-sm mt-1">
+                        {desde || hasta
+                            ? 'No hay preparaciones en el período seleccionado.'
+                            : 'Cree una nueva preparación de pintura para comenzar.'}
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-3">

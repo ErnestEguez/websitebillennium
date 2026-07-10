@@ -99,13 +99,16 @@ export const preparacionPinturaService = {
         return prep as PreparacionPintura
     },
 
-    async listar(empresaId: string): Promise<PreparacionPintura[]> {
-        const { data, error } = await supabase
+    async listar(empresaId: string, desde?: string, hasta?: string): Promise<PreparacionPintura[]> {
+        let query = supabase
             .from('preparaciones_pintura')
             .select('*')
             .eq('empresa_id', empresaId)
             .order('created_at', { ascending: false })
-            .limit(200)
+            .limit(500)
+        if (desde) query = query.gte('fecha', desde)
+        if (hasta) query = query.lte('fecha', hasta)
+        const { data, error } = await query
         if (error) throw error
         return (data || []) as PreparacionPintura[]
     },

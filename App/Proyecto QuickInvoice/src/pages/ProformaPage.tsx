@@ -344,20 +344,22 @@ export function ProformaPage() {
         }
     }, [empresa?.id])
 
-    // Pre-carga desde preparación de pintura
+    // Pre-carga desde preparación de pintura — APPEND, no reemplaza
+    const PREP_IDS_KEY = `qi_prep_ids_prf_${empresa?.id ?? ''}`
     useEffect(() => {
         if (!prepId || !empresa?.id) return
         ;(async () => {
             try {
                 const prep = await preparacionPinturaService.getCompleta(prepId)
-                const { data: prod } = await (await import('../lib/supabase')).supabase
+                const { supabase } = await import('../lib/supabase')
+                const { data: prod } = await supabase
                     .from('productos')
                     .select('id, nombre, iva_porcentaje')
                     .eq('empresa_id', empresa!.id)
                     .ilike('codigo', prep.codigo_producto)
                     .eq('activo', true)
                     .maybeSingle()
-                setDetalles([{
+                const newDetalle = {
                     producto_id:       prod?.id ?? null,
                     nombre_producto:   prep.descripcion,
                     cantidad:          1,
@@ -366,12 +368,21 @@ export function ProformaPage() {
                     iva_porcentaje:    prep.iva_porcentaje,
                     subproducto_id:    null,
                     factor_conversion: 1,
-                }])
+                }
+                setDetalles(prev => {
+                    const sinVacias = prev.filter(d => d.producto_id || d.nombre_producto.trim())
+                    return [...sinVacias, newDetalle]
+                })
+                const stored: string[] = JSON.parse(sessionStorage.getItem(PREP_IDS_KEY) || '[]')
+                if (!stored.includes(prepId)) {
+                    sessionStorage.setItem(PREP_IDS_KEY, JSON.stringify([...stored, prepId]))
+                }
                 setVista('form')
             } catch (e) {
                 console.error('Error cargando preparación en proforma:', e)
             }
         })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prepId, empresa?.id])
 
     async function loadDatos() {
@@ -533,8 +544,11 @@ export function ProformaPage() {
             setSavedProforma(saved)
             setProformaEditando(saved)
             await buscarProformas()
-            if (prepId) {
-                preparacionPinturaService.vincularProforma(prepId, saved.id).catch(console.error)
+            // Vincular todos los preparados acumulados en esta proforma
+            const prepIds: string[] = JSON.parse(sessionStorage.getItem(PREP_IDS_KEY) || '[]')
+            sessionStorage.removeItem(PREP_IDS_KEY)
+            for (const pid of prepIds) {
+                preparacionPinturaService.vincularProforma(pid, saved.id).catch(console.error)
             }
         } catch (e: any) {
             alert('Error al guardar proforma: ' + e.message)

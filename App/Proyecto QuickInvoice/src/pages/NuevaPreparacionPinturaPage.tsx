@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useFormDraft } from '../hooks/useFormDraft'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import {
@@ -16,7 +17,6 @@ import {
 } from 'lucide-react'
 
 const UNIDADES_PRODUCTO = ['1L', '1/2L', '1/4L', '1/8L', '1G', '1/2G'] as const
-const UNIDADES_INSUMO   = ['L', 'G'] as const
 
 interface InsumoRow {
     tipo: TipoInsumo
@@ -68,6 +68,40 @@ export function NuevaPreparacionPinturaPage() {
     // Estado del proceso
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState<PreparacionPintura | null>(null)
+
+    // Borrador persistente en sessionStorage
+    const clearDraft = useFormDraft(
+        'draft_prep_pintura',
+        () => ({
+            insumos: insumos.map(r => ({
+                tipo: r.tipo,
+                producto_id: r.producto_id,
+                nombre: r.nombre,
+                codigo: r.codigo,
+                cantidad: r.cantidad,
+                costo_unitario: r.costo_unitario,
+                costo_total: r.costo_total,
+            })),
+            descripcion,
+            unidad,
+            cantidadProducida,
+            precioConIva,
+        }),
+        (draft: any) => {
+            if (draft.insumos?.length) {
+                setInsumos(draft.insumos.map((r: any) => ({
+                    ...INSUMO_VACIO(r.tipo),
+                    ...r,
+                    search: r.nombre || '',
+                })))
+            }
+            if (draft.descripcion) setDescripcion(draft.descripcion)
+            if (draft.unidad) setUnidad(draft.unidad)
+            if (draft.cantidadProducida) setCantidadProducida(draft.cantidadProducida)
+            if (draft.precioConIva) setPrecioConIva(draft.precioConIva)
+        },
+        [insumos, descripcion, unidad, cantidadProducida, precioConIva],
+    )
 
     // Cargar producto de referencia según codigo_prep_pintura de la empresa
     useEffect(() => {
@@ -154,10 +188,6 @@ export function NuevaPreparacionPinturaPage() {
         }))
     }
 
-    function updateUnidad(idx: number, u: string) {
-        setInsumos(prev => prev.map((r, i) => i === idx ? { ...r, unidad: u } : r))
-    }
-
     function updateTipo(idx: number, tipo: TipoInsumo) {
         setInsumos(prev => prev.map((r, i) => i === idx ? { ...r, tipo } : r))
     }
@@ -214,6 +244,7 @@ export function NuevaPreparacionPinturaPage() {
         try {
             setSaving(true)
             const prep = await preparacionPinturaService.crear(input)
+            clearDraft()
             setSaved(prep)
 
             if (accion === 'facturar') {
@@ -260,6 +291,7 @@ export function NuevaPreparacionPinturaPage() {
                         </button>
                         <button
                             onClick={() => {
+                                clearDraft()
                                 setSaved(null)
                                 setInsumos([INSUMO_VACIO('BASE'), INSUMO_VACIO('MEZCLA')])
                                 setDescripcion('')
@@ -345,7 +377,7 @@ export function NuevaPreparacionPinturaPage() {
                             </div>
 
                             {/* Artículo */}
-                            <div className="col-span-4 relative">
+                            <div className="col-span-5 relative">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Artículo</label>
                                 <div className="relative">
                                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -398,18 +430,6 @@ export function NuevaPreparacionPinturaPage() {
                                     onChange={e => updateCantidad(idx, parseFloat(e.target.value) || 0)}
                                     className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-500 text-right"
                                 />
-                            </div>
-
-                            {/* Unidad */}
-                            <div className="col-span-1">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Unid.</label>
-                                <select
-                                    value={row.unidad}
-                                    onChange={e => updateUnidad(idx, e.target.value)}
-                                    className="w-full px-2 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-500"
-                                >
-                                    {UNIDADES_INSUMO.map(u => <option key={u} value={u}>{u}</option>)}
-                                </select>
                             </div>
 
                             {/* Costo unitario */}
