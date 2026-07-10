@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 
 const UNIDADES_PRODUCTO = ['1L', '1/2L', '1/4L', '1/8L', '1G', '1/2G'] as const
+const UNIDADES_INSUMO_SUGERIDAS = ['L', 'G', 'mL', 'kg', 'g', 'oz'] as const
 
 interface InsumoRow {
     tipo: TipoInsumo
@@ -186,6 +187,10 @@ export function NuevaPreparacionPinturaPage() {
             const ct = parseFloat((cant * r.costo_unitario).toFixed(2))
             return { ...r, cantidad: cant, costo_total: ct }
         }))
+    }
+
+    function updateUnidad(idx: number, u: string) {
+        setInsumos(prev => prev.map((r, i) => i === idx ? { ...r, unidad: u } : r))
     }
 
     function updateTipo(idx: number, tipo: TipoInsumo) {
@@ -377,7 +382,7 @@ export function NuevaPreparacionPinturaPage() {
                             </div>
 
                             {/* Artículo */}
-                            <div className="col-span-5 relative">
+                            <div className="col-span-4 relative">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Artículo</label>
                                 <div className="relative">
                                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -430,6 +435,22 @@ export function NuevaPreparacionPinturaPage() {
                                     onChange={e => updateCantidad(idx, parseFloat(e.target.value) || 0)}
                                     className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-500 text-right"
                                 />
+                            </div>
+
+                            {/* Unidad — texto libre, referencial */}
+                            <div className="col-span-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Unid.</label>
+                                <input
+                                    type="text"
+                                    list={`unid-list-${idx}`}
+                                    placeholder="L"
+                                    value={row.unidad === 'L' && !row.producto_id ? '' : row.unidad}
+                                    onChange={e => updateUnidad(idx, e.target.value || 'L')}
+                                    className="w-full px-2 py-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-500 text-center"
+                                />
+                                <datalist id={`unid-list-${idx}`}>
+                                    {UNIDADES_INSUMO_SUGERIDAS.map(u => <option key={u} value={u} />)}
+                                </datalist>
                             </div>
 
                             {/* Costo unitario */}

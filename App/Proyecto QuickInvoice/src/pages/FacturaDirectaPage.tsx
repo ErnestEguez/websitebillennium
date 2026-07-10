@@ -148,33 +148,54 @@ export function FacturaDirectaPage() {
         if (empresa?.id) loadData()
     }, [empresa?.id])
 
-    // Pre-carga desde preparación de pintura
+    // Pre-carga desde preparación de pintura — carga TODOS los preps acumulados
+    const PREP_IDS_KEY = `qi_prep_ids_${empresa?.id ?? ''}`
     useEffect(() => {
         if (!prepId || !empresa?.id) return
         ;(async () => {
             try {
-                const prep = await preparacionPinturaService.getCompleta(prepId)
-                const { data: prod } = await supabase
-                    .from('productos')
-                    .select('id, nombre, iva_porcentaje')
-                    .eq('empresa_id', empresa!.id)
-                    .ilike('codigo', prep.codigo_producto)
-                    .eq('activo', true)
-                    .maybeSingle()
-                setDetalles([{
-                    producto_id:      prod?.id ?? null,
-                    nombre_producto:  prep.descripcion,
-                    cantidad:         1,
-                    precio_unitario:  prep.precio_sin_iva ?? 0,
-                    descuento:        0,
-                    iva_porcentaje:   prep.iva_porcentaje,
-                    subproducto_id:   null,
-                    factor_conversion: 1,
-                }])
+                // Acumular el nuevo prep_id
+                const stored: string[] = JSON.parse(sessionStorage.getItem(PREP_IDS_KEY) || '[]')
+                const allIds = stored.includes(prepId) ? stored : [...stored, prepId]
+                sessionStorage.setItem(PREP_IDS_KEY, JSON.stringify(allIds))
+
+                // Cargar TODOS los preps acumulados (incluyendo los de sesiones anteriores)
+                const prepDetalles: DetalleFacturaDirecta[] = []
+                for (const pid of allIds) {
+                    const prep = await preparacionPinturaService.getCompleta(pid)
+                    const { data: prod } = await supabase
+                        .from('productos')
+                        .select('id, nombre, iva_porcentaje')
+                        .eq('empresa_id', empresa!.id)
+                        .ilike('codigo', prep.codigo_producto)
+                        .eq('activo', true)
+                        .maybeSingle()
+                    prepDetalles.push({
+                        producto_id:       prod?.id ?? null,
+                        nombre_producto:   prep.descripcion,
+                        cantidad:          1,
+                        precio_unitario:   prep.precio_sin_iva ?? 0,
+                        descuento:         0,
+                        iva_porcentaje:    prep.iva_porcentaje,
+                        subproducto_id:    null,
+                        factor_conversion: 1,
+                    })
+                }
+
+                // Reemplazar líneas: poner todos los preps primero, conservar líneas manuales
+                setDetalles(prev => {
+                    const prepNombres = new Set(prepDetalles.map(d => d.nombre_producto))
+                    const manuales = prev.filter(d =>
+                        (d.producto_id || d.nombre_producto.trim()) &&
+                        !prepNombres.has(d.nombre_producto)
+                    )
+                    return [...prepDetalles, ...manuales]
+                })
             } catch (e) {
                 console.error('Error cargando preparación:', e)
             }
         })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prepId, empresa?.id])
 
     // Búsqueda en servidor con debounce
@@ -479,8 +500,11 @@ export function FacturaDirectaPage() {
             const facturaCompleta = await facturaDirectaService.getComprobanteCompleto(factura.id)
             clearDraft()
             setFacturaFinal(facturaCompleta)
-            if (prepId) {
-                preparacionPinturaService.vincularComprobante(prepId, factura.id).catch(console.error)
+            // Vincular todos los preparados acumulados en esta factura
+            const prepIds: string[] = JSON.parse(sessionStorage.getItem(PREP_IDS_KEY) || '[]')
+            sessionStorage.removeItem(PREP_IDS_KEY)
+            for (const pid of prepIds) {
+                preparacionPinturaService.vincularComprobante(pid, factura.id).catch(console.error)
             }
         } catch (e: any) {
             alert('Error al generar factura: ' + e.message)
@@ -497,6 +521,7 @@ export function FacturaDirectaPage() {
         setMontoRecibido(0)
         setSearchCliente('')
         setSearchProducto({})
+        sessionStorage.removeItem(PREP_IDS_KEY)
         // Mantener vendedor seleccionado entre facturas
         setDiasPlazoCredito(30)
         const cf = clientes.find(c => c.identificacion === '9999999999999')

@@ -344,39 +344,51 @@ export function ProformaPage() {
         }
     }, [empresa?.id])
 
-    // Pre-carga desde preparación de pintura — APPEND, no reemplaza
+    // Pre-carga desde preparación de pintura — carga TODOS los preps acumulados
     const PREP_IDS_KEY = `qi_prep_ids_prf_${empresa?.id ?? ''}`
     useEffect(() => {
         if (!prepId || !empresa?.id) return
         ;(async () => {
             try {
-                const prep = await preparacionPinturaService.getCompleta(prepId)
                 const { supabase } = await import('../lib/supabase')
-                const { data: prod } = await supabase
-                    .from('productos')
-                    .select('id, nombre, iva_porcentaje')
-                    .eq('empresa_id', empresa!.id)
-                    .ilike('codigo', prep.codigo_producto)
-                    .eq('activo', true)
-                    .maybeSingle()
-                const newDetalle = {
-                    producto_id:       prod?.id ?? null,
-                    nombre_producto:   prep.descripcion,
-                    cantidad:          1,
-                    precio_unitario:   prep.precio_sin_iva ?? 0,
-                    descuento:         0,
-                    iva_porcentaje:    prep.iva_porcentaje,
-                    subproducto_id:    null,
-                    factor_conversion: 1,
-                }
-                setDetalles(prev => {
-                    const sinVacias = prev.filter(d => d.producto_id || d.nombre_producto.trim())
-                    return [...sinVacias, newDetalle]
-                })
+
+                // Acumular el nuevo prep_id
                 const stored: string[] = JSON.parse(sessionStorage.getItem(PREP_IDS_KEY) || '[]')
-                if (!stored.includes(prepId)) {
-                    sessionStorage.setItem(PREP_IDS_KEY, JSON.stringify([...stored, prepId]))
+                const allIds = stored.includes(prepId) ? stored : [...stored, prepId]
+                sessionStorage.setItem(PREP_IDS_KEY, JSON.stringify(allIds))
+
+                // Cargar TODOS los preps acumulados
+                const prepDetalles: DetalleFacturaDirecta[] = []
+                for (const pid of allIds) {
+                    const prep = await preparacionPinturaService.getCompleta(pid)
+                    const { data: prod } = await supabase
+                        .from('productos')
+                        .select('id, nombre, iva_porcentaje')
+                        .eq('empresa_id', empresa!.id)
+                        .ilike('codigo', prep.codigo_producto)
+                        .eq('activo', true)
+                        .maybeSingle()
+                    prepDetalles.push({
+                        producto_id:       prod?.id ?? null,
+                        nombre_producto:   prep.descripcion,
+                        cantidad:          1,
+                        precio_unitario:   prep.precio_sin_iva ?? 0,
+                        descuento:         0,
+                        iva_porcentaje:    prep.iva_porcentaje,
+                        subproducto_id:    null,
+                        factor_conversion: 1,
+                    })
                 }
+
+                // Reemplazar líneas: poner todos los preps, conservar líneas manuales
+                setDetalles(prev => {
+                    const prepNombres = new Set(prepDetalles.map(d => d.nombre_producto))
+                    const manuales = prev.filter(d =>
+                        (d.producto_id || d.nombre_producto.trim()) &&
+                        !prepNombres.has(d.nombre_producto)
+                    )
+                    return [...prepDetalles, ...manuales]
+                })
                 setVista('form')
             } catch (e) {
                 console.error('Error cargando preparación en proforma:', e)
