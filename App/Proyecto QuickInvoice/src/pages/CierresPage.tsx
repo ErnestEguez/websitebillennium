@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../components/help/HelpButton'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency, cn } from '../lib/utils'
@@ -84,6 +85,7 @@ export function CierresPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Historial de Cierres de Caja</h1>
                     <p className="text-slate-500">Consulta y gestión de turnos y arqueos realizados</p>
                 </div>
+                <HelpButton pageKey="cierres" />
             </div>
 
             <div className="card">

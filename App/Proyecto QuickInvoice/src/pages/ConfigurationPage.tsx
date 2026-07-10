@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../components/help/HelpButton'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { staffService } from '../services/staffService'
@@ -888,14 +889,17 @@ export function ConfigurationPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Configuración</h1>
                     <p className="text-slate-500">{profile?.rol === 'admin_plataforma' ? 'Administración de Plataforma' : 'Gestiona tu empresa y personal'}</p>
                 </div>
-                {profile?.rol === 'admin_plataforma' && (
-                    <a
-                        href="/"
-                        className="btn btn-secondary py-2 px-4 text-sm flex items-center gap-2"
-                    >
-                        <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
-                    </a>
-                )}
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="configuracion" />
+                    {profile?.rol === 'admin_plataforma' && (
+                        <a
+                            href="/"
+                            className="btn btn-secondary py-2 px-4 text-sm flex items-center gap-2"
+                        >
+                            <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
+                        </a>
+                    )}
+                </div>
             </div>
 
             {/* Tabs - Only show for non-platform admins */}

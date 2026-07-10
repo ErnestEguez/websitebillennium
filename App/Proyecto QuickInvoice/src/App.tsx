@@ -50,8 +50,6 @@ import { NcRidePage } from './pages/NcRidePage'
 import { DashboardGerencialPage } from './pages/DashboardGerencialPage'
 import { ProtectedRoute as RoleProtectedRoute } from './components/ProtectedRoute'
 import { AdminPermisosPage } from './pages/AdminPermisosPage'
-import { SentinelProvider } from './contexts/SentinelContext'
-import { GuidedTour } from './components/sentinel/GuidedTour'
 import { AdminUserEmpresasPage } from './pages/AdminUserEmpresasPage'
 // ── Módulo Cuentas por Pagar (Vendor Management) ─────────────
 import { ProveedoresPage as VMProveedoresPage }   from './pages/vendor/ProveedoresPage'
@@ -185,8 +183,6 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <SentinelProvider>
-          <GuidedTour />
           <SyncManager />
           <OfflineBanner />
           <Routes>
@@ -782,7 +778,6 @@ function App() {
             {/* Catch all */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          </SentinelProvider>
         </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>

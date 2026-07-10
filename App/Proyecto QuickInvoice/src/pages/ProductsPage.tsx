@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../components/help/HelpButton'
 import { productoService } from '../services/productoService'
 import type { Producto, Categoria } from '../services/productoService'
 import { subproductoService, type Subproducto } from '../services/subproductoService'
@@ -446,6 +447,7 @@ export function ProductsPage() {
                     <p className="text-slate-500">Gestiona el catálogo de productos y sus presentaciones</p>
                 </div>
                 <div className="flex gap-2">
+                    <HelpButton pageKey="articulos" />
                     <button
                         onClick={() => {
                             const next = !showBaja

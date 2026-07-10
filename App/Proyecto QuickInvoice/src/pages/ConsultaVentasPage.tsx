@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react'
+import { HelpButton } from '../components/help/HelpButton'
 import { useReactToPrint } from 'react-to-print'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
@@ -197,6 +198,7 @@ export function ConsultaVentasPage() {
                     </h1>
                     <p className="text-slate-500 text-sm mt-0.5">Consulta de facturas emitidas con detalle por formas de pago</p>
                 </div>
+                <HelpButton pageKey="consulta-ventas" />
             </div>
 
             {/* Filtros */}

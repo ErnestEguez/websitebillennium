@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { HelpButton } from '../components/help/HelpButton'
 import { sriService } from '../services/sriService'
 import { facturacionService } from '../services/facturacionService'
 import type { SriConfig } from '../services/facturacionService'
@@ -169,6 +170,7 @@ export function InvoicingPage() {
                     <p className="text-slate-500">Gestión de documentos autorizados por el SRI</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    <HelpButton pageKey="comprobantes" />
                     <button
                         onClick={() => setIsConfigModalOpen(true)}
                         className="btn bg-white border border-slate-200 text-slate-600 gap-2 hover:bg-slate-50 transition-colors"

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { HelpButton } from '../components/help/HelpButton'
 import { preparacionPinturaService } from '../services/preparacionPinturaService'
 import { useFormDraft } from '../hooks/useFormDraft'
 import { useReactToPrint } from 'react-to-print'
@@ -612,6 +613,9 @@ export function FacturaDirectaPage() {
                         Nueva Factura
                     </h1>
                     <p className="text-slate-500 text-sm">Facturación electrónica directa de artículos y servicios</p>
+                </div>
+                <div className="flex items-center gap-2 self-start">
+                    <HelpButton pageKey="factura-directa" />
                 </div>
 
                 {/* ── Selector Factura / Proforma ── */}

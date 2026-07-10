@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
+import { HelpButton } from '../components/help/HelpButton'
 import { useAuth } from '../contexts/AuthContext'
 import {
     carteraCxcService,
@@ -661,6 +662,7 @@ export function CarteraCxcPage() {
                     <p className="text-slate-600 mt-1">Facturas a crédito pendientes de cobro</p>
                 </div>
                 <div className="flex gap-2">
+                    <HelpButton pageKey="cartera-cxc" />
                     <button
                         onClick={() => { setMultiModal(true); setFiltroEstado('pendiente') }}
                         className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700"

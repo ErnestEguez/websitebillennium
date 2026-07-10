@@ -45,7 +45,6 @@ import {
     Palette,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { SentinelPanel } from './sentinel/SentinelPanel'
 import type { Modules } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
 
@@ -591,9 +590,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 </div>
                             )}
                         </div>
-
-                        {/* Sentinel — guía interactiva */}
-                        <SentinelPanel isSidebarOpen={isSidebarOpen} />
 
                         {/* Cerrar Sesión */}
                         <button

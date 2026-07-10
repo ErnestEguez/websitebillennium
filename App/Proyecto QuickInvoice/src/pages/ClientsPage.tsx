@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { HelpButton } from '../components/help/HelpButton'
 import { facturacionService } from '../services/facturacionService'
 import type { Cliente } from '../services/facturacionService'
 import { useAuth } from '../contexts/AuthContext'
@@ -174,6 +175,7 @@ export function ClientsPage() {
                     <p className="text-slate-500">Administra la base de datos de tus clientes para facturación</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <HelpButton pageKey="clientes" />
                     <button
                         onClick={() => {
                             const next = !showBaja

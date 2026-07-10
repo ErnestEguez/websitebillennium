@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { HelpButton } from '../components/help/HelpButton'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { guiaRemisionService } from '../services/guiaRemisionService'
@@ -316,12 +317,15 @@ export default function GuiasRemisionPage() {
                     <Truck className="w-6 h-6 text-teal-600" />
                     <h1 className="text-xl font-bold text-slate-800">Guías de Remisión</h1>
                 </div>
-                <button
-                    onClick={abrirWizard}
-                    className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg"
-                >
-                    <Plus className="w-4 h-4" /> Nueva Guía
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="guias-remision" />
+                    <button
+                        onClick={abrirWizard}
+                        className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg"
+                    >
+                        <Plus className="w-4 h-4" /> Nueva Guía
+                    </button>
+                </div>
             </div>
 
             {/* KPIs */}

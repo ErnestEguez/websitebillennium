@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { HelpButton } from '../components/help/HelpButton'
 import { ncService } from '../services/ncService'
 import type { NotaCredito } from '../services/ncService'
 import { kardexService } from '../services/kardexService'
@@ -206,6 +207,7 @@ ${logoHtml}
                     </h1>
                     <p className="text-slate-500 text-sm">Devoluciones, descuentos y correcciones autorizadas por SRI</p>
                 </div>
+                <HelpButton pageKey="notas-credito" />
                 <button
                     onClick={() => navigate('/notas-credito/nueva')}
                     className="btn bg-primary-600 text-white gap-2 hover:bg-primary-700 shadow-lg shadow-primary-200 active:scale-95 transition-all"
