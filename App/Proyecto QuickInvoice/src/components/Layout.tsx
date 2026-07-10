@@ -45,6 +45,7 @@ import {
     Palette,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { SentinelPanel } from './sentinel/SentinelPanel'
 import type { Modules } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
 
@@ -55,13 +56,15 @@ interface SidebarItemProps {
     active?: boolean
     sub?: boolean
     disabled?: boolean
+    sentinelId?: string
 }
 
-const SidebarItem = ({ to, icon: Icon, label, active, sub, disabled }: SidebarItemProps) => {
+const SidebarItem = ({ to, icon: Icon, label, active, sub, disabled, sentinelId }: SidebarItemProps) => {
     if (disabled) return null  // ocultar completamente cuando no tiene permiso
     return (
         <Link
             to={to}
+            data-sentinel={sentinelId}
             className={cn(
                 "flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group",
                 sub ? "pl-8 py-2" : "",
@@ -269,14 +272,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={['/nueva-factura','/proformas','/facturacion','/vendedores','/notas-credito','/anulacion-facturas','/guias-remision','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
                         >
-                            <SidebarItem to="/nueva-factura"      icon={FilePlus}        label="Nueva Factura"      active={location.pathname === '/nueva-factura'} sub disabled={!p.perm_nueva_factura} />
+                            <SidebarItem to="/nueva-factura"      icon={FilePlus}        label="Nueva Factura"      active={location.pathname === '/nueva-factura'} sub disabled={!p.perm_nueva_factura} sentinelId="nav-nueva-factura" />
                             <SidebarItem to="/proformas"          icon={FileText}        label="Proformas"          active={location.pathname.startsWith('/proformas')} sub disabled={!p.perm_nueva_factura} />
                             <SidebarItem to="/facturacion"        icon={FileText}        label="Comprobantes"       active={location.pathname === '/facturacion'} sub disabled={!p.perm_comprobantes} />
                             <SidebarItem to="/notas-credito"      icon={FileMinus}       label="Notas de Crédito"   active={location.pathname === '/notas-credito'} sub disabled={!p.perm_notas_credito} />
                             <SidebarItem to="/anulacion-facturas" icon={Ban}             label="Anulación Facturas" active={location.pathname === '/anulacion-facturas'} sub disabled={!p.perm_anulacion_facturas} />
                             <SidebarItem to="/guias-remision"    icon={Truck}           label="Guías de Remisión"  active={location.pathname.startsWith('/guias-remision')} sub disabled={!p.perm_guias_remision} />
                             <SidebarItem to="/cierres"            icon={BookOpen}        label="Cierres de Caja"    active={location.pathname === '/cierres'} sub disabled={!p.perm_cierres_caja} />
-                            <SidebarItem to="/consultas/ventas"         icon={Search}    label="Consulta Ventas"      active={location.pathname === '/consultas/ventas'} sub disabled={!p.perm_consulta_ventas} />
+                            <SidebarItem to="/consultas/ventas"         icon={Search}    label="Consulta Ventas"      active={location.pathname === '/consultas/ventas'} sub disabled={!p.perm_consulta_ventas} sentinelId="nav-consulta-ventas" />
                             <SidebarItem to="/consultas/ventas-cliente" icon={User}      label="Ventas por Cliente"   active={location.pathname === '/consultas/ventas-cliente'} sub disabled={!p.perm_consulta_ventas} />
                             {profile?.rol === 'oficina' && (
                                 <button
@@ -301,7 +304,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/preparaciones-pintura','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
                         >
-                            <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub />
+                            <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub sentinelId="nav-productos" />
                             <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub />
                             <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub />
                             <SidebarItem to="/preparaciones-pintura"    icon={Palette}           label="Prep. Pinturas"        active={location.pathname.startsWith('/preparaciones-pintura')} sub disabled={!p.perm_preparaciones_pintura} />
@@ -321,7 +324,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={['/clientes','/cartera','/consultas/cartera'].some(p => location.pathname.startsWith(p))}
                         >
-                            <SidebarItem to="/clientes"                    icon={Users}      label="Clientes"         active={location.pathname === '/clientes'} sub disabled={!p.perm_clientes} />
+                            <SidebarItem to="/clientes"                    icon={Users}      label="Clientes"         active={location.pathname === '/clientes'} sub disabled={!p.perm_clientes} sentinelId="nav-clientes" />
                             <SidebarItem to="/cartera-cxc"                 icon={CreditCard} label="Cartera / Abonos" active={location.pathname === '/cartera-cxc'} sub disabled={!p.perm_cartera_cxc} />
                             <SidebarItem to="/clientes/gestion-cartera"    icon={ClipboardList} label="Gestión de Cartera" active={location.pathname === '/clientes/gestion-cartera'} sub disabled={!p.perm_gestion_cartera} />
                             <SidebarItem to="/consultas/cartera-clientes"  icon={FileSearch} label="Consulta Cartera" active={location.pathname === '/consultas/cartera-clientes'} sub disabled={!p.perm_consulta_cartera} />
@@ -569,7 +572,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             </button>
                             {openGroups.includes('ajustes') && isSidebarOpen && (
                                 <div className="mt-0.5 ml-2 border-l-2 border-slate-100 pl-1 space-y-0.5">
-                                    <SidebarItem to="/configuracion"      icon={Settings}  label="Configuración"       active={location.pathname === '/configuracion'} sub />
+                                    <SidebarItem to="/configuracion"      icon={Settings}  label="Configuración"       active={location.pathname === '/configuracion'} sub sentinelId="nav-configuracion" />
                                     <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub />
                                     {isAdmin && <SidebarItem to="/ajustes/permisos" icon={UserCog} label="Permisos de usuario" active={location.pathname === '/ajustes/permisos'} sub />}
                                     {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub />}
@@ -588,6 +591,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 </div>
                             )}
                         </div>
+
+                        {/* Sentinel — guía interactiva */}
+                        <SentinelPanel isSidebarOpen={isSidebarOpen} />
 
                         {/* Cerrar Sesión */}
                         <button

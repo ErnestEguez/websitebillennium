@@ -1,0 +1,35 @@
+[
+  {
+    "id": "p1",
+    "orden": 1,
+    "titulo": "Ir al módulo Clientes",
+    "texto": "Haz clic aquí para abrir el catálogo de clientes.",
+    "target": "nav-clientes",
+    "accion": "click",
+    "ruta": "/clientes"
+  },
+  {
+    "id": "p2",
+    "orden": 2,
+    "titulo": "Nuevo cliente",
+    "texto": "Presiona '+ Nuevo Cliente' para abrir el formulario de registro.",
+    "target": "btn-nuevo-cliente",
+    "accion": "click"
+  },
+  {
+    "id": "p3",
+    "orden": 3,
+    "titulo": "Ingresar identificación",
+    "texto": "Escribe el RUC o cédula. El sistema consultará el SRI para autocompletar nombre y dirección.",
+    "target": "campo-identificacion-cliente",
+    "accion": "fill"
+  },
+  {
+    "id": "p4",
+    "orden": 4,
+    "titulo": "Guardar cliente",
+    "texto": "Revisa los datos y presiona Guardar. El cliente ya estará disponible al facturar.",
+    "target": "btn-guardar-cliente",
+    "accion": "click"
+  }
+]

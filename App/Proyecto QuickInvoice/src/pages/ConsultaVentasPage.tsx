@@ -204,7 +204,7 @@ export function ConsultaVentasPage() {
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
                     <div>
                         <label className="block text-xs font-semibold text-slate-500 mb-1">Desde</label>
-                        <input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)}
+                        <input data-sentinel="filtro-fecha-inicio" type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)}
                             className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
                     </div>
                     <div>
@@ -221,7 +221,7 @@ export function ConsultaVentasPage() {
                         </select>
                     </div>
                     <div>
-                        <button onClick={consultar} disabled={loading}
+                        <button data-sentinel="btn-consultar-ventas" onClick={consultar} disabled={loading}
                             className="w-full btn btn-primary flex items-center justify-center gap-2 py-2">
                             <Search className="w-4 h-4" />
                             {loading ? 'Consultando...' : 'Consultar'}

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "p1",
+    "orden": 1,
+    "titulo": "Ir a Nueva Factura",
+    "texto": "Haz clic aquí en el menú para abrir el formulario de facturación.",
+    "target": "nav-nueva-factura",
+    "accion": "click",
+    "ruta": "/nueva-factura"
+  },
+  {
+    "id": "p2",
+    "orden": 2,
+    "titulo": "Buscar el cliente",
+    "texto": "Escribe el nombre o RUC del cliente. El sistema lo buscará automáticamente.",
+    "target": "search-cliente-factura",
+    "accion": "fill"
+  },
+  {
+    "id": "p3",
+    "orden": 3,
+    "titulo": "Sección de pagos",
+    "texto": "Aquí defines cómo pagará el cliente: efectivo, tarjeta, crédito, etc.",
+    "target": "seccion-pagos-factura",
+    "accion": "observe"
+  },
+  {
+    "id": "p4",
+    "orden": 4,
+    "titulo": "Generar la factura",
+    "texto": "Presiona 'Generar Factura' para firmar y enviar al SRI. ¡Ya quedará autorizada!",
+    "target": "btn-generar-factura",
+    "accion": "click"
+  }
+]

@@ -192,6 +192,7 @@ export function ClientsPage() {
                         {showBaja ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                     <button
+                        data-sentinel="btn-nuevo-cliente"
                         onClick={() => {
                             setEditingCliente({ identificacion: '', nombre: '', email: '', direccion: '' })
                             setIsModalOpen(true)
@@ -331,6 +332,7 @@ export function ClientsPage() {
                             <div className="relative">
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Identificación (RUC/Cédula)</label>
                                 <input
+                                    data-sentinel="campo-identificacion-cliente"
                                     required
                                     type="text"
                                     className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none pr-10"
@@ -397,6 +399,7 @@ export function ClientsPage() {
                                     Cancelar
                                 </button>
                                 <button
+                                    data-sentinel="btn-guardar-cliente"
                                     type="submit"
                                     className="flex-1 bg-primary-600 text-white rounded-lg px-4 py-2 font-bold hover:bg-primary-700 shadow-lg shadow-primary-200 flex items-center justify-center gap-2"
                                 >

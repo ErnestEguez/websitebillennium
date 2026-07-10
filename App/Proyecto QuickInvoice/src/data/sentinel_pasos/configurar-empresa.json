@@ -1,0 +1,27 @@
+[
+  {
+    "id": "p1",
+    "orden": 1,
+    "titulo": "Ir a Ajustes",
+    "texto": "Haz clic en 'Configuración' dentro del menú Ajustes.",
+    "target": "nav-configuracion",
+    "accion": "click",
+    "ruta": "/configuracion"
+  },
+  {
+    "id": "p2",
+    "orden": 2,
+    "titulo": "Datos de la empresa",
+    "texto": "Aquí editas el nombre comercial, dirección y datos del SRI. Toca 'Guardar' al terminar.",
+    "target": "tab-empresa",
+    "accion": "observe"
+  },
+  {
+    "id": "p3",
+    "orden": 3,
+    "titulo": "Firma electrónica",
+    "texto": "Carga el archivo .p12 de tu firma electrónica. Sin esto no podrás autorizar facturas en el SRI.",
+    "target": "tab-firma",
+    "accion": "observe"
+  }
+]

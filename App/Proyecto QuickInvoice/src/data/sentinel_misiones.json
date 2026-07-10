@@ -1,0 +1,42 @@
+[
+  {
+    "id": "emitir-factura",
+    "nombre": "Emitir tu primera factura",
+    "descripcion": "Aprende a crear y autorizar una factura electrónica con el SRI.",
+    "modulo": "Facturación",
+    "icono": "FilePlus",
+    "ruta": "/nueva-factura"
+  },
+  {
+    "id": "configurar-clientes",
+    "nombre": "Registrar un cliente",
+    "descripcion": "Agrega un cliente al catálogo para usarlo en tus facturas.",
+    "modulo": "Clientes",
+    "icono": "Users",
+    "ruta": "/clientes"
+  },
+  {
+    "id": "primer-producto",
+    "nombre": "Registrar un producto o servicio",
+    "descripcion": "Crea un artículo en el catálogo para facturar más rápido.",
+    "modulo": "Inventario",
+    "icono": "Package",
+    "ruta": "/productos"
+  },
+  {
+    "id": "ventas-del-dia",
+    "nombre": "Ver ventas del período",
+    "descripcion": "Consulta el resumen de facturas emitidas con detalle por formas de pago.",
+    "modulo": "Reportes",
+    "icono": "BarChart3",
+    "ruta": "/consultas/ventas"
+  },
+  {
+    "id": "configurar-empresa",
+    "nombre": "Configurar tu empresa",
+    "descripcion": "Completa los datos de tu empresa, firma electrónica y logotipo.",
+    "modulo": "Ajustes",
+    "icono": "Settings",
+    "ruta": "/configuracion"
+  }
+]

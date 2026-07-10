@@ -475,6 +475,7 @@ export function ProductsPage() {
                             })
                             setIsModalOpen(true)
                         }}
+                        data-sentinel="btn-nuevo-producto"
                         className="btn btn-primary flex items-center gap-2"
                     >
                         <Plus className="w-4 h-4" />
@@ -700,7 +701,7 @@ export function ProductsPage() {
             {/* Modal editar/crear producto */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                    <div data-sentinel="modal-nuevo-producto" className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
                             <h2 className="text-lg font-bold text-slate-900">
                                 {editingProduct?.id ? 'Editar Producto' : 'Nuevo Producto'}
@@ -942,6 +943,7 @@ export function ProductsPage() {
                                     Cancelar
                                 </button>
                                 <button
+                                    data-sentinel="btn-guardar-producto"
                                     type="submit"
                                     className="flex-1 bg-primary-600 text-white rounded-lg px-4 py-2 font-bold hover:bg-primary-700 shadow-lg shadow-primary-200 flex items-center justify-center gap-2"
                                 >

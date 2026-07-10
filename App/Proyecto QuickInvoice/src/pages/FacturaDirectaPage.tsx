@@ -739,7 +739,7 @@ export function FacturaDirectaPage() {
                                     <div className="space-y-2 mt-3">
                                         <div className="relative">
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                            <input type="text" placeholder="Buscar por identificación o nombre..."
+                                            <input data-sentinel="search-cliente-factura" type="text" placeholder="Buscar por identificación o nombre..."
                                                 className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
                                                 value={searchCliente}
                                                 onChange={e => setSearchCliente(e.target.value)} />
@@ -1101,7 +1101,7 @@ export function FacturaDirectaPage() {
                 {/* COLUMNA LATERAL */}
                 <div className="space-y-6">
                     {/* ── FORMAS DE PAGO ───────────────── */}
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+                    <div data-sentinel="seccion-pagos-factura" className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
                         <div className="flex items-center justify-between">
                             <h2 className="font-bold text-slate-900 flex items-center gap-2">
                                 <CreditCard className="w-5 h-5 text-primary-500" /> Formas de Pago
@@ -1313,6 +1313,7 @@ export function FacturaDirectaPage() {
 
                         {/* Botón Facturar */}
                         <button
+                            data-sentinel="btn-generar-factura"
                             onClick={handleGenerarFactura}
                             disabled={saving || !selectedCliente || totales.total <= 0}
                             className="w-full bg-primary-600 text-white rounded-xl py-4 font-black text-sm hover:bg-primary-700 shadow-xl shadow-primary-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale transition-all active:scale-95 mt-2">

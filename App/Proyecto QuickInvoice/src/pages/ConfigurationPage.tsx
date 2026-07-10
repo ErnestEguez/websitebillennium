@@ -902,6 +902,7 @@ export function ConfigurationPage() {
             {profile?.rol !== 'admin_plataforma' && (
                 <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit flex-wrap">
                     <button
+                        data-sentinel="tab-empresa"
                         onClick={() => setActiveTab('empresa')}
                         className={cn(
                             "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
@@ -1150,7 +1151,7 @@ export function ConfigurationPage() {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
+                                    <div data-sentinel="tab-firma" className="space-y-1">
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
                                             Firma (.p12)
                                             {companyData.config_sri?.firma_path && (
