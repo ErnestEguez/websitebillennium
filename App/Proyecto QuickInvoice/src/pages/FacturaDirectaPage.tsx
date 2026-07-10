@@ -394,7 +394,7 @@ export function FacturaDirectaPage() {
     const autoCompletarPago = () => {
         if (pagos.length === 1) {
             setPagos([{ ...pagos[0], valor: totales.total }])
-            if (pagos[0].metodo === 'efectivo') setMontoRecibido(totales.total)
+            // No auto-llenar "Efectivo Recibido" — el cajero ingresa cuánto recibió si es diferente al total
         }
     }
 
@@ -1131,7 +1131,14 @@ export function FacturaDirectaPage() {
                                             <input type="number" min="0" step="0.01"
                                                 className="w-full pl-2 pr-2 py-2.5 rounded-lg border-2 border-primary-200 text-sm font-bold outline-none focus:ring-2 focus:ring-primary-400 text-right"
                                                 value={p.valor}
-                                                onChange={e => updatePago(i, 'valor', parseFloat(e.target.value) || 0)} />
+                                                onChange={e => {
+                                                    const val = parseFloat(e.target.value) || 0
+                                                    updatePago(i, 'valor', val)
+                                                    // Sincronizar "Efectivo Recibido" si supera el total (muestra vuelto en pantalla)
+                                                    if (p.metodo === 'efectivo') {
+                                                        setMontoRecibido(val > totales.total ? val : 0)
+                                                    }
+                                                }} />
                                         </div>
                                         <button onClick={() => removePago(i)} disabled={pagos.length === 1}
                                             className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20">
