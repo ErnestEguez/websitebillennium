@@ -28,6 +28,9 @@ import {
     Printer,
     AlignLeft,
     FolderTree,
+    Download,
+    Copy,
+    CheckCheck,
 } from 'lucide-react'
 import { ContabilidadConfigTab } from '../components/ContabilidadConfigTab'
 import { TalentoNominasConfigTab } from '../components/TalentoNominasConfigTab'
@@ -109,6 +112,7 @@ export function ConfigurationPage() {
     const [savingMsg, setSavingMsg]               = useState(false)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [copiado, setCopiado] = useState(false)
 
     // Empresa State
     const [companyData, setCompanyData] = useState<any>({
@@ -1233,6 +1237,87 @@ export function ConfigurationPage() {
                                 <img src={companyData.logo_url} alt="Logo" className="max-h-32 object-contain rounded-xl" />
                             </div>
                         )}
+
+                        {/* ── Impresora Térmica 80mm ── */}
+                        <div className="card p-6 space-y-4">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                <Printer className="w-4 h-4 text-primary-500" />
+                                Impresora Térmica 80mm — Impresión Directa
+                            </h3>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                                Para que Chrome imprima <strong>directamente a la térmica sin mostrar el diálogo</strong>,
+                                abre la aplicación con el flag <code className="bg-slate-100 px-1 rounded font-mono">--kiosk-printing</code> y
+                                configura la impresora 80mm como predeterminada en Windows.
+                            </p>
+
+                            <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside">
+                                <li>En Windows, ve a <strong>Impresoras y escáneres</strong> → selecciona tu impresora 80mm → <strong>Establecer como predeterminada</strong></li>
+                                <li>Descarga el acceso directo (botón abajo) y guárdalo en el escritorio</li>
+                                <li>Abre QuickInvoice siempre usando ese acceso directo — Chrome imprimirá directo sin diálogo</li>
+                            </ol>
+
+                            <div className="bg-slate-50 rounded-xl p-3">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Comando Chrome</p>
+                                <code className="text-xs text-slate-700 font-mono break-all">
+                                    chrome.exe --kiosk-printing --app={window.location.origin}
+                                </code>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        const url = window.location.origin
+                                        const bat = [
+                                            '@echo off',
+                                            'title QuickInvoice — Impresion Directa',
+                                            '',
+                                            'SET CHROME1="C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"',
+                                            'SET CHROME2="C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"',
+                                            `SET APP_URL=${url}`,
+                                            '',
+                                            'IF EXIST %CHROME1% (',
+                                            '    start "" %CHROME1% --kiosk-printing --app=%APP_URL%',
+                                            '    GOTO :fin',
+                                            ')',
+                                            'IF EXIST %CHROME2% (',
+                                            '    start "" %CHROME2% --kiosk-printing --app=%APP_URL%',
+                                            '    GOTO :fin',
+                                            ')',
+                                            '',
+                                            'echo Chrome no encontrado. Abrir manualmente con --kiosk-printing',
+                                            'pause',
+                                            ':fin',
+                                        ].join('\r\n')
+                                        const blob = new Blob([bat], { type: 'text/plain' })
+                                        const a = document.createElement('a')
+                                        a.href = URL.createObjectURL(blob)
+                                        a.download = 'QuickInvoice_ImpresionDirecta.bat'
+                                        a.click()
+                                        URL.revokeObjectURL(a.href)
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-700 transition-colors"
+                                >
+                                    <Download className="w-3.5 h-3.5" /> Descargar .bat
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(
+                                            `chrome.exe --kiosk-printing --app=${window.location.origin}`
+                                        ).then(() => {
+                                            setCopiado(true)
+                                            setTimeout(() => setCopiado(false), 2000)
+                                        })
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors"
+                                >
+                                    {copiado
+                                        ? <><CheckCheck className="w-3.5 h-3.5 text-emerald-600" /> Copiado</>
+                                        : <><Copy className="w-3.5 h-3.5" /> Copiar comando</>
+                                    }
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             ) : activeTab === 'staff' ? (
