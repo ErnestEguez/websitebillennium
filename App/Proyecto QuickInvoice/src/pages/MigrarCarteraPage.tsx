@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import {
     Upload, CheckCircle, AlertCircle, Loader2,
-    FileText, AlertTriangle, Wallet, Download,
+    FileText, AlertTriangle, Wallet, Download, ShieldAlert,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { formatCurrency } from '../lib/utils'
@@ -83,6 +83,26 @@ export function MigrarCarteraPage() {
     const [rows, setRows] = useState<CsvRow[]>([])
     const [importing, setImporting] = useState(false)
     const [summary, setSummary] = useState<ImportSummary | null>(null)
+    const [migrationReady, setMigrationReady] = useState<boolean | null>(null)  // null=checking
+
+    /* Verificar si la migración SQL fue ejecutada en Supabase */
+    useEffect(() => {
+        if (!empresa?.id) return
+        supabase
+            .from('cartera_cxc')
+            .select('origen')
+            .eq('empresa_id', empresa.id)
+            .limit(1)
+            .then(({ error }) => {
+                if (error?.message?.toLowerCase().includes('origen') ||
+                    error?.message?.toLowerCase().includes('does not exist') ||
+                    error?.message?.toLowerCase().includes('no existe')) {
+                    setMigrationReady(false)
+                } else {
+                    setMigrationReady(true)
+                }
+            })
+    }, [empresa?.id])
 
     /* ── Lectura del archivo ───────────────────────────────────────────── */
     function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -177,7 +197,15 @@ export function MigrarCarteraPage() {
                 })
 
             if (error) {
-                results.push({ row: rowNum, identificacion: row.identificacion, numero_documento: row.numero_documento, status: 'error', message: error.message })
+                const isMigErr = error.message.toLowerCase().includes('origen') ||
+                    error.message.toLowerCase().includes('numero_documento_externo') ||
+                    error.message.toLowerCase().includes('not-null') ||
+                    error.message.toLowerCase().includes('null value in column')
+                const msg = isMigErr
+                    ? `Error de esquema — ejecuta el SQL de migración en Supabase SQL Editor primero (${error.message})`
+                    : error.message
+                if (isMigErr) setMigrationReady(false)
+                results.push({ row: rowNum, identificacion: row.identificacion, numero_documento: row.numero_documento, status: 'error', message: msg })
                 errors++
             } else {
                 results.push({ row: rowNum, identificacion: row.identificacion, numero_documento: row.numero_documento, status: 'ok', message: `${cliente.nombre} — ${formatCurrency(row.saldo)} pendiente` })
@@ -219,6 +247,42 @@ export function MigrarCarteraPage() {
                     <p className="text-sm text-slate-500 mt-0.5">Importa cuentas por cobrar pendientes desde un sistema externo</p>
                 </div>
             </div>
+
+            {/* Banner: migración SQL pendiente */}
+            {migrationReady === false && (
+                <div className="bg-red-50 border border-red-300 rounded-2xl p-5 flex gap-4">
+                    <ShieldAlert className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
+                    <div className="space-y-2">
+                        <p className="text-sm font-bold text-red-800">
+                            Paso previo obligatorio: ejecutar el SQL de migración en Supabase
+                        </p>
+                        <p className="text-sm text-red-700">
+                            La base de datos no tiene las columnas necesarias para esta función.
+                            Ve a <strong>Supabase → SQL Editor</strong> y ejecuta el siguiente script:
+                        </p>
+                        <pre className="bg-red-100 text-red-900 rounded-xl p-3 text-xs overflow-x-auto whitespace-pre-wrap select-all">
+{`-- Permitir comprobante_id NULL (registros migrados no tienen comprobante interno)
+ALTER TABLE facturacion.cartera_cxc
+    ALTER COLUMN comprobante_id DROP NOT NULL;
+
+-- Número de documento externo (referencia del sistema anterior)
+ALTER TABLE facturacion.cartera_cxc
+    ADD COLUMN IF NOT EXISTS numero_documento_externo TEXT;
+
+-- Origen del registro
+ALTER TABLE facturacion.cartera_cxc
+    ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'SISTEMA'
+    CHECK (origen IN ('SISTEMA', 'MIGRACION'));
+
+CREATE INDEX IF NOT EXISTS idx_cartera_cxc_origen
+    ON facturacion.cartera_cxc(empresa_id, origen);`}
+                        </pre>
+                        <p className="text-xs text-red-600">
+                            Después de ejecutarlo, recarga esta página.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Info CSV */}
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 space-y-3">
@@ -329,8 +393,9 @@ export function MigrarCarteraPage() {
 
                         <button
                             onClick={handleImport}
-                            disabled={importing}
-                            className="flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-colors disabled:opacity-50"
+                            disabled={importing || migrationReady === false}
+                            title={migrationReady === false ? 'Ejecuta el SQL de migración en Supabase primero' : undefined}
+                            className="flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {importing
                                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Importando…</>
