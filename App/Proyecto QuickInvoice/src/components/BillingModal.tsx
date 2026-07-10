@@ -546,7 +546,7 @@ export function BillingModal({ isOpen, onClose, pedido, onSuccess }: BillingModa
 
                         <div className="bg-slate-50 rounded-2xl p-6 flex flex-col items-center">
                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Previsualización de Ticket</p>
-                            <div className="bg-white shadow-lg p-4 rounded border border-slate-100 max-h-96 overflow-y-auto w-full max-w-[80mm] mx-auto scale-90 origin-top">
+                            <div className="bg-white shadow-lg p-4 rounded border border-slate-100 max-h-96 overflow-y-auto w-full max-w-[72mm] mx-auto scale-90 origin-top">
                                 <InvoiceTicketPOS
                                     ref={printRef}
                                     factura={facturaFinal}

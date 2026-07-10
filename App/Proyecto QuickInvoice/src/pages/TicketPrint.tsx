@@ -53,7 +53,7 @@ export function TicketPrint() {
             </div>
 
             {/* Ticket 80mm */}
-            <div className="mx-auto bg-white p-[5mm] w-[80mm] font-mono text-[10px] leading-tight text-black print:p-0 print:shadow-none">
+            <div className="mx-auto bg-white p-[5mm] w-[72mm] font-mono text-[10px] leading-tight text-black print:p-0 print:shadow-none">
                 <style dangerouslySetInnerHTML={{ __html: '@page { size: 80mm auto; margin: 0; }' }} />
                 {/* Header Logos */}
                 <div className="flex justify-center mb-4">

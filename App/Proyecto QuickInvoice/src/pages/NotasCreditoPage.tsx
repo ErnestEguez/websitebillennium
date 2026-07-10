@@ -133,7 +133,7 @@ export function NotasCreditoPage() {
 <title>RIDE NC ${nc.secuencial}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{width:80mm;padding:3mm;font-family:Arial,sans-serif;font-size:9px;}
+body{width:72mm;padding:3mm;font-family:Arial,sans-serif;font-size:9px;}
 .center{text-align:center;}.bold{font-weight:bold;}
 .hr{border-top:1px dashed #000;margin:3px 0;}
 .hr2{border-top:2px solid #000;margin:3px 0;}

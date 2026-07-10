@@ -194,9 +194,9 @@ function generarHtml80mm(
 <meta charset="UTF-8">
 <title>Proforma ${esc(prf.numero)}</title>
 <style>
-  @page{margin:3mm;size:80mm auto}
+  @page{margin:0;size:80mm auto}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Courier New',Courier,monospace;font-size:8pt;color:#000;width:74mm}
+  body{font-family:'Courier New',Courier,monospace;font-size:8pt;color:#000;width:72mm}
   .c{text-align:center}
   .r{text-align:right}
   .b{font-weight:bold}

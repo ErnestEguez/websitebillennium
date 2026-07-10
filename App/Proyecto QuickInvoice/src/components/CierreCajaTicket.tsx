@@ -50,7 +50,7 @@ export const CierreCajaTicket = React.forwardRef<HTMLDivElement, CierreCajaTicke
         const diferencia = totalRecaudado - totalCalculado;
 
         return (
-            <div ref={ref} className="p-4 bg-white text-black font-mono text-xs" style={{ width: '80mm' }}>
+            <div ref={ref} className="p-4 bg-white text-black font-mono text-xs" style={{ width: '72mm' }}>
                 <div className="text-center mb-4 border-b border-black pb-2">
                     <h2 className="font-bold text-sm uppercase">{datos.empresa.nombre}</h2>
                     {datos.empresa.ruc && <p>RUC: {datos.empresa.ruc}</p>}
