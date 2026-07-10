@@ -113,6 +113,9 @@ export function FacturaDirectaPage() {
     // Estado: proceso
     const [saving, setSaving] = useState(false)
     const [facturaFinal, setFacturaFinal] = useState<any>(null)
+    // Capturados en el momento exacto del save para evitar condición de carrera con el ticket
+    const [ticketMontoRecibido, setTicketMontoRecibido] = useState<number | undefined>()
+    const [ticketVuelto, setTicketVuelto] = useState<number | undefined>()
 
     // ── Draft ────────────────────────────────────────────────────
     const clearDraft = useFormDraft(
@@ -387,10 +390,6 @@ export function FacturaDirectaPage() {
     // Vuelto solo aplica si hay pago en efectivo
     const tieneEfectivo = pagos.some(p => p.metodo === 'efectivo')
     const vuelto = tieneEfectivo ? Math.max(0, montoRecibido - totales.total) : 0
-    // Para el ticket: si no ingresaron monto recibido, usar la suma del pago en efectivo
-    const efectivoSum = pagos.filter(p => p.metodo === 'efectivo').reduce((s, p) => s + Number(p.valor), 0)
-    const montoRecibidoTicket = tieneEfectivo ? (montoRecibido > 0 ? montoRecibido : efectivoSum) : undefined
-    const vueltoTicket = tieneEfectivo ? Math.max(0, (montoRecibidoTicket ?? 0) - totales.total) : undefined
 
     const autoCompletarPago = () => {
         if (pagos.length === 1) {
@@ -484,6 +483,12 @@ export function FacturaDirectaPage() {
         }
 
         // ── Path online: flujo normal ─────────────────────────────────────────
+        // Capturar monto recibido y vuelto ANTES del save (estado puede cambiar después)
+        const _efectivoSum = pagos.filter(p => p.metodo === 'efectivo').reduce((s, p) => s + Number(p.valor), 0)
+        const _tieneEfectivo = pagos.some(p => p.metodo === 'efectivo')
+        const _mRecibido = _tieneEfectivo ? (montoRecibido > 0 ? montoRecibido : _efectivoSum) : undefined
+        const _mVuelto = _tieneEfectivo ? Math.max(0, (_mRecibido ?? 0) - totales.total) : undefined
+
         try {
             setSaving(true)
             const factura = await facturaDirectaService.generarFacturaDirecta({
@@ -499,6 +504,8 @@ export function FacturaDirectaPage() {
 
             const facturaCompleta = await facturaDirectaService.getComprobanteCompleto(factura.id)
             clearDraft()
+            setTicketMontoRecibido(_mRecibido)
+            setTicketVuelto(_mVuelto)
             setFacturaFinal(facturaCompleta)
             // Vincular todos los preparados acumulados en esta factura
             const prepIds: string[] = JSON.parse(sessionStorage.getItem(PREP_IDS_KEY) || '[]')
@@ -515,6 +522,8 @@ export function FacturaDirectaPage() {
 
     const handleNuevaFactura = () => {
         setFacturaFinal(null)
+        setTicketMontoRecibido(undefined)
+        setTicketVuelto(undefined)
         setOfflineSaved(false)
         setDetalles([{ ...DETALLE_VACIO }])
         setPagos([{ metodo: 'efectivo', valor: 0, referencia: '' }])
@@ -1316,8 +1325,8 @@ export function FacturaDirectaPage() {
                     <div ref={printRef}>
                         <InvoiceTicketPOS
                             factura={facturaFinal}
-                            montoRecibido={montoRecibidoTicket}
-                            vuelto={vueltoTicket}
+                            montoRecibido={ticketMontoRecibido}
+                            vuelto={ticketVuelto}
                         />
                     </div>
                 )}
