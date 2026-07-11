@@ -351,26 +351,21 @@ export const ncService = {
         comprobanteOrigenId: string,
         usuarioId: string
     ): Promise<number> {
-        // 1. Obtener saldo disponible de la NC
-        const { data: nc, error: ncErr } = await supabase
-            .from('notas_credito')
-            .select('saldo_nc, total')
-            .eq('id', ncId)
-            .single()
+        // 1+2. NC y cartera son independientes — corren en paralelo
+        const [
+            { data: nc, error: ncErr },
+            { data: carteraRows, error: cErr },
+        ] = await Promise.all([
+            supabase.from('notas_credito').select('saldo_nc, total').eq('id', ncId).single(),
+            supabase.from('cartera_cxc').select('id, comprobante_id, saldo')
+                .eq('empresa_id', empresaId).eq('cliente_id', clienteId)
+                .in('estado', ['pendiente', 'parcial']).order('fecha_emision', { ascending: true }),
+        ])
         if (ncErr) throw ncErr
+        if (cErr) throw cErr
 
         let saldoDisponible = Number(nc.saldo_nc)
         if (saldoDisponible <= 0) return 0
-
-        // 2. Obtener cartera abierta del cliente (factura origen primero, luego FIFO)
-        const { data: carteraRows, error: cErr } = await supabase
-            .from('cartera_cxc')
-            .select('id, comprobante_id, saldo')
-            .eq('empresa_id', empresaId)
-            .eq('cliente_id', clienteId)
-            .in('estado', ['pendiente', 'parcial'])
-            .order('fecha_emision', { ascending: true })
-        if (cErr) throw cErr
 
         // Ordenar: factura origen al frente
         const ordenadas = [

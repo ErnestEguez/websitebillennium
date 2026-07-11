@@ -269,20 +269,21 @@ export const carteraGestionService = {
     },
 
     async getKPIs(empresaId: string, fechaCorte: string): Promise<KPIsCartera> {
-        const { data } = await supabase
-            .from('cartera_cxc')
-            .select('saldo, fecha_vencimiento')
-            .eq('empresa_id', empresaId)
-            .in('estado', ['pendiente', 'parcial'])
-            .gt('saldo', 0)
+        const fechaHace30 = new Date(fechaCorte)
+        fechaHace30.setDate(fechaHace30.getDate() - 30)
 
-        const { data: clientesMora } = await supabase
-            .from('cartera_cxc')
-            .select('cliente_id')
-            .eq('empresa_id', empresaId)
-            .in('estado', ['pendiente', 'parcial'])
-            .gt('saldo', 0)
-            .lt('fecha_vencimiento', fechaCorte)
+        const [{ data }, { data: clientesMora }, { data: ventasData }] = await Promise.all([
+            supabase.from('cartera_cxc').select('saldo, fecha_vencimiento')
+                .eq('empresa_id', empresaId).in('estado', ['pendiente', 'parcial']).gt('saldo', 0),
+            supabase.from('cartera_cxc').select('cliente_id')
+                .eq('empresa_id', empresaId).in('estado', ['pendiente', 'parcial'])
+                .gt('saldo', 0).lt('fecha_vencimiento', fechaCorte),
+            supabase.from('comprobantes').select('total')
+                .eq('empresa_id', empresaId).eq('tipo_comprobante', 'FACTURA')
+                .neq('estado_sistema', 'ANULADO')
+                .gte('created_at', fechaHace30.toISOString().split('T')[0] + 'T00:00:00')
+                .lte('created_at', fechaCorte + 'T23:59:59'),
+        ])
 
         const filas = data ?? []
         let totalCartera = 0, totalVencido = 0, totalPorVencer = 0, diasSuma = 0, diasCnt = 0
@@ -298,16 +299,6 @@ export const carteraGestionService = {
         const clientesUnicos = new Set((clientesMora ?? []).map((r: any) => r.cliente_id)).size
 
         // Rotación: CxC promedio / ventas 30 días × 365 (approx)
-        const fechaHace30 = new Date(fechaCorte)
-        fechaHace30.setDate(fechaHace30.getDate() - 30)
-        const { data: ventasData } = await supabase
-            .from('comprobantes')
-            .select('total')
-            .eq('empresa_id', empresaId)
-            .eq('tipo_comprobante', 'FACTURA')
-            .neq('estado_sistema', 'ANULADO')
-            .gte('created_at', fechaHace30.toISOString().split('T')[0] + 'T00:00:00')
-            .lte('created_at', fechaCorte + 'T23:59:59')
         const ventas30 = (ventasData ?? []).reduce((s: number, v: any) => s + Number(v.total || 0), 0)
         const rotacion = ventas30 > 0 ? Math.round((totalCartera / ventas30) * 30) : 0
 
@@ -391,17 +382,19 @@ export const carteraGestionService = {
     },
 
     async recalcularScore(empresaId: string, clienteId: string): Promise<{ score: number; clasificacion: ClasificacionScore }> {
-        // Historial de cartera (últimos 12 meses)
         const hace12 = new Date(); hace12.setFullYear(hace12.getFullYear() - 1)
-        const { data: historial } = await supabase
-            .from('cartera_cxc')
-            .select('saldo, fecha_vencimiento, valor_original')
-            .eq('empresa_id', empresaId)
-            .eq('cliente_id', clienteId)
-            .gte('created_at', hace12.toISOString())
-
-        // Pagos para calcular días promedio de retraso
         const hoy = new Date().toISOString().split('T')[0]
+
+        // Historial y saldo actual son independientes — corren en paralelo
+        const [{ data: historial }, { data: cxcActual }] = await Promise.all([
+            supabase.from('cartera_cxc').select('saldo, fecha_vencimiento, valor_original')
+                .eq('empresa_id', empresaId).eq('cliente_id', clienteId)
+                .gte('created_at', hace12.toISOString()),
+            supabase.from('cartera_cxc').select('saldo, clientes!inner(limite_credito)')
+                .eq('empresa_id', empresaId).eq('cliente_id', clienteId)
+                .in('estado', ['pendiente', 'parcial']).gt('saldo', 0),
+        ])
+
         let avgDias = 0, frecMora = 0
         const facturas = historial ?? []
         if (facturas.length) {
@@ -414,7 +407,7 @@ export const carteraGestionService = {
             avgDias = cnt > 0 ? diasTotal / cnt : 0
         }
 
-        // Promesas
+        // Promesas (depende de facturas.id → secuencial después del historial)
         const { data: promesas } = await supabase
             .from('cartera_gestiones')
             .select('promesa_fecha, promesa_monto, promesa_cumplida')
@@ -427,14 +420,6 @@ export const carteraGestionService = {
         const cumplidas = (promesas ?? []).filter((p: any) => p.promesa_cumplida === true).length
         const pctCumpl = totalProm > 0 ? (cumplidas / totalProm) * 100 : 100
 
-        // Monto máximo (saldo actual)
-        const { data: cxcActual } = await supabase
-            .from('cartera_cxc')
-            .select('saldo, clientes!inner(limite_credito)')
-            .eq('empresa_id', empresaId)
-            .eq('cliente_id', clienteId)
-            .in('estado', ['pendiente', 'parcial'])
-            .gt('saldo', 0)
         const montoActual = (cxcActual ?? []).reduce((s: number, c: any) => s + Number(c.saldo || 0), 0)
         const limiteRef = (cxcActual?.[0] as any)?.clientes?.limite_credito ?? 10000
 
@@ -703,26 +688,28 @@ export const carteraGestionService = {
             })
         }
 
-        const rows: any[][] = []
-        for (const m of meses) {
-            const { data } = await supabase
-                .from('cartera_cxc')
-                .select('saldo, fecha_vencimiento, cliente_id')
-                .eq('empresa_id', empresaId)
-                .in('estado', ['pendiente', 'parcial'])
-                .gt('saldo', 0)
-                .lte('created_at', `${m.hasta}T23:59:59`)
+        const resultsMeses = await Promise.all(
+            meses.map(m =>
+                supabase.from('cartera_cxc')
+                    .select('saldo, fecha_vencimiento, cliente_id')
+                    .eq('empresa_id', empresaId)
+                    .in('estado', ['pendiente', 'parcial'])
+                    .gt('saldo', 0)
+                    .lte('created_at', `${m.hasta}T23:59:59`)
+            )
+        )
 
+        const rows: any[][] = meses.map((m, i) => {
             let total = 0, vencido = 0, clientesMora = new Set<string>()
-            for (const c of (data ?? []) as any[]) {
+            for (const c of (resultsMeses[i].data ?? []) as any[]) {
                 const s = Number(c.saldo || 0)
                 total += s
                 const d = calcDias(c.fecha_vencimiento, m.hasta)
                 if (d > 0) { vencido += s; clientesMora.add(c.cliente_id) }
             }
-            rows.push([m.label, +total.toFixed(2), +vencido.toFixed(2),
-                +(total - vencido).toFixed(2), clientesMora.size])
-        }
+            return [m.label, +total.toFixed(2), +vencido.toFixed(2),
+                +(total - vencido).toFixed(2), clientesMora.size]
+        })
 
         const header = [[empresaNombre], ['COMPARATIVO CARTERA — ÚLTIMOS 12 MESES'], [],
             ['Mes','Total Cartera','Total Vencido','Por Vencer','Clientes en Mora']]
