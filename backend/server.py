@@ -73,6 +73,9 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
+class ChangePasswordRequest(BaseModel):
+    new_password: str
+
 class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
@@ -929,6 +932,16 @@ def toggle_user_active(user_id: str, admin: dict = Depends(get_admin_user)):
     supabase.table("users").update({"is_active": new_status}).eq("id", user_id).execute()
 
     return {"message": f"Usuario {'activado' if new_status else 'desactivado'} correctamente"}
+
+@api_router.put("/admin/users/{user_id}/change-password")
+def change_user_password(user_id: str, body: ChangePasswordRequest, admin: dict = Depends(get_admin_user)):
+    if not body.new_password or len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+    existing = supabase.table("users").select("id").eq("id", user_id).execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    supabase.table("users").update({"password_hash": hash_password(body.new_password)}).eq("id", user_id).execute()
+    return {"message": "Contraseña actualizada correctamente"}
 
 # ============== STATS ROUTES ==============
 
