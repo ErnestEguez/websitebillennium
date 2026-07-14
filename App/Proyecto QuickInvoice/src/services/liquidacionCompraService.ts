@@ -141,7 +141,50 @@ export const liquidacionCompraService = {
         if (puntoError) throw new Error(`Punto emisión: ${puntoError.message}`)
         const pe = puntoData as { establecimiento: string; punto_emision: string }
 
-        // 3. Calcular totales
+        // 3. Resolver proveedor (buscar por identificación o crear automáticamente)
+        const TIPO_ID_PROV: Record<string, string> = {
+            CEDULA: 'CEDULA', PASAPORTE: 'PASAPORTE', SIN_RUC: 'CEDULA', EXTERIOR: 'EXTERIOR',
+        }
+        let proveedorIdFinal = input.proveedor_id ?? null
+
+        if (!proveedorIdFinal) {
+            // Buscar si ya existe un proveedor con esa identificación en la empresa
+            const { data: existente } = await supabase
+                .from('proveedores')
+                .select('id')
+                .eq('empresa_id', input.empresa_id)
+                .eq('ruc', input.beneficiario_identificacion)
+                .maybeSingle()
+
+            if (existente) {
+                proveedorIdFinal = (existente as { id: string }).id
+            } else {
+                // Crear nuevo proveedor con los datos del beneficiario
+                const { data: nuevo, error: provErr } = await supabase
+                    .from('proveedores')
+                    .insert({
+                        empresa_id:             input.empresa_id,
+                        ruc:                    input.beneficiario_identificacion,
+                        nombre_empresa:         input.beneficiario_nombre,
+                        tipo_identificacion:    TIPO_ID_PROV[input.beneficiario_tipo_id] ?? 'CEDULA',
+                        tipo_proveedor:         'PERSONA_NATURAL',
+                        estado:                 'ACTIVO',
+                        condicion_pago:         input.forma_pago,
+                        pais:                   'Ecuador',
+                        correo:                 input.beneficiario_email ?? null,
+                        direccion:              input.beneficiario_direccion ?? null,
+                        contribuyente_especial: false,
+                        agente_retencion:       false,
+                        tipo_regimen:           'GENERAL',
+                    })
+                    .select('id')
+                    .single()
+                if (provErr) throw new Error(`Error creando proveedor automático: ${provErr.message}`)
+                proveedorIdFinal = (nuevo as { id: string }).id
+            }
+        }
+
+        // 4. Calcular totales
         const r2 = (n: number) => Math.round(n * 100) / 100
         const base_iva_0  = r2(input.detalles.filter(d => !d.aplica_iva).reduce((s, d) => s + d.subtotal, 0))
         const base_iva_15 = r2(input.detalles.filter(d => d.aplica_iva).reduce((s, d) => s + d.subtotal, 0))
@@ -150,7 +193,7 @@ export const liquidacionCompraService = {
         const total       = r2(subtotal + valor_iva)
         const total_retenciones = r2(input.retenciones.reduce((s, r) => s + r.valor, 0))
 
-        // 4. Insertar cabecera
+        // 5. Insertar cabecera
         const { data: lc, error: lcError } = await supabase
             .from('liquidaciones_compra')
             .insert({
@@ -159,7 +202,7 @@ export const liquidacionCompraService = {
                 establecimiento:             pe.establecimiento,
                 punto_emision:               pe.punto_emision,
                 secuencial,
-                proveedor_id:                input.proveedor_id ?? null,
+                proveedor_id:                proveedorIdFinal,
                 beneficiario_tipo_id:        input.beneficiario_tipo_id,
                 beneficiario_identificacion: input.beneficiario_identificacion,
                 beneficiario_nombre:         input.beneficiario_nombre,
@@ -187,45 +230,44 @@ export const liquidacionCompraService = {
         if (lcError) throw new Error(`Liquidación: ${lcError.message}`)
         const lcRecord = lc as LiquidacionCompra
 
-        // 5. Detalles
+        // 6. Detalles
         if (input.detalles.length > 0) {
             const { error: detErr } = await supabase
                 .from('liquidacion_compra_detalles')
                 .insert(input.detalles.map((d, i) => ({
                     ...d,
-                    empresa_id:    input.empresa_id,
+                    empresa_id:     input.empresa_id,
                     liquidacion_id: lcRecord.id,
-                    orden:         i + 1,
+                    orden:          i + 1,
                 })))
             if (detErr) throw new Error(`Detalles: ${detErr.message}`)
         }
 
-        // 6. Retenciones
+        // 7. Retenciones
         if (input.retenciones.length > 0) {
             const { error: retErr } = await supabase
                 .from('liquidacion_compra_retenciones')
                 .insert(input.retenciones.map(r => ({
                     ...r,
-                    empresa_id:    input.empresa_id,
+                    empresa_id:     input.empresa_id,
                     liquidacion_id: lcRecord.id,
                 })))
             if (retErr) throw new Error(`Retenciones: ${retErr.message}`)
         }
 
-        // 7. CxP si es crédito (proveedor_id puede ser null para beneficiarios manuales)
+        // 8. CxP si es crédito — proveedorIdFinal siempre está resuelto
         if (input.forma_pago === 'CREDITO') {
             const numLC = `${lcRecord.establecimiento}-${lcRecord.punto_emision}-${lcRecord.secuencial}`
             await supabase.from('cuentas_por_pagar').insert({
-                empresa_id:          input.empresa_id,
-                proveedor_id:        input.proveedor_id ?? null,
-                liquidacion_id:      lcRecord.id,
-                fecha_emision:       input.fecha_emision,
-                fecha_vencimiento:   input.fecha_vencimiento ?? input.fecha_emision,
-                monto_original:      r2(total - total_retenciones),
-                saldo_pendiente:     r2(total - total_retenciones),
-                estado:              'PENDIENTE',
-                beneficiario_nombre: input.beneficiario_nombre,
-                observaciones:       `LC ${numLC} — ${input.beneficiario_nombre}`,
+                empresa_id:        input.empresa_id,
+                proveedor_id:      proveedorIdFinal,
+                liquidacion_id:    lcRecord.id,
+                fecha_emision:     input.fecha_emision,
+                fecha_vencimiento: input.fecha_vencimiento ?? input.fecha_emision,
+                monto_original:    r2(total - total_retenciones),
+                saldo_pendiente:   r2(total - total_retenciones),
+                estado:            'PENDIENTE',
+                observaciones:     `LC ${numLC} — ${input.beneficiario_nombre}`,
             })
         }
 
