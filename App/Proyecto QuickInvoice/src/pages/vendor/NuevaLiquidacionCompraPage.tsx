@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import { liquidacionCompraService } from '../../services/liquidacionCompraService'
+import { contabilidadComprasService } from '../../services/contabilidadComprasService'
+import { contableConfigService } from '../../services/contableConfigService'
+import { contabilidadService } from '../../services/contabilidadService'
 import { proveedorService } from '../../services/vendorService'
 import { puntoEmisionService } from '../../services/puntoEmisionService'
 import type { PuntoEmision } from '../../types/puntosEmision'
@@ -43,7 +46,7 @@ interface LineaDet {
     aplica_iva: boolean
     subtotal: number
     tipo_gasto: string
-    cuenta_contable_id: null
+    cuenta_contable_id: string | null
 }
 
 interface LineaRet {
@@ -96,6 +99,10 @@ export function NuevaLiquidacionCompraPage() {
     const [retSeccion, setRetSeccion] = useState(false)
     const [retenciones, setRetenciones] = useState<LineaRet[]>([])
 
+    // ── Contabilidad ───────────────────────────────────────────
+    const usaContabilidad = !!empresa?.usar_contabilidad_compras
+    const [cuentasGasto, setCuentasGasto] = useState<{ id: string; codigo: string; nombre: string }[]>([])
+
     // ── Carga inicial ──────────────────────────────────────────
     useEffect(() => {
         if (!empresa) return
@@ -109,6 +116,16 @@ export function NuevaLiquidacionCompraPage() {
         }).catch(e => setErrorMsg(e.message))
           .finally(() => setLoading(false))
     }, [empresa])
+
+    // ── Cuentas de gasto (solo si contabilidad activa) ─────────
+    useEffect(() => {
+        if (!usaContabilidad || !empresa?.id || cuentasGasto.length > 0) return
+        contabilidadService.listarCuentas(empresa.ruc ?? undefined)
+            .then(data => setCuentasGasto(
+                data.filter((c: { tipo: string }) => c.tipo === 'gasto')
+            ))
+            .catch(() => {})
+    }, [usaContabilidad, empresa?.id])
 
     // ── Draft ──────────────────────────────────────────────────
     const clearDraft = useFormDraft(
@@ -270,25 +287,61 @@ export function NuevaLiquidacionCompraPage() {
                 fecha_vencimiento:           formaPago === 'CREDITO' ? fechaVenc : null,
                 observaciones:               observaciones || null,
                 detalles:                    detalle.filter(d => d.subtotal > 0).map((d, i) => ({
-                    descripcion:     d.descripcion,
-                    cantidad:        d.cantidad,
-                    precio_unitario: d.precio_unitario,
-                    descuento:       d.descuento,
-                    aplica_iva:      d.aplica_iva,
-                    subtotal:        d.subtotal,
-                    tipo_gasto:      d.tipo_gasto,
-                    cuenta_contable_id: null,
-                    orden:           i + 1,
+                    descripcion:        d.descripcion,
+                    cantidad:           d.cantidad,
+                    precio_unitario:    d.precio_unitario,
+                    descuento:          d.descuento,
+                    aplica_iva:         d.aplica_iva,
+                    subtotal:           d.subtotal,
+                    tipo_gasto:         d.tipo_gasto,
+                    cuenta_contable_id: d.cuenta_contable_id,
+                    orden:              i + 1,
                 })),
                 retenciones: empresa.es_agente_retencion ? retenciones : [],
                 created_by: profile.id,
             })
 
+            // ── Asiento contable automático ────────────────────
+            try {
+                const contaConfig = await contableConfigService.getConfig(empresa.id)
+                if (contaConfig?.contabilidad_en_linea) {
+                    const numLC = `${lc.establecimiento}-${lc.punto_emision}-${lc.secuencial}`
+                    const retsActivas = empresa.es_agente_retencion ? retenciones : []
+                    await contabilidadComprasService.crearAsientoCompra({
+                        empresaId:       empresa.id,
+                        portalRuc:       empresa.ruc ?? '',
+                        fecha:           fechaEmision,
+                        numeroFactura:   numLC,
+                        proveedorNombre: nombre,
+                        subtotal,
+                        valorIva,
+                        retenciones: retsActivas.map(r => ({
+                            tipo:   r.tipo === 'IR' ? 'FUENTE' : 'IVA',
+                            codigo: r.codigo_retencion,
+                            valor:  r.valor,
+                        })),
+                        tipoCompra: 'SERVICIO',
+                        compraId:   lc.id,
+                        detallesServicio: detalle.filter(d => d.subtotal > 0).map(d => ({
+                            descripcion:      d.descripcion,
+                            subtotal:         d.subtotal,
+                            cuentaContableId: d.cuenta_contable_id,
+                        })),
+                    })
+                }
+            } catch (contabErr: any) {
+                console.error('[asientoLC]', contabErr)
+                setErrorMsg(prev =>
+                    prev
+                        ? prev
+                        : `LC guardada. El asiento contable no se generó: ${contabErr?.message ?? contabErr}`
+                )
+            }
+
             if (autorizar) {
                 try {
                     await liquidacionCompraService.autorizar(lc.id)
                 } catch (e: any) {
-                    // La LC quedó guardada — avisamos pero no bloqueamos
                     setErrorMsg(`LC guardada pero error al autorizar: ${e.message}`)
                     setSaving(false)
                     setSaved(true)
@@ -461,6 +514,9 @@ export function NuevaLiquidacionCompraPage() {
                             <tr>
                                 <th className="text-left px-3 py-2.5 text-xs text-slate-500 font-semibold min-w-[200px]">Descripción</th>
                                 <th className="text-left px-3 py-2.5 text-xs text-slate-500 font-semibold w-32">Tipo gasto</th>
+                                {usaContabilidad && cuentasGasto.length > 0 && (
+                                    <th className="text-left px-3 py-2.5 text-xs text-slate-500 font-semibold min-w-[180px]">Cuenta contable</th>
+                                )}
                                 <th className="text-right px-3 py-2.5 text-xs text-slate-500 font-semibold w-20">Cant.</th>
                                 <th className="text-right px-3 py-2.5 text-xs text-slate-500 font-semibold w-28">Precio U.</th>
                                 <th className="text-right px-3 py-2.5 text-xs text-slate-500 font-semibold w-20">Desc.%</th>
@@ -488,6 +544,20 @@ export function NuevaLiquidacionCompraPage() {
                                             ))}
                                         </select>
                                     </td>
+                                    {usaContabilidad && cuentasGasto.length > 0 && (
+                                        <td className="px-3 py-2">
+                                            <select
+                                                value={lin.cuenta_contable_id || ''}
+                                                onChange={e => actualizarLinea(idx, 'cuenta_contable_id', e.target.value || null)}
+                                                className="w-full border border-slate-200 rounded-md px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary-500 outline-none"
+                                            >
+                                                <option value="">— cuenta de Ajustes —</option>
+                                                {cuentasGasto.map(c => (
+                                                    <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                    )}
                                     <td className="px-3 py-2">
                                         <input type="number" min="0.001" step="0.001"
                                             value={lin.cantidad}

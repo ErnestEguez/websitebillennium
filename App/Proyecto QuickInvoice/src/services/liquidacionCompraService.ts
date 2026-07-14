@@ -212,17 +212,20 @@ export const liquidacionCompraService = {
             if (retErr) throw new Error(`Retenciones: ${retErr.message}`)
         }
 
-        // 7. CxP solo si es crédito y hay proveedor en catálogo
-        if (input.forma_pago === 'CREDITO' && input.proveedor_id) {
+        // 7. CxP si es crédito (proveedor_id puede ser null para beneficiarios manuales)
+        if (input.forma_pago === 'CREDITO') {
+            const numLC = `${lcRecord.establecimiento}-${lcRecord.punto_emision}-${lcRecord.secuencial}`
             await supabase.from('cuentas_por_pagar').insert({
-                empresa_id:        input.empresa_id,
-                proveedor_id:      input.proveedor_id,
-                liquidacion_id:    lcRecord.id,
-                fecha_emision:     input.fecha_emision,
-                fecha_vencimiento: input.fecha_vencimiento ?? input.fecha_emision,
-                monto_original:    r2(total - total_retenciones),
-                saldo_pendiente:   r2(total - total_retenciones),
-                estado:            'PENDIENTE',
+                empresa_id:          input.empresa_id,
+                proveedor_id:        input.proveedor_id ?? null,
+                liquidacion_id:      lcRecord.id,
+                fecha_emision:       input.fecha_emision,
+                fecha_vencimiento:   input.fecha_vencimiento ?? input.fecha_emision,
+                monto_original:      r2(total - total_retenciones),
+                saldo_pendiente:     r2(total - total_retenciones),
+                estado:              'PENDIENTE',
+                beneficiario_nombre: input.beneficiario_nombre,
+                observaciones:       `LC ${numLC} — ${input.beneficiario_nombre}`,
             })
         }
 
