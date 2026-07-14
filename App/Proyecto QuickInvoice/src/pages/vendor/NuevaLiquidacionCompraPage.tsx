@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import { liquidacionCompraService } from '../../services/liquidacionCompraService'
-import { contabilidadComprasService } from '../../services/contabilidadComprasService'
-import { contableConfigService } from '../../services/contableConfigService'
-import { contabilidadService } from '../../services/contabilidadService'
+import { contabilidadService, type CuentasCompras } from '../../services/contabilidadService'
 import { proveedorService } from '../../services/vendorService'
 import { puntoEmisionService } from '../../services/puntoEmisionService'
 import type { PuntoEmision } from '../../types/puntosEmision'
@@ -100,8 +98,8 @@ export function NuevaLiquidacionCompraPage() {
     const [retenciones, setRetenciones] = useState<LineaRet[]>([])
 
     // ── Contabilidad ───────────────────────────────────────────
-    const usaContabilidad = !!empresa?.usar_contabilidad_compras
-    const [cuentasGasto, setCuentasGasto] = useState<{ id: string; codigo: string; nombre: string }[]>([])
+    const [todasCuentas, setTodasCuentas] = useState<{ id: string; codigo: string; nombre: string; tipo: string }[]>([])
+    const cuentasGasto = todasCuentas.filter(c => c.tipo === 'gasto')
 
     // ── Carga inicial ──────────────────────────────────────────
     useEffect(() => {
@@ -117,15 +115,13 @@ export function NuevaLiquidacionCompraPage() {
           .finally(() => setLoading(false))
     }, [empresa])
 
-    // ── Cuentas de gasto (solo si contabilidad activa) ─────────
+    // ── Cargar todas las cuentas LP (gasto + activo) ───────────
     useEffect(() => {
-        if (!usaContabilidad || !empresa?.id || cuentasGasto.length > 0) return
+        if (!empresa?.id || todasCuentas.length > 0) return
         contabilidadService.listarCuentas(empresa.ruc ?? undefined)
-            .then(data => setCuentasGasto(
-                data.filter((c: { tipo: string }) => c.tipo === 'gasto')
-            ))
+            .then(data => setTodasCuentas(data))
             .catch(() => {})
-    }, [usaContabilidad, empresa?.id])
+    }, [empresa?.id])
 
     // ── Draft ──────────────────────────────────────────────────
     const clearDraft = useFormDraft(
@@ -303,39 +299,46 @@ export function NuevaLiquidacionCompraPage() {
 
             // ── Asiento contable automático ────────────────────
             try {
-                const contaConfig = await contableConfigService.getConfig(empresa.id)
-                if (contaConfig?.contabilidad_en_linea) {
+                const cfg = (empresa as any).config_cuentas_compras as Record<string, string> | null | undefined
+                const cuentas: CuentasCompras = {
+                    inventarios:       cfg?.inventarios       ?? '',
+                    gastos_servicios:  cfg?.gastos_servicios  ?? '',
+                    iva_compras:       cfg?.iva_compras        ?? '',
+                    cuentas_por_pagar: cfg?.cuentas_por_pagar ?? '',
+                    efectivo:          cfg?.efectivo           ?? '',
+                    ret_fuente:        cfg?.ret_fuente         ?? '',
+                    ret_iva:           cfg?.ret_iva            ?? '',
+                }
+                // Solo generar asiento si hay cuentas mínimas configuradas
+                const tieneMin = (formaPago === 'CREDITO' ? cuentas.cuentas_por_pagar : cuentas.efectivo)
+                if (tieneMin) {
                     const numLC = `${lc.establecimiento}-${lc.punto_emision}-${lc.secuencial}`
                     const retsActivas = empresa.es_agente_retencion ? retenciones : []
-                    await contabilidadComprasService.crearAsientoCompra({
-                        empresaId:       empresa.id,
-                        portalRuc:       empresa.ruc ?? '',
-                        fecha:           fechaEmision,
-                        numeroFactura:   numLC,
-                        proveedorNombre: nombre,
+                    const retIR  = retsActivas.filter(r => r.tipo === 'IR').reduce((s, r) => s + r.valor, 0)
+                    const retIVA = retsActivas.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
+                    await contabilidadService.crearAsientoCompra({
+                        empresaId:     empresa.id,
+                        portalRuc:     empresa.ruc ?? '',
+                        fecha:         fechaEmision,
+                        glosa:         `LC ${numLC} — ${nombre}`,
                         subtotal,
                         valorIva,
-                        retenciones: retsActivas.map(r => ({
-                            tipo:   r.tipo === 'IR' ? 'FUENTE' : 'IVA',
-                            codigo: r.codigo_retencion,
-                            valor:  r.valor,
-                        })),
-                        tipoCompra: 'SERVICIO',
-                        compraId:   lc.id,
-                        detallesServicio: detalle.filter(d => d.subtotal > 0).map(d => ({
-                            descripcion:      d.descripcion,
-                            subtotal:         d.subtotal,
-                            cuentaContableId: d.cuenta_contable_id,
+                        retFuente:     r2(retIR),
+                        retIva:        r2(retIVA),
+                        formaPago,
+                        tipoCompra:    'SERVICIO',
+                        cuentas,
+                        referencia:    lc.id,
+                        lineasServicio: detalle.filter(d => d.subtotal > 0).map(d => ({
+                            descripcion:        d.descripcion,
+                            subtotal:           d.subtotal,
+                            cuenta_contable_id: d.cuenta_contable_id,
                         })),
                     })
                 }
             } catch (contabErr: any) {
                 console.error('[asientoLC]', contabErr)
-                setErrorMsg(prev =>
-                    prev
-                        ? prev
-                        : `LC guardada. El asiento contable no se generó: ${contabErr?.message ?? contabErr}`
-                )
+                setErrorMsg(`LC guardada. Asiento contable no generado: ${contabErr?.message ?? contabErr}`)
             }
 
             if (autorizar) {
@@ -514,7 +517,7 @@ export function NuevaLiquidacionCompraPage() {
                             <tr>
                                 <th className="text-left px-3 py-2.5 text-xs text-slate-500 font-semibold min-w-[200px]">Descripción</th>
                                 <th className="text-left px-3 py-2.5 text-xs text-slate-500 font-semibold w-32">Tipo gasto</th>
-                                {usaContabilidad && cuentasGasto.length > 0 && (
+                                {cuentasGasto.length > 0 && (
                                     <th className="text-left px-3 py-2.5 text-xs text-slate-500 font-semibold min-w-[180px]">Cuenta contable</th>
                                 )}
                                 <th className="text-right px-3 py-2.5 text-xs text-slate-500 font-semibold w-20">Cant.</th>
@@ -544,7 +547,7 @@ export function NuevaLiquidacionCompraPage() {
                                             ))}
                                         </select>
                                     </td>
-                                    {usaContabilidad && cuentasGasto.length > 0 && (
+                                    {cuentasGasto.length > 0 && (
                                         <td className="px-3 py-2">
                                             <select
                                                 value={lin.cuenta_contable_id || ''}
