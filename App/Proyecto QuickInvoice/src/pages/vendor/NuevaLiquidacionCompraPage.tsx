@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useFormDraft } from '../../hooks/useFormDraft'
+import { supabase } from '../../lib/supabase'
 import { liquidacionCompraService } from '../../services/liquidacionCompraService'
 import { contabilidadService, type CuentasCompras } from '../../services/contabilidadService'
 import { proveedorService } from '../../services/vendorService'
@@ -100,6 +101,7 @@ export function NuevaLiquidacionCompraPage() {
     // ── Contabilidad ───────────────────────────────────────────
     const [todasCuentas, setTodasCuentas] = useState<{ id: string; codigo: string; nombre: string; tipo: string }[]>([])
     const cuentasGasto = todasCuentas.filter(c => c.tipo === 'gasto')
+    const [configCuentas, setConfigCuentas] = useState<Record<string, string>>({})
 
     // ── Carga inicial ──────────────────────────────────────────
     useEffect(() => {
@@ -120,6 +122,23 @@ export function NuevaLiquidacionCompraPage() {
         if (!empresa?.id || todasCuentas.length > 0) return
         contabilidadService.listarCuentas(empresa.ruc ?? undefined)
             .then(data => setTodasCuentas(data))
+            .catch(() => {})
+    }, [empresa?.id])
+
+    // ── Cargar config de cuentas compras directo desde DB ──────
+    // AuthContext puede tener datos obsoletos si el usuario guardó en Ajustes
+    // sin refrescar la sesión; leemos la fuente de verdad aquí.
+    useEffect(() => {
+        if (!empresa?.id) return
+        supabase
+            .from('empresas')
+            .select('config_cuentas_compras')
+            .eq('id', empresa.id)
+            .single()
+            .then(({ data }) => {
+                if (data?.config_cuentas_compras && typeof data.config_cuentas_compras === 'object')
+                    setConfigCuentas(data.config_cuentas_compras as Record<string, string>)
+            })
             .catch(() => {})
     }, [empresa?.id])
 
@@ -299,15 +318,15 @@ export function NuevaLiquidacionCompraPage() {
 
             // ── Asiento contable automático ────────────────────
             try {
-                const cfg = (empresa as any).config_cuentas_compras as Record<string, string> | null | undefined
+                const cfg = configCuentas
                 const cuentas: CuentasCompras = {
-                    inventarios:       cfg?.inventarios       ?? '',
-                    gastos_servicios:  cfg?.gastos_servicios  ?? '',
-                    iva_compras:       cfg?.iva_compras        ?? '',
-                    cuentas_por_pagar: cfg?.cuentas_por_pagar ?? '',
-                    efectivo:          cfg?.efectivo           ?? '',
-                    ret_fuente:        cfg?.ret_fuente         ?? '',
-                    ret_iva:           cfg?.ret_iva            ?? '',
+                    inventarios:       cfg.inventarios       ?? '',
+                    gastos_servicios:  cfg.gastos_servicios  ?? '',
+                    iva_compras:       cfg.iva_compras        ?? '',
+                    cuentas_por_pagar: cfg.cuentas_por_pagar ?? '',
+                    efectivo:          cfg.efectivo           ?? '',
+                    ret_fuente:        cfg.ret_fuente         ?? '',
+                    ret_iva:           cfg.ret_iva            ?? '',
                 }
                 // Solo generar asiento si hay cuentas mínimas configuradas
                 const tieneMin = (formaPago === 'CREDITO' ? cuentas.cuentas_por_pagar : cuentas.efectivo)

@@ -15,7 +15,7 @@ const CUENTAS_BASE = [
 ]
 
 export function AjustesPage() {
-    const { empresa } = useAuth()
+    const { empresa, refreshEmpresa } = useAuth()
     const [loading, setLoading]   = useState(true)
     const [saving, setSaving]     = useState(false)
     const [cuentas, setCuentas]   = useState<Record<string, string>>({})
@@ -60,6 +60,7 @@ export function AjustesPage() {
                 .update({ config_cuentas_compras: cuentas })
                 .eq('id', empresa.id)
             if (error) throw error
+            await refreshEmpresa()
             alert('Plantilla de cuentas guardada.')
         } catch (e: any) { alert('Error: ' + e.message) }
         finally { setSaving(false) }

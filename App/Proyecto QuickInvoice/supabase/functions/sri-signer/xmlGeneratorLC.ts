@@ -1,5 +1,6 @@
 // xmlGeneratorLC.ts
-// Genera el XML de Liquidación de Compra (codDoc=03) para SRI Ecuador v1.0.0
+// Genera el XML de Liquidación de Compra (codDoc=03) para SRI Ecuador v1.1.0
+// Las retenciones de una LC son comprobantes separados — NO van en este XML.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { format } from "https://esm.sh/date-fns@3.6.0";
@@ -11,15 +12,6 @@ const TIPO_ID_SRI: Record<string, string> = {
     SIN_RUC:   "07",
     EXTERIOR:  "08",
     RUC:       "04",
-};
-
-// Forma de pago → código SRI
-const FORMA_PAGO_SRI: Record<string, string> = {
-    CONTADO:      "01",
-    CREDITO:      "16",
-    EFECTIVO:     "01",
-    TRANSFERENCIA:"17",
-    CHEQUE:       "15",
 };
 
 export default function generarXmlLC(lc: any, empresa: any): string {
@@ -44,7 +36,7 @@ export default function generarXmlLC(lc: any, empresa: any): string {
     const valorIva          = r2(lc.valor_iva ?? 0);
     const importeTotal      = r2(lc.total ?? 0);
 
-    // Totales con impuestos (IVA 15%)
+    // Totales con impuestos
     const base0   = r2(lc.base_iva_0  ?? 0);
     const base15  = r2(lc.base_iva_15 ?? 0);
     const totalConImpuestosBlocks: string[] = [];
@@ -66,6 +58,16 @@ export default function generarXmlLC(lc: any, empresa: any): string {
         <valor>${valorIva.toFixed(2)}</valor>
       </totalImpuesto>`);
     }
+    // Siempre emitir al menos un bloque si ambas bases son 0
+    if (base0 === 0 && base15 === 0) {
+        totalConImpuestosBlocks.push(`
+      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>0</codigoPorcentaje>
+        <baseImponible>${totalSinImpuestos.toFixed(2)}</baseImponible>
+        <valor>0.00</valor>
+      </totalImpuesto>`);
+    }
 
     // Detalles
     const detalles: any[] = lc.detalles ?? [];
@@ -75,7 +77,7 @@ export default function generarXmlLC(lc: any, empresa: any): string {
         const sub  = r2(Number(d.subtotal || 0));
         const iva  = d.aplica_iva ? r2(sub * 0.15) : 0;
         const codigoPct = d.aplica_iva ? "4" : "0";
-        const tarifa    = d.aplica_iva ? "15" : "0";
+        const tarifa    = d.aplica_iva ? "15.00" : "0.00";
         return `
     <detalle>
       <codigoPrincipal>${String(i + 1).padStart(3, "0")}</codigoPrincipal>
@@ -96,54 +98,51 @@ export default function generarXmlLC(lc: any, empresa: any): string {
     </detalle>`;
     }).join("");
 
-    // Retenciones (sólo si hay retenciones registradas)
-    const retenciones: any[] = lc.retenciones ?? [];
-    let retencionesXml = "";
-    if (retenciones.length > 0) {
-        const retenLines = retenciones.map((r: any) => {
-            // codigo: 1=Renta, 2=IVA
-            const codigoRet = r.tipo === "IVA" ? "2" : "1";
-            return `
-    <retencion>
-      <codigo>${codigoRet}</codigo>
-      <codigoPorcentaje>${r.codigo_retencion}</codigoPorcentaje>
-      <tarifa>${Number(r.porcentaje).toFixed(2)}</tarifa>
-      <valor>${Number(r.valor).toFixed(2)}</valor>
-    </retencion>`;
-        }).join("");
-        retencionesXml = `
-  <retenciones>${retenLines}
-  </retenciones>`;
-    }
-
-    // Pago
-    const formaPagoSri = FORMA_PAGO_SRI[lc.forma_pago] || "01";
-    const totalPago    = importeTotal - r2(lc.total_retenciones ?? 0);
-    const diasPlazo    = lc.forma_pago === "CREDITO"
-        ? Math.max(0, Math.round((new Date(lc.fecha_vencimiento || lc.fecha_emision).getTime() - new Date(lc.fecha_emision).getTime()) / 86400000))
-        : 0;
-
     const obligadoContabilidad = configSri.obligado_contabilidad || "NO";
 
-    const rimpeTag = configSri.regimen_rimpe || (empresa.razon_social || "").includes("RIMPE")
-        ? "<contribuyenteRimpe>CONTRIBUYENTE RÉGIMEN RIMPE</contribuyenteRimpe>"
+    // Agente de retención — solo incluir si está habilitado
+    const esAgenteRetencion = configSri.agente_retencion || empresa.agente_retencion;
+    const agenteRetencionTag = esAgenteRetencion
+        ? "\n    <agenteRetencion>1</agenteRetencion>"
         : "";
 
+    // RIMPE
+    const esRimpe = configSri.regimen_rimpe || (empresa.razon_social || "").includes("RIMPE");
+    const rimpeTag = esRimpe
+        ? "\n    <contribuyenteRimpe>CONTRIBUYENTE RÉGIMEN RIMPE</contribuyenteRimpe>"
+        : "";
+
+    // infoAdicional
+    const camposAdicionales: string[] = [];
+    if (lc.beneficiario_email) {
+        camposAdicionales.push(`    <campoAdicional nombre="Email">${lc.beneficiario_email}</campoAdicional>`);
+    }
+    if (lc.beneficiario_direccion) {
+        camposAdicionales.push(`    <campoAdicional nombre="Direccion">${(lc.beneficiario_direccion).toUpperCase()}</campoAdicional>`);
+    }
+    if (lc.observaciones) {
+        camposAdicionales.push(`    <campoAdicional nombre="Observaciones">${lc.observaciones}</campoAdicional>`);
+    }
+    if (camposAdicionales.length === 0) {
+        camposAdicionales.push(`    <campoAdicional nombre="Emisor">${(empresa.razon_social || "EMPRESA").toUpperCase()}</campoAdicional>`);
+    }
+
+    // XML v1.1.0 — estructura validada contra XML autorizado SRI Ecuador
+    // SIN <pagos> y SIN <retenciones> (no forman parte del schema LC v1.1.0)
     const xml = `<?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<liquidacionCompra id="comprobante" version="1.0.0">
+<liquidacionCompra id="comprobante" version="1.1.0">
   <infoTributaria>
     <ambiente>${ambiente}</ambiente>
     <tipoEmision>1</tipoEmision>
     <razonSocial>${(empresa.razon_social || empresa.nombre || "EMPRESA").toUpperCase()}</razonSocial>
-    <nombreComercial>${(empresa.nombre || "EMPRESA").toUpperCase()}</nombreComercial>
+    <nombreComercial>${(empresa.nombre || empresa.razon_social || "EMPRESA").toUpperCase()}</nombreComercial>
     <ruc>${empresa.ruc || "9999999999999"}</ruc>
     <claveAcceso>${lc.clave_acceso}</claveAcceso>
     <codDoc>03</codDoc>
     <estab>${estab}</estab>
     <ptoEmi>${ptoEmi}</ptoEmi>
     <secuencial>${secuencial9}</secuencial>
-    <dirMatriz>${(empresa.direccion || "ECUADOR").toUpperCase()}</dirMatriz>
-    ${rimpeTag}
+    <dirMatriz>${(empresa.direccion || "ECUADOR").toUpperCase()}</dirMatriz>${agenteRetencionTag}${rimpeTag}
   </infoTributaria>
   <infoLiquidacionCompra>
     <fechaEmision>${fechaEmision}</fechaEmision>
@@ -158,21 +157,11 @@ export default function generarXmlLC(lc: any, empresa: any): string {
     </totalConImpuestos>
     <importeTotal>${importeTotal.toFixed(2)}</importeTotal>
     <moneda>DOLAR</moneda>
-    <pagos>
-      <pago>
-        <formaPago>${formaPagoSri}</formaPago>
-        <total>${totalPago.toFixed(2)}</total>
-        <plazo>${diasPlazo}</plazo>
-        <unidadTiempo>DIAS</unidadTiempo>
-      </pago>
-    </pagos>
   </infoLiquidacionCompra>
   <detalles>${detallesXml}
-  </detalles>${retencionesXml}
+  </detalles>
   <infoAdicional>
-    <campoAdicional nombre="Email">${lc.beneficiario_email || "S/N"}</campoAdicional>
-    <campoAdicional nombre="Direccion">${(lc.beneficiario_direccion || "S/N").toUpperCase()}</campoAdicional>
-    ${lc.observaciones ? `<campoAdicional nombre="Observaciones">${lc.observaciones}</campoAdicional>` : ""}
+${camposAdicionales.join("\n")}
   </infoAdicional>
 </liquidacionCompra>`;
 
