@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS facturacion.liquidaciones_compra (
     id                          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     empresa_id                  UUID NOT NULL,
-    punto_emision_id            UUID NOT NULL,
+    punto_emision_id            UUID NOT NULL REFERENCES facturacion.puntos_emision(id),
     establecimiento             TEXT NOT NULL,    -- '001' (3 dígitos)
     punto_emision               TEXT NOT NULL,    -- '001' (3 dígitos)
     secuencial                  TEXT NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS facturacion.liquidaciones_compra (
     estado_sri                  TEXT NOT NULL DEFAULT 'PENDIENTE'
         CHECK (estado_sri IN ('PENDIENTE','AUTORIZADO','RECHAZADO','ANULADO')),
     -- Beneficiario (persona natural, extranjero, empleado, etc.)
-    proveedor_id                UUID,             -- FK opcional al catálogo de proveedores
+    proveedor_id                UUID REFERENCES facturacion.proveedores(id) ON DELETE SET NULL,
     beneficiario_tipo_id        TEXT NOT NULL DEFAULT 'CEDULA'
         CHECK (beneficiario_tipo_id IN ('CEDULA','PASAPORTE','SIN_RUC','EXTERIOR')),
     beneficiario_identificacion TEXT NOT NULL,
