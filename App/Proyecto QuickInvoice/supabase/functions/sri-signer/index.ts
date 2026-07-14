@@ -855,7 +855,6 @@ async function handleLiquidacion(liquidacion_id: string, supabase: any): Promise
         .from("liquidaciones_compra")
         .select(`
             *,
-            empresa:empresas(*),
             detalles:liquidacion_compra_detalles(*),
             retenciones:liquidacion_compra_retenciones(*)
         `)
@@ -869,7 +868,15 @@ async function handleLiquidacion(liquidacion_id: string, supabase: any): Promise
         });
     }
 
-    const empresa  = lc.empresa;
+    // Cargar empresa por separado (liquidaciones_compra no tiene FK declarada a empresas)
+    const { data: empresaData, error: empError } = await supabase
+        .from("empresas")
+        .select("*")
+        .eq("id", lc.empresa_id)
+        .single();
+    if (empError || !empresaData) throw new Error(`Empresa no encontrada: ${empError?.message}`);
+
+    const empresa  = empresaData;
     const configSri = empresa.config_sri || {};
     const ambiente = configSri.ambiente === "PRODUCCION" ? "PRODUCCION" : "PRUEBAS";
     const endpoints = SRI_ENDPOINTS[ambiente as keyof typeof SRI_ENDPOINTS];
