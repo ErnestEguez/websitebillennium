@@ -130,16 +130,15 @@ export function NuevaLiquidacionCompraPage() {
     // sin refrescar la sesión; leemos la fuente de verdad aquí.
     useEffect(() => {
         if (!empresa?.id) return
-        supabase
-            .from('empresas')
-            .select('config_cuentas_compras')
-            .eq('id', empresa.id)
-            .single()
-            .then(({ data }) => {
-                if (data?.config_cuentas_compras && typeof data.config_cuentas_compras === 'object')
-                    setConfigCuentas(data.config_cuentas_compras as Record<string, string>)
-            })
-            .catch(() => {})
+        void (async () => {
+            const { data } = await supabase
+                .from('empresas')
+                .select('config_cuentas_compras')
+                .eq('id', empresa.id)
+                .single()
+            if (data?.config_cuentas_compras && typeof data.config_cuentas_compras === 'object')
+                setConfigCuentas(data.config_cuentas_compras as Record<string, string>)
+        })()
     }, [empresa?.id])
 
     // ── Draft ──────────────────────────────────────────────────
