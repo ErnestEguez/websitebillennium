@@ -24,6 +24,9 @@ interface Empresa {
     usar_contabilidad_compras?: boolean
     config_cuentas_compras?: Record<string, unknown> | null
     usar_talento_humano?: boolean
+    es_agente_retencion?: boolean
+    numero_resolucion_retencion?: string | null
+    fecha_inicio_retencion?: string | null
 }
 
 export interface Modules {

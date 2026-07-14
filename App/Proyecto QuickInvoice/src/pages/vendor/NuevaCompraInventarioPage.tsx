@@ -20,7 +20,7 @@ import type { Categoria } from '../../services/productoService'
 import type { TipoProveedor } from '../../types/vendors'
 import {
     ArrowLeft, Plus, Trash2, Save, Package, ChevronDown, ChevronUp, CheckSquare,
-    ScanLine, Upload, Loader2,
+    ScanLine, Upload, Loader2, Info,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { BuscadorProducto, type ProductoResultado } from '../../components/BuscadorProducto'
@@ -978,34 +978,47 @@ export function NuevaCompraInventarioPage() {
                 )}
             </div>
 
-            {/* Retenciones */}
-            <div className="card overflow-hidden">
-                <button onClick={() => setRetSeccion(v => !v)}
-                    className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Retenciones</span>
-                        {retenciones.filter(r => r.valor > 0).length > 0 && (
-                            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                                {retenciones.filter(r => r.valor > 0).length} ret. — ${totalRet.toFixed(2)}
-                            </span>
-                        )}
-                    </div>
-                    {retSeccion ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
+            {/* Retenciones — visible solo si la empresa es agente de retención */}
+            {empresa?.es_agente_retencion ? (
+                <div className="card overflow-hidden">
+                    <button onClick={() => setRetSeccion(v => !v)}
+                        className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Retenciones</span>
+                            {retenciones.filter(r => r.valor > 0).length > 0 && (
+                                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                                    {retenciones.filter(r => r.valor > 0).length} ret. — ${totalRet.toFixed(2)}
+                                </span>
+                            )}
+                        </div>
+                        {retSeccion ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                    </button>
 
-                {retSeccion && (
-                    <div className="p-5 pt-0 border-t border-slate-100">
-                        <RetencionesEditor
-                            numeroRetencion={numeroRetencion}
-                            onChangeNumero={setNumeroRetencion}
-                            retenciones={retenciones}
-                            onChange={setRetenciones}
-                            baseDefault={subtotalLineas}
-                            baseIva={ivaCalc}
-                        />
-                    </div>
-                )}
-            </div>
+                    {retSeccion && (
+                        <div className="p-5 pt-0 border-t border-slate-100">
+                            <RetencionesEditor
+                                numeroRetencion={numeroRetencion}
+                                onChangeNumero={setNumeroRetencion}
+                                retenciones={retenciones}
+                                onChange={setRetenciones}
+                                baseDefault={subtotalLineas}
+                                baseIva={ivaCalc}
+                            />
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="card p-4 flex items-start gap-3 bg-slate-50 border border-slate-200">
+                    <Info className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-slate-500">
+                        Su empresa no está configurada como Agente de Retención.{' '}
+                        Si fue designado por el SRI, actívelo en{' '}
+                        <a href="/configuracion" className="text-primary-600 font-semibold hover:underline">
+                            Ajustes → Empresa
+                        </a>.
+                    </p>
+                </div>
+            )}
 
             <div className="flex justify-end gap-3">
                 <button onClick={() => navigate('/compras')} className="btn btn-secondary">Cancelar</button>

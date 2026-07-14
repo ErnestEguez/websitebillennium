@@ -430,11 +430,19 @@ export function ConfigurationPage() {
                     tope_consumidor_final: companyData.tope_consumidor_final ?? null,
                     glosa_factura: companyData.glosa_factura || null,
                     codigo_prep_pintura: companyData.codigo_prep_pintura || null,
+                    // Configuración tributaria — agente de retención
+                    es_agente_retencion: companyData.es_agente_retencion ?? false,
+                    numero_resolucion_retencion: companyData.es_agente_retencion
+                        ? (companyData.numero_resolucion_retencion || null)
+                        : null,
+                    fecha_inicio_retencion: companyData.es_agente_retencion
+                        ? (companyData.fecha_inicio_retencion || null)
+                        : null,
                 })
                 .eq('id', empresa!.id)
             if (error) throw error
 
-            alert('Configuración de empresa guardada')
+            alert('Configuración de empresa guardada correctamente')
         } catch (error: any) {
             alert(`Error al guardar: ${error.message}`)
         } finally {
@@ -1190,6 +1198,72 @@ export function ConfigurationPage() {
                                         />
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Configuración Tributaria */}
+                            <div className="border-t border-slate-100 pt-6 space-y-4">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                    <Shield className="w-4 h-4 text-amber-500" />
+                                    Configuración Tributaria
+                                </h3>
+
+                                {/* Toggle agente de retención */}
+                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                                    <div>
+                                        <p className="font-semibold text-slate-800 text-sm">¿Es Agente de Retención?</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">Designado por el SRI para emitir comprobantes de retención</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const nuevoValor = !companyData.es_agente_retencion
+                                            if (!nuevoValor && companyData.es_agente_retencion) {
+                                                if (!window.confirm('¿Está seguro? Esto desactivará las validaciones de retención en compras.')) return
+                                            }
+                                            setCompanyData({ ...companyData, es_agente_retencion: nuevoValor })
+                                        }}
+                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${companyData.es_agente_retencion ? 'bg-primary-600' : 'bg-slate-200'}`}
+                                    >
+                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${companyData.es_agente_retencion ? 'translate-x-6' : 'translate-x-1'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Campos adicionales — visibles solo cuando está activo */}
+                                {companyData.es_agente_retencion && (
+                                    <div className="space-y-4 p-4 bg-amber-50 rounded-xl border border-amber-100">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                    N° Resolución SRI
+                                                    <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">opcional — referencial</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Ej: NAC-DNCRASC23-00000001"
+                                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                                                    value={companyData.numero_resolucion_retencion || ''}
+                                                    onChange={e => setCompanyData({ ...companyData, numero_resolucion_retencion: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                    Vigente desde
+                                                    <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">opcional</span>
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                                                    value={companyData.fecha_inicio_retencion || ''}
+                                                    onChange={e => setCompanyData({ ...companyData, fecha_inicio_retencion: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-amber-700 flex items-start gap-2">
+                                            <span className="text-base leading-none">⚠️</span>
+                                            <span>Al activar esta opción, el sistema exigirá retenciones en compras de inventario y servicios.</span>
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="pt-2">
