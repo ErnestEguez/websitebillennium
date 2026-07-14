@@ -338,7 +338,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('cxp')}
                             onToggle={() => toggleGroup('cxp')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/proveedores','/compras','/cxp','/reportes/compras','/reportes/cxp','/reportes/estado-cuenta','/ajustes','/retenciones'].some(x => location.pathname.startsWith(x))}
+                            anyActive={['/proveedores','/compras','/cxp','/reportes/compras','/reportes/cxp','/reportes/estado-cuenta','/ajustes','/retenciones','/liquidaciones'].some(x => location.pathname.startsWith(x))}
                         >
                             <SidebarItem to="/proveedores" icon={Truck} label="Proveedores" active={location.pathname === '/proveedores'} sub disabled={!p.perm_proveedores} />
 
@@ -355,6 +355,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                         <SidebarItem to="/compras"                icon={FileText}  label="Lista de Compras"     active={location.pathname === '/compras'} sub disabled={!p.perm_compras} />
                                         <SidebarItem to="/compras/nueva-servicio" icon={FileText}  label="Compras de Servicios" active={location.pathname === '/compras/nueva-servicio'} sub disabled={!p.perm_compras} />
                                         <SidebarItem to="/retenciones"            icon={UserCheck} label="Retenciones"          active={location.pathname === '/retenciones'} sub disabled={!p.perm_compras} />
+                                        <SidebarItem to="/liquidaciones"          icon={Receipt}   label="Liquidaciones Compra"  active={location.pathname.startsWith('/liquidaciones')} sub disabled={!p.perm_compras} />
                                     </div>
                                 )}
                             </div>
