@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { format } from 'date-fns'
@@ -17,39 +17,48 @@ interface Linea {
 }
 
 export function RetencionRidePage() {
-    const { compra_id } = useParams()
-    const navigate      = useNavigate()
-    const { empresa }   = useAuth()
+    const { compra_id }    = useParams()
+    const [searchParams]   = useSearchParams()
+    const esLC             = searchParams.get('tipo') === 'lc'
+    const navigate         = useNavigate()
+    const { empresa }      = useAuth()
     const [datos, setDatos]   = useState<any>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         if (compra_id && empresa?.id) loadDatos()
-    }, [compra_id, empresa?.id])
+    }, [compra_id, empresa?.id, esLC])
 
     async function loadDatos() {
         try {
             setLoading(true)
-            const { data, error } = await supabase
+
+            let q = supabase
                 .from('retenciones_compras')
                 .select(`
-                    compra_id, numero_retencion, fecha_emision,
+                    compra_id, liquidacion_id, numero_retencion, fecha_emision,
                     tipo, codigo_retencion, descripcion,
                     base_imponible, porcentaje, valor,
                     estado, numero_autorizacion, fecha_autorizacion,
                     estado_sri, clave_acceso, xml_firmado,
-                    compra:ingresos_stock(numero_factura, fecha_emision),
+                    compra:ingresos_stock!compra_id(numero_factura, fecha_emision),
+                    lc:liquidaciones_compra!liquidacion_id(establecimiento, punto_emision, secuencial, fecha_emision),
                     proveedor:proveedores(nombre_empresa, ruc, telefono, correo, direccion)
                 `)
-                .eq('compra_id', compra_id!)
                 .eq('empresa_id', empresa!.id)
                 .order('tipo', { ascending: true })
+
+            q = esLC
+                ? q.eq('liquidacion_id', compra_id!)
+                : q.eq('compra_id', compra_id!)
+
+            const { data, error } = await q
             if (error) throw error
 
             const rows = data ?? []
             if (rows.length === 0) { setDatos(null); return }
 
-            const meta = rows[0]
+            const meta = rows[0] as any
             const lineas: Linea[] = rows.map((r: any) => ({
                 tipo:             r.tipo,
                 codigo_retencion: r.codigo_retencion,
@@ -59,16 +68,29 @@ export function RetencionRidePage() {
                 valor:            Number(r.valor),
             }))
 
+            // Calcular número y fecha del documento sustento
+            let sustentoNumero = ''
+            let sustentoFecha  = ''
+            if (esLC && meta.lc) {
+                sustentoNumero = `${meta.lc.establecimiento}-${meta.lc.punto_emision}-${meta.lc.secuencial}`
+                sustentoFecha  = meta.lc.fecha_emision
+            } else if (meta.compra) {
+                sustentoNumero = meta.compra.numero_factura ?? ''
+                sustentoFecha  = meta.compra.fecha_emision
+            }
+
             setDatos({
-                numero_retencion:   meta.numero_retencion,
-                fecha_emision:      meta.fecha_emision,
+                numero_retencion:    meta.numero_retencion,
+                fecha_emision:       meta.fecha_emision,
                 numero_autorizacion: meta.numero_autorizacion,
-                fecha_autorizacion: meta.fecha_autorizacion,
-                estado_sri:         meta.estado_sri,
-                clave_acceso:       meta.clave_acceso,
-                xml_firmado:        meta.xml_firmado,
-                compra:             meta.compra,
-                proveedor:          meta.proveedor,
+                fecha_autorizacion:  meta.fecha_autorizacion,
+                estado_sri:          meta.estado_sri,
+                clave_acceso:        meta.clave_acceso,
+                xml_firmado:         meta.xml_firmado,
+                sustento_numero:     sustentoNumero,
+                sustento_fecha:      sustentoFecha,
+                es_lc:               esLC,
+                proveedor:           meta.proveedor,
                 lineas,
             })
         } catch (e: any) {
@@ -99,7 +121,6 @@ export function RetencionRidePage() {
     if (!datos) return <div className="p-12 text-center text-red-500">No se encontró el comprobante de retención.</div>
 
     const proveedor = datos.proveedor || {}
-    const compra    = datos.compra    || {}
     const lineas: Linea[] = datos.lineas
     const totalRetenido = lineas.reduce((s, l) => s + l.valor, 0)
 
@@ -275,16 +296,16 @@ export function RetencionRidePage() {
                     <div className="grid grid-cols-3 gap-x-3">
                         <div>
                             <span className="font-bold">Tipo Comprobante Sustento: </span>
-                            <span>FACTURA</span>
+                            <span>{datos.es_lc ? 'LIQUIDACIÓN DE COMPRA' : 'FACTURA'}</span>
                         </div>
                         <div>
                             <span className="font-bold">Nro. Sustento: </span>
-                            <span className="font-mono">{compra.numero_factura || '—'}</span>
+                            <span className="font-mono">{datos.sustento_numero || '—'}</span>
                         </div>
                         <div>
                             <span className="font-bold">Fecha Emisión Doc.: </span>
-                            <span>{compra.fecha_emision
-                                ? format(new Date(compra.fecha_emision + 'T12:00:00'), 'dd/MM/yyyy')
+                            <span>{datos.sustento_fecha
+                                ? format(new Date(datos.sustento_fecha + 'T12:00:00'), 'dd/MM/yyyy')
                                 : '—'}</span>
                         </div>
                     </div>

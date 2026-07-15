@@ -26,7 +26,7 @@ export function LiquidacionCompraRidePage() {
                 .select(`
                     *,
                     detalles:liquidacion_compra_detalles(*),
-                    retenciones:liquidacion_compra_retenciones(*)
+                    retenciones:retenciones_compras!liquidacion_id(*)
                 `)
                 .eq('id', id!)
                 .single()
@@ -67,7 +67,7 @@ export function LiquidacionCompraRidePage() {
     const retenciones = datos.retenciones ?? []
     const ambiente   = (empresa as any)?.config_sri?.ambiente || 'PRODUCCION'
 
-    const retsIR  = retenciones.filter((r: any) => r.tipo === 'IR')
+    const retsIR  = retenciones.filter((r: any) => r.tipo === 'FUENTE')
     const retsIVA = retenciones.filter((r: any) => r.tipo === 'IVA')
 
     return (
@@ -289,10 +289,10 @@ export function LiquidacionCompraRidePage() {
                                     <tr key={r.id ?? i}>
                                         <td className="border border-slate-200 px-1 py-0.5">
                                             <span className={`px-1 py-0.5 rounded text-[8px] font-semibold ${
-                                                r.tipo === 'IR'
+                                                r.tipo === 'FUENTE'
                                                     ? 'bg-blue-100 text-blue-700'
                                                     : 'bg-purple-100 text-purple-700'
-                                            }`}>{r.tipo}</span>
+                                            }`}>{r.tipo === 'FUENTE' ? 'IR' : r.tipo}</span>
                                         </td>
                                         <td className="border border-slate-200 px-1 py-0.5 font-mono font-bold">
                                             {r.codigo_retencion}

@@ -172,9 +172,10 @@ serve(async (req) => {
         return new Response("ok", { headers: corsHeaders });
 
     try {
-        const { compra_id, empresa_id, solo_consulta } = await req.json();
-        if (!compra_id || !empresa_id)
-            throw new Error("compra_id y empresa_id son requeridos");
+        const { compra_id, liquidacion_id, empresa_id, solo_consulta } = await req.json();
+        if ((!compra_id && !liquidacion_id) || !empresa_id)
+            throw new Error("(compra_id o liquidacion_id) y empresa_id son requeridos");
+        const esLC = !!liquidacion_id;
 
         const supabase = createClient(
             Deno.env.get("SUPABASE_URL")!,
@@ -183,7 +184,7 @@ serve(async (req) => {
         );
 
         // ── 1. Fetch retenciones ──────────────────────────────
-        const { data: rows, error: rowsErr } = await supabase
+        let retQ = supabase
             .from("retenciones_compras")
             .select(`
                 id, tipo, codigo_retencion, base_imponible, porcentaje, valor,
@@ -191,10 +192,15 @@ serve(async (req) => {
                 clave_acceso, numero_autorizacion, xml_firmado,
                 proveedor:proveedores(ruc, nombre_empresa)
             `)
-            .eq("compra_id", compra_id)
             .eq("empresa_id", empresa_id)
             .neq("estado", "ANULADO")
             .order("tipo");
+
+        retQ = esLC
+            ? retQ.eq("liquidacion_id", liquidacion_id)
+            : retQ.eq("compra_id", compra_id);
+
+        const { data: rows, error: rowsErr } = await retQ;
 
         if (rowsErr) throw rowsErr;
         if (!rows || rows.length === 0)
@@ -222,14 +228,34 @@ serve(async (req) => {
         if (empErr || !empresa) throw new Error("Empresa no encontrada");
         const configSri = (empresa as any).config_sri || {};
 
-        // ── 4. Fetch compra (numero_factura, fecha_emision) ───
-        const { data: compra, error: compraErr } = await supabase
-            .from("ingresos_stock")
-            .select("numero_factura, fecha_emision")
-            .eq("id", compra_id)
-            .single();
+        // ── 4. Fetch sustento (factura o LC) ─────────────────
+        let sustentoNumero = "";
+        let sustentoFecha  = "";
+        let codDocSustento = "01";
 
-        if (compraErr || !compra) throw new Error("Compra no encontrada");
+        if (esLC) {
+            const { data: lc, error: lcErr } = await supabase
+                .from("liquidaciones_compra")
+                .select("establecimiento, punto_emision, secuencial, fecha_emision")
+                .eq("id", liquidacion_id)
+                .single();
+
+            if (lcErr || !lc) throw new Error("Liquidación de compra no encontrada");
+            const l = lc as any;
+            sustentoNumero = `${l.establecimiento}-${l.punto_emision}-${l.secuencial}`;
+            sustentoFecha  = l.fecha_emision;
+            codDocSustento = "03";
+        } else {
+            const { data: compra, error: compraErr } = await supabase
+                .from("ingresos_stock")
+                .select("numero_factura, fecha_emision")
+                .eq("id", compra_id)
+                .single();
+
+            if (compraErr || !compra) throw new Error("Compra no encontrada");
+            sustentoNumero = (compra as any).numero_factura || "";
+            sustentoFecha  = (compra as any).fecha_emision;
+        }
 
         // ── 5. Determine estab / pto / secuencial ─────────────
         let estab       = ((configSri.estab        || "001") + "").padStart(3, "0");
@@ -346,8 +372,9 @@ serve(async (req) => {
                         nombre_empresa: proveedor?.nombre_empresa || "PROVEEDOR",
                     },
                     compra: {
-                        fecha_emision:  (compra as any).fecha_emision,
-                        numero_factura: (compra as any).numero_factura || "",
+                        fecha_emision:   sustentoFecha,
+                        numero_factura:  sustentoNumero,
+                        codDocSustento,
                     },
                     claveAcceso,
                     estab,
@@ -439,12 +466,17 @@ serve(async (req) => {
             updatePayload.origen = "SRI";
         }
 
-        await supabase
+        let upd = supabase
             .from("retenciones_compras")
             .update(updatePayload)
-            .eq("compra_id", compra_id)
             .eq("empresa_id", empresa_id)
             .neq("estado", "ANULADO");
+
+        upd = esLC
+            ? upd.eq("liquidacion_id", liquidacion_id)
+            : upd.eq("compra_id", compra_id);
+
+        await upd;
 
         return new Response(JSON.stringify({
             success:    true,

@@ -22,7 +22,7 @@ const LC_COMPLETA_SELECT = `
     proveedor:proveedores(nombre_empresa, ruc),
     punto:puntos_emision(establecimiento, punto_emision, nombre),
     detalles:liquidacion_compra_detalles(*),
-    retenciones:liquidacion_compra_retenciones(*),
+    retenciones:retenciones_compras!liquidacion_id(*),
     cxp:cuentas_por_pagar(id, saldo_pendiente, estado, fecha_vencimiento)
 `
 
@@ -243,14 +243,25 @@ export const liquidacionCompraService = {
             if (detErr) throw new Error(`Detalles: ${detErr.message}`)
         }
 
-        // 7. Retenciones
+        // 7. Retenciones — se guardan en retenciones_compras (tabla unificada)
         if (input.retenciones.length > 0) {
             const { error: retErr } = await supabase
-                .from('liquidacion_compra_retenciones')
-                .insert(input.retenciones.map(r => ({
-                    ...r,
-                    empresa_id:     input.empresa_id,
-                    liquidacion_id: lcRecord.id,
+                .from('retenciones_compras')
+                .insert(input.retenciones.map((r: any) => ({
+                    empresa_id:       input.empresa_id,
+                    liquidacion_id:   lcRecord.id,
+                    compra_id:        null,
+                    proveedor_id:     proveedorIdFinal,
+                    fecha_emision:    input.fecha_emision,
+                    tipo:             r.tipo === 'IR' ? 'FUENTE' : r.tipo,
+                    codigo_retencion: r.codigo_retencion,
+                    descripcion:      r.descripcion ?? null,
+                    base_imponible:   r.base_imponible,
+                    porcentaje:       r.porcentaje,
+                    valor:            r.valor,
+                    estado:           'ACTIVO',
+                    origen:           'MANUAL',
+                    estado_sri:       'NO_FIRMADA',
                 })))
             if (retErr) throw new Error(`Retenciones: ${retErr.message}`)
         }

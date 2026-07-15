@@ -61,12 +61,15 @@ const PRINT_CSS = `
 type EstadoSri = 'NO_FIRMADA' | 'ENVIADO' | 'AUTORIZADO' | 'RECHAZADO' | null
 
 interface RetencionDocumento {
-    compra_id:            string
+    clave_doc:            string  // agrupación: compra_id o liquidacion_id
+    compra_id:            string | null
+    liquidacion_id:       string | null
     numero_retencion:     string | null
     proveedor_id:         string
     proveedor_nombre:     string
     proveedor_ruc:        string
-    factura_numero:       string | null
+    factura_numero:       string | null  // factura o LC número
+    es_lc:                boolean
     fecha_emision:        string
     lineas: {
         tipo:             string
@@ -134,6 +137,7 @@ export function ComprobantesRetencionPage() {
                 .from('retenciones_compras')
                 .select(`
                     compra_id,
+                    liquidacion_id,
                     numero_retencion,
                     proveedor_id,
                     fecha_emision,
@@ -151,7 +155,8 @@ export function ComprobantesRetencionPage() {
                     clave_acceso,
                     xml_firmado,
                     observaciones_sri,
-                    compra:ingresos_stock(numero_factura),
+                    compra:ingresos_stock!compra_id(numero_factura),
+                    lc:liquidaciones_compra!liquidacion_id(establecimiento, punto_emision, secuencial),
                     proveedor:proveedores(nombre_empresa, ruc)
                 `)
                 .eq('empresa_id', empresa.id)
@@ -166,15 +171,28 @@ export function ComprobantesRetencionPage() {
 
             const mapa = new Map<string, RetencionDocumento>()
             ;(data ?? []).forEach((r: any) => {
-                const clave = `${r.compra_id}|${r.numero_retencion ?? 'sin_numero'}`
+                const esLC    = !r.compra_id && !!r.liquidacion_id
+                const claveId = esLC ? r.liquidacion_id : r.compra_id
+                const clave   = `${claveId}|${r.numero_retencion ?? 'sin_numero'}`
+
+                let facturaNumero: string | null = null
+                if (esLC && r.lc) {
+                    facturaNumero = `${r.lc.establecimiento}-${r.lc.punto_emision}-${r.lc.secuencial}`
+                } else if (r.compra) {
+                    facturaNumero = r.compra.numero_factura ?? null
+                }
+
                 if (!mapa.has(clave)) {
                     mapa.set(clave, {
-                        compra_id:           r.compra_id,
+                        clave_doc:           clave,
+                        compra_id:           r.compra_id ?? null,
+                        liquidacion_id:      r.liquidacion_id ?? null,
+                        es_lc:               esLC,
                         numero_retencion:    r.numero_retencion,
                         proveedor_id:        r.proveedor_id,
                         proveedor_nombre:    r.proveedor?.nombre_empresa ?? '—',
                         proveedor_ruc:       r.proveedor?.ruc ?? '',
-                        factura_numero:      r.compra?.numero_factura ?? null,
+                        factura_numero:      facturaNumero,
                         fecha_emision:       r.fecha_emision,
                         lineas:              [],
                         total:               0,
@@ -210,12 +228,13 @@ export function ComprobantesRetencionPage() {
 
     async function autorizarSRI(doc: RetencionDocumento) {
         if (!empresa?.id) return
-        setSriLoading(doc.compra_id)
+        setSriLoading(doc.clave_doc)
         setSriMsg(null)
         try {
-            const { data, error } = await supabase.functions.invoke('sri-retencion', {
-                body: { compra_id: doc.compra_id, empresa_id: empresa.id },
-            })
+            const body = doc.es_lc
+                ? { liquidacion_id: doc.liquidacion_id, empresa_id: empresa.id }
+                : { compra_id: doc.compra_id, empresa_id: empresa.id }
+            const { data, error } = await supabase.functions.invoke('sri-retencion', { body })
             if (error) throw new Error(error.message || 'Error al invocar función')
             if (!data?.success) throw new Error(data?.error || 'Error en función SRI')
 
@@ -334,7 +353,8 @@ export function ComprobantesRetencionPage() {
                             NroRetencion:    d.numero_retencion ?? '',
                             Proveedor:       d.proveedor_nombre,
                             RUC:             d.proveedor_ruc,
-                            FacturaRelacion: d.factura_numero ?? '',
+                            DocRelacion:     d.factura_numero ?? '',
+                            TipoDoc:         d.es_lc ? 'LC' : 'FACTURA',
                             TotalRetenido:   d.total,
                             EstadoSRI:       d.estado_sri ?? 'NO_FIRMADA',
                             Autorizacion:    d.numero_autorizacion ?? '',
@@ -358,11 +378,11 @@ export function ComprobantesRetencionPage() {
             ) : (
                 <div className="space-y-3">
                     {visibles.map((doc, idx) => {
-                        const clave     = `${doc.compra_id}|${doc.numero_retencion}`
+                        const clave     = doc.clave_doc
                         const abierto   = expandido === clave
                         const sriBadge  = SRI_BADGE[doc.estado_sri ?? 'NO_FIRMADA']
                         const autorizado = doc.estado_sri === 'AUTORIZADO'
-                        const procesando = sriLoading === doc.compra_id
+                        const procesando = sriLoading === doc.clave_doc
 
                         return (
                             <div key={idx} className="card overflow-hidden">
@@ -400,7 +420,9 @@ export function ComprobantesRetencionPage() {
                                                 <span className="text-slate-400 ml-2">{doc.proveedor_ruc}</span>
                                             </p>
                                             {doc.factura_numero && (
-                                                <p className="text-xs text-slate-400 font-mono">Fact: {doc.factura_numero}</p>
+                                                <p className="text-xs text-slate-400 font-mono">
+                                                    {doc.es_lc ? 'LC:' : 'Fact:'} {doc.factura_numero}
+                                                </p>
                                             )}
                                         </div>
                                         <div className="text-right shrink-0 hidden sm:block">
@@ -435,7 +457,9 @@ export function ComprobantesRetencionPage() {
                                                 </button>
                                             )}
                                             <Link
-                                                to={`/retenciones/${doc.compra_id}/ride`}
+                                                to={doc.es_lc
+                                                    ? `/retenciones/${doc.liquidacion_id}/ride?tipo=lc`
+                                                    : `/retenciones/${doc.compra_id}/ride`}
                                                 className="flex items-center gap-1 px-2.5 py-1.5 border border-slate-200 text-slate-600 text-xs rounded-lg hover:bg-slate-50"
                                                 title="Ver RIDE"
                                             >
@@ -569,7 +593,7 @@ export function ComprobantesRetencionPage() {
                                 <th style={{textAlign:'left', width:'68px'}}>Fecha</th>
                                 <th style={{textAlign:'left', width:'90px'}}>Nº Retención</th>
                                 <th style={{textAlign:'left'}}>Proveedor</th>
-                                <th style={{textAlign:'left', width:'80px'}}>Fact. Rel.</th>
+                                <th style={{textAlign:'left', width:'80px'}}>Doc. Rel.</th>
                                 <th style={{textAlign:'left', width:'80px'}}>Estado SRI</th>
                                 <th className="r" style={{width:'70px'}}>Total</th>
                                 <th style={{textAlign:'left', width:'60px'}}>Estado</th>
@@ -602,6 +626,7 @@ export function ComprobantesRetencionPage() {
                                         )}
                                     </td>
                                     <td style={{fontFamily:"'Courier New',monospace",fontSize:'8.5px',color:'#555'}}>
+                                        {d.es_lc && <span style={{color:'#1d4ed8',fontWeight:'bold',fontSize:'7px'}}>LC </span>}
                                         {d.factura_numero ?? '—'}
                                     </td>
                                     <td>

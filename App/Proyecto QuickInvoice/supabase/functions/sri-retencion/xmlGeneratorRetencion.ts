@@ -22,8 +22,9 @@ export interface RetencionXmlData {
         nombre_empresa: string
     }
     compra: {
-        fecha_emision:  string  // YYYY-MM-DD
-        numero_factura: string
+        fecha_emision:    string  // YYYY-MM-DD
+        numero_factura:   string
+        codDocSustento?:  string  // '01'=factura (default), '03'=LC
     }
     claveAcceso:  string
     estab:        string
@@ -74,7 +75,7 @@ export function generarXmlRetencion(data: RetencionXmlData): string {
       <baseImponible>${r.base_imponible.toFixed(2)}</baseImponible>
       <porcentajeRetener>${r.porcentaje.toFixed(2)}</porcentajeRetener>
       <valorRetenido>${r.valor.toFixed(2)}</valorRetenido>
-      <codDocSustento>01</codDocSustento>
+      <codDocSustento>${compra.codDocSustento ?? '01'}</codDocSustento>
       <numDocSustento>${fmtNumDoc(compra.numero_factura || '001-001-000000001')}</numDocSustento>
       <fechaEmisionDocSustento>${fmtDate(compra.fecha_emision)}</fechaEmisionDocSustento>
     </impuesto>`
