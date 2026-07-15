@@ -16,8 +16,6 @@ import type {
 import { codigoRetencionService, type CodigoRetencion } from '../../services/codigoRetencionService'
 import {
     TIPO_BENEFICIARIO_LABELS,
-    CODIGOS_IR_LC,
-    CODIGOS_IVA_LC,
     LIMITES_LC,
 } from '../../types/liquidacionCompra'
 import { TIPO_SUSTENTO_LABELS, TIPO_GASTO_LABELS } from '../../types/vendors'
@@ -222,20 +220,18 @@ export function NuevaLiquidacionCompraPage() {
 
     // ── Retenciones helpers ────────────────────────────────────
     function agregarRetencion(tipo: TipoRetencionLC) {
-        const codigosLista = tipo === 'IR' ? CODIGOS_IR_LC : CODIGOS_IVA_LC
-        const def = codigosLista[0]
-        const baseAuto = tipo === 'IR' ? subtotal : valorIva
-        const valor = r2(baseAuto * def.porcentaje / 100)
         const tipoServicio = tipo === 'IR' ? 'FUENTE' : 'IVA'
-        const catEntry = codigosRet.find(c => c.codigo === def.codigo && c.tipo === tipoServicio)
+        const baseAuto = tipo === 'IR' ? subtotal : valorIva
+        const def = codigosRet.find(c => c.tipo === tipoServicio && c.activo)
+        if (!def) return
         setRetenciones(prev => [...prev, {
             tipo,
             codigo_retencion: def.codigo,
             descripcion: def.descripcion,
             base_imponible: baseAuto,
             porcentaje: def.porcentaje,
-            valor,
-            cuenta_contable_id: catEntry?.cuenta_contable_id ?? null,
+            valor: r2(baseAuto * def.porcentaje / 100),
+            cuenta_contable_id: def.cuenta_contable_id ?? null,
         }])
     }
 
@@ -244,15 +240,13 @@ export function NuevaLiquidacionCompraPage() {
             const copia = [...prev]
             const lin   = { ...copia[idx], [campo]: valor } as LineaRet
             if (campo === 'codigo_retencion') {
-                const lista = lin.tipo === 'IR' ? CODIGOS_IR_LC : CODIGOS_IVA_LC
-                const found = lista.find(c => c.codigo === valor)
-                if (found) {
-                    lin.descripcion = found.descripcion
-                    lin.porcentaje  = found.porcentaje
-                }
                 const tipoServicio = lin.tipo === 'IR' ? 'FUENTE' : 'IVA'
                 const catEntry = codigosRet.find(c => c.codigo === valor && c.tipo === tipoServicio)
-                lin.cuenta_contable_id = catEntry?.cuenta_contable_id ?? null
+                if (catEntry) {
+                    lin.descripcion        = catEntry.descripcion
+                    lin.porcentaje         = catEntry.porcentaje
+                    lin.cuenta_contable_id = catEntry.cuenta_contable_id ?? null
+                }
             }
             lin.valor = r2(lin.base_imponible * lin.porcentaje / 100)
             copia[idx] = lin
@@ -731,7 +725,8 @@ export function NuevaLiquidacionCompraPage() {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {retenciones.map((r, idx) => {
-                                            const codigos = r.tipo === 'IR' ? CODIGOS_IR_LC : CODIGOS_IVA_LC
+                                            const tipoSrv = r.tipo === 'IR' ? 'FUENTE' : 'IVA'
+                                            const codigosDropdown = codigosRet.filter(c => c.tipo === tipoSrv && c.activo)
                                             return (
                                                 <tr key={idx}>
                                                     <td className="px-3 py-2">
@@ -745,9 +740,9 @@ export function NuevaLiquidacionCompraPage() {
                                                             onChange={e => actualizarRetencion(idx, 'codigo_retencion', e.target.value)}
                                                             className="w-full border border-slate-200 rounded-md px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary-500 outline-none"
                                                         >
-                                                            {codigos.map(c => (
+                                                            {codigosDropdown.map(c => (
                                                                 <option key={c.codigo} value={c.codigo}>
-                                                                    {c.codigo} — {c.descripcion.slice(0, 60)}
+                                                                    {c.codigo} — {c.porcentaje}% — {c.descripcion.slice(0, 50)}
                                                                 </option>
                                                             ))}
                                                         </select>

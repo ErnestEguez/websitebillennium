@@ -148,26 +148,6 @@ export const ESTADO_LC_BADGE: Record<EstadoLC, string> = {
     ANULADO:    'bg-slate-100 text-slate-500',
 }
 
-// ── Códigos SRI para retenciones de Liquidaciones de Compra ─────
-// IR: Impuesto a la Renta — los más comunes para LC
-export const CODIGOS_IR_LC = [
-    { codigo: '340', descripcion: 'Por pagos a través de liquidación de compra (nivel cultural o rusticidad)', porcentaje: 2 },
-    { codigo: '341', descripcion: 'Por compras a través de liquidaciones de compra (bienes agrícolas)', porcentaje: 1 },
-    { codigo: '303', descripcion: 'Honorarios profesionales y demás pagos por servicios', porcentaje: 10 },
-    { codigo: '304', descripcion: 'Servicios donde predomina la mano de obra', porcentaje: 2 },
-    { codigo: '307', descripcion: 'Servicios de construcción', porcentaje: 1 },
-    { codigo: '312', descripcion: 'Transporte privado de pasajeros o carga', porcentaje: 1 },
-    { codigo: '319', descripcion: 'Otros servicios no contemplados en los anteriores', porcentaje: 2 },
-    { codigo: '403', descripcion: 'Bienes agrícolas, avícolas, pecuarios, apícolas, cunículas', porcentaje: 1 },
-    { codigo: '601', descripcion: 'Pagos al exterior — no registrados en el SRI', porcentaje: 0 },
-]
-
-// IVA: porcentaje retenido
-export const CODIGOS_IVA_LC = [
-    { codigo: '725', descripcion: 'Retención IVA 30% — bienes', porcentaje: 30 },
-    { codigo: '726', descripcion: 'Retención IVA 70% — servicios', porcentaje: 70 },
-    { codigo: '727', descripcion: 'Retención IVA 100% — servicios profesionales / LC', porcentaje: 100 },
-]
 
 // Límites SRI anuales para Liquidaciones de Compra (Art. 9 LORTI)
 export const LIMITES_LC = {
