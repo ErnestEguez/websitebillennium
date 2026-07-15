@@ -173,7 +173,7 @@ export function ComprobantesRetencionPage() {
             ;(data ?? []).forEach((r: any) => {
                 const esLC    = !r.compra_id && !!r.liquidacion_id
                 const claveId = esLC ? r.liquidacion_id : r.compra_id
-                const clave   = `${claveId}|${r.numero_retencion ?? 'sin_numero'}`
+                const clave   = `${claveId}`
 
                 let facturaNumero: string | null = null
                 if (esLC && r.lc) {

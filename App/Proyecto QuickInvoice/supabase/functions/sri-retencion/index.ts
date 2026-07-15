@@ -9,6 +9,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 // @deno-types="https://esm.sh/forge@0.10.0/dist/forge.min.d.ts"
 import forge from "npm:node-forge@1.3.1";
 import { generarXmlRetencion } from "./xmlGeneratorRetencion.ts";
+import { jsPDF } from "npm:jspdf@2.5.1";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -151,6 +152,232 @@ async function firmarXmlRetencion(
     );
 }
 
+// ─── Email helpers ───────────────────────────────────────────
+
+function buildEmailHtml(opts: {
+    tipo: string; nombreCliente: string; identificacionCliente: string;
+    nombreEmpresa: string; ruc: string; logoUrl?: string | null;
+    secuencial: string; fechaFormat: string; total: string;
+    ambiente?: string; extraRows?: string;
+}): string {
+    const logoHtml = opts.logoUrl
+        ? `<img src="${opts.logoUrl}" alt="" style="max-height:55px;max-width:180px;display:block;margin:0 auto;">`
+        : `<span style="color:#fff;font-weight:800;font-size:18px;">${opts.nombreEmpresa}</span>`;
+    const esPrueba = (opts.ambiente ?? "PRUEBAS") !== "PRODUCCION";
+    const ambienteBadge = esPrueba
+        ? `<span style="display:inline-block;margin-top:12px;background:#f59e0b;color:#fff;padding:4px 16px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:1.5px;">&#9888; AMBIENTE DE PRUEBAS</span>`
+        : `<span style="display:inline-block;margin-top:12px;background:#10b981;color:#fff;padding:4px 16px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:1.5px;">&#10003; PRODUCCI&#211;N</span>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:24px 0;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.14);">
+<tr><td style="background:linear-gradient(135deg,#1e4db8 0%,#2563eb 100%);padding:24px 32px 20px;text-align:center;">
+  ${logoHtml}
+  <p style="margin:14px 0 4px;color:rgba(255,255,255,0.75);font-size:11px;letter-spacing:0.5px;text-transform:uppercase;">Documento electr&#243;nico para</p>
+  <p style="margin:0;color:#ffffff;font-size:17px;font-weight:700;">${opts.nombreCliente}</p>
+  ${ambienteBadge}
+</td></tr>
+<tr><td style="background:#fff;padding:20px 32px 16px;text-align:center;">
+  <p style="margin:0;color:#6b7280;font-size:13px;">Ha recibido un documento electr&#243;nico de</p>
+  <p style="margin:6px 0 0;color:#1e4db8;font-size:15px;font-weight:700;">${opts.nombreEmpresa}</p>
+</td></tr>
+<tr><td style="background:#fff;padding:0 32px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"></td></tr>
+<tr><td style="background:#fff;padding:10px 32px 0;text-align:center;">
+  <span style="font-size:11px;font-weight:700;padding:4px 14px;border-radius:99px;letter-spacing:1px;color:#1e40af;background:#dbeafe;">${opts.tipo}</span>
+</td></tr>
+<tr><td style="background:#fff;padding:12px 32px 16px;">
+  <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
+    <tr style="border-bottom:1px solid #f3f4f6;"><td style="color:#6b7280;">N&#176; Comprobante</td><td align="right" style="font-weight:700;color:#111827;">${opts.secuencial}</td></tr>
+    <tr style="border-bottom:1px solid #f3f4f6;"><td style="color:#6b7280;">Identificaci&#243;n</td><td align="right" style="color:#374151;">${opts.identificacionCliente}</td></tr>
+    <tr${opts.extraRows ? ' style="border-bottom:1px solid #f3f4f6;"' : ""}><td style="color:#6b7280;">Fecha</td><td align="right" style="color:#374151;">${opts.fechaFormat}</td></tr>
+    ${opts.extraRows ?? ""}
+  </table>
+</td></tr>
+<tr><td style="background:#fefce8;padding:22px 32px;text-align:center;border-top:2px solid #fde68a;border-bottom:2px solid #fde68a;">
+  <p style="margin:0 0 4px;color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;">Total Retenido</p>
+  <p style="margin:0;color:#111827;font-size:46px;font-weight:900;line-height:1.1;">$${opts.total}</p>
+</td></tr>
+<tr><td style="background:#fff;padding:16px 32px;text-align:center;">
+  <p style="margin:0;color:#6b7280;font-size:12px;">&#128206; Se adjuntan el <strong>RIDE en PDF</strong> y el <strong>XML autorizado</strong> por el SRI</p>
+</td></tr>
+<tr><td style="background:#1e3a8a;padding:18px 32px;text-align:center;">
+  <p style="margin:0 0 4px;color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;">${opts.nombreEmpresa} &nbsp;&middot;&nbsp; RUC: ${opts.ruc}</p>
+  <p style="margin:0;color:rgba(255,255,255,0.55);font-size:10px;">Powered by QuickInvoice &nbsp;&middot;&nbsp; www.billenniumsystem.com</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+
+async function generarRideRetencionPdf(opts: {
+    empresa: any; proveedor: any; compra: any;
+    claveAcceso: string; estab: string; pto: string; secuencial: string;
+    fechaEmision: string; numAuth?: string; fechaAuth?: string;
+    retenciones: { tipo: string; codigo_retencion: string; base_imponible: number; porcentaje: number; valor: number }[];
+}): Promise<Uint8Array> {
+    const f2 = (n: any) => Number(n ?? 0).toFixed(2);
+    const fmtDate = (d: any): string => {
+        const m = String(d ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : String(d ?? "");
+    };
+    const configSri = opts.empresa.config_sri || {};
+    const ambiente = ((configSri.ambiente || "PRUEBAS") as string).toUpperCase();
+    const numRet = `${opts.estab}-${opts.pto}-${opts.secuencial}`;
+
+    let logoB64 = ""; let logoExt = "PNG";
+    if (opts.empresa.logo_url) {
+        try {
+            const resp = await fetch(opts.empresa.logo_url);
+            logoB64 = toBase64(new Uint8Array(await resp.arrayBuffer()));
+            logoExt = opts.empresa.logo_url.toLowerCase().includes(".png") ? "PNG" : "JPEG";
+        } catch { /* logo unavailable */ }
+    }
+
+    let qrDataUrl = "";
+    if (opts.claveAcceso) {
+        try {
+            const QRCode = (await import("npm:qrcode")).default;
+            qrDataUrl = await QRCode.toDataURL(opts.claveAcceso, { margin: 1, width: 120 });
+        } catch { /* QR unavailable */ }
+    }
+
+    const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+    const ML = 10; const CW = 190; const RX = 200; const PH = 284;
+    const S400: [number,number,number] = [148, 163, 184];
+    const S200: [number,number,number] = [226, 232, 240];
+    const S100: [number,number,number] = [241, 245, 249];
+    const sd4 = () => { doc.setDrawColor(...S400); doc.setLineWidth(0.4); };
+    const sf1 = () => doc.setFillColor(...S100);
+
+    let y = 10;
+    const LW = 104.5; const RW = 85.5; const DIV = ML + LW;
+    const HDR_H = 48;
+    const RH1=7, RH2=8, RH3=7, RH4=10, RH5=7, RH6=9;
+    sf1(); doc.rect(DIV, y+RH1, RW, RH2, "F");
+    sd4();
+    doc.rect(ML, y, CW, HDR_H);
+    doc.line(DIV, y, DIV, y+HDR_H);
+    [RH1, RH1+RH2, RH1+RH2+RH3, RH1+RH2+RH3+RH4, RH1+RH2+RH3+RH4+RH5].forEach(o =>
+        doc.line(DIV, y+o, DIV+RW, y+o));
+
+    let lY = y + 2;
+    if (logoB64) { doc.addImage(logoB64, logoExt, ML+2, lY, 40, 16); lY += 18; }
+    const empNom = (opts.empresa.razon_social || opts.empresa.nombre || "").toUpperCase();
+    doc.setFontSize(10); doc.setFont("helvetica", "bold");
+    doc.text(doc.splitTextToSize(empNom, LW-4), ML+2, lY+3);
+    lY += doc.splitTextToSize(empNom, LW-4).length * 4 + 2;
+    doc.setFontSize(7.5); doc.setFont("helvetica", "normal");
+    if (opts.empresa.direccion) { doc.text(`Dir: ${opts.empresa.direccion}`, ML+2, lY); lY += 4; }
+    doc.setFont("helvetica", "bold");
+    doc.text(`R.U.C.: ${opts.empresa.ruc || ""}`, ML+2, lY);
+
+    const rX = DIV + 2; let rY = y + 2;
+    doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+    doc.text("R.U.C.", rX, rY + RH1 - 1);
+    doc.setFontSize(8.5); doc.setFont("helvetica", "bold");
+    doc.text(opts.empresa.ruc || "", rX, rY + RH1 + 3.5);
+    rY += RH1 + RH2;
+    doc.setFontSize(7.5); doc.setFont("helvetica", "bold"); doc.setTextColor(100, 0, 200);
+    doc.text("COMPROBANTE DE RETENCIÓN", DIV + RW/2, rY + 4.5, { align: "center" });
+    doc.setTextColor(0,0,0);
+    rY += RH3;
+    doc.setFontSize(6.5); doc.setFont("helvetica", "normal");
+    doc.text("Número:", rX, rY + 3); doc.setFont("helvetica", "bold");
+    doc.text(numRet, rX + 20, rY + 3);
+    rY += RH4;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(6.5);
+    doc.text("NÚMERO DE AUTORIZACIÓN:", rX, rY + 4);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(6);
+    doc.text((opts.numAuth || "").substring(0, 49), rX, rY + 8);
+    rY += RH5;
+    const ambLabel = ambiente === "PRODUCCION" ? "AMBIENTE: PRODUCCIÓN" : "AMBIENTE: PRUEBAS";
+    doc.setFont("helvetica", "normal"); doc.setFontSize(6.5);
+    doc.text(ambLabel, rX, rY + 3);
+    doc.text("EMISIÓN NORMAL", rX, rY + 6.5);
+    doc.text(`Fecha Auth: ${opts.fechaAuth ? fmtDate(opts.fechaAuth.substring(0,10)) : "--"}`, rX, rY + 9.5);
+
+    y += HDR_H + 4;
+
+    // Proveedor info
+    sd4(); sf1(); doc.rect(ML, y, CW, 6, "FD");
+    doc.setFontSize(7.5); doc.setFont("helvetica", "bold"); doc.setTextColor(0,0,0);
+    doc.text("DATOS DEL PROVEEDOR", ML+2, y+4.5);
+    y += 6;
+    sd4(); doc.rect(ML, y, CW, 14); doc.line(ML+100, y, ML+100, y+14);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+    doc.text("Razón Social:", ML+2, y+4); doc.setFont("helvetica", "bold");
+    doc.text(opts.proveedor.nombre_empresa || "", ML+2, y+8);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+    doc.text("RUC / Identificación:", ML+2, y+12); doc.setFont("helvetica", "bold");
+    doc.text(opts.proveedor.ruc || "", ML+30, y+12);
+    doc.setFont("helvetica", "normal");
+    doc.text("Fecha Emisión:", ML+102, y+4); doc.setFont("helvetica", "bold");
+    doc.text(fmtDate(opts.fechaEmision), ML+125, y+4);
+    doc.setFont("helvetica", "normal");
+    doc.text("Doc. Sustento:", ML+102, y+8); doc.setFont("helvetica", "bold");
+    doc.text(opts.compra.numero_factura || "", ML+125, y+8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Fecha Doc. Sustento:", ML+102, y+12); doc.setFont("helvetica", "bold");
+    doc.text(fmtDate(opts.compra.fecha_emision || ""), ML+132, y+12);
+    y += 18;
+
+    // Retenciones table
+    sd4(); sf1(); doc.rect(ML, y, CW, 6, "FD");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(0,0,0);
+    doc.text("DETALLE DE RETENCIONES", ML+2, y+4.5);
+    y += 6;
+
+    const cols = [
+        { label: "Tipo", x: ML+2, w: 12 },
+        { label: "Código", x: ML+14, w: 16 },
+        { label: "Base Imponible", x: ML+30, w: 35 },
+        { label: "% Retención", x: ML+65, w: 30 },
+        { label: "Valor Retenido", x: ML+95, w: 95 },
+    ];
+    sd4(); sf1(); doc.rect(ML, y, CW, 6, "FD");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(6.5);
+    cols.forEach(c => doc.text(c.label, c.x, y+4));
+    y += 6;
+
+    doc.setFont("helvetica", "normal");
+    let totalRet = 0;
+    for (const r of opts.retenciones) {
+        const rowH = 6;
+        doc.setDrawColor(...S200); doc.setLineWidth(0.2);
+        doc.rect(ML, y, CW, rowH);
+        doc.setFontSize(6.5);
+        doc.text(r.tipo === "IR" ? "IR" : "IVA", cols[0].x, y+4);
+        doc.text(r.codigo_retencion || "", cols[1].x, y+4);
+        doc.text(f2(r.base_imponible), cols[2].x+30, y+4, { align: "right" });
+        doc.text(f2(r.porcentaje) + "%", cols[3].x+20, y+4, { align: "right" });
+        doc.text(f2(r.valor), RX-5, y+4, { align: "right" });
+        totalRet += Number(r.valor ?? 0);
+        y += rowH;
+    }
+    // Total row
+    sf1(); doc.rect(ML, y, CW, 7, "FD"); sd4(); doc.rect(ML, y, CW, 7);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+    doc.text("TOTAL RETENIDO:", ML+2, y+5);
+    doc.text(`$${f2(totalRet)}`, RX-5, y+5, { align: "right" });
+    y += 12;
+
+    // Clave acceso
+    if (opts.claveAcceso) {
+        sd4(); sf1(); doc.rect(ML, y, CW, 5, "FD");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.text("CLAVE DE ACCESO:", ML+2, y+3.5);
+        y += 5;
+        doc.rect(ML, y, CW, 8);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(6);
+        doc.text(opts.claveAcceso || "", ML + CW/2, y+5, { align: "center" });
+        y += 10;
+        if (qrDataUrl) { doc.addImage(qrDataUrl, "PNG", ML + CW/2 - 15, y, 30, 30); y += 32; }
+    }
+
+    return doc.output("arraybuffer") as unknown as Uint8Array;
+}
+
 const SRI_ENDPOINTS = {
     PRODUCCION: {
         recepcion:    "https://cel.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline",
@@ -190,7 +417,7 @@ serve(async (req) => {
                 id, tipo, codigo_retencion, base_imponible, porcentaje, valor,
                 fecha_emision, numero_retencion, estado, estado_sri,
                 clave_acceso, numero_autorizacion, xml_firmado,
-                proveedor:proveedores(ruc, nombre_empresa)
+                proveedor:proveedores(ruc, nombre_empresa, correo)
             `)
             .eq("empresa_id", empresa_id)
             .neq("estado", "ANULADO")
@@ -476,7 +703,92 @@ serve(async (req) => {
             ? upd.eq("liquidacion_id", liquidacion_id)
             : upd.eq("compra_id", compra_id);
 
-        await upd;
+        const { error: updErr } = await upd;
+        if (updErr) console.error("[sri-retencion] Update error:", updErr.message);
+
+        // ── 10. Email al proveedor (background) ───────────────
+        const emailTask = (async () => {
+            if (!autorizado) return;
+            const proveedorCorreo = (primera.proveedor as any)?.correo as string | undefined;
+            if (!proveedorCorreo) return;
+            try {
+                const mailHost = configSri.mail_host as string | undefined;
+                const mailUser = configSri.mail_user as string | undefined;
+                const mailPass = configSri.mail_pass as string | undefined;
+                if (!mailHost || !mailUser || !mailPass) return;
+
+                const nombreEmpresa = ((empresa as any).razon_social || (empresa as any).nombre || "La Empresa").toUpperCase();
+                const provNombre    = (primera.proveedor as any)?.nombre_empresa || "";
+                const provRuc       = (primera.proveedor as any)?.ruc || "";
+                const fechaFormat   = new Date(fechaEmision + "T12:00:00").toLocaleDateString("es-EC");
+
+                const emailHtml = buildEmailHtml({
+                    tipo:                  "COMPROBANTE DE RETENCIÓN",
+                    nombreCliente:         provNombre.toUpperCase(),
+                    identificacionCliente: provRuc,
+                    nombreEmpresa,
+                    ruc:       (empresa as any).ruc || "",
+                    logoUrl:   (empresa as any).logo_url || null,
+                    secuencial: numRet || "",
+                    fechaFormat,
+                    total:     rows.reduce((s: number, r: any) => s + Number(r.valor ?? 0), 0).toFixed(2),
+                    ambiente:  configSri.ambiente,
+                    extraRows: `<tr><td style="color:#6b7280;">Doc. Sustento</td><td align="right" style="color:#374151;">${sustentoNumero}</td></tr>`,
+                });
+
+                let pdfB64: string | null = null;
+                try {
+                    const pdfBytes = await generarRideRetencionPdf({
+                        empresa,
+                        proveedor: primera.proveedor,
+                        compra:    { numero_factura: sustentoNumero, fecha_emision: sustentoFecha },
+                        claveAcceso,
+                        estab, pto, secuencial: secuencial9,
+                        fechaEmision,
+                        numAuth,
+                        fechaAuth,
+                        retenciones: rows.map((r: any) => ({
+                            tipo:             r.tipo,
+                            codigo_retencion: r.codigo_retencion,
+                            base_imponible:   Number(r.base_imponible),
+                            porcentaje:       Number(r.porcentaje),
+                            valor:            Number(r.valor),
+                        })),
+                    });
+                    let bin = "";
+                    const chunk = 8192;
+                    for (let i = 0; i < pdfBytes.length; i += chunk)
+                        bin += String.fromCharCode(...pdfBytes.subarray(i, Math.min(i + chunk, pdfBytes.length)));
+                    pdfB64 = btoa(bin);
+                } catch (pdfErr) {
+                    console.error("[RET EMAIL] Error PDF:", pdfErr);
+                }
+
+                const attachments: any[] = [];
+                if (pdfB64)
+                    attachments.push({ filename: `RIDE_RET_${numRet}.pdf`, content: pdfB64, encoding: "base64", contentType: "application/pdf" });
+                attachments.push({ filename: `RET_${numRet}.xml`, content: xmlFirmado || "", contentType: "application/xml; charset=utf-8" });
+
+                const nodemailer = (await import("npm:nodemailer@6.9.13")).default;
+                const transporter = nodemailer.createTransport({
+                    host: mailHost, port: Number(configSri.mail_port) || 587,
+                    secure: configSri.mail_ssl === true,
+                    auth: { user: mailUser, pass: mailPass },
+                    tls: { rejectUnauthorized: false },
+                });
+                await transporter.sendMail({
+                    from:    `Facturación ${nombreEmpresa} <${mailUser}>`,
+                    to:      proveedorCorreo,
+                    subject: `Comprobante de Retención ${numRet} - ${nombreEmpresa}`,
+                    html:    emailHtml,
+                    attachments,
+                });
+                console.log("[RET EMAIL] Enviado a:", proveedorCorreo);
+            } catch (emailErr) {
+                console.error("[RET EMAIL] Error:", emailErr);
+            }
+        })();
+        (globalThis as any).EdgeRuntime?.waitUntil?.(emailTask);
 
         return new Response(JSON.stringify({
             success:    true,
