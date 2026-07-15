@@ -13,6 +13,7 @@ import type {
     TipoBeneficiario,
     TipoRetencionLC,
 } from '../../types/liquidacionCompra'
+import { codigoRetencionService, type CodigoRetencion } from '../../services/codigoRetencionService'
 import {
     TIPO_BENEFICIARIO_LABELS,
     CODIGOS_IR_LC,
@@ -103,7 +104,7 @@ export function NuevaLiquidacionCompraPage() {
     // ── Contabilidad ───────────────────────────────────────────
     const [todasCuentas, setTodasCuentas] = useState<{ id: string; codigo: string; nombre: string; tipo: string }[]>([])
     const cuentasGasto  = todasCuentas.filter(c => c.tipo === 'gasto')
-    const cuentasPasivo = todasCuentas.filter(c => c.tipo === 'pasivo')
+    const [codigosRet, setCodigosRet] = useState<CodigoRetencion[]>([])
     const [configCuentas, setConfigCuentas] = useState<Record<string, string>>({})
 
     // ── Carga inicial ──────────────────────────────────────────
@@ -112,9 +113,11 @@ export function NuevaLiquidacionCompraPage() {
         Promise.all([
             puntoEmisionService.listar(empresa.id),
             proveedorService.listar(empresa.id),
-        ]).then(([pts, provs]) => {
+            codigoRetencionService.listar(empresa.id),
+        ]).then(([pts, provs, codigos]) => {
             setPuntosEmision(pts)
             setProveedores(provs)
+            setCodigosRet(codigos.filter(c => c.activo))
             if (pts.length > 0) setPuntoEmisionId(pts[0].id)
         }).catch(e => setErrorMsg(e.message))
           .finally(() => setLoading(false))
@@ -223,6 +226,8 @@ export function NuevaLiquidacionCompraPage() {
         const def = codigosLista[0]
         const baseAuto = tipo === 'IR' ? subtotal : valorIva
         const valor = r2(baseAuto * def.porcentaje / 100)
+        const tipoServicio = tipo === 'IR' ? 'FUENTE' : 'IVA'
+        const catEntry = codigosRet.find(c => c.codigo === def.codigo && c.tipo === tipoServicio)
         setRetenciones(prev => [...prev, {
             tipo,
             codigo_retencion: def.codigo,
@@ -230,7 +235,7 @@ export function NuevaLiquidacionCompraPage() {
             base_imponible: baseAuto,
             porcentaje: def.porcentaje,
             valor,
-            cuenta_contable_id: null,
+            cuenta_contable_id: catEntry?.cuenta_contable_id ?? null,
         }])
     }
 
@@ -245,6 +250,9 @@ export function NuevaLiquidacionCompraPage() {
                     lin.descripcion = found.descripcion
                     lin.porcentaje  = found.porcentaje
                 }
+                const tipoServicio = lin.tipo === 'IR' ? 'FUENTE' : 'IVA'
+                const catEntry = codigosRet.find(c => c.codigo === valor && c.tipo === tipoServicio)
+                lin.cuenta_contable_id = catEntry?.cuenta_contable_id ?? null
             }
             lin.valor = r2(lin.base_imponible * lin.porcentaje / 100)
             copia[idx] = lin
@@ -350,7 +358,8 @@ export function NuevaLiquidacionCompraPage() {
                 const retsActivas = empresa.es_agente_retencion ? retenciones : []
 
                 if (retsActivas.length > 0 && retsActivas.some(r => !r.cuenta_contable_id)) {
-                    contabError = 'Asigne una cuenta contable a cada línea de retención'
+                    const sinCuenta = retsActivas.filter(r => !r.cuenta_contable_id).map(r => r.codigo_retencion).join(', ')
+                    contabError = `Código(s) de retención sin cuenta contable: ${sinCuenta}. Configúrala en Retenciones → Códigos de Retención.`
                     throw new Error(contabError)
                 }
 
@@ -702,9 +711,6 @@ export function NuevaLiquidacionCompraPage() {
                                             <th className="text-right px-3 py-2 text-xs text-slate-500 font-semibold w-28">Base Imp.</th>
                                             <th className="text-right px-3 py-2 text-xs text-slate-500 font-semibold w-20">%</th>
                                             <th className="text-right px-3 py-2 text-xs text-slate-500 font-semibold w-28">Valor</th>
-                                            {cuentasPasivo.length > 0 && (
-                                                <th className="text-left px-3 py-2 text-xs text-slate-500 font-semibold min-w-[180px]">Cuenta contable</th>
-                                            )}
                                             <th className="w-8" />
                                         </tr>
                                     </thead>
@@ -754,23 +760,6 @@ export function NuevaLiquidacionCompraPage() {
                                                     <td className="px-3 py-2 text-right font-semibold text-amber-700">
                                                         ${r.valor.toFixed(2)}
                                                     </td>
-                                                    {cuentasPasivo.length > 0 && (
-                                                        <td className="px-3 py-2">
-                                                            <select
-                                                                value={r.cuenta_contable_id || ''}
-                                                                onChange={e => actualizarRetencion(idx, 'cuenta_contable_id', e.target.value || null)}
-                                                                className={cn(
-                                                                    'w-full border rounded-md px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary-500 outline-none',
-                                                                    !r.cuenta_contable_id ? 'border-amber-400 bg-amber-50' : 'border-slate-200'
-                                                                )}
-                                                            >
-                                                                <option value="">— cuenta por pagar —</option>
-                                                                {cuentasPasivo.map(c => (
-                                                                    <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>
-                                                                ))}
-                                                            </select>
-                                                        </td>
-                                                    )}
                                                     <td className="px-3 py-2">
                                                         <button onClick={() => eliminarRetencion(idx)}
                                                             className="p-1 hover:bg-red-50 rounded text-slate-300 hover:text-red-500">
