@@ -850,13 +850,13 @@ async function generarRideLcPdf(lc: any, empresa: any): Promise<Uint8Array> {
 async function handleLiquidacion(liquidacion_id: string, supabase: any): Promise<Response> {
     const cleanMsg = (txt: string) => txt.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
-    // 1. Cargar LC completa con empresa, detalles y retenciones
+    // 1. Cargar LC completa con empresa y detalles
+    //    Las retenciones son comprobantes separados (codDoc=07), no parte del XML LC v1.1.0
     const { data: lc, error: lcError } = await supabase
         .from("liquidaciones_compra")
         .select(`
             *,
-            detalles:liquidacion_compra_detalles(*),
-            retenciones:liquidacion_compra_retenciones(*)
+            detalles:liquidacion_compra_detalles(*)
         `)
         .eq("id", liquidacion_id)
         .single();

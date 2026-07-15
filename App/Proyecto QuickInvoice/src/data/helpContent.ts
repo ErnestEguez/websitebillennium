@@ -1374,4 +1374,76 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
         ],
     },
+
+    // ─── LIQUIDACIÓN DE COMPRA ──────────────────────────────────────────────
+    'nueva-lc': {
+        titulo: 'Nueva Liquidación de Compra',
+        subtitulo: 'Comprobante electrónico codDoc=03 para compras a personas naturales sin RUC',
+        secciones: [
+            {
+                titulo: '¿Cuándo emitir una Liquidación de Compra?',
+                texto: 'La LC (codDoc=03) se emite cuando la empresa compra bienes o servicios a una persona natural que NO está obligada a emitir comprobante (sin RUC, con cédula, pasaporte, etc.). Ejemplos: jornaleros, artesanos, personas en zonas rurales, pagos por servicios ocasionales. El SRI exige que el comprador (la empresa) emita este documento en lugar del vendedor.',
+                tips: [
+                    'No uses LC cuando el proveedor tiene RUC — en ese caso pide factura.',
+                    'El SRI limita a $50.000 por beneficiario al año y $200.000 en total de LC.',
+                    'Las LC se autorizan en línea igual que las facturas (firma + envío al SRI).',
+                ],
+                alerta: 'Si el proveedor tiene RUC, el documento correcto es una Factura de Proveedor, no una LC. Emitir LC a alguien con RUC es incorrecto ante el SRI.',
+            },
+            {
+                titulo: '1. Punto de emisión y fechas',
+                texto: 'Selecciona el punto de emisión (establecimientos registrados en el SRI). La fecha de emisión por defecto es hoy. El tipo de sustento identifica la naturaleza del gasto (servicios, bienes, etc.) y es relevante para el crédito tributario de IVA.',
+                tips: [
+                    'Tipo sustento 02 = Compra de bienes y servicios (el más común).',
+                    'Si la compra genera crédito tributario de IVA, usa el tipo adecuado.',
+                ],
+            },
+            {
+                titulo: '2. Beneficiario',
+                texto: 'Ingresa la identificación (cédula o pasaporte) y el nombre completo del vendedor. Puedes buscarlo en el catálogo de proveedores si ya fue registrado, o ingresarlo manualmente. Si el beneficiario no existe en proveedores, el sistema lo crea automáticamente.',
+                tips: [
+                    'El sistema acepta cédula (10 dígitos), pasaporte o SIN_RUC.',
+                    'La dirección y correo son opcionales pero recomendados para el RIDE.',
+                ],
+            },
+            {
+                titulo: '3. Detalle de bienes / servicios',
+                texto: 'Agrega cada concepto de la compra con descripción, cantidad, precio unitario y si aplica IVA. Para empresas con contabilidad habilitada, asigna una cuenta contable a cada línea (o configura una cuenta genérica de gastos en Ajustes). El IVA se calcula automáticamente al 15% para los ítems marcados.',
+                tips: [
+                    'Marca "IVA" en los ítems que generan crédito tributario.',
+                    'Asigna cuenta contable por línea para desglosar el asiento por tipo de gasto.',
+                    'Si no asignas cuenta por línea, se usará la cuenta "Gastos de Servicios" de Ajustes.',
+                ],
+            },
+            {
+                titulo: '4. Retenciones (solo agentes de retención)',
+                texto: 'Si tu empresa es Agente de Retención designado por el SRI, la sección de Retenciones aparece activa. Agrega las retenciones de IR e IVA según los códigos SRI aplicables. Las retenciones se generan como un comprobante separado (codDoc=07) y aparecen en la sección "Comprobantes de Retención".',
+                tips: [
+                    'Los códigos de retención para LC son los mismos que para compras normales.',
+                    'El comprobante de retención debe autorizarse independientemente desde "Comprobantes de Retención".',
+                    'La LC y el comprobante de retención son dos documentos electrónicos distintos.',
+                ],
+                alerta: 'Las retenciones aplican sobre la base antes de IVA (para IR) o sobre el IVA (para retención de IVA). Verifica los porcentajes vigentes en la tabla del SRI.',
+            },
+            {
+                titulo: '5. Contabilización automática',
+                texto: 'Al guardar la LC, el sistema genera automáticamente el asiento contable en LedgerPro si la integración está activa. El asiento registra: DEBE en las cuentas de gasto por línea + IVA crédito fiscal; HABER en Cuentas por Pagar (crédito) o Efectivo (contado) + Retenciones a pagar.',
+                tips: [
+                    'Para que el asiento se genere, configura las cuentas en Compras → Ajustes.',
+                    'La cuenta "Gastos de Servicios (fallback)" es esencial si no asignas cuenta por línea.',
+                    'El período contable debe estar abierto en LedgerPro para el mes de la LC.',
+                ],
+                alerta: 'Si aparece el mensaje "Asiento contable NO generado", revisa: (1) que el período esté abierto en LedgerPro, (2) que esté configurada la cuenta Cuentas por Pagar y la cuenta de Gastos en Ajustes.',
+            },
+            {
+                titulo: '6. Guardar y autorizar',
+                texto: '"Guardar borrador" crea la LC en estado PENDIENTE sin enviarla al SRI. "Guardar y Autorizar SRI" hace todo en un paso: crea la LC, la firma electrónicamente y la envía al SRI para autorización inmediata. Una vez autorizada, aparece en la lista con el número de autorización del SRI y puedes descargar el RIDE (PDF) y el XML.',
+                tips: [
+                    'Usa "Guardar borrador" si quieres revisar los datos antes de autorizar.',
+                    'La LC autorizada puede verse y descargarse desde la lista de Liquidaciones de Compra.',
+                    'El RIDE de la LC es el documento oficial para sustentar el gasto.',
+                ],
+            },
+        ],
+    },
 }

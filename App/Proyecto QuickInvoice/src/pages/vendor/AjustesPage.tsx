@@ -7,6 +7,7 @@ import { SlidersHorizontal, Save, Loader2, AlertTriangle, BookOpen, Info } from 
 // Base accounts to map (no VendorManagement switch — that's admin-only)
 const CUENTAS_BASE = [
     { key: 'inventarios',       label: 'Inventarios / Mercaderías',        hint: 'Activo — para compras de inventario' },
+    { key: 'gastos_servicios',  label: 'Gastos de Servicios (fallback)',    hint: 'Gasto — cuenta base para LC y compras de servicio sin cuenta por línea' },
     { key: 'iva_compras',       label: 'IVA Crédito Fiscal (Compras)',      hint: 'Activo — IVA que la empresa puede recuperar' },
     { key: 'cuentas_por_pagar', label: 'Cuentas por Pagar Proveedores',     hint: 'Pasivo — saldo a crédito con proveedores' },
     { key: 'efectivo',          label: 'Efectivo / Banco',                  hint: 'Activo — pagos al contado' },

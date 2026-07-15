@@ -25,6 +25,7 @@ import {
     ChevronDown, ChevronUp, Loader2, CheckCircle,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { HelpButton } from '../../components/help/HelpButton'
 
 const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white'
 
@@ -316,6 +317,7 @@ export function NuevaLiquidacionCompraPage() {
             })
 
             // ── Asiento contable automático ────────────────────
+            let contabError = ''
             try {
                 const cfg = configCuentas
                 const cuentas: CuentasCompras = {
@@ -327,36 +329,49 @@ export function NuevaLiquidacionCompraPage() {
                     ret_fuente:        cfg.ret_fuente         ?? '',
                     ret_iva:           cfg.ret_iva            ?? '',
                 }
-                // Solo generar asiento si hay cuentas mínimas configuradas
-                const tieneMin = (formaPago === 'CREDITO' ? cuentas.cuentas_por_pagar : cuentas.efectivo)
-                if (tieneMin) {
-                    const numLC = `${lc.establecimiento}-${lc.punto_emision}-${lc.secuencial}`
-                    const retsActivas = empresa.es_agente_retencion ? retenciones : []
-                    const retIR  = retsActivas.filter(r => r.tipo === 'IR').reduce((s, r) => s + r.valor, 0)
-                    const retIVA = retsActivas.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
-                    await contabilidadService.crearAsientoCompra({
-                        empresaId:     empresa.id,
-                        portalRuc:     empresa.ruc ?? '',
-                        fecha:         fechaEmision,
-                        glosa:         `LC ${numLC} — ${nombre}`,
-                        subtotal,
-                        valorIva,
-                        retFuente:     r2(retIR),
-                        retIva:        r2(retIVA),
-                        formaPago,
-                        tipoCompra:    'SERVICIO',
-                        cuentas,
-                        referencia:    lc.id,
-                        lineasServicio: detalle.filter(d => d.subtotal > 0).map(d => ({
-                            descripcion:        d.descripcion,
-                            subtotal:           d.subtotal,
-                            cuenta_contable_id: d.cuenta_contable_id,
-                        })),
-                    })
+                // Validar cuentas mínimas: contraparte del pasivo + al menos una cuenta de gasto
+                const cuentaHaber = formaPago === 'CREDITO' ? cuentas.cuentas_por_pagar : cuentas.efectivo
+                const cuentaGastoFallback = cuentas.gastos_servicios
+                const tieneMin  = !!cuentaHaber
+                // Verificar que al menos una línea tiene cuenta asignada o hay fallback de gasto
+                const hayDebit  = detalle.filter(d => d.subtotal > 0).some(d => d.cuenta_contable_id) || !!cuentaGastoFallback
+
+                if (!tieneMin) {
+                    contabError = 'Configure la cuenta Cuentas por Pagar (o Efectivo) en Compras → Ajustes'
+                    throw new Error(contabError)
                 }
-            } catch (contabErr: any) {
-                console.error('[asientoLC]', contabErr)
-                setErrorMsg(`LC guardada. Asiento contable no generado: ${contabErr?.message ?? contabErr}`)
+                if (!hayDebit) {
+                    contabError = 'Configure la cuenta "Gastos de Servicios (fallback)" en Compras → Ajustes, o asigne cuenta contable a cada línea'
+                    throw new Error(contabError)
+                }
+
+                const numLC = `${lc.establecimiento}-${lc.punto_emision}-${lc.secuencial}`
+                const retsActivas = empresa.es_agente_retencion ? retenciones : []
+                const retIR  = retsActivas.filter(r => r.tipo === 'IR').reduce((s, r) => s + r.valor, 0)
+                const retIVA = retsActivas.filter(r => r.tipo === 'IVA').reduce((s, r) => s + r.valor, 0)
+                await contabilidadService.crearAsientoCompra({
+                    empresaId:     empresa.id,
+                    portalRuc:     empresa.ruc ?? '',
+                    fecha:         fechaEmision,
+                    glosa:         `LC ${numLC} — ${nombre}`,
+                    subtotal,
+                    valorIva,
+                    retFuente:     r2(retIR),
+                    retIva:        r2(retIVA),
+                    formaPago,
+                    tipoCompra:    'SERVICIO',
+                    cuentas,
+                    referencia:    lc.id,
+                    lineasServicio: detalle.filter(d => d.subtotal > 0).map(d => ({
+                        descripcion:        d.descripcion,
+                        subtotal:           d.subtotal,
+                        cuenta_contable_id: d.cuenta_contable_id,
+                    })),
+                })
+            } catch (err: any) {
+                if (!contabError) contabError = err?.message ?? String(err)
+                console.error('[asientoLC]', contabError)
+                setErrorMsg(`LC guardada. ⚠ Asiento contable NO generado: ${contabError}`)
             }
 
             if (autorizar) {
@@ -374,7 +389,8 @@ export function NuevaLiquidacionCompraPage() {
 
             clearDraft()
             setSaved(true)
-            setTimeout(() => navigate('/liquidaciones'), 1200)
+            // Si hubo error contable, dar 8 s para que el usuario lea el mensaje
+            setTimeout(() => navigate('/liquidaciones'), contabError ? 8000 : 1200)
         } catch (e: any) {
             setErrorMsg(e.message)
         } finally {
@@ -398,8 +414,13 @@ export function NuevaLiquidacionCompraPage() {
                 <button onClick={() => navigate('/liquidaciones')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-primary-600 mb-2">
                     <ArrowLeft className="w-4 h-4" /> Liquidaciones de Compra
                 </button>
-                <h1 className="text-2xl font-bold text-slate-900">Nueva Liquidación de Compra</h1>
-                <p className="text-sm text-slate-500 mt-0.5">Comprobante electrónico codDoc=03 · SRI Ecuador</p>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">Nueva Liquidación de Compra</h1>
+                        <p className="text-sm text-slate-500 mt-0.5">Comprobante electrónico codDoc=03 · SRI Ecuador</p>
+                    </div>
+                    <HelpButton pageKey="nueva-lc" />
+                </div>
             </div>
 
             {/* Alerta límites SRI */}

@@ -25,8 +25,7 @@ export function LiquidacionCompraRidePage() {
                 .from('liquidaciones_compra')
                 .select(`
                     *,
-                    detalles:liquidacion_compra_detalles(*),
-                    retenciones:retenciones_compras!liquidacion_id(*)
+                    detalles:liquidacion_compra_detalles(*)
                 `)
                 .eq('id', id!)
                 .single()
@@ -62,13 +61,9 @@ export function LiquidacionCompraRidePage() {
         <div className="p-12 text-center text-red-500">No se encontró la liquidación de compra.</div>
     )
 
-    const numLC      = `${datos.establecimiento}-${datos.punto_emision}-${datos.secuencial}`
-    const detalles   = datos.detalles   ?? []
-    const retenciones = datos.retenciones ?? []
-    const ambiente   = (empresa as any)?.config_sri?.ambiente || 'PRODUCCION'
-
-    const retsIR  = retenciones.filter((r: any) => r.tipo === 'FUENTE')
-    const retsIVA = retenciones.filter((r: any) => r.tipo === 'IVA')
+    const numLC    = `${datos.establecimiento}-${datos.punto_emision}-${datos.secuencial}`
+    const detalles = datos.detalles ?? []
+    const ambiente = (empresa as any)?.config_sri?.ambiente || 'PRODUCCION'
 
     return (
         <>
@@ -267,51 +262,6 @@ export function LiquidacionCompraRidePage() {
                         ))}
                     </tbody>
                 </table>
-
-                {/* RETENCIONES (si aplica) */}
-                {retenciones.length > 0 && (
-                    <>
-                        <div className="border border-t-0 border-slate-400 px-2 py-1 bg-amber-50/50">
-                            <p className="font-bold text-[8.5px] uppercase">Retenciones Aplicadas</p>
-                        </div>
-                        <table className="w-full border-collapse border border-t-0 border-slate-400 text-[9px]">
-                            <thead>
-                                <tr className="bg-amber-50 text-[8.5px]">
-                                    <th className="border border-slate-300 px-1 py-1 text-left font-bold">Tipo</th>
-                                    <th className="border border-slate-300 px-1 py-1 text-left font-bold">Código</th>
-                                    <th className="border border-slate-300 px-1 py-1 text-right font-bold">Base Imponible</th>
-                                    <th className="border border-slate-300 px-1 py-1 text-right font-bold">%</th>
-                                    <th className="border border-slate-300 px-1 py-1 text-right font-bold">Valor Retenido</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {[...retsIR, ...retsIVA].map((r: any, i: number) => (
-                                    <tr key={r.id ?? i}>
-                                        <td className="border border-slate-200 px-1 py-0.5">
-                                            <span className={`px-1 py-0.5 rounded text-[8px] font-semibold ${
-                                                r.tipo === 'FUENTE'
-                                                    ? 'bg-blue-100 text-blue-700'
-                                                    : 'bg-purple-100 text-purple-700'
-                                            }`}>{r.tipo === 'FUENTE' ? 'IR' : r.tipo}</span>
-                                        </td>
-                                        <td className="border border-slate-200 px-1 py-0.5 font-mono font-bold">
-                                            {r.codigo_retencion}
-                                        </td>
-                                        <td className="border border-slate-200 px-1 py-0.5 text-right font-mono">
-                                            {fmt2(r.base_imponible)}
-                                        </td>
-                                        <td className="border border-slate-200 px-1 py-0.5 text-right font-mono">
-                                            {Number(r.porcentaje).toFixed(2)}%
-                                        </td>
-                                        <td className="border border-slate-200 px-1 py-0.5 text-right font-mono font-bold text-amber-800">
-                                            {fmt2(r.valor)}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </>
-                )}
 
                 {/* TOTALES */}
                 <table className="w-full border-collapse border border-t-0 border-slate-400">
