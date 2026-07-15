@@ -78,6 +78,7 @@ const ComprobantesRetencionPage    = lz(() => import('./pages/vendor/Comprobante
 const RetencionRidePage            = lz(() => import('./pages/vendor/RetencionRidePage'), 'RetencionRidePage')
 const LiquidacionesCompraPage      = lz(() => import('./pages/vendor/LiquidacionesCompraPage'), 'LiquidacionesCompraPage')
 const NuevaLiquidacionCompraPage   = lz(() => import('./pages/vendor/NuevaLiquidacionCompraPage'), 'NuevaLiquidacionCompraPage')
+const LiquidacionCompraRidePage    = lz(() => import('./pages/vendor/LiquidacionCompraRidePage'), 'LiquidacionCompraRidePage')
 
 // ── Módulo Contabilidad ───────────────────────────────────────────────────────
 const ContaDashboard               = lz(() => import('./pages/contabilidad/DashboardPage'), 'DashboardPage')
@@ -651,6 +652,7 @@ function App() {
               <Route path="/retenciones/:compra_id/ride" element={<RetencionRidePage />} />
               <Route path="/liquidaciones" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><LiquidacionesCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/liquidaciones/nueva" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaLiquidacionCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
+              <Route path="/liquidaciones/:id/ride" element={<LiquidacionCompraRidePage />} />
               <Route path="/reportes/compras" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><VendorConsultaComprasPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/reportes/cxp" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><ConsultaCxPPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/reportes/estado-cuenta" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><EstadoCuentaProveedorPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />

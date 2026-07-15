@@ -4,10 +4,11 @@ import { useAuth } from '../../contexts/AuthContext'
 import { liquidacionCompraService } from '../../services/liquidacionCompraService'
 import type { LiquidacionCompra, KPIsLC, EstadoLC } from '../../types/liquidacionCompra'
 import { ESTADO_LC_BADGE } from '../../types/liquidacionCompra'
+import { Link } from 'react-router-dom'
 import {
     FilePlus, Search, Filter, Eye, Ban, Download, Loader2,
     AlertCircle, X, CheckCircle, Clock, XCircle, FileText,
-    RefreshCw,
+    RefreshCw, Send,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import * as XLSX from 'xlsx'
@@ -220,16 +221,22 @@ function DetalleModal({ id, onClose, onAnular }: {
                 {/* Acciones */}
                 {data && !loading && (
                     <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap gap-2 justify-end">
-                        {data.estado_sri === 'PENDIENTE' && (
+                        {['PENDIENTE', 'RECHAZADO'].includes(data.estado_sri) && (
                             <button
                                 onClick={handleAutorizar}
                                 disabled={autorizando}
                                 className="btn-primary flex items-center gap-2"
                             >
-                                {autorizando ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                                {autorizando ? 'Autorizando…' : 'Autorizar en SRI'}
+                                {autorizando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                {autorizando ? 'Autorizando…' : (data.estado_sri === 'RECHAZADO' ? 'Reintentar SRI' : 'Autorizar en SRI')}
                             </button>
                         )}
+                        <Link
+                            to={`/liquidaciones/${id}/ride`}
+                            className="btn-secondary flex items-center gap-2 text-sm"
+                        >
+                            <FileText className="w-4 h-4" /> RIDE
+                        </Link>
                         {data.xml_firmado && (
                             <a
                                 href={`data:text/xml;charset=utf-8,${encodeURIComponent(data.xml_firmado)}`}
@@ -239,7 +246,7 @@ function DetalleModal({ id, onClose, onAnular }: {
                                 <Download className="w-4 h-4" /> XML
                             </a>
                         )}
-                        {['PENDIENTE', 'RECHAZADO'].includes(data.estado_sri) && (
+                        {data.estado_sri !== 'ANULADO' && (
                             <button
                                 onClick={() => onAnular(id)}
                                 className="px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1"
@@ -322,8 +329,9 @@ export function LiquidacionesCompraPage() {
     const [busqueda, setBusqueda] = useState('')
 
     // Modales
-    const [detalleId, setDetalleId] = useState<string | null>(null)
-    const [anularId, setAnularId]   = useState<string | null>(null)
+    const [detalleId, setDetalleId]       = useState<string | null>(null)
+    const [anularId, setAnularId]         = useState<string | null>(null)
+    const [autorizandoId, setAutorizandoId] = useState<string | null>(null)
 
     // Exportar
     const [exporting, setExporting] = useState(false)
@@ -383,6 +391,30 @@ export function LiquidacionesCompraPage() {
         setAnularId(null)
         setDetalleId(null)
         cargar()
+    }
+
+    async function handleAutorizarInline(lc: LiquidacionCompra) {
+        setAutorizandoId(lc.id)
+        try {
+            await liquidacionCompraService.autorizar(lc.id)
+            await cargar()
+        } catch (e: any) {
+            setError(`Error al autorizar LC ${numLC(lc)}: ${e.message}`)
+        } finally {
+            setAutorizandoId(null)
+        }
+    }
+
+    function descargarXml(lc: LiquidacionCompra) {
+        const xml = (lc as any).xml_firmado
+        if (!xml) return
+        const blob = new Blob([xml], { type: 'application/xml' })
+        const url  = URL.createObjectURL(blob)
+        const a    = document.createElement('a')
+        a.href     = url
+        a.download = `LC-${numLC(lc)}.xml`
+        a.click()
+        URL.revokeObjectURL(url)
     }
 
     const kpiCards = [
@@ -536,14 +568,59 @@ export function LiquidacionesCompraPage() {
                                                 {lc.estado_sri}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <button
-                                                onClick={() => setDetalleId(lc.id)}
-                                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600"
-                                                title="Ver detalle"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                            </button>
+                                        <td className="px-2 py-3">
+                                            <div className="flex items-center gap-1 justify-end">
+                                                {/* Autorizar / Reintentar */}
+                                                {['PENDIENTE', 'RECHAZADO'].includes(lc.estado_sri) && lc.estado_sri !== 'ANULADO' && (
+                                                    <button
+                                                        onClick={() => handleAutorizarInline(lc)}
+                                                        disabled={autorizandoId === lc.id}
+                                                        title={lc.estado_sri === 'RECHAZADO' ? 'Reintentar' : 'Autorizar en SRI'}
+                                                        className="flex items-center gap-1 px-2 py-1.5 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 disabled:opacity-50 whitespace-nowrap"
+                                                    >
+                                                        {autorizandoId === lc.id
+                                                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                            : <Send className="w-3 h-3" />}
+                                                        {autorizandoId === lc.id ? '' : (lc.estado_sri === 'RECHAZADO' ? 'Reintentar' : 'Autorizar')}
+                                                    </button>
+                                                )}
+                                                {/* RIDE */}
+                                                <Link
+                                                    to={`/liquidaciones/${lc.id}/ride`}
+                                                    title="Ver RIDE"
+                                                    className="flex items-center gap-1 px-2 py-1.5 border border-slate-200 text-slate-600 text-xs rounded-lg hover:bg-slate-50"
+                                                >
+                                                    <FileText className="w-3 h-3" /> RIDE
+                                                </Link>
+                                                {/* XML */}
+                                                {(lc as any).xml_firmado && (
+                                                    <button
+                                                        onClick={() => descargarXml(lc)}
+                                                        title="Descargar XML"
+                                                        className="flex items-center gap-1 px-2 py-1.5 border border-slate-200 text-slate-600 text-xs rounded-lg hover:bg-slate-50"
+                                                    >
+                                                        <Download className="w-3 h-3" /> XML
+                                                    </button>
+                                                )}
+                                                {/* Ver detalle */}
+                                                <button
+                                                    onClick={() => setDetalleId(lc.id)}
+                                                    title="Ver detalle"
+                                                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </button>
+                                                {/* Anular */}
+                                                {lc.estado_sri !== 'ANULADO' && (
+                                                    <button
+                                                        onClick={() => setAnularId(lc.id)}
+                                                        title="Anular"
+                                                        className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600"
+                                                    >
+                                                        <Ban className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
