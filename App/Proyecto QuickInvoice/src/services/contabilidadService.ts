@@ -157,6 +157,8 @@ export const contabilidadService = {
         creadoPor?:     string
         // Per-line accounts for service purchases
         lineasServicio?: { descripcion: string; subtotal: number; cuenta_contable_id?: string | null }[]
+        // Per-line accounts for retenciones (overrides global ret_fuente / ret_iva)
+        lineasRetencion?: { tipo: string; valor: number; cuenta_contable_id?: string | null }[]
     }): Promise<void> {
         const lpId = await getLpEmpresaId(p.portalRuc)
         const [año, mes] = p.fecha.split('-').map(Number)
@@ -198,12 +200,22 @@ export const contabilidadService = {
         if (neto > 0)
             lineas.push({ comprobante_id: id, empresa_id: lpId, cuenta_id: cuentaHaber,
                 descripcion: null, debe: 0, haber: neto, orden: ord++ })
-        if (p.retFuente > 0 && p.cuentas.ret_fuente)
-            lineas.push({ comprobante_id: id, empresa_id: lpId, cuenta_id: p.cuentas.ret_fuente,
-                descripcion: null, debe: 0, haber: p.retFuente, orden: ord++ })
-        if (p.retIva > 0 && p.cuentas.ret_iva)
-            lineas.push({ comprobante_id: id, empresa_id: lpId, cuenta_id: p.cuentas.ret_iva,
-                descripcion: null, debe: 0, haber: p.retIva, orden: ord++ })
+        if (p.lineasRetencion?.length) {
+            for (const lr of p.lineasRetencion) {
+                const ctaFallback = lr.tipo === 'IVA' ? p.cuentas.ret_iva : p.cuentas.ret_fuente
+                const cta = lr.cuenta_contable_id || ctaFallback
+                if (cta && lr.valor > 0)
+                    lineas.push({ comprobante_id: id, empresa_id: lpId, cuenta_id: cta,
+                        descripcion: null, debe: 0, haber: Math.round(lr.valor * 100) / 100, orden: ord++ })
+            }
+        } else {
+            if (p.retFuente > 0 && p.cuentas.ret_fuente)
+                lineas.push({ comprobante_id: id, empresa_id: lpId, cuenta_id: p.cuentas.ret_fuente,
+                    descripcion: null, debe: 0, haber: p.retFuente, orden: ord++ })
+            if (p.retIva > 0 && p.cuentas.ret_iva)
+                lineas.push({ comprobante_id: id, empresa_id: lpId, cuenta_id: p.cuentas.ret_iva,
+                    descripcion: null, debe: 0, haber: p.retIva, orden: ord++ })
+        }
 
         await insertarLineas(lineas)
         await actualizarSaldos(id)
