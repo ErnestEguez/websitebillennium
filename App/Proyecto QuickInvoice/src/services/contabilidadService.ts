@@ -177,6 +177,27 @@ export const contabilidadService = {
         const [año, mes] = p.fecha.split('-').map(Number)
         const periodoId  = await getPeriodo(lpId, p.fecha)
         const tipoId     = await getTipo('CD')
+
+        // Idempotencia: si ya existe un comprobante para esta referencia, verificar
+        // Si tiene líneas → ya está completo, salir. Si no → es huérfano, eliminarlo.
+        if (p.referencia) {
+            const { data: existente } = await supabaseContabilidad
+                .from('lp_comprobantes')
+                .select('id')
+                .eq('empresa_id', lpId)
+                .eq('referencia_externa', p.referencia)
+                .maybeSingle()
+            if (existente?.id) {
+                const { count } = await (supabaseContabilidad as any)
+                    .from('lp_comprobante_lineas')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('comprobante_id', existente.id)
+                if (count && count > 0) return  // Asiento completo ya existe
+                // Comprobante huérfano (sin líneas) — eliminar para recrear limpio
+                await supabaseContabilidad.from('lp_comprobantes').delete().eq('id', existente.id)
+            }
+        }
+
         const numero     = await getNumero(lpId, 'CD', año, mes)
 
         const neto   = Math.round((p.subtotal + p.valorIva - p.retFuente - p.retIva) * 100) / 100
