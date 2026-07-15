@@ -329,19 +329,17 @@ export function NuevaLiquidacionCompraPage() {
                     ret_fuente:        cfg.ret_fuente         ?? '',
                     ret_iva:           cfg.ret_iva            ?? '',
                 }
-                // Validar cuentas mínimas: contraparte del pasivo + al menos una cuenta de gasto
+                // Validar cuentas mínimas
                 const cuentaHaber = formaPago === 'CREDITO' ? cuentas.cuentas_por_pagar : cuentas.efectivo
-                const cuentaGastoFallback = cuentas.gastos_servicios
                 const tieneMin  = !!cuentaHaber
-                // Verificar que al menos una línea tiene cuenta asignada o hay fallback de gasto
-                const hayDebit  = detalle.filter(d => d.subtotal > 0).some(d => d.cuenta_contable_id) || !!cuentaGastoFallback
+                const hayDebit  = detalle.filter(d => d.subtotal > 0).some(d => d.cuenta_contable_id)
 
                 if (!tieneMin) {
                     contabError = 'Configure la cuenta Cuentas por Pagar (o Efectivo) en Compras → Ajustes'
                     throw new Error(contabError)
                 }
                 if (!hayDebit) {
-                    contabError = 'Configure la cuenta "Gastos de Servicios (fallback)" en Compras → Ajustes, o asigne cuenta contable a cada línea'
+                    contabError = 'Asigne una cuenta contable a las líneas de detalle (columna "Cuenta contable" en el formulario)'
                     throw new Error(contabError)
                 }
 
@@ -593,7 +591,7 @@ export function NuevaLiquidacionCompraPage() {
                                                 onChange={e => actualizarLinea(idx, 'cuenta_contable_id', e.target.value || null)}
                                                 className="w-full border border-slate-200 rounded-md px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary-500 outline-none"
                                             >
-                                                <option value="">— cuenta de Ajustes —</option>
+                                                <option value="">— seleccionar cuenta de gasto —</option>
                                                 {cuentasGasto.map(c => (
                                                     <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}</option>
                                                 ))}
