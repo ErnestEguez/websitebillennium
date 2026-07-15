@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { proveedorService } from '../services/vendorService'
 import type { Proveedor } from '../types/vendors'
 import { REGIMEN_LABELS } from '../types/vendors'
-import { CODIGOS_SRI_DEFAULT } from '../services/codigoRetencionService'
+import { codigoRetencionService, type CodigoRetencion } from '../services/codigoRetencionService'
 import {
     Building2, Plus, Edit2, Save, X, Search,
     Phone, Mail, MapPin, AlertCircle,
@@ -49,15 +49,19 @@ export function ProveedoresPage() {
     const [editando, setEditando] = useState<Partial<Proveedor>>(PROVEEDOR_VACIO)
     const [tabForm, setTabForm] = useState<'basico' | 'tributario' | 'pago'>('basico')
     const [saving, setSaving] = useState(false)
-    const codsRet = CODIGOS_SRI_DEFAULT
+    const [codsRet, setCodsRet] = useState<CodigoRetencion[]>([])
 
     useEffect(() => { if (empresa?.id) load() }, [empresa?.id])
 
     async function load() {
         try {
             setLoading(true)
-            const data = await proveedorService.listar(empresa!.id)
+            const [data, codigos] = await Promise.all([
+                proveedorService.listar(empresa!.id),
+                codigoRetencionService.listar(empresa!.id),
+            ])
             setProveedores(data)
+            setCodsRet(codigos.filter(c => c.activo))
         } catch (e: any) {
             alert('Error al cargar proveedores: ' + e.message)
         } finally {
@@ -448,9 +452,7 @@ export function ProveedoresPage() {
                                                 <select className="input text-sm"
                                                     value={editando.ret_fuente_codigo ?? ''}
                                                     onChange={e => {
-                                                        const cod = codsRet.find(c => c.codigo === e.target.value && c.tipo === 'FUENTE')
                                                         set('ret_fuente_codigo', e.target.value || null)
-                                                        set('ret_fuente_porcentaje', cod?.porcentaje ?? null)
                                                     }}>
                                                     <option value="">— Sin retención —</option>
                                                     {codsRet.filter(c => c.tipo === 'FUENTE' && c.activo).map(c => (
@@ -463,9 +465,7 @@ export function ProveedoresPage() {
                                                 <select className="input text-sm"
                                                     value={editando.ret_iva_codigo ?? ''}
                                                     onChange={e => {
-                                                        const cod = codsRet.find(c => c.codigo === e.target.value && c.tipo === 'IVA')
                                                         set('ret_iva_codigo', e.target.value || null)
-                                                        set('ret_iva_porcentaje', cod?.porcentaje ?? null)
                                                     }}>
                                                     <option value="">— Sin retención —</option>
                                                     {codsRet.filter(c => c.tipo === 'IVA' && c.activo).map(c => (
