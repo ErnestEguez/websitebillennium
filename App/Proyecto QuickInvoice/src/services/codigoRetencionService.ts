@@ -223,21 +223,25 @@ export const codigoRetencionService = {
         if (error) throw error
     },
 
-    async sembrarDefaults(empresaId: string): Promise<void> {
-        // Upsert solo los campos SRI (no toca cuenta_contable_* que el usuario ya configuró)
-        const registros = CODIGOS_SRI_DEFAULT.map(c => ({
-            empresa_id:  empresaId,
-            codigo:      c.codigo,
-            tipo:        c.tipo,
-            descripcion: c.descripcion,
-            porcentaje:  c.porcentaje,
-            aplica_a:    c.aplica_a,
-            base_legal:  c.base_legal,
-            activo:      c.activo,
-        }))
+    async contarCodigos(empresaId: string): Promise<number> {
+        const { count } = await supabase
+            .from('codigos_retencion')
+            .select('id', { count: 'exact', head: true })
+            .eq('empresa_id', empresaId)
+        return count ?? 0
+    },
+
+    async sembrarDefaults(empresaId: string): Promise<{ insertados: number }> {
+        // Solo inserta códigos que NO existan — jamás actualiza registros existentes.
+        // Las actualizaciones de porcentajes/descripciones del SRI se hacen
+        // manualmente desde la UI (botón Editar de cada código).
+        const registros = CODIGOS_SRI_DEFAULT.map(c => ({ ...c, empresa_id: empresaId }))
         const { error } = await supabase
             .from('codigos_retencion')
-            .upsert(registros, { onConflict: 'empresa_id,codigo,tipo' })
+            .upsert(registros, { onConflict: 'empresa_id,codigo,tipo', ignoreDuplicates: true })
         if (error) throw error
+        // Retorna cuántos quedaron en total para que la UI pueda informar
+        const total = await codigoRetencionService.contarCodigos(empresaId)
+        return { insertados: total }
     },
 }

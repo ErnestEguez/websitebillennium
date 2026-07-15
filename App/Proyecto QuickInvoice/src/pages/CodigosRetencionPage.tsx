@@ -116,7 +116,11 @@ export function CodigosRetencionPage() {
 
     async function sembrarDefaults() {
         if (!empresa?.id) return
-        if (!confirm('¿Cargar los códigos de retención SRI Ecuador 2025? Se añadirán los que no existan sin borrar los actuales.')) return
+        if (codigos.length > 0) {
+            alert('Esta empresa ya tiene códigos de retención configurados.\n\nPara actualizar porcentajes o descripciones cuando el SRI los cambie, usa el botón Editar (✏) de cada código — así no se pierden las cuentas contables que ya asignaste.')
+            return
+        }
+        if (!confirm('¿Cargar el catálogo inicial de códigos SRI Ecuador? Se insertarán todos los códigos base. Los porcentajes que cambie el SRI en el futuro se actualizan manualmente desde esta página.')) return
         setSeeding(true)
         try {
             await codigoRetencionService.sembrarDefaults(empresa.id)
@@ -228,10 +232,11 @@ export function CodigosRetencionPage() {
                     <p className="text-slate-500 text-sm">Catálogo vigente Ecuador 2025-2026 · LRTI Art. 45/48 · LIVA Art. 63 · Res. NAC-DGERCGC15-00000284</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                    <button onClick={sembrarDefaults} disabled={seeding}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-200 text-emerald-700 text-sm font-bold bg-emerald-50 hover:bg-emerald-100 transition-colors disabled:opacity-50">
+                    <button onClick={sembrarDefaults} disabled={seeding || codigos.length > 0}
+                        title={codigos.length > 0 ? 'Ya tienes códigos. Actualiza cada uno manualmente con el botón Editar.' : 'Carga el catálogo base para empresas nuevas'}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-200 text-emerald-700 text-sm font-bold bg-emerald-50 hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                         {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                        Cargar códigos SRI Ecuador
+                        {codigos.length > 0 ? 'Catálogo ya cargado' : 'Cargar catálogo inicial SRI'}
                     </button>
                     <button onClick={abrirNuevo}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-700 transition-colors">
