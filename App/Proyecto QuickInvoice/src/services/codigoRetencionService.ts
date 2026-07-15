@@ -78,7 +78,7 @@ export const CODIGOS_SRI_DEFAULT: CodigoDefault[] = [
     { tipo: 'FUENTE', codigo: '332', porcentaje: 2, activo: true, aplica_a: 'TODOS', base_legal: 'Art. 45 LRTI',
       descripcion: 'Por pagos a través de Liquidación de Compra — bienes (nivel cultural o rusticidad)',
       cuenta_contable_id: null, cuenta_contable_codigo: null, cuenta_contable_nombre: null },
-    { tipo: 'FUENTE', codigo: '340', porcentaje: 2, activo: true, aplica_a: 'TODOS', base_legal: 'Art. 45 LRTI',
+    { tipo: 'FUENTE', codigo: '340', porcentaje: 3, activo: true, aplica_a: 'TODOS', base_legal: 'Art. 45 LRTI',
       descripcion: 'Por pagos a través de Liquidación de Compra — servicios (nivel cultural o rusticidad)',
       cuenta_contable_id: null, cuenta_contable_codigo: null, cuenta_contable_nombre: null },
     { tipo: 'FUENTE', codigo: '341', porcentaje: 1, activo: true, aplica_a: 'PERSONA_NATURAL', base_legal: 'Art. 45 LRTI',
