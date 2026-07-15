@@ -501,24 +501,25 @@ serve(async (req) => {
                 secuencial9 = numRet.replace(/\D/g, "").padStart(9, "0").slice(-9);
             }
         } else {
-            // Auto-generate: find max secuencial in DB
+            // Auto-generate: find max secuencial ONLY for this estab/pto
+            const prefix = `${estab}-${pto}-`;
             const { data: existing } = await supabase
                 .from("retenciones_compras")
                 .select("numero_retencion")
                 .eq("empresa_id", empresa_id)
+                .like("numero_retencion", `${prefix}%`)
                 .not("numero_retencion", "is", null);
 
             let maxSeq = 0;
             (existing ?? []).forEach((r: any) => {
-                const m = (r.numero_retencion || "").match(/^\d{3}-\d{3}-(\d+)$/);
+                const m = (r.numero_retencion || "").match(/^\d{3}-\d{3}-(\d{9})$/);
                 if (m) {
                     const seq = parseInt(m[1], 10);
                     if (seq > maxSeq) maxSeq = seq;
                 }
             });
-            const nextSeq = maxSeq + 1;
-            secuencial9   = nextSeq.toString().padStart(9, "0");
-            numRet        = `${estab}-${pto}-${secuencial9}`;
+            secuencial9 = (maxSeq + 1).toString().padStart(9, "0");
+            numRet      = `${prefix}${secuencial9}`;
         }
 
         // ── 6. Build ambient and clave de acceso ──────────────
@@ -529,14 +530,18 @@ serve(async (req) => {
         const fechaEmision = (primera.fecha_emision as string) ||
             new Date().toISOString().split("T")[0];
 
-        const claveAcceso = generarClaveAcceso({
-            fechaEmision,
-            ruc:       (empresa as any).ruc,
-            ambiente:  ambienteCod,
-            estab,
-            pto,
-            secuencial: secuencial9,
-        });
+        // Reutilizar clave de acceso existente si ya fue firmada con este número
+        const claveAccesoExistente = primera.clave_acceso as string | null;
+        const claveAcceso = (claveAccesoExistente && primera.xml_firmado)
+            ? claveAccesoExistente
+            : generarClaveAcceso({
+                fechaEmision,
+                ruc:       (empresa as any).ruc,
+                ambiente:  ambienteCod,
+                estab,
+                pto,
+                secuencial: secuencial9,
+            });
 
         console.log("[sri-retencion] claveAcceso:", claveAcceso);
 

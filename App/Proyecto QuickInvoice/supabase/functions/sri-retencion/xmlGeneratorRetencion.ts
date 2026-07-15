@@ -67,7 +67,7 @@ export function generarXmlRetencion(data: RetencionXmlData): string {
         : ''
 
     const impuestosXml = retenciones.map(r => {
-        const codigoSRI = r.tipo === 'IVA' ? '1' : '2'
+        const codigoSRI = r.tipo === 'IVA' ? '2' : '1'
         return `
     <impuesto>
       <codigo>${codigoSRI}</codigo>

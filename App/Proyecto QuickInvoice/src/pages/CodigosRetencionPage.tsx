@@ -225,7 +225,7 @@ export function CodigosRetencionPage() {
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Códigos de Retención SRI</h1>
-                    <p className="text-slate-500 text-sm">Catálogo maestro Ecuador 2025 · Resolución NAC-DGERCGC14-00787</p>
+                    <p className="text-slate-500 text-sm">Catálogo vigente Ecuador 2025-2026 · LRTI Art. 45/48 · LIVA Art. 63 · Res. NAC-DGERCGC15-00000284</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                     <button onClick={sembrarDefaults} disabled={seeding}
