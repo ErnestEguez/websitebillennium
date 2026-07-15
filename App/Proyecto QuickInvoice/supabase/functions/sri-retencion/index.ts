@@ -376,7 +376,7 @@ async function generarRideRetencionPdf(opts: {
         if (qrDataUrl) { doc.addImage(qrDataUrl, "PNG", ML + CW/2 - 15, y, 30, 30); y += 32; }
     }
 
-    return doc.output("arraybuffer") as unknown as Uint8Array;
+    return new Uint8Array(doc.output("arraybuffer") as ArrayBuffer);
 }
 
 const SRI_ENDPOINTS = {
