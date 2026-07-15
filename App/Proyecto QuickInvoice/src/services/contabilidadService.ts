@@ -83,35 +83,48 @@ type Linea = {
     orden: number
 }
 
-async function insertarComprobante(empresaId: string, params: {
-    periodoId: string; tipoId: string; numero: string
-    fecha: string; glosa: string; origen: string
-    totalDebe: number; totalHaber: number
-    referenciaExterna?: string; creadoPor?: string
-}): Promise<string> {
-    const { data, error } = await supabaseContabilidad
-        .from('lp_comprobantes')
-        .insert({
-            empresa_id:          empresaId,
-            periodo_id:          params.periodoId,
-            tipo_comprobante_id: params.tipoId,
-            numero:              params.numero,
-            secuencial:          1,
-            fecha:               params.fecha,
-            glosa:               params.glosa,
-            estado:              'confirmado',
-            total_debe:          params.totalDebe,
-            total_haber:         params.totalHaber,
-            moneda_id:           null,
-            tipo_cambio:         1,
-            origen:              params.origen,
-            referencia_externa:  params.referenciaExterna ?? null,
-            created_by:          params.creadoPor ?? null,
-        })
-        .select('id')
-        .single()
-    if (error || !data) throw error ?? new Error('Error creando comprobante')
-    return data.id
+async function insertarComprobante(
+    empresaId: string,
+    params: {
+        periodoId: string; tipoId: string; numero: string
+        fecha: string; glosa: string; origen: string
+        totalDebe: number; totalHaber: number
+        referenciaExterna?: string; creadoPor?: string
+    },
+    getNextNumero?: () => Promise<string>,
+): Promise<string> {
+    let numero = params.numero
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const { data, error } = await supabaseContabilidad
+            .from('lp_comprobantes')
+            .insert({
+                empresa_id:          empresaId,
+                periodo_id:          params.periodoId,
+                tipo_comprobante_id: params.tipoId,
+                numero,
+                secuencial:          1,
+                fecha:               params.fecha,
+                glosa:               params.glosa,
+                estado:              'confirmado',
+                total_debe:          params.totalDebe,
+                total_haber:         params.totalHaber,
+                moneda_id:           null,
+                tipo_cambio:         1,
+                origen:              params.origen,
+                referencia_externa:  params.referenciaExterna ?? null,
+                created_by:          params.creadoPor ?? null,
+            })
+            .select('id')
+            .single()
+        if (!error && data) return data.id
+        // Número duplicado: pedir el siguiente y reintentar
+        if (error?.code === '23505' && getNextNumero && attempt < 2) {
+            numero = await getNextNumero()
+            continue
+        }
+        throw error ?? new Error('Error creando comprobante contable')
+    }
+    throw new Error('No se pudo insertar el comprobante contable tras 3 intentos')
 }
 
 async function insertarLineas(lineas: Linea[]): Promise<void> {
@@ -176,7 +189,7 @@ export const contabilidadService = {
             fecha: p.fecha, glosa: p.glosa, origen: 'quickinvoice',
             totalDebe: tdebe, totalHaber: thaber,
             referenciaExterna: p.referencia, creadoPor: p.creadoPor,
-        })
+        }, () => getNumero(lpId, 'CD', año, mes))
 
         const lineas: Linea[] = []
         let ord = 0
@@ -243,7 +256,7 @@ export const contabilidadService = {
             fecha: p.fecha, glosa: p.glosa, origen: 'quickinvoice',
             totalDebe: p.monto, totalHaber: p.monto,
             referenciaExterna: p.referencia, creadoPor: p.creadoPor,
-        })
+        }, () => getNumero(lpId, 'CE', año, mes))
 
         await insertarLineas([
             { comprobante_id: id, empresa_id: lpId, cuenta_id: p.cuentas.cuentas_por_pagar, descripcion: null, debe: p.monto, haber: 0,       orden: 0 },
