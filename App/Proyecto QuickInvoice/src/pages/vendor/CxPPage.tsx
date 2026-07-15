@@ -150,7 +150,10 @@ export function CxPPage() {
                                                     {(c.proveedor as any)?.nombre_empresa ?? '—'}
                                                 </td>
                                                 <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                                                    {(c.compra as any)?.numero_factura ?? '—'}
+                                                    {(c.compra as any)?.numero_factura
+                                                        ?? (c.liquidacion ? `${c.liquidacion.establecimiento}-${c.liquidacion.punto_emision}-${c.liquidacion.secuencial}` : null)
+                                                        ?? c.observaciones?.split('—')[0]?.replace('LC ','').trim()
+                                                        ?? '—'}
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-slate-600">{fmtFecha(c.fecha_emision)}</td>
                                                 <td className={cn('px-4 py-3 whitespace-nowrap font-medium', vencida ? 'text-red-600' : 'text-slate-600')}>

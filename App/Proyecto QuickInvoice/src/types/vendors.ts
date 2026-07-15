@@ -188,7 +188,8 @@ export interface CuentaPorPagar {
     id: string
     empresa_id: string
     proveedor_id: string
-    compra_id: string
+    compra_id?: string | null
+    liquidacion_id?: string | null
     fecha_emision: string
     fecha_vencimiento: string
     monto_original: number
@@ -199,7 +200,8 @@ export interface CuentaPorPagar {
     updated_at?: string
     // Joins
     proveedor?: Pick<Proveedor, 'nombre_empresa' | 'ruc'>
-    compra?: Pick<Compra, 'numero_factura' | 'fecha_emision' | 'tipo_compra'>
+    compra?: Pick<Compra, 'numero_factura' | 'fecha_emision' | 'tipo_compra'> | null
+    liquidacion?: { establecimiento: string; punto_emision: string; secuencial: string } | null
     pagos?: PagoProveedor[]
 }
 

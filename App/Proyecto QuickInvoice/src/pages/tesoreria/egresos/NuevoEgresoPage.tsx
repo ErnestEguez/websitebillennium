@@ -374,7 +374,10 @@ export function NuevoEgresoPage() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between gap-2">
                                                 <p className="text-sm font-semibold text-slate-800 truncate">
-                                                    {cxp.compra?.numero_factura || '—'}
+                                                    {cxp.compra?.numero_factura
+                                                        ?? (cxp.liquidacion ? `${cxp.liquidacion.establecimiento}-${cxp.liquidacion.punto_emision}-${cxp.liquidacion.secuencial}` : null)
+                                                        ?? cxp.observaciones?.split('—')[0]?.replace('LC ','').trim()
+                                                        ?? '—'}
                                                 </p>
                                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${ESTADO_CXP_BADGE[cxp.estado]}`}>
                                                     {cxp.estado}

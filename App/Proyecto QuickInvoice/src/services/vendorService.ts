@@ -18,7 +18,8 @@ const COMPRA_SELECT = `
 const CXP_SELECT = `
     *,
     proveedor:proveedores(nombre_empresa, ruc),
-    compra:ingresos_stock(numero_factura, fecha_emision, tipo_compra)
+    compra:ingresos_stock(numero_factura, fecha_emision, tipo_compra),
+    liquidacion:liquidaciones_compra(establecimiento, punto_emision, secuencial)
 `
 
 // ── Proveedores ─────────────────────────────────────────────
