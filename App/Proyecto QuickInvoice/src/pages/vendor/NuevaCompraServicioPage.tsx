@@ -4,7 +4,7 @@ import { useFormDraft } from '../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { compraService, proveedorService, retencionService } from '../../services/vendorService'
-import { CODIGOS_SRI_DEFAULT } from '../../services/codigoRetencionService'
+import { codigoRetencionService, type CodigoRetencion } from '../../services/codigoRetencionService'
 import { contableConfigService } from '../../services/contableConfigService'
 import { contabilidadComprasService } from '../../services/contabilidadComprasService'
 import type { Proveedor, DetalleServicio, TipoGasto } from '../../types/vendors'
@@ -63,6 +63,7 @@ export function NuevaCompraServicioPage() {
     const [numeroRetencion, setNumeroRetencion] = useState('')
     const [retenciones, setRetenciones]         = useState<RetLine[]>([])
     const [retSeccion, setRetSeccion]            = useState(false)
+    const [codigosRet, setCodigosRet]            = useState<CodigoRetencion[]>([])
 
     // Accounts for "Cuenta de gasto" per line (only if contabilidad enabled)
     const [cuentasGasto, setCuentasGasto] = useState<{ id: string; codigo: string; nombre: string }[]>([])
@@ -118,8 +119,12 @@ export function NuevaCompraServicioPage() {
 
     async function load() {
         try {
-            const provs = await proveedorService.listar(empresa!.id)
+            const [provs, codigos] = await Promise.all([
+                proveedorService.listar(empresa!.id),
+                codigoRetencionService.listar(empresa!.id),
+            ])
             setProveedores(provs.filter(p => p.estado === 'ACTIVO'))
+            setCodigosRet(codigos.filter(c => c.activo))
         } catch (e: any) { alert('Error: ' + e.message) }
         finally { setLoading(false) }
     }
@@ -338,17 +343,15 @@ export function NuevaCompraServicioPage() {
                                     setFechaVenc(d.toLocaleDateString('en-CA', { timeZone: 'America/Guayaquil' }))
                                 }
                             }
-                            // Auto-retenciones del proveedor
+                            // Auto-retenciones del proveedor — porcentaje/descripción siempre desde codigos_retencion
                             const autoRets: RetLine[] = []
-                            if (prov?.ret_fuente_codigo && prov.ret_fuente_porcentaje != null) {
-                                const desc = CODIGOS_SRI_DEFAULT.find(c => c.codigo === prov.ret_fuente_codigo && c.tipo === 'FUENTE')?.descripcion
-                                    ?? `Ret. Fuente ${prov.ret_fuente_codigo}`
-                                autoRets.push({ tipo: 'FUENTE', codigo: prov.ret_fuente_codigo, descripcion: desc, base: 0, pct: prov.ret_fuente_porcentaje!, valor: 0 })
+                            if (prov?.ret_fuente_codigo) {
+                                const cat = codigosRet.find(c => c.codigo === prov.ret_fuente_codigo && c.tipo === 'FUENTE')
+                                if (cat) autoRets.push({ tipo: 'FUENTE', codigo: cat.codigo, descripcion: cat.descripcion, base: 0, pct: cat.porcentaje, valor: 0 })
                             }
-                            if (prov?.ret_iva_codigo && prov.ret_iva_porcentaje != null) {
-                                const desc = CODIGOS_SRI_DEFAULT.find(c => c.codigo === prov.ret_iva_codigo && c.tipo === 'IVA')?.descripcion
-                                    ?? `Ret. IVA ${prov.ret_iva_codigo}`
-                                autoRets.push({ tipo: 'IVA', codigo: prov.ret_iva_codigo, descripcion: desc, base: 0, pct: prov.ret_iva_porcentaje!, valor: 0 })
+                            if (prov?.ret_iva_codigo) {
+                                const cat = codigosRet.find(c => c.codigo === prov.ret_iva_codigo && c.tipo === 'IVA')
+                                if (cat) autoRets.push({ tipo: 'IVA', codigo: cat.codigo, descripcion: cat.descripcion, base: 0, pct: cat.porcentaje, valor: 0 })
                             }
                             if (autoRets.length > 0) {
                                 const retsCalculadas = autoRets.map(r => {
@@ -559,6 +562,7 @@ export function NuevaCompraServicioPage() {
                                 onChange={setRetenciones}
                                 baseDefault={subtotalLineas}
                                 baseIva={ivaCalc}
+                                codigos={codigosRet}
                             />
                         </div>
                     )}

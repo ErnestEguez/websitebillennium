@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { CODIGOS_RETENCION_FUENTE, CODIGOS_RETENCION_IVA } from '../../types/vendors'
 import type { TipoRetencion } from '../../types/vendors'
+import type { CodigoRetencion } from '../../services/codigoRetencionService'
 import { cn } from '../../lib/utils'
 
 export interface RetLine {
@@ -24,11 +24,12 @@ interface Props {
     onChange:          (list: RetLine[]) => void
     baseDefault:       number   // base para líneas FUENTE (subtotal de la factura)
     baseIva?:          number   // base para líneas de IVA (valor_iva de la factura)
+    codigos:           CodigoRetencion[]   // catálogo leído desde la BD (codigos_retencion)
 }
 
 export function RetencionesEditor({
     numeroRetencion, onChangeNumero,
-    retenciones, onChange, baseDefault, baseIva = 0,
+    retenciones, onChange, baseDefault, baseIva = 0, codigos,
 }: Props) {
 
     function baseParaTipo(tipo: TipoRetencion) {
@@ -55,8 +56,7 @@ export function RetencionesEditor({
     }
 
     function selCodigo(i: number, tipo: TipoRetencion, codigo: string) {
-        const lista = tipo === 'FUENTE' ? CODIGOS_RETENCION_FUENTE : CODIGOS_RETENCION_IVA
-        const item  = lista.find(c => c.codigo === codigo)
+        const item  = codigos.find(c => c.tipo === tipo && c.codigo === codigo)
         const next  = retenciones.map((r, j) => {
             if (j !== i) return r
             const pct  = item?.porcentaje ?? r.pct
@@ -115,7 +115,7 @@ export function RetencionesEditor({
                             <select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white" value={r.codigo}
                                 onChange={e => selCodigo(i, r.tipo, e.target.value)}>
                                 <option value="">Seleccionar...</option>
-                                {(r.tipo === 'FUENTE' ? CODIGOS_RETENCION_FUENTE : CODIGOS_RETENCION_IVA).map(c => (
+                                {codigos.filter(c => c.tipo === r.tipo && c.activo).map(c => (
                                     <option key={c.codigo} value={c.codigo}>
                                         {c.codigo} — {c.descripcion.slice(0, 45)} ({c.porcentaje}%)
                                     </option>

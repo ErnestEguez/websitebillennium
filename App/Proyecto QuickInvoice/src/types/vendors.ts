@@ -59,11 +59,9 @@ export interface Proveedor {
     contribuyente_especial: boolean
     agente_retencion:     boolean
     tipo_regimen:         TipoRegimen
-    // Retenciones automáticas predeterminadas
+    // Retenciones automáticas predeterminadas (solo código; porcentaje viene de codigos_retencion)
     ret_fuente_codigo?:      string | null
-    ret_fuente_porcentaje?:  number | null
     ret_iva_codigo?:         string | null
-    ret_iva_porcentaje?:     number | null
     created_at?: string
     updated_at?: string
 }
@@ -292,27 +290,3 @@ export const REGIMEN_LABELS: Record<TipoRegimen, string> = {
     RIMPE_NEGOCIO_POPULAR:  'RIMPE Negocio Popular',
 }
 
-// Códigos de retención frecuentes (fuente)
-export const CODIGOS_RETENCION_FUENTE = [
-    { codigo: '303', descripcion: 'Honorarios profesionales y demás pagos por servicios', porcentaje: 10 },
-    { codigo: '304', descripcion: 'Servicios predomina mano de obra', porcentaje: 2 },
-    { codigo: '307', descripcion: 'Servicios de construcción', porcentaje: 1 },
-    { codigo: '309', descripcion: 'Arrendamiento de bienes inmuebles', porcentaje: 8 },
-    { codigo: '310', descripcion: 'Seguros y reaseguros', porcentaje: 1 },
-    { codigo: '312', descripcion: 'Transporte privado de pasajeros o servicio público o privado de carga', porcentaje: 1 },
-    { codigo: '319', descripcion: 'Otros servicios no contemplados', porcentaje: 2 },
-    { codigo: '320', descripcion: 'Arrendamiento bienes muebles', porcentaje: 2 },
-    { codigo: '322', descripcion: 'Seguros y reaseguros primas y cesiones', porcentaje: 1 },
-    { codigo: '327', descripcion: 'Energía eléctrica', porcentaje: 1 },
-    { codigo: '340', descripcion: 'Por pagos a través de liquidación de compra (nivel cultural o rusticidad)', porcentaje: 2 },
-    { codigo: '341', descripcion: 'Por compras a través de liquidaciones de compra', porcentaje: 1 },
-    { codigo: '403', descripcion: 'Compras de bienes agrícolas, avícolas, pecuarios, apícolas, cunículas, bioacuáticos', porcentaje: 1 },
-    { codigo: '601', descripcion: 'No Registrados', porcentaje: 0 },
-    { codigo: '721', descripcion: 'Bienes no producidos en el país - con impuesto a la renta - pagos al exterior', porcentaje: 0 },
-]
-
-export const CODIGOS_RETENCION_IVA = [
-    { codigo: '725', descripcion: 'Ret. IVA 30% - Bienes', porcentaje: 30 },
-    { codigo: '726', descripcion: 'Ret. IVA 70% - Servicios', porcentaje: 70 },
-    { codigo: '727', descripcion: 'Ret. IVA 100% - Servicios profesionales', porcentaje: 100 },
-]
