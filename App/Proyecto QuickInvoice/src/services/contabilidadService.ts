@@ -70,7 +70,26 @@ async function getNumero(empresaId: string, tipoCodigo: string, año: number, me
         p_mes: mes,
     })
     if (error) throw error
-    return data as string
+    const rpcNumero = data as string
+
+    // Verificar que el número del RPC no esté ya ocupado (contador desincronizado)
+    const mesStr = String(mes).padStart(2, '0')
+    const prefix = `${tipoCodigo}-${año}-${mesStr}-`
+    const { data: maxRow } = await (supabaseContabilidad as any)
+        .from('lp_comprobantes')
+        .select('numero')
+        .eq('empresa_id', empresaId)
+        .like('numero', `${prefix}%`)
+        .order('numero', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    // Si el RPC devuelve un número mayor que el MAX real → está bien, usarlo
+    if (!maxRow || rpcNumero > maxRow.numero) return rpcNumero
+
+    // Contador desincronizado: calcular próximo desde el MAX real
+    const maxSeq = parseInt((maxRow.numero as string).replace(prefix, ''), 10)
+    return `${prefix}${String(maxSeq + 1).padStart(6, '0')}`
 }
 
 type Linea = {
