@@ -64,13 +64,14 @@ function generarClaveAcceso(params: {
         console.warn("[ClaveAcceso] base48 length:", base48.length, base48)
     }
 
-    const weights = [2, 3, 4, 5, 6, 7]
+    // Módulo 11: coeficientes 2-7 de derecha a izquierda (igual que sri-signer)
+    const coefs = [2, 3, 4, 5, 6, 7]
     let sum = 0
-    for (let i = 0; i < base48.length; i++) {
-        sum += parseInt(base48[i], 10) * weights[i % 6]
+    for (let i = base48.length - 1; i >= 0; i--) {
+        sum += parseInt(base48[i], 10) * coefs[(base48.length - 1 - i) % 6]
     }
-    const residuo  = 11 - (sum % 11)
-    const verifier = residuo === 11 ? 0 : residuo === 10 ? 1 : residuo
+    const residuo  = sum % 11
+    const verifier = residuo === 0 ? 0 : residuo === 1 ? 1 : 11 - residuo
 
     return base48 + verifier.toString()
 }
