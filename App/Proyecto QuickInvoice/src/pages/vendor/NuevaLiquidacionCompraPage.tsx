@@ -406,6 +406,21 @@ export function NuevaLiquidacionCompraPage() {
                     setTimeout(() => navigate('/liquidaciones'), 3000)
                     return
                 }
+
+                // Autorizar retención automáticamente si aplica
+                const retsParaAutorizar = empresa.es_agente_retencion ? retenciones : []
+                if (retsParaAutorizar.length > 0) {
+                    try {
+                        const { data: retData } = await supabase.functions.invoke('sri-retencion', {
+                            body: { liquidacion_id: lc.id, empresa_id: empresa.id },
+                        })
+                        if (!retData?.authorized) {
+                            setErrorMsg(`LC autorizada. ⚠ Retención: ${retData?.message || retData?.error || 'No autorizada aún'}`)
+                        }
+                    } catch (retErr: any) {
+                        setErrorMsg(`LC autorizada. ⚠ Error al autorizar retención: ${retErr.message}`)
+                    }
+                }
             }
 
             clearDraft()
