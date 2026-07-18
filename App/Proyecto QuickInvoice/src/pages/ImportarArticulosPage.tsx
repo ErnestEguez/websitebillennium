@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { bodegaService } from '../services/bodegaService'
 import {
-    Upload, CheckCircle, AlertCircle, Loader2, FileText, X, AlertTriangle,
+    Upload, CheckCircle, AlertCircle, Loader2, FileText, X, AlertTriangle, Wrench,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -25,22 +26,45 @@ interface ImportSummary {
     errorMessages: string[]
 }
 
+interface CorrectionSummary {
+    corrected: number
+    notFound: string[]
+    alreadyHasMovements: string[]
+    stockNotZero: string[]
+    errorMessages: string[]
+}
+
+type FieldDelimiter = ';' | ','
+
 /* ── Utilidades ─────────────────────────────────────────────────────────── */
 
 const BATCH_SIZE = 50
 
+// Acepta "4,00" y "4.00" indistintamente. Si trae ambos separadores
+// (ej. "1.234,56" o "1,234.56"), asume que el último es el decimal.
 function parseNumber(val: string): number {
-    const n = Number(val.trim())
+    let s = (val ?? '').trim()
+    if (!s) return 0
+    const hasComma = s.includes(',')
+    const hasDot = s.includes('.')
+    if (hasComma && hasDot) {
+        s = s.lastIndexOf(',') > s.lastIndexOf('.')
+            ? s.replace(/\./g, '').replace(',', '.')
+            : s.replace(/,/g, '')
+    } else if (hasComma) {
+        s = s.replace(',', '.')
+    }
+    const n = Number(s)
     return isNaN(n) ? 0 : n
 }
 
-function parseCsvRows(text: string): CsvRow[] {
+function parseCsvRows(text: string, delimiter: FieldDelimiter): CsvRow[] {
     const lines = text.split(/\r?\n/)
     const rows: CsvRow[] = []
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim()
         if (!line) continue
-        const parts = line.split(';')
+        const parts = line.split(delimiter)
         if (parts.length < 4) continue
 
         const codigo   = (parts[0] ?? '').trim()
@@ -78,12 +102,16 @@ export function ImportarArticulosPage() {
 
     const fileRef = useRef<HTMLInputElement>(null)
     const [fileName, setFileName]     = useState('')
+    const [rawText, setRawText]       = useState('')
+    const [delimiter, setDelimiter]   = useState<FieldDelimiter>(';')
+    const [mode, setMode]             = useState<'importar' | 'corregir'>('importar')
     const [allRows, setAllRows]       = useState<CsvRow[]>([])
     const [duplicates, setDuplicates] = useState<string[]>([])
     const [parseError, setParseError] = useState('')
     const [importing, setImporting]   = useState(false)
     const [progress, setProgress]     = useState({ current: 0, total: 0 })
     const [summary, setSummary]       = useState<ImportSummary | null>(null)
+    const [correctionSummary, setCorrectionSummary] = useState<CorrectionSummary | null>(null)
 
     // Bodegas de la empresa
     const [bodegas, setBodegas]   = useState<{ id: string; nombre: string; es_principal: boolean }[]>([])
@@ -105,26 +133,36 @@ export function ImportarArticulosPage() {
             })
     }, [empresa?.id])
 
+    const [fechaMovimiento, setFechaMovimiento] = useState(() => new Date().toISOString().split('T')[0])
+
     const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-        setParseError(''); setSummary(null); setFileName(file.name)
+        setParseError(''); setSummary(null); setCorrectionSummary(null); setFileName(file.name)
         const reader = new FileReader()
         reader.onload = (ev) => {
-            try {
-                const text = ev.target?.result as string
-                const parsed = parseCsvRows(text)
-                if (parsed.length === 0) { setParseError('No se encontraron filas válidas.'); setAllRows([]); setDuplicates([]); return }
-                const { unique, duplicateCodes } = deduplicateRows(parsed)
-                setAllRows(unique); setDuplicates(duplicateCodes)
-            } catch { setParseError('Error al leer el archivo CSV.'); setAllRows([]); setDuplicates([]) }
+            const text = ev.target?.result as string
+            setRawText(text)
         }
+        reader.onerror = () => setParseError('Error al leer el archivo CSV.')
         reader.readAsText(file, 'UTF-8')
     }, [])
 
+    // Reparsea si cambia el archivo o el separador de campo elegido
+    useEffect(() => {
+        if (!rawText) return
+        try {
+            const parsed = parseCsvRows(rawText, delimiter)
+            if (parsed.length === 0) { setParseError('No se encontraron filas válidas con este separador.'); setAllRows([]); setDuplicates([]); return }
+            setParseError('')
+            const { unique, duplicateCodes } = deduplicateRows(parsed)
+            setAllRows(unique); setDuplicates(duplicateCodes)
+        } catch { setParseError('Error al leer el archivo CSV.'); setAllRows([]); setDuplicates([]) }
+    }, [rawText, delimiter])
+
     const handleClear = useCallback(() => {
-        setFileName(''); setAllRows([]); setDuplicates([]); setParseError('')
-        setSummary(null); setProgress({ current: 0, total: 0 })
+        setFileName(''); setRawText(''); setAllRows([]); setDuplicates([]); setParseError('')
+        setSummary(null); setCorrectionSummary(null); setProgress({ current: 0, total: 0 })
         if (fileRef.current) fileRef.current.value = ''
     }, [])
 
@@ -211,14 +249,13 @@ export function ImportarArticulosPage() {
                     if (stockErr) result.errorMessages.push(`Error stock lote ${Math.floor(i / BATCH_SIZE) + 1}: ${stockErr.message}`)
 
                     // Kardex — campos correctos del schema
-                    const hoy = new Date().toISOString().split('T')[0]
                     const kardexRows = rowsWithIds
                         .filter(({ row }) => row.stock > 0)
                         .map(({ row, id }) => ({
                             empresa_id:          empresa.id,
                             producto_id:         id,
                             bodega_id:           bodegaId,
-                            fecha:               hoy,
+                            fecha:               fechaMovimiento,
                             tipo_movimiento:     'ENTRADA',
                             motivo:              'Importación masiva inicial',
                             cantidad:            row.stock,
@@ -241,7 +278,88 @@ export function ImportarArticulosPage() {
         } finally {
             setSummary(result); setImporting(false)
         }
-    }, [allRows, duplicates, empresa?.id, bodegaId])
+    }, [allRows, duplicates, empresa?.id, bodegaId, fechaMovimiento])
+
+    // Corrige el saldo inicial de productos YA existentes (creados por un import
+    // previo donde el stock/costo se leyó mal, ej. separador decimal incorrecto).
+    // No crea productos ni los toca si ya tienen movimientos en Kardex.
+    const handleCorregirSaldo = useCallback(async () => {
+        if (!allRows.length || !empresa?.id || !bodegaId) return
+        setImporting(true); setCorrectionSummary(null)
+
+        const result: CorrectionSummary = {
+            corrected: 0, notFound: [], alreadyHasMovements: [], stockNotZero: [], errorMessages: [],
+        }
+
+        try {
+            const codigos = allRows.map(r => r.codigo)
+            const { data: productosExistentes, error: prodErr } = await supabase
+                .from('productos').select('id, codigo, stock')
+                .eq('empresa_id', empresa.id).in('codigo', codigos)
+            if (prodErr) throw new Error(`Error cargando productos: ${prodErr.message}`)
+
+            const prodMap = new Map<string, { id: string; stock: number }>()
+            for (const p of productosExistentes ?? []) {
+                prodMap.set((p.codigo ?? '').toUpperCase(), { id: p.id, stock: Number(p.stock || 0) })
+            }
+
+            const idsExistentes = [...prodMap.values()].map(p => p.id)
+            const movimientosSet = new Set<string>()
+            if (idsExistentes.length > 0) {
+                const { data: movimientos, error: movErr } = await supabase
+                    .from('kardex').select('producto_id')
+                    .eq('empresa_id', empresa.id).in('producto_id', idsExistentes)
+                if (movErr) throw new Error(`Error verificando movimientos: ${movErr.message}`)
+                for (const m of movimientos ?? []) movimientosSet.add(m.producto_id)
+            }
+
+            const total = allRows.length
+            setProgress({ current: 0, total })
+
+            for (let i = 0; i < total; i++) {
+                const row = allRows[i]
+                const prod = prodMap.get(row.codigo.toUpperCase())
+
+                if (!prod) { result.notFound.push(row.codigo) }
+                else if (movimientosSet.has(prod.id)) { result.alreadyHasMovements.push(row.codigo) }
+                else if (prod.stock !== 0) { result.stockNotZero.push(row.codigo) }
+                else if (row.stock > 0) {
+                    try {
+                        const { error: kardexErr } = await supabase.from('kardex').insert({
+                            empresa_id:          empresa.id,
+                            producto_id:         prod.id,
+                            bodega_id:           bodegaId,
+                            fecha:               fechaMovimiento,
+                            tipo_movimiento:     'ENTRADA',
+                            motivo:              'Corrección saldo inicial (import)',
+                            cantidad:            row.stock,
+                            costo_unitario:      row.costo,
+                            saldo_cantidad:      row.stock,
+                            saldo_costo_promedio: row.costo,
+                        })
+                        if (kardexErr) throw kardexErr
+
+                        await bodegaService.upsertStock(empresa.id, bodegaId, prod.id, row.stock, row.costo)
+
+                        const { error: updErr } = await supabase.from('productos')
+                            .update({ stock: row.stock, costo_promedio: row.costo })
+                            .eq('id', prod.id)
+                        if (updErr) throw updErr
+
+                        result.corrected++
+                    } catch (e: any) {
+                        result.errorMessages.push(`${row.codigo}: ${e.message || 'error desconocido'}`)
+                    }
+                }
+
+                if ((i + 1) % BATCH_SIZE === 0 || i === total - 1) setProgress({ current: i + 1, total })
+            }
+        } catch (err: any) {
+            result.errorMessages.push(err.message || 'Error desconocido')
+        } finally {
+            setCorrectionSummary(result); setImporting(false)
+        }
+    }, [allRows, empresa?.id, bodegaId, fechaMovimiento])
 
     const preview = allRows.slice(0, 20)
 
@@ -254,33 +372,82 @@ export function ImportarArticulosPage() {
                 </p>
             </div>
 
-            {/* Selector de bodega */}
-            {bodegas.length > 0 && (
+            {/* Modo: importar nuevos vs corregir saldo inicial de existentes */}
+            <div className="flex gap-2 border-b border-slate-200">
+                <button
+                    onClick={() => { setMode('importar'); setSummary(null); setCorrectionSummary(null) }}
+                    className={cn(
+                        "px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors",
+                        mode === 'importar' ? "border-primary-600 text-primary-700" : "border-transparent text-slate-500 hover:text-slate-700"
+                    )}
+                >
+                    Importar artículos nuevos
+                </button>
+                <button
+                    onClick={() => { setMode('corregir'); setSummary(null); setCorrectionSummary(null) }}
+                    className={cn(
+                        "px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors flex items-center gap-1.5",
+                        mode === 'corregir' ? "border-amber-600 text-amber-700" : "border-transparent text-slate-500 hover:text-slate-700"
+                    )}
+                >
+                    <Wrench className="w-3.5 h-3.5" /> Corregir saldo inicial
+                </button>
+            </div>
+
+            {/* Selector de bodega, separador y fecha del movimiento */}
+            <div className="flex flex-wrap items-center gap-4">
+                {bodegas.length > 0 && (
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-semibold text-slate-600 whitespace-nowrap">Bodega destino:</label>
+                        <select
+                            value={bodegaId ?? ''}
+                            onChange={e => setBodegaId(e.target.value)}
+                            className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500 outline-none"
+                        >
+                            {bodegas.map(b => (
+                                <option key={b.id} value={b.id}>
+                                    {b.nombre}{b.es_principal ? ' (Principal)' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
                 <div className="flex items-center gap-3">
-                    <label className="text-sm font-semibold text-slate-600 whitespace-nowrap">Bodega destino:</label>
+                    <label className="text-sm font-semibold text-slate-600 whitespace-nowrap">Separador de campo:</label>
                     <select
-                        value={bodegaId ?? ''}
-                        onChange={e => setBodegaId(e.target.value)}
+                        value={delimiter}
+                        onChange={e => setDelimiter(e.target.value as FieldDelimiter)}
                         className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500 outline-none"
                     >
-                        {bodegas.map(b => (
-                            <option key={b.id} value={b.id}>
-                                {b.nombre}{b.es_principal ? ' (Principal)' : ''}
-                            </option>
-                        ))}
+                        <option value=";">Punto y coma ( ; )</option>
+                        <option value=",">Coma ( , )</option>
                     </select>
                 </div>
-            )}
+
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-semibold text-slate-600 whitespace-nowrap">Fecha del movimiento:</label>
+                    <input
+                        type="date"
+                        value={fechaMovimiento}
+                        onChange={e => setFechaMovimiento(e.target.value)}
+                        className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500 outline-none"
+                    />
+                </div>
+            </div>
 
             {/* Instrucciones del formato */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-                <p className="font-semibold mb-1">Formato del archivo CSV (separador: punto y coma)</p>
+                <p className="font-semibold mb-1">Formato del archivo CSV (separador de campo seleccionado arriba)</p>
                 <p className="font-mono text-xs bg-white border border-blue-100 rounded px-3 py-2 mt-1">
-                    codigo;nombre;precio_venta;categoria;costo;stock
+                    {['codigo', 'nombre', 'precio_venta', 'categoria', 'costo', 'stock'].join(delimiter)}
                 </p>
                 <p className="text-xs text-blue-600 mt-1.5">
                     Las columnas <strong>costo</strong> y <strong>stock</strong> son opcionales (dejar en 0 si no aplica).
-                    La primera fila se omite (encabezados).
+                    Los decimales pueden ir con coma o con punto (ej. 4,00 o 4.00). La primera fila se omite (encabezados).
+                    {mode === 'corregir' && (
+                        <> <strong>Modo corrección:</strong> solo actualiza productos existentes con stock en 0 y sin movimientos previos en Kardex; no crea productos nuevos.</>
+                    )}
                 </p>
             </div>
 
@@ -325,7 +492,7 @@ export function ImportarArticulosPage() {
                 </div>
             )}
 
-            {allRows.length > 0 && !summary && (
+            {allRows.length > 0 && !summary && !correctionSummary && (
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                         <h2 className="font-semibold text-slate-800">
@@ -335,17 +502,19 @@ export function ImportarArticulosPage() {
                             </span>
                         </h2>
                         <button
-                            onClick={handleImport}
+                            onClick={mode === 'corregir' ? handleCorregirSaldo : handleImport}
                             disabled={importing || !bodegaId}
                             className={cn(
                                 "flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-colors",
                                 importing || !bodegaId
                                     ? "bg-slate-300 text-slate-500 cursor-not-allowed"
-                                    : "bg-primary-600 text-white hover:bg-primary-700"
+                                    : mode === 'corregir' ? "bg-amber-600 text-white hover:bg-amber-700" : "bg-primary-600 text-white hover:bg-primary-700"
                             )}
                         >
                             {importing ? (
-                                <><Loader2 className="w-4 h-4 animate-spin" /> Importando {progress.current}/{progress.total}...</>
+                                <><Loader2 className="w-4 h-4 animate-spin" /> Procesando {progress.current}/{progress.total}...</>
+                            ) : mode === 'corregir' ? (
+                                <><Wrench className="w-4 h-4" /> Corregir saldo de {allRows.length.toLocaleString()} artículos</>
                             ) : (
                                 <><Upload className="w-4 h-4" /> Importar {allRows.length.toLocaleString()} artículos</>
                             )}
@@ -450,6 +619,98 @@ export function ImportarArticulosPage() {
                     <div className="text-center">
                         <button onClick={handleClear} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-sm">
                             Nueva importación
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {correctionSummary && (
+                <div className="space-y-4">
+                    <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+                        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <CheckCircle className="w-6 h-6 text-green-600" /> Corrección de saldo completada
+                        </h2>
+                        <div className="grid grid-cols-4 gap-4">
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                                <p className="text-2xl font-bold text-green-700">{correctionSummary.corrected.toLocaleString()}</p>
+                                <p className="text-sm text-green-600">Corregidos</p>
+                            </div>
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center">
+                                <p className="text-2xl font-bold text-slate-700">{correctionSummary.notFound.length.toLocaleString()}</p>
+                                <p className="text-sm text-slate-600">No encontrados</p>
+                            </div>
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
+                                <p className="text-2xl font-bold text-amber-700">{correctionSummary.alreadyHasMovements.length.toLocaleString()}</p>
+                                <p className="text-sm text-amber-600">Ya tienen movimientos</p>
+                            </div>
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                                <p className="text-2xl font-bold text-red-700">{correctionSummary.errorMessages.length.toLocaleString()}</p>
+                                <p className="text-sm text-red-600">Errores</p>
+                            </div>
+                        </div>
+
+                        {correctionSummary.stockNotZero.length > 0 && (
+                            <div>
+                                <button onClick={() => { const el = document.getElementById('stock-nz-list'); if (el) el.classList.toggle('hidden') }}
+                                    className="flex items-center gap-2 text-sm font-medium text-amber-700">
+                                    <AlertTriangle className="w-4 h-4" /> Ver {correctionSummary.stockNotZero.length} omitidos por ya tener stock distinto de cero
+                                </button>
+                                <div id="stock-nz-list" className="hidden mt-2 max-h-48 overflow-y-auto bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {correctionSummary.stockNotZero.map((code, i) => (
+                                            <span key={i} className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-mono">{code}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {correctionSummary.alreadyHasMovements.length > 0 && (
+                            <div>
+                                <button onClick={() => { const el = document.getElementById('mov-list'); if (el) el.classList.toggle('hidden') }}
+                                    className="flex items-center gap-2 text-sm font-medium text-amber-700">
+                                    <AlertTriangle className="w-4 h-4" /> Ver {correctionSummary.alreadyHasMovements.length} omitidos por ya tener movimientos en Kardex
+                                </button>
+                                <div id="mov-list" className="hidden mt-2 max-h-48 overflow-y-auto bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {correctionSummary.alreadyHasMovements.map((code, i) => (
+                                            <span key={i} className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-mono">{code}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {correctionSummary.notFound.length > 0 && (
+                            <div>
+                                <button onClick={() => { const el = document.getElementById('nf-list'); if (el) el.classList.toggle('hidden') }}
+                                    className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                                    <AlertTriangle className="w-4 h-4" /> Ver {correctionSummary.notFound.length} códigos no encontrados
+                                </button>
+                                <div id="nf-list" className="hidden mt-2 max-h-48 overflow-y-auto bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {correctionSummary.notFound.map((code, i) => (
+                                            <span key={i} className="px-2 py-0.5 bg-slate-200 text-slate-700 rounded text-xs font-mono">{code}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {correctionSummary.errorMessages.length > 0 && (
+                            <div>
+                                <p className="flex items-center gap-2 text-sm font-medium text-red-700 mb-2">
+                                    <AlertCircle className="w-4 h-4" /> Errores durante la corrección:
+                                </p>
+                                <div className="max-h-48 overflow-y-auto bg-red-50 border border-red-200 rounded-lg p-3 space-y-1">
+                                    {correctionSummary.errorMessages.map((msg, i) => <p key={i} className="text-xs text-red-700">{msg}</p>)}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="text-center">
+                        <button onClick={handleClear} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold text-sm">
+                            Nueva corrección
                         </button>
                     </div>
                 </div>
