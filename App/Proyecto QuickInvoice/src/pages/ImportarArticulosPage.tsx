@@ -29,10 +29,11 @@ interface ImportSummary {
 interface CorrectionSummary {
     corrected: number
     notFound: string[]
-    alreadyHasMovements: string[]
-    stockNotZero: string[]
+    alreadyCorrected: string[]
     errorMessages: string[]
 }
+
+const MOTIVO_SALDO_INICIAL = ['Importación masiva inicial', 'Corrección saldo inicial (import)']
 
 type FieldDelimiter = ';' | ','
 
@@ -280,37 +281,46 @@ export function ImportarArticulosPage() {
         }
     }, [allRows, duplicates, empresa?.id, bodegaId, fechaMovimiento])
 
-    // Corrige el saldo inicial de productos YA existentes (creados por un import
-    // previo donde el stock/costo se leyó mal, ej. separador decimal incorrecto).
-    // No crea productos ni los toca si ya tienen movimientos en Kardex.
+    // Corrige el saldo inicial de productos YA existentes cuyo stock/costo se
+    // leyó mal en el import original (separador decimal incorrecto). Como la
+    // empresa ya está en producción, muchos de estos productos ya tienen
+    // ventas registradas partiendo de un stock inicial de 0 (algunas incluso
+    // en negativo). Por eso esto no sobrescribe el stock: inserta el
+    // movimiento de saldo inicial con fecha anterior a esas ventas y
+    // RECALCULA el saldo corrido de todo el Kardex posterior del producto,
+    // para que el histórico quede cronológicamente correcto.
     const handleCorregirSaldo = useCallback(async () => {
         if (!allRows.length || !empresa?.id || !bodegaId) return
         setImporting(true); setCorrectionSummary(null)
 
         const result: CorrectionSummary = {
-            corrected: 0, notFound: [], alreadyHasMovements: [], stockNotZero: [], errorMessages: [],
+            corrected: 0, notFound: [], alreadyCorrected: [], errorMessages: [],
         }
 
         try {
             const codigos = allRows.map(r => r.codigo)
             const { data: productosExistentes, error: prodErr } = await supabase
-                .from('productos').select('id, codigo, stock')
+                .from('productos').select('id, codigo')
                 .eq('empresa_id', empresa.id).in('codigo', codigos)
             if (prodErr) throw new Error(`Error cargando productos: ${prodErr.message}`)
 
-            const prodMap = new Map<string, { id: string; stock: number }>()
-            for (const p of productosExistentes ?? []) {
-                prodMap.set((p.codigo ?? '').toUpperCase(), { id: p.id, stock: Number(p.stock || 0) })
-            }
+            const prodMap = new Map<string, string>() // codigo -> producto_id
+            for (const p of productosExistentes ?? []) prodMap.set((p.codigo ?? '').toUpperCase(), p.id)
 
-            const idsExistentes = [...prodMap.values()].map(p => p.id)
-            const movimientosSet = new Set<string>()
+            const idsExistentes = [...prodMap.values()]
+            const kardexPorProducto = new Map<string, any[]>()
             if (idsExistentes.length > 0) {
                 const { data: movimientos, error: movErr } = await supabase
-                    .from('kardex').select('producto_id')
-                    .eq('empresa_id', empresa.id).in('producto_id', idsExistentes)
-                if (movErr) throw new Error(`Error verificando movimientos: ${movErr.message}`)
-                for (const m of movimientos ?? []) movimientosSet.add(m.producto_id)
+                    .from('kardex')
+                    .select('id, producto_id, fecha, created_at, tipo_movimiento, cantidad, costo_unitario, saldo_cantidad, saldo_costo_promedio, motivo')
+                    .eq('empresa_id', empresa.id).eq('bodega_id', bodegaId)
+                    .in('producto_id', idsExistentes)
+                    .order('fecha', { ascending: true }).order('created_at', { ascending: true })
+                if (movErr) throw new Error(`Error cargando kardex: ${movErr.message}`)
+                for (const m of movimientos ?? []) {
+                    if (!kardexPorProducto.has(m.producto_id)) kardexPorProducto.set(m.producto_id, [])
+                    kardexPorProducto.get(m.producto_id)!.push(m)
+                }
             }
 
             const total = allRows.length
@@ -318,38 +328,80 @@ export function ImportarArticulosPage() {
 
             for (let i = 0; i < total; i++) {
                 const row = allRows[i]
-                const prod = prodMap.get(row.codigo.toUpperCase())
+                const productoId = prodMap.get(row.codigo.toUpperCase())
 
-                if (!prod) { result.notFound.push(row.codigo) }
-                else if (movimientosSet.has(prod.id)) { result.alreadyHasMovements.push(row.codigo) }
-                else if (prod.stock !== 0) { result.stockNotZero.push(row.codigo) }
-                else if (row.stock > 0) {
-                    try {
-                        const { error: kardexErr } = await supabase.from('kardex').insert({
-                            empresa_id:          empresa.id,
-                            producto_id:         prod.id,
-                            bodega_id:           bodegaId,
-                            fecha:               fechaMovimiento,
-                            tipo_movimiento:     'ENTRADA',
-                            motivo:              'Corrección saldo inicial (import)',
-                            cantidad:            row.stock,
-                            costo_unitario:      row.costo,
-                            saldo_cantidad:      row.stock,
-                            saldo_costo_promedio: row.costo,
-                        })
-                        if (kardexErr) throw kardexErr
+                if (!productoId) { result.notFound.push(row.codigo); continue }
 
-                        await bodegaService.upsertStock(empresa.id, bodegaId, prod.id, row.stock, row.costo)
+                const historial = kardexPorProducto.get(productoId) ?? []
+                if (historial.some(h => MOTIVO_SALDO_INICIAL.includes(h.motivo))) {
+                    result.alreadyCorrected.push(row.codigo); continue
+                }
 
-                        const { error: updErr } = await supabase.from('productos')
-                            .update({ stock: row.stock, costo_promedio: row.costo })
-                            .eq('id', prod.id)
-                        if (updErr) throw updErr
+                try {
+                    // Línea de tiempo: corrección (fecha elegida) + historial real,
+                    // ordenada cronológicamente. En empate de fecha, la corrección
+                    // va primero (es el saldo con el que arrancó el inventario).
+                    const timeline = [
+                        { isNew: true, fecha: fechaMovimiento, tipo_movimiento: 'ENTRADA' as const, cantidad: row.stock, costo_unitario: row.costo },
+                        ...historial.map(h => ({ isNew: false, id: h.id, fecha: h.fecha, tipo_movimiento: h.tipo_movimiento, cantidad: Number(h.cantidad), costo_unitario: Number(h.costo_unitario || 0), saldoPrevio: Number(h.saldo_cantidad), costoPrevio: Number(h.saldo_costo_promedio || 0) })),
+                    ].sort((a, b) => {
+                        const fa = String(a.fecha), fb = String(b.fecha)
+                        if (fa !== fb) return fa < fb ? -1 : 1
+                        return a.isNew ? -1 : b.isNew ? 1 : 0
+                    })
 
-                        result.corrected++
-                    } catch (e: any) {
-                        result.errorMessages.push(`${row.codigo}: ${e.message || 'error desconocido'}`)
+                    let qty = 0, cost = 0
+                    let nuevoSaldoInicial = { cantidad: 0, costo: 0 }
+                    const actualizaciones: { id: string; saldo_cantidad: number; saldo_costo_promedio: number }[] = []
+
+                    for (const item of timeline) {
+                        if (item.tipo_movimiento === 'ENTRADA') {
+                            const costoUnit = item.costo_unitario > 0 ? item.costo_unitario : cost
+                            const nuevaQty = qty + item.cantidad
+                            cost = nuevaQty > 0 ? ((qty * cost) + (item.cantidad * costoUnit)) / nuevaQty : costoUnit
+                            qty = nuevaQty
+                        } else {
+                            qty -= item.cantidad
+                        }
+
+                        if (item.isNew) {
+                            nuevoSaldoInicial = { cantidad: qty, costo: cost }
+                        } else if (item.saldoPrevio !== qty || item.costoPrevio !== cost) {
+                            actualizaciones.push({ id: item.id, saldo_cantidad: qty, saldo_costo_promedio: cost })
+                        }
                     }
+
+                    const { error: kardexErr } = await supabase.from('kardex').insert({
+                        empresa_id:          empresa.id,
+                        producto_id:         productoId,
+                        bodega_id:           bodegaId,
+                        fecha:               fechaMovimiento,
+                        tipo_movimiento:     'ENTRADA',
+                        motivo:              'Corrección saldo inicial (import)',
+                        cantidad:            row.stock,
+                        costo_unitario:      row.costo,
+                        saldo_cantidad:      nuevoSaldoInicial.cantidad,
+                        saldo_costo_promedio: nuevoSaldoInicial.costo,
+                    })
+                    if (kardexErr) throw kardexErr
+
+                    for (const u of actualizaciones) {
+                        const { error: updKardexErr } = await supabase.from('kardex')
+                            .update({ saldo_cantidad: u.saldo_cantidad, saldo_costo_promedio: u.saldo_costo_promedio })
+                            .eq('id', u.id)
+                        if (updKardexErr) throw updKardexErr
+                    }
+
+                    await bodegaService.upsertStock(empresa.id, bodegaId, productoId, qty, cost)
+
+                    const { error: updErr } = await supabase.from('productos')
+                        .update({ stock: qty, costo_promedio: cost })
+                        .eq('id', productoId)
+                    if (updErr) throw updErr
+
+                    result.corrected++
+                } catch (e: any) {
+                    result.errorMessages.push(`${row.codigo}: ${e.message || 'error desconocido'}`)
                 }
 
                 if ((i + 1) % BATCH_SIZE === 0 || i === total - 1) setProgress({ current: i + 1, total })
@@ -446,7 +498,7 @@ export function ImportarArticulosPage() {
                     Las columnas <strong>costo</strong> y <strong>stock</strong> son opcionales (dejar en 0 si no aplica).
                     Los decimales pueden ir con coma o con punto (ej. 4,00 o 4.00). La primera fila se omite (encabezados).
                     {mode === 'corregir' && (
-                        <> <strong>Modo corrección:</strong> solo actualiza productos existentes con stock en 0 y sin movimientos previos en Kardex; no crea productos nuevos.</>
+                        <> <strong>Modo corrección:</strong> no crea productos nuevos. Inserta el saldo inicial con la fecha indicada y recalcula el saldo corrido de las ventas ya registradas para ese producto; no sobrescribe el stock actual, lo ajusta. Productos que ya tengan un saldo inicial cargado se omiten.</>
                     )}
                 </p>
             </div>
@@ -640,8 +692,8 @@ export function ImportarArticulosPage() {
                                 <p className="text-sm text-slate-600">No encontrados</p>
                             </div>
                             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
-                                <p className="text-2xl font-bold text-amber-700">{correctionSummary.alreadyHasMovements.length.toLocaleString()}</p>
-                                <p className="text-sm text-amber-600">Ya tienen movimientos</p>
+                                <p className="text-2xl font-bold text-amber-700">{correctionSummary.alreadyCorrected.length.toLocaleString()}</p>
+                                <p className="text-sm text-amber-600">Ya corregidos antes</p>
                             </div>
                             <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
                                 <p className="text-2xl font-bold text-red-700">{correctionSummary.errorMessages.length.toLocaleString()}</p>
@@ -649,31 +701,15 @@ export function ImportarArticulosPage() {
                             </div>
                         </div>
 
-                        {correctionSummary.stockNotZero.length > 0 && (
-                            <div>
-                                <button onClick={() => { const el = document.getElementById('stock-nz-list'); if (el) el.classList.toggle('hidden') }}
-                                    className="flex items-center gap-2 text-sm font-medium text-amber-700">
-                                    <AlertTriangle className="w-4 h-4" /> Ver {correctionSummary.stockNotZero.length} omitidos por ya tener stock distinto de cero
-                                </button>
-                                <div id="stock-nz-list" className="hidden mt-2 max-h-48 overflow-y-auto bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {correctionSummary.stockNotZero.map((code, i) => (
-                                            <span key={i} className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-mono">{code}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {correctionSummary.alreadyHasMovements.length > 0 && (
+                        {correctionSummary.alreadyCorrected.length > 0 && (
                             <div>
                                 <button onClick={() => { const el = document.getElementById('mov-list'); if (el) el.classList.toggle('hidden') }}
                                     className="flex items-center gap-2 text-sm font-medium text-amber-700">
-                                    <AlertTriangle className="w-4 h-4" /> Ver {correctionSummary.alreadyHasMovements.length} omitidos por ya tener movimientos en Kardex
+                                    <AlertTriangle className="w-4 h-4" /> Ver {correctionSummary.alreadyCorrected.length} omitidos por ya tener un saldo inicial registrado
                                 </button>
                                 <div id="mov-list" className="hidden mt-2 max-h-48 overflow-y-auto bg-amber-50 border border-amber-200 rounded-lg p-3">
                                     <div className="flex flex-wrap gap-1.5">
-                                        {correctionSummary.alreadyHasMovements.map((code, i) => (
+                                        {correctionSummary.alreadyCorrected.map((code, i) => (
                                             <span key={i} className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs font-mono">{code}</span>
                                         ))}
                                     </div>
