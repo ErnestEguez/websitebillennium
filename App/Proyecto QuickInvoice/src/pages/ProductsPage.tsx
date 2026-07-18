@@ -295,6 +295,9 @@ export function ProductsPage() {
     const [loadingBaja, setLoadingBaja] = useState(false)
     const [restoringId, setRestoringId] = useState<string | null>(null)
     const [showConIva, setShowConIva] = useState(false)
+    const [bodegas, setBodegas] = useState<{ id: string; nombre: string; es_principal: boolean }[]>([])
+    const [selectedBodegaId, setSelectedBodegaId] = useState('') // '' = todas las bodegas (stock total)
+    const [stockPorBodega, setStockPorBodega] = useState<Record<string, number>>({})
 
     const applyIva = (base: number | null | undefined, ivaPct: number) => {
         if (!base || base === 0) return '—'
@@ -316,7 +319,36 @@ export function ProductsPage() {
             setLineas(lineasData)
             setSubcategorias(subcatsData)
         }).catch(console.error)
+
+        supabase
+            .from('bodegas')
+            .select('id, nombre, es_principal')
+            .eq('empresa_id', empresa.id).eq('activo', true)
+            .order('es_principal', { ascending: false })
+            .then(({ data }) => setBodegas(data ?? []))
     }, [empresa?.id])
+
+    // Consulta el stock de una bodega puntual para los productos ya cargados
+    // (en lotes: con miles de ids en un solo .in() Supabase responde Bad Request)
+    async function cargarStockBodega(productoIds: string[], bodegaId: string) {
+        if (productoIds.length === 0) { setStockPorBodega({}); return }
+        const CHUNK = 150
+        const mapa: Record<string, number> = {}
+        for (let i = 0; i < productoIds.length; i += CHUNK) {
+            const chunk = productoIds.slice(i, i + CHUNK)
+            const { data } = await supabase
+                .from('stock_bodega').select('producto_id, cantidad')
+                .eq('bodega_id', bodegaId).in('producto_id', chunk)
+            for (const r of data ?? []) mapa[r.producto_id] = Number(r.cantidad || 0)
+        }
+        setStockPorBodega(mapa)
+    }
+
+    // Si cambia la bodega seleccionada, recalcula el stock para los productos ya en pantalla
+    useEffect(() => {
+        if (!selectedBodegaId) { setStockPorBodega({}); return }
+        cargarStockBodega(productos.map(p => p.id), selectedBodegaId)
+    }, [selectedBodegaId, productos])
 
     // Búsqueda server-side: se ejecuta solo al presionar Buscar o Enter
     async function ejecutarBusqueda() {
@@ -508,6 +540,18 @@ export function ProductsPage() {
                         <option key={cat.id} value={cat.id}>{cat.nombre}</option>
                     ))}
                 </select>
+                {bodegas.length > 0 && (
+                    <select
+                        className="px-4 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary-500"
+                        value={selectedBodegaId}
+                        onChange={(e) => setSelectedBodegaId(e.target.value)}
+                    >
+                        <option value="">Todas las bodegas</option>
+                        {bodegas.map(b => (
+                            <option key={b.id} value={b.id}>{b.nombre}{b.es_principal ? ' (Principal)' : ''}</option>
+                        ))}
+                    </select>
+                )}
                 <button onClick={ejecutarBusqueda} disabled={loading}
                     className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
@@ -536,6 +580,9 @@ export function ProductsPage() {
                                 <th className="px-3 py-4 font-medium text-right text-slate-400">P3</th>
                                 <th className="px-3 py-4 font-medium text-right text-slate-400">P4</th>
                                 <th className="px-3 py-4 font-medium text-center">IVA</th>
+                                <th className="px-3 py-4 font-medium text-right">
+                                    Stock{selectedBodegaId ? '' : ' (Total)'}
+                                </th>
                                 <th className="px-4 py-4 font-medium text-right">Acciones</th>
                             </tr>
                         </thead>
@@ -587,6 +634,15 @@ export function ProductsPage() {
                                     <td className="px-3 py-4 text-center text-sm text-slate-500">
                                         {producto.iva_porcentaje}%
                                     </td>
+                                    <td className="px-3 py-4 text-right text-sm font-mono">
+                                        {!producto.maneja_stock ? (
+                                            <span className="text-slate-300">—</span>
+                                        ) : (
+                                            <span className={(selectedBodegaId ? stockPorBodega[producto.id] ?? 0 : Number(producto.stock || 0)) <= 0 ? 'text-red-500 font-bold' : 'text-slate-700'}>
+                                                {(selectedBodegaId ? stockPorBodega[producto.id] ?? 0 : Number(producto.stock || 0)).toLocaleString()}
+                                            </span>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-4 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button
@@ -624,7 +680,7 @@ export function ProductsPage() {
                             ))}
                             {filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
+                                    <td colSpan={10} className="px-6 py-12 text-center text-slate-400">
                                         {!search.trim() && !selectedCategoria
                                             ? 'Escribe un nombre o código para buscar productos.'
                                             : 'No se encontraron productos con ese criterio.'}
