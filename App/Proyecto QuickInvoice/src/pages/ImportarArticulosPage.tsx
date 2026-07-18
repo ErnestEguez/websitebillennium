@@ -96,6 +96,15 @@ function deduplicateRows(rows: CsvRow[]): { unique: CsvRow[]; duplicateCodes: st
     return { unique, duplicateCodes }
 }
 
+// Divide listas largas para consultas .in(...) — con miles de códigos/ids en
+// una sola petición la URL supera el límite de PostgREST y responde Bad Request.
+const CHUNK_SIZE = 150
+function chunkArray<T>(arr: T[], size: number): T[][] {
+    const chunks: T[][] = []
+    for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size))
+    return chunks
+}
+
 /* ── Componente ─────────────────────────────────────────────────────────── */
 
 export function ImportarArticulosPage() {
@@ -186,9 +195,13 @@ export function ImportarArticulosPage() {
 
             // Códigos ya existentes (para saltar duplicados en BD)
             const codigos = allRows.map(r => r.codigo)
-            const { data: existentes } = await supabase
-                .from('productos').select('codigo').eq('empresa_id', empresa.id).in('codigo', codigos)
-            const codsExistentes = new Set((existentes ?? []).map((p: any) => (p.codigo ?? '').toUpperCase()))
+            const codsExistentes = new Set<string>()
+            for (const chunk of chunkArray(codigos, CHUNK_SIZE)) {
+                const { data: existentes, error: existErr } = await supabase
+                    .from('productos').select('codigo').eq('empresa_id', empresa.id).in('codigo', chunk)
+                if (existErr) throw new Error(`Error verificando duplicados: ${existErr.message}`)
+                for (const p of existentes ?? []) codsExistentes.add((p.codigo ?? '').toUpperCase())
+            }
 
             const total = allRows.length
             setProgress({ current: 0, total })
@@ -299,22 +312,23 @@ export function ImportarArticulosPage() {
 
         try {
             const codigos = allRows.map(r => r.codigo)
-            const { data: productosExistentes, error: prodErr } = await supabase
-                .from('productos').select('id, codigo')
-                .eq('empresa_id', empresa.id).in('codigo', codigos)
-            if (prodErr) throw new Error(`Error cargando productos: ${prodErr.message}`)
-
             const prodMap = new Map<string, string>() // codigo -> producto_id
-            for (const p of productosExistentes ?? []) prodMap.set((p.codigo ?? '').toUpperCase(), p.id)
+            for (const chunk of chunkArray(codigos, CHUNK_SIZE)) {
+                const { data: productosExistentes, error: prodErr } = await supabase
+                    .from('productos').select('id, codigo')
+                    .eq('empresa_id', empresa.id).in('codigo', chunk)
+                if (prodErr) throw new Error(`Error cargando productos: ${prodErr.message}`)
+                for (const p of productosExistentes ?? []) prodMap.set((p.codigo ?? '').toUpperCase(), p.id)
+            }
 
             const idsExistentes = [...prodMap.values()]
             const kardexPorProducto = new Map<string, any[]>()
-            if (idsExistentes.length > 0) {
+            for (const chunk of chunkArray(idsExistentes, CHUNK_SIZE)) {
                 const { data: movimientos, error: movErr } = await supabase
                     .from('kardex')
                     .select('id, producto_id, fecha, created_at, tipo_movimiento, cantidad, costo_unitario, saldo_cantidad, saldo_costo_promedio, motivo')
                     .eq('empresa_id', empresa.id).eq('bodega_id', bodegaId)
-                    .in('producto_id', idsExistentes)
+                    .in('producto_id', chunk)
                     .order('fecha', { ascending: true }).order('created_at', { ascending: true })
                 if (movErr) throw new Error(`Error cargando kardex: ${movErr.message}`)
                 for (const m of movimientos ?? []) {
