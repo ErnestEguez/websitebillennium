@@ -341,10 +341,14 @@ export function ImportarArticulosPage() {
                     // Línea de tiempo: corrección (fecha elegida) + historial real,
                     // ordenada cronológicamente. En empate de fecha, la corrección
                     // va primero (es el saldo con el que arrancó el inventario).
-                    const timeline = [
-                        { isNew: true, fecha: fechaMovimiento, tipo_movimiento: 'ENTRADA' as const, cantidad: row.stock, costo_unitario: row.costo },
-                        ...historial.map(h => ({ isNew: false, id: h.id, fecha: h.fecha, tipo_movimiento: h.tipo_movimiento, cantidad: Number(h.cantidad), costo_unitario: Number(h.costo_unitario || 0), saldoPrevio: Number(h.saldo_cantidad), costoPrevio: Number(h.saldo_costo_promedio || 0) })),
-                    ].sort((a, b) => {
+                    type TimelineItem =
+                        | { isNew: true; fecha: string; tipo_movimiento: 'ENTRADA'; cantidad: number; costo_unitario: number }
+                        | { isNew: false; id: string; fecha: string; tipo_movimiento: string; cantidad: number; costo_unitario: number; saldoPrevio: number; costoPrevio: number }
+
+                    const nuevoItem: TimelineItem = { isNew: true, fecha: fechaMovimiento, tipo_movimiento: 'ENTRADA', cantidad: row.stock, costo_unitario: row.costo }
+                    const historialItems: TimelineItem[] = historial.map((h): TimelineItem => ({ isNew: false, id: h.id, fecha: h.fecha, tipo_movimiento: h.tipo_movimiento, cantidad: Number(h.cantidad), costo_unitario: Number(h.costo_unitario || 0), saldoPrevio: Number(h.saldo_cantidad), costoPrevio: Number(h.saldo_costo_promedio || 0) }))
+
+                    const timeline: TimelineItem[] = [nuevoItem, ...historialItems].sort((a, b) => {
                         const fa = String(a.fecha), fb = String(b.fecha)
                         if (fa !== fb) return fa < fb ? -1 : 1
                         return a.isNew ? -1 : b.isNew ? 1 : 0
