@@ -171,8 +171,13 @@ export const compraService = {
             .insert(detalle.map(d => ({ ...d, ingreso_id: compra.id })))
         if (eDetalle) throw eDetalle
 
-        // 3. Kardex ENTRADA — usa kardexService para actualizar stock_bodega correctamente
+        // 3. Kardex ENTRADA — usa kardexService para actualizar stock_bodega correctamente.
+        // costo_unitario es el precio bruto de la factura; el costo que entra al
+        // Kardex/costo promedio es el NETO (descontado el descuento de la línea).
         for (const d of detalle) {
+            const costoNeto = d.cantidad > 0
+                ? (d.cantidad * d.costo_unitario - (d.descuento ?? 0)) / d.cantidad
+                : d.costo_unitario
             await kardexService.registrarMovimiento({
                 empresa_id:           cabecera.empresa_id,
                 producto_id:          d.producto_id,
@@ -181,7 +186,7 @@ export const compraService = {
                 motivo:               'Compra inventario',
                 documento_referencia: cabecera.numero_factura ?? compra.id,
                 cantidad:             d.cantidad,
-                costo_unitario:       d.costo_unitario,
+                costo_unitario:       costoNeto,
                 fecha:                cabecera.fecha_ingreso,
             })
         }

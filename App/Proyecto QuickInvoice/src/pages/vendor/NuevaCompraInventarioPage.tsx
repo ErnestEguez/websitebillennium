@@ -43,9 +43,17 @@ interface LineaDetalle {
     nombre: string
     cantidad: number
     costo_unitario: number
+    descuento_porcentaje?: number
     iva_porcentaje?: number
     status?: LineaStatus
     categoria_sugerida?: string
+}
+
+// Descuento y subtotal neto de una línea (costo_unitario es el precio bruto de factura)
+function lineaNeta(d: LineaDetalle) {
+    const bruto = d.cantidad * d.costo_unitario
+    const montoDescuento = Math.round(bruto * (d.descuento_porcentaje ?? 0) / 100 * 100) / 100
+    return { bruto, montoDescuento, neto: bruto - montoDescuento }
 }
 
 // Similitud por palabras para matching de descripción
@@ -348,7 +356,7 @@ export function NuevaCompraInventarioPage() {
     }
 
     // ── Cálculos ──────────────────────────────────────────────────────────────
-    const subtotalLineas = detalle.reduce((s, d) => s + d.cantidad * d.costo_unitario, 0)
+    const subtotalLineas = Math.round(detalle.reduce((s, d) => s + lineaNeta(d).neto, 0) * 100) / 100
     const b0  = usarIvaManual ? baseIva0  : 0
     const b5  = usarIvaManual ? baseIva5  : 0
     const b15 = usarIvaManual ? baseIva15 : subtotalLineas
@@ -386,7 +394,7 @@ export function NuevaCompraInventarioPage() {
     }
 
     function addLinea() {
-        setDetalle(prev => [...prev, { producto_id: '', codigo: '', nombre: '', cantidad: 1, costo_unitario: 0 }])
+        setDetalle(prev => [...prev, { producto_id: '', codigo: '', nombre: '', cantidad: 1, costo_unitario: 0, descuento_porcentaje: 0 }])
     }
 
     function updLinea(i: number, campo: keyof LineaDetalle, val: unknown) {
@@ -453,16 +461,19 @@ export function NuevaCompraInventarioPage() {
 
                     if (!catId) continue  // sin categoría no se puede crear
 
+                    // Costo neto (post-descuento) — base real para sugerir precio y costo promedio
+                    const costoUnitNeto = d.cantidad > 0 ? lineaNeta(d).neto / d.cantidad : d.costo_unitario
+
                     const newProd = await productoService.createProducto({
                         empresa_id:     empresa!.id,
                         codigo:         d.codigo || null,
                         nombre:         d.nombre,
                         descripcion:    d.nombre,
-                        precio_venta:   Math.round(d.costo_unitario * 1.3 * 100) / 100,
+                        precio_venta:   Math.round(costoUnitNeto * 1.3 * 100) / 100,
                         categoria_id:   catId,
                         iva_porcentaje: d.iva_porcentaje ?? 15,
                         maneja_stock:   true,
-                        costo_promedio: d.costo_unitario,
+                        costo_promedio: costoUnitNeto,
                         activo:         true,
                     } as any)
 
@@ -526,12 +537,16 @@ export function NuevaCompraInventarioPage() {
                     bodega_id: bodegaId || undefined,
                     created_by: profile?.id,
                 },
-                validas.map(d => ({
-                    producto_id:    d.producto_id,
-                    cantidad:       d.cantidad,
-                    costo_unitario: d.costo_unitario,
-                    subtotal:       Math.round(d.cantidad * d.costo_unitario * 100) / 100,
-                })),
+                validas.map(d => {
+                    const { montoDescuento, neto } = lineaNeta(d)
+                    return {
+                        producto_id:    d.producto_id,
+                        cantidad:       d.cantidad,
+                        costo_unitario: d.costo_unitario,
+                        descuento:      montoDescuento,
+                        subtotal:       Math.round(neto * 100) / 100,
+                    }
+                }),
                 retsParaGuardar,
             )
 
@@ -812,6 +827,7 @@ export function NuevaCompraInventarioPage() {
                                         <th className="text-left py-2 pr-3 font-semibold">Producto</th>
                                         <th className="text-right py-2 px-3 w-24 font-semibold">Cant.</th>
                                         <th className="text-right py-2 px-3 w-28 font-semibold">Costo unit.</th>
+                                        <th className="text-right py-2 px-3 w-20 font-semibold">Desc. %</th>
                                         <th className="text-right py-2 px-3 w-28 font-semibold">Subtotal</th>
                                         <th className="w-8" />
                                     </tr>
@@ -892,9 +908,25 @@ export function NuevaCompraInventarioPage() {
                                                         onBlur={() => numBlur(`costo_${i}`, v => updLinea(i, 'costo_unitario', v))} />
                                                 </td>
 
-                                                {/* Subtotal */}
-                                                <td className="py-2 px-3 text-right font-mono font-semibold text-slate-800">
-                                                    ${(d.cantidad * d.costo_unitario).toFixed(2)}
+                                                {/* Descuento % */}
+                                                <td className="py-2 px-3">
+                                                    <input type="text" inputMode="decimal"
+                                                        className={cn(inp, 'text-sm text-right')}
+                                                        value={numVal(`desc_${i}`, d.descuento_porcentaje ?? 0)}
+                                                        onChange={e => numChange(`desc_${i}`, e.target.value, v => updLinea(i, 'descuento_porcentaje', Math.min(v, 100)))}
+                                                        onBlur={() => numBlur(`desc_${i}`, v => updLinea(i, 'descuento_porcentaje', Math.min(v, 100)))} />
+                                                </td>
+
+                                                {/* Subtotal (neto de descuento) */}
+                                                <td className="py-2 px-3 text-right font-mono">
+                                                    {(d.descuento_porcentaje ?? 0) > 0 && (
+                                                        <div className="text-[10px] text-slate-400 line-through leading-tight">
+                                                            ${lineaNeta(d).bruto.toFixed(2)}
+                                                        </div>
+                                                    )}
+                                                    <div className="font-semibold text-slate-800">
+                                                        ${lineaNeta(d).neto.toFixed(2)}
+                                                    </div>
                                                 </td>
 
                                                 {/* Eliminar */}

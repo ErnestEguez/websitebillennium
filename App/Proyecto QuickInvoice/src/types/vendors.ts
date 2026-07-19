@@ -130,6 +130,7 @@ export interface DetalleInventario {
     producto_id: string
     cantidad: number
     costo_unitario: number
+    descuento?: number
     subtotal?: number
     bodega_id?: string
     producto?: { nombre: string; codigo: string }
