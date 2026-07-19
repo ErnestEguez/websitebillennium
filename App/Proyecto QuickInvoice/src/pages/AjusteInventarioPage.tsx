@@ -132,13 +132,25 @@ export function AjusteInventarioPage() {
         if (!empresa?.id) return
         try {
             if (bodegaId) {
-                const { data } = await supabase
-                    .from('stock_bodega')
-                    .select('producto_id, cantidad')
-                    .eq('empresa_id', empresa.id)
-                    .eq('bodega_id', bodegaId)
+                // Paginado: sin .range() Supabase/PostgREST corta el resultado en 1000
+                // filas por defecto. Con miles de productos, cualquiera fuera de ese
+                // primer lote quedaba sin entrada en el mapa y mostraba stock 0 aunque
+                // sí tuviera existencias.
+                const PAGE = 1000
                 const map: Record<string, number> = {}
-                for (const r of (data ?? [])) map[r.producto_id] = Number(r.cantidad)
+                let from = 0
+                while (true) {
+                    const { data, error } = await supabase
+                        .from('stock_bodega')
+                        .select('producto_id, cantidad')
+                        .eq('empresa_id', empresa.id)
+                        .eq('bodega_id', bodegaId)
+                        .range(from, from + PAGE - 1)
+                    if (error) throw error
+                    for (const r of (data ?? [])) map[r.producto_id] = Number(r.cantidad)
+                    if (!data || data.length < PAGE) break
+                    from += PAGE
+                }
                 setStockMap(map)
             } else {
                 // Sin bodega: usar productos.stock
