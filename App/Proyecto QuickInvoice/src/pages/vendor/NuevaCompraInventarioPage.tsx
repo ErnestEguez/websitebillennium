@@ -44,15 +44,21 @@ interface LineaDetalle {
     cantidad: number
     costo_unitario: number
     descuento_porcentaje?: number
+    descuento_valor?: number  // descuento directo en $ — mutuamente excluyente con descuento_porcentaje
     iva_porcentaje?: number
     status?: LineaStatus
     categoria_sugerida?: string
 }
 
-// Descuento y subtotal neto de una línea (costo_unitario es el precio bruto de factura)
+// Descuento y subtotal neto de una línea (costo_unitario es el precio bruto de factura).
+// descuento_valor (directo en $) y descuento_porcentaje son mutuamente excluyentes:
+// si hay valor directo, tiene prioridad sobre el %.
 function lineaNeta(d: LineaDetalle) {
     const bruto = d.cantidad * d.costo_unitario
-    const montoDescuento = Math.round(bruto * (d.descuento_porcentaje ?? 0) / 100 * 100) / 100
+    const valorDirecto = d.descuento_valor ?? 0
+    const montoDescuento = valorDirecto > 0
+        ? Math.min(Math.round(valorDirecto * 100) / 100, bruto)
+        : Math.round(bruto * (d.descuento_porcentaje ?? 0) / 100 * 100) / 100
     return { bruto, montoDescuento, neto: bruto - montoDescuento }
 }
 
@@ -409,7 +415,7 @@ export function NuevaCompraInventarioPage() {
         if (brutoTotal <= 0) { alert('Agrega productos con cantidad y costo unitario antes de distribuir el descuento.'); return }
         if (descuentoTotalFactura > brutoTotal) { alert('El descuento total no puede ser mayor al subtotal de los productos.'); return }
         const pct = Math.round((descuentoTotalFactura / brutoTotal) * 100 * 10000) / 10000
-        setDetalle(prev => prev.map(d => ({ ...d, descuento_porcentaje: pct })))
+        setDetalle(prev => prev.map(d => ({ ...d, descuento_porcentaje: pct, descuento_valor: 0 })))
     }
 
     function updLinea(i: number, campo: keyof LineaDetalle, val: unknown) {
@@ -418,6 +424,14 @@ export function NuevaCompraInventarioPage() {
             if (campo === 'producto_id') {
                 const prod = productosSimple.find(p => p.id === val)
                 return { ...d, producto_id: val as string, nombre: prod?.nombre ?? '' }
+            }
+            // Descuento por % y descuento directo en $ son mutuamente excluyentes:
+            // al ingresar uno, se limpia el otro.
+            if (campo === 'descuento_porcentaje') {
+                return { ...d, descuento_porcentaje: val as number, descuento_valor: 0 }
+            }
+            if (campo === 'descuento_valor') {
+                return { ...d, descuento_valor: val as number, descuento_porcentaje: 0 }
             }
             return { ...d, [campo]: val }
         }))
@@ -843,6 +857,7 @@ export function NuevaCompraInventarioPage() {
                                         <th className="text-right py-2 px-3 w-24 font-semibold">Cant.</th>
                                         <th className="text-right py-2 px-3 w-28 font-semibold">Costo unit.</th>
                                         <th className="text-right py-2 px-3 w-20 font-semibold">Desc. %</th>
+                                        <th className="text-right py-2 px-3 w-24 font-semibold">Desc. $</th>
                                         <th className="text-right py-2 px-3 w-28 font-semibold">Subtotal</th>
                                         <th className="w-8" />
                                     </tr>
@@ -923,18 +938,31 @@ export function NuevaCompraInventarioPage() {
                                                         onBlur={() => numBlur(`costo_${i}`, v => updLinea(i, 'costo_unitario', v))} />
                                                 </td>
 
-                                                {/* Descuento % */}
+                                                {/* Descuento % — deshabilitado si ya hay descuento directo en $ */}
                                                 <td className="py-2 px-3">
                                                     <input type="text" inputMode="decimal"
-                                                        className={cn(inp, 'text-sm text-right')}
+                                                        disabled={(d.descuento_valor ?? 0) > 0}
+                                                        title={(d.descuento_valor ?? 0) > 0 ? 'Ya hay un descuento directo en $ para esta línea' : undefined}
+                                                        className={cn(inp, 'text-sm text-right', (d.descuento_valor ?? 0) > 0 && 'opacity-40 pointer-events-none')}
                                                         value={numVal(`desc_${i}`, d.descuento_porcentaje ?? 0)}
                                                         onChange={e => numChange(`desc_${i}`, e.target.value, v => updLinea(i, 'descuento_porcentaje', Math.min(v, 100)))}
                                                         onBlur={() => numBlur(`desc_${i}`, v => updLinea(i, 'descuento_porcentaje', Math.min(v, 100)))} />
                                                 </td>
 
+                                                {/* Descuento directo en $ — deshabilitado si ya hay % */}
+                                                <td className="py-2 px-3">
+                                                    <input type="text" inputMode="decimal"
+                                                        disabled={(d.descuento_porcentaje ?? 0) > 0}
+                                                        title={(d.descuento_porcentaje ?? 0) > 0 ? 'Ya hay un % de descuento para esta línea' : undefined}
+                                                        className={cn(inp, 'text-sm text-right', (d.descuento_porcentaje ?? 0) > 0 && 'opacity-40 pointer-events-none')}
+                                                        value={numVal(`descval_${i}`, d.descuento_valor ?? 0)}
+                                                        onChange={e => numChange(`descval_${i}`, e.target.value, v => updLinea(i, 'descuento_valor', Math.max(v, 0)))}
+                                                        onBlur={() => numBlur(`descval_${i}`, v => updLinea(i, 'descuento_valor', Math.max(v, 0)))} />
+                                                </td>
+
                                                 {/* Subtotal (neto de descuento) */}
                                                 <td className="py-2 px-3 text-right font-mono">
-                                                    {(d.descuento_porcentaje ?? 0) > 0 && (
+                                                    {((d.descuento_porcentaje ?? 0) > 0 || (d.descuento_valor ?? 0) > 0) && (
                                                         <div className="text-[10px] text-slate-400 line-through leading-tight">
                                                             ${lineaNeta(d).bruto.toFixed(2)}
                                                         </div>
