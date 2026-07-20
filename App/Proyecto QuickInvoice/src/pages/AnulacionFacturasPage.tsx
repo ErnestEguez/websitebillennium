@@ -5,7 +5,7 @@ import { kardexService } from '../services/kardexService'
 import { formatCurrency } from '../lib/utils'
 import {
     Search, AlertTriangle, CheckCircle2, Copy, Check,
-    ChevronDown, ChevronUp, Trash2, FileX, Calendar,
+    ChevronDown, ChevronUp, Trash2, FileX, Calendar, Wrench,
 } from 'lucide-react'
 
 function hoyISO() {
@@ -86,6 +86,9 @@ export function AnulacionFacturasPage() {
 
     // Revertir pago
     const [revirtiendoPago, setRevirtiendoPago] = useState<string | null>(null)
+
+    // Reparar stock de facturas anuladas cuya reversión de Kardex nunca se creó
+    const [reparandoId, setReparandoId] = useState<string | null>(null)
 
     function cambiarPeriodo(p: Periodo) {
         setPeriodo(p)
@@ -225,16 +228,18 @@ export function AnulacionFacturasPage() {
 
             // 3. Revertir el kardex: crear ENTRADA por cada producto de la factura
             //    para restaurar el stock que la venta descontó.
-            const { data: comprobante } = await supabase
+            const { data: comprobante, error: errComprobante } = await supabase
                 .from('comprobantes')
                 .select('bodega_id')
                 .eq('id', anulandoId)
                 .single()
+            if (errComprobante) throw errComprobante
 
-            const { data: detalles } = await supabase
+            const { data: detalles, error: errDetalles } = await supabase
                 .from('comprobante_detalles')
                 .select('producto_id, cantidad')
                 .eq('comprobante_id', anulandoId)
+            if (errDetalles) throw errDetalles
 
             const bodegaId = comprobante?.bodega_id ?? undefined
             const hoy = new Date().toISOString().split('T')[0]
@@ -268,6 +273,76 @@ export function AnulacionFacturasPage() {
             alert('Error al anular: ' + e.message)
         } finally {
             setSavingAnul(false)
+        }
+    }
+
+    // Repara el stock de una factura YA anulada cuya reversión de Kardex nunca
+    // se llegó a crear (ej. por un fallo silencioso en anularFactura()). Es
+    // idempotente: si ya existe el movimiento de reversión, no hace nada.
+    async function repararStock(f: Factura) {
+        setReparandoId(f.id)
+        try {
+            const { data: yaRevertido, error: errCheck } = await supabase
+                .from('kardex')
+                .select('id')
+                .eq('documento_referencia', f.id)
+                .eq('motivo', `Reversión anulación factura ${f.secuencial}`)
+                .limit(1)
+            if (errCheck) throw errCheck
+            if (yaRevertido && yaRevertido.length > 0) {
+                alert('Esta factura ya tiene su reversión de stock registrada en Kardex. No se hizo ningún cambio.')
+                return
+            }
+
+            const { data: comprobante, error: errComprobante } = await supabase
+                .from('comprobantes')
+                .select('bodega_id')
+                .eq('id', f.id)
+                .single()
+            if (errComprobante) throw errComprobante
+
+            const { data: detalles, error: errDetalles } = await supabase
+                .from('comprobante_detalles')
+                .select('producto_id, cantidad')
+                .eq('comprobante_id', f.id)
+            if (errDetalles) throw errDetalles
+
+            const bodegaId = comprobante?.bodega_id ?? undefined
+            const hoy = new Date().toISOString().split('T')[0]
+            let reparados = 0
+
+            for (const det of (detalles ?? [])) {
+                if (!det.producto_id || Number(det.cantidad) <= 0) continue
+                const { data: prod, error: errProd } = await supabase
+                    .from('productos')
+                    .select('maneja_stock')
+                    .eq('id', det.producto_id)
+                    .single()
+                if (errProd) throw errProd
+                if (!prod?.maneja_stock) continue
+
+                await kardexService.registrarMovimiento({
+                    empresa_id:           empresa!.id,
+                    producto_id:          det.producto_id,
+                    bodega_id:            bodegaId,
+                    tipo_movimiento:      'ENTRADA',
+                    motivo:               `Reversión anulación factura ${f.secuencial}`,
+                    documento_referencia: f.id,
+                    cantidad:             Number(det.cantidad),
+                    fecha:                hoy,
+                })
+                reparados++
+            }
+
+            if (reparados === 0) {
+                alert('No se encontraron productos con stock para reparar en esta factura.')
+            } else {
+                alert(`Stock reparado: se restauraron ${reparados} producto(s).`)
+            }
+        } catch (e: any) {
+            alert('Error al reparar stock: ' + e.message)
+        } finally {
+            setReparandoId(null)
         }
     }
 
@@ -453,6 +528,17 @@ export function AnulacionFacturasPage() {
                                                         >
                                                             <FileX className="w-3.5 h-3.5" />
                                                             Anular
+                                                        </button>
+                                                    )}
+                                                    {esAnulada && (
+                                                        <button
+                                                            onClick={() => repararStock(f)}
+                                                            disabled={reparandoId === f.id}
+                                                            title="Verifica si el stock de esta factura anulada ya fue restaurado en Kardex; si no, lo repara"
+                                                            className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-xs rounded-lg hover:bg-amber-600 font-medium disabled:opacity-50"
+                                                        >
+                                                            <Wrench className="w-3.5 h-3.5" />
+                                                            {reparandoId === f.id ? 'Reparando...' : 'Reparar Stock'}
                                                         </button>
                                                     )}
                                                     <button className="p-1.5 text-slate-400">
