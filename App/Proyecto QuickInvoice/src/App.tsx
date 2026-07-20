@@ -19,6 +19,7 @@ const lz = (fn: () => Promise<any>, k: string): React.LazyExoticComponent<React.
 // ── Core pages ────────────────────────────────────────────────────────────────
 const HomePage                     = lz(() => import('./pages/HomePage'), 'HomePage')
 const FacturaDirectaPage           = lz(() => import('./pages/FacturaDirectaPage'), 'FacturaDirectaPage')
+const FacturaGridPage               = lz(() => import('./pages/FacturaGridPage'), 'FacturaGridPage')
 const ProformaPage                 = lz(() => import('./pages/ProformaPage'), 'ProformaPage')
 const PreparacionesPinturaPage     = lz(() => import('./pages/PreparacionesPinturaPage'), 'PreparacionesPinturaPage')
 const NuevaPreparacionPinturaPage  = lz(() => import('./pages/NuevaPreparacionPinturaPage'), 'NuevaPreparacionPinturaPage')
@@ -249,6 +250,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <FacturaDirectaPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/nueva-factura-grid" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <FacturaGridPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>
