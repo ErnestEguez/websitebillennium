@@ -96,6 +96,10 @@ export function NuevaCompraInventarioPage() {
     // Detalle
     const [detalle, setDetalle] = useState<LineaDetalle[]>([])
 
+    // Descuento total de factura (cuando el proveedor no da % por línea) —
+    // solo se usa para distribuirlo entre las líneas, no se guarda aparte.
+    const [descuentoTotalFactura, setDescuentoTotalFactura] = useState(0)
+
     // Bases IVA
     const [baseIva0,  setBaseIva0]  = useState(0)
     const [baseIva5,  setBaseIva5]  = useState(0)
@@ -395,6 +399,17 @@ export function NuevaCompraInventarioPage() {
 
     function addLinea() {
         setDetalle(prev => [...prev, { producto_id: '', codigo: '', nombre: '', cantidad: 1, costo_unitario: 0, descuento_porcentaje: 0 }])
+    }
+
+    // Reparte el descuento total de la factura como el mismo % en cada línea
+    // (para proveedores que solo dan el descuento global, no por producto).
+    function distribuirDescuentoTotal() {
+        if (descuentoTotalFactura <= 0) { alert('Ingresa el valor del descuento total de la factura.'); return }
+        const brutoTotal = detalle.reduce((s, d) => s + lineaNeta(d).bruto, 0)
+        if (brutoTotal <= 0) { alert('Agrega productos con cantidad y costo unitario antes de distribuir el descuento.'); return }
+        if (descuentoTotalFactura > brutoTotal) { alert('El descuento total no puede ser mayor al subtotal de los productos.'); return }
+        const pct = Math.round((descuentoTotalFactura / brutoTotal) * 100 * 10000) / 10000
+        setDetalle(prev => prev.map(d => ({ ...d, descuento_porcentaje: pct })))
     }
 
     function updLinea(i: number, campo: keyof LineaDetalle, val: unknown) {
@@ -950,6 +965,27 @@ export function NuevaCompraInventarioPage() {
                                 Puedes editar el nombre y código antes de guardar.
                             </div>
                         )}
+
+                        {/* Descuento global de factura — cuando el proveedor solo da el total, no por línea */}
+                        <div className="border-t pt-4">
+                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Descuento global de factura (opcional)</p>
+                            <div className="flex flex-wrap items-end gap-3">
+                                <div className="w-40">
+                                    <label className="label text-xs">Descuento total $</label>
+                                    <input type="text" inputMode="decimal" className={cn(inp, 'text-right')}
+                                        value={numVal('descTotal', descuentoTotalFactura)}
+                                        onChange={e => numChange('descTotal', e.target.value, setDescuentoTotalFactura)}
+                                        onBlur={() => numBlur('descTotal', setDescuentoTotalFactura)} />
+                                </div>
+                                <button type="button" onClick={distribuirDescuentoTotal}
+                                    className="btn btn-secondary btn-sm">
+                                    Distribuir entre líneas
+                                </button>
+                                <p className="text-xs text-slate-400 max-w-sm">
+                                    Úsalo cuando la factura del proveedor solo indica el descuento total (no por producto): aplica el mismo % a todas las líneas actuales.
+                                </p>
+                            </div>
+                        </div>
 
                         {/* IVA */}
                         <div className="border-t pt-4 space-y-3">
