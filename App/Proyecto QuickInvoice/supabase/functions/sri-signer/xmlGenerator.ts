@@ -61,6 +61,9 @@ export default function generarXml(comprobante: any): string {
   // Se calculan sumando los valores redondeados del ivaMap (no acumulando floats crudos)
   const totalSinImpuestosXml = r2(Object.values(ivaMap).reduce((s, iv) => s + iv.base,  0));
   const totalImpuestosXml    = r2(Object.values(ivaMap).reduce((s, iv) => s + iv.valor, 0));
+  // totalDescuento debe ser la suma de los descuentos de cada <detalle> — si no
+  // coincide con esa sumatoria, el SRI rechaza la autorización.
+  const totalDescuentoXml    = r2(detallesProcesados.reduce((s, d) => s + d.descuentoValor, 0));
   // importeTotal = lo que el SRI verifica: totalSinImpuestos + totalImpuestos
   const importeTotalXml      = r2(totalSinImpuestosXml + totalImpuestosXml);
 
@@ -172,7 +175,7 @@ export default function generarXml(comprobante: any): string {
     <identificacionComprador>${identificacion}</identificacionComprador>
     <direccionComprador>${(cliente.direccion || "ECUADOR").toUpperCase()}</direccionComprador>
     <totalSinImpuestos>${totalSinImpuestosXml.toFixed(2)}</totalSinImpuestos>
-    <totalDescuento>0.00</totalDescuento>
+    <totalDescuento>${totalDescuentoXml.toFixed(2)}</totalDescuento>
     <totalConImpuestos>${totalConImpuestosXml}
     </totalConImpuestos>
     <propina>0.00</propina>
