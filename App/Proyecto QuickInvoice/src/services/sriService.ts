@@ -83,15 +83,18 @@ export const sriService = {
         return data.config_sri
     },
 
-    async uploadFirma(_empresaId: string, file: File) {
-        // Usar el nombre original del .p12 para que sea reutilizable entre empresas
-        // upsert=true sobreescribe si ya existe el mismo archivo
+    async uploadFirma(empresaId: string, file: File) {
+        // Ruta con prefijo de empresa: el bucket es compartido por toda la
+        // plataforma, así que dos empresas subiendo un .p12 con el mismo
+        // nombre de archivo (ej. "firma.p12") se pisaban silenciosamente.
+        // upsert=true sobreescribe solo si la MISMA empresa vuelve a subir
+        // (ej. renovación de certificado).
         const { data, error } = await supabase.storage
             .from('firmas_electronicas')
-            .upload(file.name, file, { upsert: true })
+            .upload(`${empresaId}/${file.name}`, file, { upsert: true })
 
         if (error) throw error
-        return data.path  // e.g. "mi_firma_2024.p12"
+        return data.path  // e.g. "3f2a.../mi_firma_2024.p12"
     },
 
 
