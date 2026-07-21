@@ -78,6 +78,11 @@ export interface Permisos {
     perm_inventario_valorizado: boolean
     perm_kardex:                boolean
     perm_importar_articulos:    boolean
+    perm_configuracion:         boolean
+    perm_codigos_retencion:     boolean
+    perm_vendedores:            boolean
+    perm_importar_clientes:     boolean
+    perm_migracion_cartera:     boolean
 }
 
 interface AuthContextType {
@@ -153,6 +158,11 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_inventario_valorizado: true,
     perm_kardex:                true,
     perm_importar_articulos:    true,
+    perm_configuracion:         true,
+    perm_codigos_retencion:     true,
+    perm_vendedores:            true,
+    perm_importar_clientes:     true,
+    perm_migracion_cartera:     true,
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -308,6 +318,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_inventario_valorizado: permData.perm_inventario_valorizado ?? true,
                     perm_kardex:                permData.perm_kardex                ?? true,
                     perm_importar_articulos:    permData.perm_importar_articulos    ?? true,
+                    perm_configuracion:         permData.perm_configuracion         ?? true,
+                    perm_codigos_retencion:     permData.perm_codigos_retencion     ?? true,
+                    perm_vendedores:            permData.perm_vendedores            ?? true,
+                    perm_importar_clientes:     permData.perm_importar_clientes     ?? true,
+                    perm_migracion_cartera:     permData.perm_migracion_cartera     ?? true,
                 } : DEFAULT_PERMISOS)
             }
         } catch {

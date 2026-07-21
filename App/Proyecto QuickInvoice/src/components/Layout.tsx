@@ -572,13 +572,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             </button>
                             {openGroups.includes('ajustes') && isSidebarOpen && (
                                 <div className="mt-0.5 ml-2 border-l-2 border-slate-100 pl-1 space-y-0.5">
-                                    <SidebarItem to="/configuracion"      icon={Settings}  label="Configuración"       active={location.pathname === '/configuracion'} sub sentinelId="nav-configuracion" />
-                                    <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub />
+                                    <SidebarItem to="/configuracion"      icon={Settings}  label="Configuración"       active={location.pathname === '/configuracion'} sub sentinelId="nav-configuracion" disabled={!p.perm_configuracion} />
+                                    <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub disabled={!p.perm_codigos_retencion} />
                                     {isAdmin && <SidebarItem to="/ajustes/permisos" icon={UserCog} label="Permisos de usuario" active={location.pathname === '/ajustes/permisos'} sub />}
-                                    {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub />}
+                                    {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub disabled={!p.perm_vendedores} />}
                                     {esOficina && <SidebarItem to="/importar-articulos" icon={Upload} label="Importar Artículos" active={location.pathname === '/importar-articulos'} sub disabled={!p.perm_importar_articulos} />}
-                                    {esOficina && <SidebarItem to="/importar-clientes"  icon={Users}  label="Clientes (Import/Export)" active={location.pathname === '/importar-clientes'} sub />}
-                                    {esOficina && <SidebarItem to="/migrar-cartera"     icon={Wallet} label="Migración Cartera"         active={location.pathname === '/migrar-cartera'} sub />}
+                                    {esOficina && <SidebarItem to="/importar-clientes"  icon={Users}  label="Clientes (Import/Export)" active={location.pathname === '/importar-clientes'} sub disabled={!p.perm_importar_clientes} />}
+                                    {esOficina && <SidebarItem to="/migrar-cartera"     icon={Wallet} label="Migración Cartera"         active={location.pathname === '/migrar-cartera'} sub disabled={!p.perm_migracion_cartera} />}
                                     <button
                                         onClick={toggleDarkSidebar}
                                         className="flex items-center gap-3 w-full pl-8 pr-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors"

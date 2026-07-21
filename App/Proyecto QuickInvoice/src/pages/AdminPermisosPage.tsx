@@ -46,7 +46,17 @@ const MODULOS = [
             { field: 'perm_transferencia_bodega',   label: 'Transferencia de Bodegas' },
             { field: 'perm_inventario_valorizado',  label: 'Inventario Valorado' },
             { field: 'perm_kardex',                 label: 'Kardex' },
-            { field: 'perm_importar_articulos',     label: 'Importar Artículos' },
+        ],
+    },
+    {
+        key: 'ajustes', label: 'Ajustes',
+        items: [
+            { field: 'perm_configuracion',       label: 'Configuración' },
+            { field: 'perm_codigos_retencion',   label: 'Códigos Ret. SRI' },
+            { field: 'perm_vendedores',          label: 'Vendedores' },
+            { field: 'perm_importar_articulos',  label: 'Importar Artículos' },
+            { field: 'perm_importar_clientes',   label: 'Clientes (Import/Export)' },
+            { field: 'perm_migracion_cartera',   label: 'Migración Cartera' },
         ],
     },
     {
@@ -181,6 +191,11 @@ export function AdminPermisosPage() {
                     perm_inventario_valorizado: r.perm_inventario_valorizado ?? def.perm_inventario_valorizado,
                     perm_kardex:                r.perm_kardex                ?? def.perm_kardex,
                     perm_importar_articulos:    r.perm_importar_articulos    ?? def.perm_importar_articulos,
+                    perm_configuracion:         r.perm_configuracion         ?? def.perm_configuracion,
+                    perm_codigos_retencion:     r.perm_codigos_retencion     ?? def.perm_codigos_retencion,
+                    perm_vendedores:            r.perm_vendedores            ?? def.perm_vendedores,
+                    perm_importar_clientes:     r.perm_importar_clientes     ?? def.perm_importar_clientes,
+                    perm_migracion_cartera:     r.perm_migracion_cartera     ?? def.perm_migracion_cartera,
                 }
             })
 
