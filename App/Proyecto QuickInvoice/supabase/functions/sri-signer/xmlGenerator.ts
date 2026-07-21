@@ -4,6 +4,19 @@
 
 import { format } from "https://esm.sh/date-fns@3.6.0";
 
+// Escapa cualquier texto libre (nombre de producto, cliente, dirección, etc.)
+// antes de insertarlo en el XML. Sin esto, un solo "&", "<" o ">" en un
+// nombre/dirección rompe la estructura del documento y el SRI lo rechaza
+// con ConversionArchivoXMLException, aunque el resto de la factura esté bien.
+function escapeXml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 export default function generarXml(comprobante: any): string {
   const empresa = comprobante.empresas || {};
   const cliente = comprobante.clientes || {};
@@ -84,8 +97,8 @@ export default function generarXml(comprobante: any): string {
     .map(
       (d: any) => `
     <detalle>
-      <codigoPrincipal>${(d.productos?.codigo || d.producto_id || "SIN-COD").slice(0, 25)}</codigoPrincipal>
-      <descripcion>${(d.nombre_producto || "Producto").toUpperCase()}</descripcion>
+      <codigoPrincipal>${escapeXml((d.productos?.codigo || d.producto_id || "SIN-COD").slice(0, 25))}</codigoPrincipal>
+      <descripcion>${escapeXml((d.nombre_producto || "Producto").toUpperCase())}</descripcion>
       <cantidad>${Number(d.cantidad).toFixed(6)}</cantidad>
       <precioUnitario>${d.precioUnitarioSinIva.toFixed(6)}</precioUnitario>
       <descuento>${d.descuentoValor.toFixed(2)}</descuento>
@@ -155,25 +168,25 @@ export default function generarXml(comprobante: any): string {
   <infoTributaria>
     <ambiente>${ambiente}</ambiente>
     <tipoEmision>1</tipoEmision>
-    <razonSocial>${(empresa.razon_social || empresa.nombre || "EMPRESA").toUpperCase()}</razonSocial>
-    <nombreComercial>${(empresa.nombre || "EMPRESA").toUpperCase()}</nombreComercial>
+    <razonSocial>${escapeXml((empresa.razon_social || empresa.nombre || "EMPRESA").toUpperCase())}</razonSocial>
+    <nombreComercial>${escapeXml((empresa.nombre || "EMPRESA").toUpperCase())}</nombreComercial>
     <ruc>${empresa.ruc || "9999999999999"}</ruc>
     <claveAcceso>${comprobante.clave_acceso}</claveAcceso>
     <codDoc>01</codDoc>
     <estab>${estab}</estab>
     <ptoEmi>${pto}</ptoEmi>
     <secuencial>${secuencial9}</secuencial>
-    <dirMatriz>${(empresa.direccion || "ECUADOR").toUpperCase()}</dirMatriz>
+    <dirMatriz>${escapeXml((empresa.direccion || "ECUADOR").toUpperCase())}</dirMatriz>
     ${rimpeTag}
   </infoTributaria>
   <infoFactura>
     <fechaEmision>${fechaEmision}</fechaEmision>
-    <dirEstablecimiento>${(empresa.direccion || "LOCAL PRINCIPAL").toUpperCase()}</dirEstablecimiento>
+    <dirEstablecimiento>${escapeXml((empresa.direccion || "LOCAL PRINCIPAL").toUpperCase())}</dirEstablecimiento>
     <obligadoContabilidad>${configSri.obligado_contabilidad || "NO"}</obligadoContabilidad>
     <tipoIdentificacionComprador>${tipoId}</tipoIdentificacionComprador>
-    <razonSocialComprador>${(cliente.nombre || "CONSUMIDOR FINAL").toUpperCase()}</razonSocialComprador>
+    <razonSocialComprador>${escapeXml((cliente.nombre || "CONSUMIDOR FINAL").toUpperCase())}</razonSocialComprador>
     <identificacionComprador>${identificacion}</identificacionComprador>
-    <direccionComprador>${(cliente.direccion || "ECUADOR").toUpperCase()}</direccionComprador>
+    <direccionComprador>${escapeXml((cliente.direccion || "ECUADOR").toUpperCase())}</direccionComprador>
     <totalSinImpuestos>${totalSinImpuestosXml.toFixed(2)}</totalSinImpuestos>
     <totalDescuento>${totalDescuentoXml.toFixed(2)}</totalDescuento>
     <totalConImpuestos>${totalConImpuestosXml}
@@ -187,8 +200,8 @@ export default function generarXml(comprobante: any): string {
   <detalles>${detallesXml}
   </detalles>
   <infoAdicional>
-    <campoAdicional nombre="Email">${cliente.email || "S/N"}</campoAdicional>
-    <campoAdicional nombre="Direccion">${cliente.direccion || "S/N"}</campoAdicional>
+    <campoAdicional nombre="Email">${escapeXml(cliente.email || "S/N")}</campoAdicional>
+    <campoAdicional nombre="Direccion">${escapeXml(cliente.direccion || "S/N")}</campoAdicional>
   </infoAdicional>
 </factura>`;
 
