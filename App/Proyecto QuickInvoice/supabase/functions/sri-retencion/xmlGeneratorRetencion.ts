@@ -34,6 +34,18 @@ export interface RetencionXmlData {
     fechaEmision: string  // YYYY-MM-DD
 }
 
+// Escapa texto libre antes de insertarlo en el XML — sin esto un "&", "<" o
+// ">" en razón social/dirección rompe la estructura del documento y el SRI
+// la rechaza con ConversionArchivoXMLException.
+function escapeXml(value: unknown): string {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;')
+}
+
 function fmtDate(s: string): string {
     const [y, m, d] = s.split('-')
     return `${d}/${m}/${y}`
@@ -86,23 +98,23 @@ export function generarXmlRetencion(data: RetencionXmlData): string {
   <infoTributaria>
     <ambiente>${ambiente}</ambiente>
     <tipoEmision>1</tipoEmision>
-    <razonSocial>${(empresa.razon_social || empresa.nombre || '').toUpperCase()}</razonSocial>
-    <nombreComercial>${(empresa.nombre || '').toUpperCase()}</nombreComercial>
+    <razonSocial>${escapeXml((empresa.razon_social || empresa.nombre || '').toUpperCase())}</razonSocial>
+    <nombreComercial>${escapeXml((empresa.nombre || '').toUpperCase())}</nombreComercial>
     <ruc>${empresa.ruc}</ruc>
     <claveAcceso>${claveAcceso}</claveAcceso>
     <codDoc>07</codDoc>
     <estab>${estab}</estab>
     <ptoEmi>${pto}</ptoEmi>
     <secuencial>${secuencial}</secuencial>
-    <dirMatriz>${(empresa.direccion || 'ECUADOR').toUpperCase()}</dirMatriz>
+    <dirMatriz>${escapeXml((empresa.direccion || 'ECUADOR').toUpperCase())}</dirMatriz>
     ${rimpeTag}
   </infoTributaria>
   <infoCompRetencion>
     <fechaEmision>${fmtDate(fechaEmision)}</fechaEmision>
-    <dirEstablecimiento>${(empresa.direccion || 'LOCAL PRINCIPAL').toUpperCase()}</dirEstablecimiento>
+    <dirEstablecimiento>${escapeXml((empresa.direccion || 'LOCAL PRINCIPAL').toUpperCase())}</dirEstablecimiento>
     <obligadoContabilidad>${cfg.obligado_contabilidad || 'NO'}</obligadoContabilidad>
     <tipoIdentificacionSujetoRetenido>${tipoIdProv}</tipoIdentificacionSujetoRetenido>
-    <razonSocialSujetoRetenido>${proveedor.nombre_empresa.toUpperCase()}</razonSocialSujetoRetenido>
+    <razonSocialSujetoRetenido>${escapeXml(proveedor.nombre_empresa.toUpperCase())}</razonSocialSujetoRetenido>
     <identificacionSujetoRetenido>${rucProv}</identificacionSujetoRetenido>
     <periodoFiscal>${periodoFiscal}</periodoFiscal>
   </infoCompRetencion>

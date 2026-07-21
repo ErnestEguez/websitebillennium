@@ -5,6 +5,18 @@
 
 import { format } from "https://esm.sh/date-fns@3.6.0";
 
+// Escapa texto libre antes de insertarlo en el XML — sin esto un "&", "<" o
+// ">" en nombre/dirección del proveedor o descripción rompe la estructura
+// del documento y el SRI la rechaza con ConversionArchivoXMLException.
+function escapeXml(value: unknown): string {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+}
+
 // Tipos de identificación SRI para el proveedor/beneficiario
 const TIPO_ID_SRI: Record<string, string> = {
     CEDULA:    "05",
@@ -81,7 +93,7 @@ export default function generarXmlLC(lc: any, empresa: any): string {
         return `
     <detalle>
       <codigoPrincipal>${String(i + 1).padStart(3, "0")}</codigoPrincipal>
-      <descripcion>${(d.descripcion || "SERVICIO").toUpperCase()}</descripcion>
+      <descripcion>${escapeXml((d.descripcion || "SERVICIO").toUpperCase())}</descripcion>
       <cantidad>${cant.toFixed(6)}</cantidad>
       <precioUnitario>${pu.toFixed(6)}</precioUnitario>
       <descuento>${r2(Number(d.descuento || 0) * sub / 100).toFixed(2)}</descuento>
@@ -115,16 +127,16 @@ export default function generarXmlLC(lc: any, empresa: any): string {
     // infoAdicional
     const camposAdicionales: string[] = [];
     if (lc.beneficiario_email) {
-        camposAdicionales.push(`    <campoAdicional nombre="Email">${lc.beneficiario_email}</campoAdicional>`);
+        camposAdicionales.push(`    <campoAdicional nombre="Email">${escapeXml(lc.beneficiario_email)}</campoAdicional>`);
     }
     if (lc.beneficiario_direccion) {
-        camposAdicionales.push(`    <campoAdicional nombre="Direccion">${(lc.beneficiario_direccion).toUpperCase()}</campoAdicional>`);
+        camposAdicionales.push(`    <campoAdicional nombre="Direccion">${escapeXml((lc.beneficiario_direccion).toUpperCase())}</campoAdicional>`);
     }
     if (lc.observaciones) {
-        camposAdicionales.push(`    <campoAdicional nombre="Observaciones">${lc.observaciones}</campoAdicional>`);
+        camposAdicionales.push(`    <campoAdicional nombre="Observaciones">${escapeXml(lc.observaciones)}</campoAdicional>`);
     }
     if (camposAdicionales.length === 0) {
-        camposAdicionales.push(`    <campoAdicional nombre="Emisor">${(empresa.razon_social || "EMPRESA").toUpperCase()}</campoAdicional>`);
+        camposAdicionales.push(`    <campoAdicional nombre="Emisor">${escapeXml((empresa.razon_social || "EMPRESA").toUpperCase())}</campoAdicional>`);
     }
 
     // XML v1.1.0 — estructura validada contra XML autorizado SRI Ecuador
@@ -134,22 +146,22 @@ export default function generarXmlLC(lc: any, empresa: any): string {
   <infoTributaria>
     <ambiente>${ambiente}</ambiente>
     <tipoEmision>1</tipoEmision>
-    <razonSocial>${(empresa.razon_social || empresa.nombre || "EMPRESA").toUpperCase()}</razonSocial>
-    <nombreComercial>${(empresa.nombre || empresa.razon_social || "EMPRESA").toUpperCase()}</nombreComercial>
+    <razonSocial>${escapeXml((empresa.razon_social || empresa.nombre || "EMPRESA").toUpperCase())}</razonSocial>
+    <nombreComercial>${escapeXml((empresa.nombre || empresa.razon_social || "EMPRESA").toUpperCase())}</nombreComercial>
     <ruc>${empresa.ruc || "9999999999999"}</ruc>
     <claveAcceso>${lc.clave_acceso}</claveAcceso>
     <codDoc>03</codDoc>
     <estab>${estab}</estab>
     <ptoEmi>${ptoEmi}</ptoEmi>
     <secuencial>${secuencial9}</secuencial>
-    <dirMatriz>${(empresa.direccion || "ECUADOR").toUpperCase()}</dirMatriz>${agenteRetencionTag}${rimpeTag}
+    <dirMatriz>${escapeXml((empresa.direccion || "ECUADOR").toUpperCase())}</dirMatriz>${agenteRetencionTag}${rimpeTag}
   </infoTributaria>
   <infoLiquidacionCompra>
     <fechaEmision>${fechaEmision}</fechaEmision>
-    <dirEstablecimiento>${(empresa.direccion || "LOCAL PRINCIPAL").toUpperCase()}</dirEstablecimiento>
+    <dirEstablecimiento>${escapeXml((empresa.direccion || "LOCAL PRINCIPAL").toUpperCase())}</dirEstablecimiento>
     <obligadoContabilidad>${obligadoContabilidad}</obligadoContabilidad>
     <tipoIdentificacionProveedor>${tipoIdProveedor}</tipoIdentificacionProveedor>
-    <razonSocialProveedor>${(lc.beneficiario_nombre || "PROVEEDOR").toUpperCase()}</razonSocialProveedor>
+    <razonSocialProveedor>${escapeXml((lc.beneficiario_nombre || "PROVEEDOR").toUpperCase())}</razonSocialProveedor>
     <identificacionProveedor>${lc.beneficiario_identificacion}</identificacionProveedor>
     <totalSinImpuestos>${totalSinImpuestos.toFixed(2)}</totalSinImpuestos>
     <totalDescuento>${totalDescuento.toFixed(2)}</totalDescuento>

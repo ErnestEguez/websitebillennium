@@ -27,6 +27,18 @@ function toBase64(bytes: Uint8Array | ArrayBuffer): string {
   return btoa(bin);
 }
 
+// Escapa texto libre antes de insertarlo en el XML — sin esto un "&", "<" o
+// ">" en nombre de producto/cliente/motivo rompe la estructura del documento
+// y el SRI la rechaza con ConversionArchivoXMLException.
+function escapeXml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 async function sha1b64(input: string | Uint8Array): Promise<string> {
   const md = forge.md.sha1.create();
   if (typeof input === "string") {
@@ -178,8 +190,8 @@ function generarXmlNC(nc: any, comprobanteOrigen: any): string {
   // En NC el SRI usa <codigoInterno> (no <codigoPrincipal> como en factura)
   const detallesXml = detallesProcesados.map((d: any) => `
     <detalle>
-      <codigoInterno>${d.codigoPrincipal}</codigoInterno>
-      <descripcion>${(d.nombre_producto || "Producto").toUpperCase()}</descripcion>
+      <codigoInterno>${escapeXml(d.codigoPrincipal)}</codigoInterno>
+      <descripcion>${escapeXml((d.nombre_producto || "Producto").toUpperCase())}</descripcion>
       <cantidad>${d.cantidad.toFixed(6)}</cantidad>
       <precioUnitario>${d.precioUnitarioSinIva.toFixed(6)}</precioUnitario>
       <descuento>${d.descuentoValor.toFixed(2)}</descuento>
@@ -204,22 +216,22 @@ function generarXmlNC(nc: any, comprobanteOrigen: any): string {
   <infoTributaria>
     <ambiente>${ambiente}</ambiente>
     <tipoEmision>1</tipoEmision>
-    <razonSocial>${(empresa.razon_social || empresa.nombre || "EMPRESA").toUpperCase()}</razonSocial>
-    <nombreComercial>${(empresa.nombre || "EMPRESA").toUpperCase()}</nombreComercial>
+    <razonSocial>${escapeXml((empresa.razon_social || empresa.nombre || "EMPRESA").toUpperCase())}</razonSocial>
+    <nombreComercial>${escapeXml((empresa.nombre || "EMPRESA").toUpperCase())}</nombreComercial>
     <ruc>${empresa.ruc || "9999999999999"}</ruc>
     <claveAcceso>${nc.clave_acceso}</claveAcceso>
     <codDoc>04</codDoc>
     <estab>${estab}</estab>
     <ptoEmi>${pto}</ptoEmi>
     <secuencial>${secuencial9}</secuencial>
-    <dirMatriz>${(empresa.direccion || "ECUADOR").toUpperCase()}</dirMatriz>
+    <dirMatriz>${escapeXml((empresa.direccion || "ECUADOR").toUpperCase())}</dirMatriz>
     ${rimpeTag}
   </infoTributaria>
   <infoNotaCredito>
     <fechaEmision>${fechaEmision}</fechaEmision>
-    <dirEstablecimiento>${(empresa.direccion || "LOCAL PRINCIPAL").toUpperCase()}</dirEstablecimiento>
+    <dirEstablecimiento>${escapeXml((empresa.direccion || "LOCAL PRINCIPAL").toUpperCase())}</dirEstablecimiento>
     <tipoIdentificacionComprador>${tipoId}</tipoIdentificacionComprador>
-    <razonSocialComprador>${(cliente.nombre || "CONSUMIDOR FINAL").toUpperCase()}</razonSocialComprador>
+    <razonSocialComprador>${escapeXml((cliente.nombre || "CONSUMIDOR FINAL").toUpperCase())}</razonSocialComprador>
     <identificacionComprador>${identificacion}</identificacionComprador>
     <obligadoContabilidad>${configSri.obligado_contabilidad || "NO"}</obligadoContabilidad>
     <codDocModificado>01</codDocModificado>
@@ -230,13 +242,13 @@ function generarXmlNC(nc: any, comprobanteOrigen: any): string {
     <moneda>DOLAR</moneda>
     <totalConImpuestos>${totalConImpuestosXml}
     </totalConImpuestos>
-    <motivo>${(nc.motivo_descripcion || nc.tipo_nc || "Nota de Crédito").substring(0, 300)}</motivo>
+    <motivo>${escapeXml((nc.motivo_descripcion || nc.tipo_nc || "Nota de Crédito").substring(0, 300))}</motivo>
   </infoNotaCredito>
   <detalles>${detallesXml}
   </detalles>
   <infoAdicional>
-    <campoAdicional nombre="Email">${cliente.email || "S/N"}</campoAdicional>
-    <campoAdicional nombre="FacturaOrigen">${numDocModificado}</campoAdicional>
+    <campoAdicional nombre="Email">${escapeXml(cliente.email || "S/N")}</campoAdicional>
+    <campoAdicional nombre="FacturaOrigen">${escapeXml(numDocModificado)}</campoAdicional>
   </infoAdicional>
 </notaCredito>`;
 

@@ -4,6 +4,18 @@
 
 import { format } from "https://esm.sh/date-fns@3.6.0";
 
+// Escapa texto libre antes de insertarlo en el XML — sin esto un "&", "<" o
+// ">" en nombre de producto/cliente/motivo rompe la estructura del documento
+// y el SRI la rechaza con ConversionArchivoXMLException.
+function escapeXml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 export default function generarXmlNC(nc: any): string {
   const empresa    = nc.empresas || {};
   const cliente    = nc.clientes || {};
@@ -57,8 +69,8 @@ export default function generarXmlNC(nc: any): string {
 
   const detallesXml = detallesProcesados.map((d: any) => `
     <detalle>
-      <codigoInterno>${(d.productos?.codigo || d.producto_id || "SIN-COD").slice(0, 25)}</codigoInterno>
-      <descripcion>${(d.nombre_producto || "Producto").toUpperCase()}</descripcion>
+      <codigoInterno>${escapeXml((d.productos?.codigo || d.producto_id || "SIN-COD").slice(0, 25))}</codigoInterno>
+      <descripcion>${escapeXml((d.nombre_producto || "Producto").toUpperCase())}</descripcion>
       <cantidad>${Number(d.cantidad).toFixed(6)}</cantidad>
       <precioUnitario>${d.precioUnitarioSinIva.toFixed(6)}</precioUnitario>
       <descuento>${d.descuentoValor.toFixed(2)}</descuento>
@@ -89,7 +101,7 @@ export default function generarXmlNC(nc: any): string {
     "03": "REBAJA O DESCUENTO",
     "04": "CORRECCION EN EL VALOR",
   };
-  const motivoFinal = `${motivoTextos[nc.motivo_sri] || "DEVOLUCION"}: ${nc.motivo_descripcion || ""}`.toUpperCase();
+  const motivoFinal = escapeXml(`${motivoTextos[nc.motivo_sri] || "DEVOLUCION"}: ${nc.motivo_descripcion || ""}`.toUpperCase());
 
   const rimpeTag = configSri.regimen_rimpe || empresa.razon_social?.includes("RIMPE")
     ? "<contribuyenteRimpe>CONTRIBUYENTE RÉGIMEN RIMPE</contribuyenteRimpe>"
@@ -100,22 +112,22 @@ export default function generarXmlNC(nc: any): string {
   <infoTributaria>
     <ambiente>${ambiente}</ambiente>
     <tipoEmision>1</tipoEmision>
-    <razonSocial>${(empresa.razon_social || empresa.nombre || "EMPRESA").toUpperCase()}</razonSocial>
-    <nombreComercial>${(empresa.nombre || "EMPRESA").toUpperCase()}</nombreComercial>
+    <razonSocial>${escapeXml((empresa.razon_social || empresa.nombre || "EMPRESA").toUpperCase())}</razonSocial>
+    <nombreComercial>${escapeXml((empresa.nombre || "EMPRESA").toUpperCase())}</nombreComercial>
     <ruc>${empresa.ruc || "9999999999999"}</ruc>
     <claveAcceso>${nc.clave_acceso}</claveAcceso>
     <codDoc>04</codDoc>
     <estab>${estab}</estab>
     <ptoEmi>${pto}</ptoEmi>
     <secuencial>${secuencial9}</secuencial>
-    <dirMatriz>${(empresa.direccion || "ECUADOR").toUpperCase()}</dirMatriz>
+    <dirMatriz>${escapeXml((empresa.direccion || "ECUADOR").toUpperCase())}</dirMatriz>
     ${rimpeTag}
   </infoTributaria>
   <infoNotaCredito>
     <fechaEmision>${fechaEmision}</fechaEmision>
-    <dirEstablecimiento>${(empresa.direccion || "LOCAL PRINCIPAL").toUpperCase()}</dirEstablecimiento>
+    <dirEstablecimiento>${escapeXml((empresa.direccion || "LOCAL PRINCIPAL").toUpperCase())}</dirEstablecimiento>
     <tipoIdentificacionComprador>${tipoId}</tipoIdentificacionComprador>
-    <razonSocialComprador>${(cliente.nombre || "CONSUMIDOR FINAL").toUpperCase()}</razonSocialComprador>
+    <razonSocialComprador>${escapeXml((cliente.nombre || "CONSUMIDOR FINAL").toUpperCase())}</razonSocialComprador>
     <identificacionComprador>${identificacion}</identificacionComprador>
     <obligadoContabilidad>${configSri.obligado_contabilidad || "NO"}</obligadoContabilidad>
     <codDocModificado>01</codDocModificado>
@@ -131,8 +143,8 @@ export default function generarXmlNC(nc: any): string {
   <detalles>${detallesXml}
   </detalles>
   <infoAdicional>
-    <campoAdicional nombre="Email">${cliente.email || "S/N"}</campoAdicional>
-    <campoAdicional nombre="FacturaOrigen">${origen.secuencial || "S/N"}</campoAdicional>
+    <campoAdicional nombre="Email">${escapeXml(cliente.email || "S/N")}</campoAdicional>
+    <campoAdicional nombre="FacturaOrigen">${escapeXml(origen.secuencial || "S/N")}</campoAdicional>
   </infoAdicional>
 </notaCredito>`;
 
