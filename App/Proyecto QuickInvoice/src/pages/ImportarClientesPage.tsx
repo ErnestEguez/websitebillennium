@@ -29,13 +29,42 @@ interface ImportSummary {
 
 const BATCH_SIZE = 100
 
+// Separa una línea de CSV respetando comillas (RFC 4180): un campo que
+// empieza con " puede contener el delimitador o comillas escapadas como ""
+// sin que se corten las columnas. Sin esto, una dirección/nombre con
+// comillas quedaba guardado con las comillas incluidas.
+function splitCsvLine(line: string, delimiter: string): string[] {
+    const fields: string[] = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        if (inQuotes) {
+            if (char === '"') {
+                if (line[i + 1] === '"') { current += '"'; i++ }
+                else { inQuotes = false }
+            } else {
+                current += char
+            }
+        } else if (char === '"' && current === '') {
+            inQuotes = true
+        } else if (char === delimiter) {
+            fields.push(current); current = ''
+        } else {
+            current += char
+        }
+    }
+    fields.push(current)
+    return fields
+}
+
 function parseCsvClientes(text: string): CsvRow[] {
     const lines = text.split(/\r?\n/)
     const rows: CsvRow[] = []
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim()
         if (!line) continue
-        const p = line.split(';')
+        const p = splitCsvLine(line, ';')
         const identificacion = (p[0] ?? '').trim()
         const nombre         = (p[1] ?? '').trim()
         if (!identificacion || !nombre) continue
