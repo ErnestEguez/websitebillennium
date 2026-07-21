@@ -129,6 +129,8 @@ const PERM_RUTAS: [string, string][] = [
     ['/consultas/cartera-clientes',    'perm_consulta_cartera'],
     ['/cartera/estado-cuenta',         'perm_estado_cuenta'],
     ['/proveedores',                   'perm_proveedores'],
+    ['/compras/ordenes',               'perm_ordenes_compra'],
+    ['/compras/nueva-inventario',      'perm_compras_inventario'],
     ['/compras',                       'perm_compras'],
     ['/cxp',                           'perm_cxp'],
     ['/reportes/compras',              'perm_reportes_cxp'],

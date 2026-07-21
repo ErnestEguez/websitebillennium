@@ -62,7 +62,7 @@ export function KardexPage() {
         const timer = setTimeout(async () => {
             setSearching(true)
             try {
-                const q = `%${searchText.trim()}%`
+                const q = '%' + searchText.trim().replace(/\*/g, '%') + '%'
                 const { data } = await supabase
                     .from('productos')
                     .select('id, codigo, nombre, stock, costo_promedio')
@@ -224,7 +224,7 @@ export function KardexPage() {
                         {productoSeleccionado && (
                             <p className="text-xs text-primary-600 mt-1 font-medium">✓ {productoNombre}</p>
                         )}
-                        {searchOpen && searchResults.length > 0 && !productoSeleccionado && (
+                        {searchOpen && searchResults.length > 0 && (
                             <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-white rounded-xl border border-slate-200 shadow-xl max-h-64 overflow-y-auto">
                                 {searchResults.map(p => (
                                     <button key={p.id} type="button"

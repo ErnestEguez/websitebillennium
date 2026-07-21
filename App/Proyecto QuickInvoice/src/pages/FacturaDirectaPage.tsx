@@ -51,6 +51,15 @@ const METODOS_PAGO: { value: PagoFactura['metodo']; label: string; cfBlocked?: b
 ]
 
 
+// Permite usar * como comodín (ej. "Erne*Eg") al buscar cliente por nombre,
+// igual que ya funciona en los buscadores de productos.
+function coincideComodin(texto: string, patron: string): boolean {
+    if (!patron) return true
+    if (!patron.includes('*')) return texto.toLowerCase().includes(patron.toLowerCase())
+    const escapado = patron.split('*').map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*')
+    try { return new RegExp(escapado, 'i').test(texto) } catch { return false }
+}
+
 const DETALLE_VACIO: DetalleFacturaDirecta = {
     producto_id: null,
     nombre_producto: '',
@@ -277,7 +286,7 @@ export function FacturaDirectaPage() {
 
     // ─── CLIENTE ──────────────────────────────────────────
     const filteredClientes = clientes.filter(c =>
-        c.nombre?.toLowerCase().includes(searchCliente.toLowerCase()) ||
+        coincideComodin(c.nombre ?? '', searchCliente) ||
         c.identificacion?.includes(searchCliente)
     )
 
