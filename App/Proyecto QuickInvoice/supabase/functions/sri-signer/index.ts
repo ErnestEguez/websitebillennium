@@ -504,7 +504,18 @@ async function firmarXmlXadesBes(
 
     const issuerDN = cert.issuer.attributes
         .slice().reverse()
-        .map((a: any) => `${a.shortName}=${a.value}`)
+        .map((a: any) => {
+            if (a.shortName) return `${a.shortName}=${a.value}`;
+            // Atributo sin nombre corto en node-forge (ej. OID 2.5.4.97
+            // "organizationIdentifier" en certificados UANATACA) → se
+            // representa como OID + valor en DER hexadecimal, igual que
+            // lo exige XAdES para atributos no estándar del emisor.
+            const tagClass = a.valueTagClass ?? forge.asn1.Type.PRINTABLESTRING;
+            const valueAsn1 = forge.asn1.create(forge.asn1.Class.UNIVERSAL, tagClass, false, String(a.value));
+            const der = forge.asn1.toDer(valueAsn1).getBytes();
+            const hex = Array.from(der).map((c: string) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("").toUpperCase();
+            return `${a.type}=#${hex}`;
+        })
         .join(",");
 
     const serialNumber = BigInt("0x" + cert.serialNumber).toString();
