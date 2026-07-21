@@ -38,7 +38,15 @@ const MODULOS = [
     {
         key: 'inventario', label: 'Inventarios',
         items: [
-            { field: 'perm_preparaciones_pintura', label: 'Preparaciones de Pintura' },
+            { field: 'perm_productos',             label: 'Artículos' },
+            { field: 'perm_ordenes_compra',         label: 'Órdenes de Compra' },
+            { field: 'perm_compras_inventario',     label: 'Compras Inventario' },
+            { field: 'perm_preparaciones_pintura',  label: 'Preparaciones de Pintura' },
+            { field: 'perm_ajuste_inventario',      label: 'Ajuste de Inventario' },
+            { field: 'perm_transferencia_bodega',   label: 'Transferencia de Bodegas' },
+            { field: 'perm_inventario_valorizado',  label: 'Inventario Valorado' },
+            { field: 'perm_kardex',                 label: 'Kardex' },
+            { field: 'perm_importar_articulos',     label: 'Importar Artículos' },
         ],
     },
     {
@@ -165,6 +173,14 @@ export function AdminPermisosPage() {
                     perm_th_rol_nomina:         r.perm_th_rol_nomina         ?? def.perm_th_rol_nomina,
                     perm_guias_remision:        r.perm_guias_remision        ?? def.perm_guias_remision,
                     perm_preparaciones_pintura: r.perm_preparaciones_pintura ?? def.perm_preparaciones_pintura,
+                    perm_productos:             r.perm_productos             ?? def.perm_productos,
+                    perm_ordenes_compra:        r.perm_ordenes_compra        ?? def.perm_ordenes_compra,
+                    perm_compras_inventario:    r.perm_compras_inventario    ?? def.perm_compras_inventario,
+                    perm_ajuste_inventario:     r.perm_ajuste_inventario     ?? def.perm_ajuste_inventario,
+                    perm_transferencia_bodega:  r.perm_transferencia_bodega  ?? def.perm_transferencia_bodega,
+                    perm_inventario_valorizado: r.perm_inventario_valorizado ?? def.perm_inventario_valorizado,
+                    perm_kardex:                r.perm_kardex                ?? def.perm_kardex,
+                    perm_importar_articulos:    r.perm_importar_articulos    ?? def.perm_importar_articulos,
                 }
             })
 

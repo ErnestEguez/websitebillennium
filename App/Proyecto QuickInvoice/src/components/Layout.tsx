@@ -303,14 +303,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/preparaciones-pintura','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
                         >
-                            <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub sentinelId="nav-productos" />
-                            <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub />
-                            <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub />
+                            <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub sentinelId="nav-productos" disabled={!p.perm_productos} />
+                            <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub disabled={!p.perm_ordenes_compra} />
+                            <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub disabled={!p.perm_compras_inventario} />
                             <SidebarItem to="/preparaciones-pintura"    icon={Palette}           label="Prep. Pinturas"        active={location.pathname.startsWith('/preparaciones-pintura')} sub disabled={!p.perm_preparaciones_pintura} />
-                            <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub />
-                            <SidebarItem to="/transferencia-bodega"     icon={ArrowLeftRight}    label="Transfer. Bodegas"     active={location.pathname === '/transferencia-bodega'} sub />
-                            <SidebarItem to="/inventario-valorizado"    icon={BarChart3}         label="Inventario Valorado"   active={location.pathname === '/inventario-valorizado'} sub />
-                            <SidebarItem to="/kardex"                   icon={ArrowDownUp}       label="Kardex"                active={location.pathname.startsWith('/kardex')} sub />
+                            <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub disabled={!p.perm_ajuste_inventario} />
+                            <SidebarItem to="/transferencia-bodega"     icon={ArrowLeftRight}    label="Transfer. Bodegas"     active={location.pathname === '/transferencia-bodega'} sub disabled={!p.perm_transferencia_bodega} />
+                            <SidebarItem to="/inventario-valorizado"    icon={BarChart3}         label="Inventario Valorado"   active={location.pathname === '/inventario-valorizado'} sub disabled={!p.perm_inventario_valorizado} />
+                            <SidebarItem to="/kardex"                   icon={ArrowDownUp}       label="Kardex"                active={location.pathname.startsWith('/kardex')} sub disabled={!p.perm_kardex} />
                         </ModuleSection>}
 
                         {/* ── MÓDULO 1b: Manejo de Clientes ────────────── */}
@@ -576,7 +576,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub />
                                     {isAdmin && <SidebarItem to="/ajustes/permisos" icon={UserCog} label="Permisos de usuario" active={location.pathname === '/ajustes/permisos'} sub />}
                                     {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub />}
-                                    {esOficina && <SidebarItem to="/importar-articulos" icon={Upload} label="Importar Artículos" active={location.pathname === '/importar-articulos'} sub />}
+                                    {esOficina && <SidebarItem to="/importar-articulos" icon={Upload} label="Importar Artículos" active={location.pathname === '/importar-articulos'} sub disabled={!p.perm_importar_articulos} />}
                                     {esOficina && <SidebarItem to="/importar-clientes"  icon={Users}  label="Clientes (Import/Export)" active={location.pathname === '/importar-clientes'} sub />}
                                     {esOficina && <SidebarItem to="/migrar-cartera"     icon={Wallet} label="Migración Cartera"         active={location.pathname === '/migrar-cartera'} sub />}
                                     <button

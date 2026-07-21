@@ -70,6 +70,14 @@ export interface Permisos {
     perm_th_rol_nomina:         boolean
     perm_guias_remision:        boolean
     perm_preparaciones_pintura: boolean
+    perm_productos:             boolean
+    perm_ordenes_compra:        boolean
+    perm_compras_inventario:    boolean
+    perm_ajuste_inventario:     boolean
+    perm_transferencia_bodega:  boolean
+    perm_inventario_valorizado: boolean
+    perm_kardex:                boolean
+    perm_importar_articulos:    boolean
 }
 
 interface AuthContextType {
@@ -137,6 +145,14 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_th_rol_nomina:         true,
     perm_guias_remision:        true,
     perm_preparaciones_pintura: true,
+    perm_productos:             true,
+    perm_ordenes_compra:        true,
+    perm_compras_inventario:    true,
+    perm_ajuste_inventario:     true,
+    perm_transferencia_bodega:  true,
+    perm_inventario_valorizado: true,
+    perm_kardex:                true,
+    perm_importar_articulos:    true,
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -284,6 +300,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_th_rol_nomina:         permData.perm_th_rol_nomina         ?? true,
                     perm_guias_remision:        permData.perm_guias_remision        ?? true,
                     perm_preparaciones_pintura: permData.perm_preparaciones_pintura ?? true,
+                    perm_productos:             permData.perm_productos             ?? true,
+                    perm_ordenes_compra:        permData.perm_ordenes_compra        ?? true,
+                    perm_compras_inventario:    permData.perm_compras_inventario    ?? true,
+                    perm_ajuste_inventario:     permData.perm_ajuste_inventario     ?? true,
+                    perm_transferencia_bodega:  permData.perm_transferencia_bodega  ?? true,
+                    perm_inventario_valorizado: permData.perm_inventario_valorizado ?? true,
+                    perm_kardex:                permData.perm_kardex                ?? true,
+                    perm_importar_articulos:    permData.perm_importar_articulos    ?? true,
                 } : DEFAULT_PERMISOS)
             }
         } catch {
