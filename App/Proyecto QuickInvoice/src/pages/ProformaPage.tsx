@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useFormDraft } from '../hooks/useFormDraft'
 import { preparacionPinturaService } from '../services/preparacionPinturaService'
 import { useAuth } from '../contexts/AuthContext'
 import { facturacionService } from '../services/facturacionService'
@@ -335,6 +336,24 @@ export function ProformaPage() {
     const [converting, setConverting]       = useState(false)
     const [facturaGenerada, setFacturaGenerada] = useState<{ numero: string; id: string } | null>(null)
 
+    // ── Draft — evita perder la digitación al salir a otra área del ERP ────────
+    const clearDraft = useFormDraft(
+        'draft_proforma',
+        () => ({ proformaEditando, selectedCliente, selectedVendedorId, detalles, observaciones, esModoServicio }),
+        (d) => {
+            const tieneContenido = !!d.selectedCliente || (d.detalles ?? []).some(x => x.nombre_producto)
+            if (!tieneContenido) return
+            if (d.proformaEditando)   setProformaEditando(d.proformaEditando)
+            if (d.selectedCliente)    setSelectedCliente(d.selectedCliente)
+            if (d.selectedVendedorId) setSelectedVendedorId(d.selectedVendedorId)
+            if (d.detalles?.length)   setDetalles(d.detalles)
+            if (d.observaciones)      setObservaciones(d.observaciones)
+            if (d.esModoServicio)     setEsModoServicio(d.esModoServicio)
+            setVista('form')
+        },
+        [proformaEditando, selectedCliente, selectedVendedorId, detalles, observaciones, esModoServicio],
+    )
+
     // ─── Carga inicial ────────────────────────────────────────────────────────
 
     useEffect(() => {
@@ -555,6 +574,7 @@ export function ProformaPage() {
             })
             setSavedProforma(saved)
             setProformaEditando(saved)
+            clearDraft()
             await buscarProformas()
             // Vincular todos los preparados acumulados en esta proforma
             const prepIds: string[] = JSON.parse(sessionStorage.getItem(PREP_IDS_KEY) || '[]')
