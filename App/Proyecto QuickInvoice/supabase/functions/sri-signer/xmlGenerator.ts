@@ -5,16 +5,18 @@
 import { format } from "https://esm.sh/date-fns@3.6.0";
 
 // Escapa cualquier texto libre (nombre de producto, cliente, dirección, etc.)
-// antes de insertarlo en el XML. Sin esto, un solo "&", "<" o ">" en un
-// nombre/dirección rompe la estructura del documento y el SRI lo rechaza
-// con ConversionArchivoXMLException, aunque el resto de la factura esté bien.
+// antes de insertarlo en el XML. Solo & y < — son los únicos que rompen la
+// estructura de un documento XML en contenido de texto (no en atributos).
+// IMPORTANTE: NO escapar comillas (" ni ') aquí. Al canonicalizar (C14N)
+// para verificar la firma XAdES, el SRI no reintroduce &quot;/&apos; en
+// contenido de texto — si nosotros sí las escapamos al firmar, la huella
+// que calculamos ya no coincide con la que el SRI recalcula, y rechaza
+// con "firma inválida (documento alterado)" aunque el certificado y la
+// firma en sí estén perfectamente correctos.
 function escapeXml(value: unknown): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+    .replace(/</g, "&lt;");
 }
 
 export default function generarXml(comprobante: any): string {

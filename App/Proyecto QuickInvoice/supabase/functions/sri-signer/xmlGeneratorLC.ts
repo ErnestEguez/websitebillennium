@@ -5,16 +5,14 @@
 
 import { format } from "https://esm.sh/date-fns@3.6.0";
 
-// Escapa texto libre antes de insertarlo en el XML — sin esto un "&", "<" o
-// ">" en nombre/dirección del proveedor o descripción rompe la estructura
-// del documento y el SRI la rechaza con ConversionArchivoXMLException.
+// Escapa texto libre antes de insertarlo en el XML. Solo & y < — NO escapar
+// comillas: al canonicalizar (C14N) para verificar la firma XAdES, el SRI no
+// reintroduce &quot;/&apos; en contenido de texto, y si nosotros sí las
+// escapamos al firmar, la huella no coincide y rechaza como "firma inválida".
 function escapeXml(value: unknown): string {
     return String(value ?? "")
         .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&apos;");
+        .replace(/</g, "&lt;");
 }
 
 // Tipos de identificación SRI para el proveedor/beneficiario
