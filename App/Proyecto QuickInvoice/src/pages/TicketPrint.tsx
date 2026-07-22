@@ -58,7 +58,7 @@ export function TicketPrint() {
                 {/* Header Logos */}
                 <div className="flex justify-center mb-4">
                     {factura.empresas?.logo_url ? (
-                        <img src={factura.empresas.logo_url} className="w-20 h-20 object-contain" alt="Business" />
+                        <img src={factura.empresas.logo_url} className="w-[64mm] h-auto object-contain" alt="Business" />
                     ) : (
                         <div className="w-16 h-16 flex items-center justify-center bg-slate-100 rounded text-xl font-bold">
                             {factura.empresas?.nombre?.[0]}

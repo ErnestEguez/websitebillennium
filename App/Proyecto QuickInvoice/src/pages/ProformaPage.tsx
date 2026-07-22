@@ -292,7 +292,7 @@ export function ProformaPage() {
     const [clientes, setClientes]       = useState<any[]>([])
     const [_productos, _setProductos]   = useState<any[]>([])
     const [vendedores, setVendedores]   = useState<Vendedor[]>([])
-    const [, setCuentasBancarias] = useState<CuentaBancaria[]>([])
+    const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([])
 
     // ── Lista de proformas ────────────────────────────────────────────────────
     const [proformas, setProformas]     = useState<Proforma[]>([])
@@ -1449,24 +1449,73 @@ export function ProformaPage() {
                                         </button>
                                     </div>
                                     {pagos.map((pago, i) => (
-                                        <div key={i} className="flex gap-2 items-center">
-                                            <select
-                                                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-                                                value={pago.metodo}
-                                                onChange={e => updatePago(i, 'metodo', e.target.value as any)}>
-                                                {METODOS_PAGO.map(m => (
-                                                    <option key={m.value} value={m.value}>{m.label}</option>
-                                                ))}
-                                            </select>
-                                            <input type="number" min="0" step="0.01"
-                                                className="w-28 px-3 py-2 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-emerald-400"
-                                                value={pago.valor}
-                                                onChange={e => updatePago(i, 'valor', parseFloat(e.target.value) || 0)} />
-                                            {pagos.length > 1 && (
-                                                <button onClick={() => removePago(i)}
-                                                    className="text-slate-300 hover:text-red-500 transition-colors">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                        <div key={i} className="space-y-1.5">
+                                            <div className="flex gap-2 items-center">
+                                                <select
+                                                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                                                    value={pago.metodo}
+                                                    onChange={e => updatePago(i, 'metodo', e.target.value as any)}>
+                                                    {METODOS_PAGO.map(m => (
+                                                        <option key={m.value} value={m.value}>{m.label}</option>
+                                                    ))}
+                                                </select>
+                                                <input type="number" min="0" step="0.01"
+                                                    className="w-28 px-3 py-2 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-emerald-400"
+                                                    value={pago.valor}
+                                                    onChange={e => updatePago(i, 'valor', parseFloat(e.target.value) || 0)} />
+                                                {pagos.length > 1 && (
+                                                    <button onClick={() => removePago(i)}
+                                                        className="text-slate-300 hover:text-red-500 transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {/* Cuenta bancaria destino — solo transferencia */}
+                                            {pago.metodo === 'transferencia' && (
+                                                <select
+                                                    className="w-full px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-xs outline-none focus:ring-2 focus:ring-blue-400 text-blue-900"
+                                                    value={pago.cuenta_bancaria_id ?? ''}
+                                                    onChange={e => {
+                                                        const cb = cuentasBancarias.find(c => c.id === e.target.value)
+                                                        const label = cb ? `${cb.banco?.nombre ?? ''} — ${cb.numero_cuenta}` : ''
+                                                        updatePago(i, 'cuenta_bancaria_id', e.target.value || null)
+                                                        updatePago(i, 'cuenta_bancaria_contable_id', cb?.cuenta_contable_id ?? null)
+                                                        updatePago(i, 'referencia', label || pago.referencia || '')
+                                                    }}
+                                                >
+                                                    <option value="">🏦 Cuenta bancaria destino…</option>
+                                                    {cuentasBancarias.map(cb => (
+                                                        <option key={cb.id} value={cb.id}>
+                                                            {cb.banco?.nombre} — {cb.numero_cuenta}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                            {/* Referencia / N° cheque */}
+                                            {(pago.metodo === 'cheque' || pago.metodo === 'cheque_fecha' || pago.metodo === 'tarjeta') && (
+                                                <input type="text"
+                                                    placeholder={pago.metodo === 'tarjeta' ? 'Últimos 4 dígitos…' : 'N° de cheque…'}
+                                                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                                                    value={pago.referencia ?? ''}
+                                                    onChange={e => updatePago(i, 'referencia', e.target.value)}
+                                                />
+                                            )}
+                                            {/* Transferencia: N° de comprobante y observaciones */}
+                                            {pago.metodo === 'transferencia' && (
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    <input type="text"
+                                                        placeholder="N° comprobante transferencia"
+                                                        className="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-xs outline-none focus:ring-2 focus:ring-blue-400 text-blue-900"
+                                                        value={pago.numero_documento ?? ''}
+                                                        onChange={e => updatePago(i, 'numero_documento', e.target.value || null)}
+                                                    />
+                                                    <input type="text"
+                                                        placeholder="Observaciones"
+                                                        className="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-xs outline-none focus:ring-2 focus:ring-blue-400 text-blue-900"
+                                                        value={pago.observaciones ?? ''}
+                                                        onChange={e => updatePago(i, 'observaciones', e.target.value || null)}
+                                                    />
+                                                </div>
                                             )}
                                         </div>
                                     ))}
