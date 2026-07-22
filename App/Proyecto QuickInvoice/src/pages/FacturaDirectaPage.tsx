@@ -324,8 +324,18 @@ export function FacturaDirectaPage() {
             setSelectedCliente(created)
             setIsClientFormOpen(false)
             setNewClient({ identificacion: '', nombre: '', email: '', direccion: '', telefono: '' })
-        } catch {
-            alert('Error al guardar cliente')
+        } catch (err: any) {
+            if (err?.code === '23505') {
+                const { data: existente } = await supabase
+                    .from('clientes').select('nombre')
+                    .eq('empresa_id', empresa!.id).eq('identificacion', id)
+                    .maybeSingle()
+                alert(existente?.nombre
+                    ? `Ese cliente ya está grabado como "${existente.nombre}".`
+                    : 'Ese cliente ya está grabado.')
+            } else {
+                alert('Error al guardar cliente' + (err?.message ? `: ${err.message}` : ''))
+            }
         } finally {
             setIsSavingClient(false)
         }
