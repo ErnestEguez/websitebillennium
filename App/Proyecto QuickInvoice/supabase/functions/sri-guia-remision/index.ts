@@ -62,11 +62,22 @@ async function firmarXmlXadesBes(xmlContent: string, firmaB64: string, password:
     const certDerLeaf = forge.asn1.toDer(forge.pki.certificateToAsn1(leafCert)).getBytes();
     const certSha1B64 = await sha1b64(new TextEncoder().encode(certDerLeaf));
 
-    const getAttrValue = (cert: forge.pki.Certificate, attr: string): string => {
-        const a = cert.issuer.attributes.find((x: any) => x.shortName === attr || x.name === attr);
-        return a?.value || "";
-    };
-    const issuerDN = `CN=${getAttrValue(leafCert, "CN")},OU=${getAttrValue(leafCert, "OU")},O=${getAttrValue(leafCert, "O")},L=${getAttrValue(leafCert, "L")},ST=${getAttrValue(leafCert, "ST")},C=${getAttrValue(leafCert, "C")}`;
+    // Construcción dinámica del emisor (antes era una plantilla fija de 6
+    // campos que omitía atributos no estándar del emisor — como el OID
+    // 2.5.4.97 "organizationIdentifier" de certificados UANATACA — e incluía
+    // campos vacíos que el certificado real no tiene, produciendo un
+    // IssuerSerial incorrecto que el SRI rechaza como firma inválida).
+    const issuerDN = leafCert.issuer.attributes
+        .slice().reverse()
+        .map((a: any) => {
+            if (a.shortName) return `${a.shortName}=${a.value}`;
+            const tagClass = a.valueTagClass ?? forge.asn1.Type.PRINTABLESTRING;
+            const valueAsn1 = forge.asn1.create(forge.asn1.Class.UNIVERSAL, tagClass, false, String(a.value));
+            const der = forge.asn1.toDer(valueAsn1).getBytes();
+            const hex = Array.from(der).map((c: string) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("").toUpperCase();
+            return `${a.type}=#${hex}`;
+        })
+        .join(",");
     const serialNumber = BigInt("0x" + leafCert.serialNumber).toString();
     const publicKey   = leafCert.publicKey as forge.pki.rsa.PublicKey;
     const modulusB64  = btoa((publicKey as any).n.toByteArray().map((b: number) => String.fromCharCode(b < 0 ? b + 256 : b)).join(""));

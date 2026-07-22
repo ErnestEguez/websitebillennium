@@ -14,8 +14,10 @@ export default function generarXmlGR(guia: any): string {
     const estab       = (guia.secuencial?.split("-")[0] || "001").padStart(3, "0").slice(-3);
     const pto         = (guia.secuencial?.split("-")[1] || "001").padStart(3, "0").slice(-3);
 
+    // Solo & y < — escapar comillas aquí rompe la verificación de firma XAdES
+    // (C14N no reintroduce &quot; en contenido de texto al canonicalizar).
     const esc = (s: string) => String(s || "")
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
     const fmtDate = (d: string | null | undefined): string => {
         if (!d) return format(new Date(), "dd/MM/yyyy");
