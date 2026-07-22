@@ -179,30 +179,61 @@ export function ConsultaComprasPage() {
         base15:    filtradas.reduce((s, r) => s + r.base_iva15,  0),
         iva15:     filtradas.reduce((s, r) => s + r.iva15,        0),
         iva:       filtradas.reduce((s, r) => s + r.iva,          0),
+        totalBases: filtradas.reduce((s, r) => s + r.base_cero + r.base_iva5 + r.base_iva15, 0),
         total:     filtradas.reduce((s, r) => s + r.total,        0),
         retenido:  filtradas.reduce((s, r) => s + (r.valor_retenido ?? 0), 0),
     }
 
     function exportarExcel() {
-        const filas = filtradas.map(r => ({
-            'Tipo':             TIPO_LABEL[r.tipo] ?? r.tipo,
-            'RUC / CI':         r.proveedor_ruc,
-            'Nombre':           r.proveedor_nombre,
-            'Número':           r.numero,
-            'Fecha':            r.fecha_emision,
-            'Base 0%':          r.base_cero,
-            'Base 5%':          r.base_iva5,
-            'IVA 5%':           r.iva5,
-            'Base 15%':         r.base_iva15,
-            'IVA 15%':          r.iva15,
-            'Total IVA':        r.iva,
-            'Total':            r.total,
-            'Cód. Ret. IR':     r.codigo_retencion ?? '',
-            '% Retención':      r.porcentaje_ret ?? '',
-            'Valor Retenido':   r.valor_retenido ?? 0,
-            'Clave Acceso':     r.clave_acceso ?? '',
-        }))
-        const ws = XLSX.utils.json_to_sheet(filas)
+        const headers = [
+            'numero', 'tipo', 'secuencial', 'clave_autorizacion', 'ruc_emisor', 'nombre_emisor',
+            'fecha_emision', 'subtotal_cero', 'subtotal_iva_15', 'subtotal_iva_5', 'subtotal_exento',
+            'total_bases', 'iva 5%', 'iva 15%', 'importe_total',
+            'Cód. Ret. IR', '% Retención', 'Valor Retenido',
+        ]
+
+        const filas = filtradas.map((r, i) => [
+            i + 1,
+            TIPO_LABEL[r.tipo] ?? r.tipo,
+            r.numero,
+            r.clave_acceso ?? '',
+            r.proveedor_ruc,
+            r.proveedor_nombre,
+            r.fecha_emision,
+            r.base_cero,
+            r.base_iva15,
+            r.base_iva5,
+            0, // subtotal_exento — no se registra en el sistema aún
+            r.base_cero + r.base_iva5 + r.base_iva15,
+            r.iva5,
+            r.iva15,
+            r.total,
+            r.codigo_retencion ?? '',
+            r.porcentaje_ret ?? '',
+            r.valor_retenido ?? 0,
+        ])
+
+        const filaTotales = [
+            '', '', '', '', '', '', 'TOTALES',
+            totales.base0, totales.base15, totales.base5, 0, totales.totalBases,
+            totales.iva5, totales.iva15, totales.total,
+            '', '', totales.retenido,
+        ]
+
+        const nombreEmpresa = empresa?.razon_social || empresa?.nombre || ''
+        const periodo = `${mes > 0 ? mesNombre(mes) : 'Año completo'} ${año}`
+
+        const aoa = [
+            ['Consulta Tributaria — Compras y Ventas'],
+            [`Empresa: ${nombreEmpresa}`],
+            [`Período: ${periodo}`],
+            [],
+            headers,
+            ...filas,
+            filaTotales,
+        ]
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa)
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, 'Compras y Ventas')
         XLSX.writeFile(wb, `Tributario_${empresa?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.xlsx`)
@@ -322,6 +353,7 @@ export function ConsultaComprasPage() {
                                     <th className="py-2 px-3 text-right">IVA 5%</th>
                                     <th className="py-2 px-3 text-right">Base 15%</th>
                                     <th className="py-2 px-3 text-right">IVA 15%</th>
+                                    <th className="py-2 px-3 text-right">Total Bases</th>
                                     <th className="py-2 px-3 text-right">Total</th>
                                     <th className="py-2 px-3 text-center">Ret. IR</th>
                                 </tr>
@@ -366,6 +398,9 @@ export function ConsultaComprasPage() {
                                                 <td className="py-2 px-3 text-right text-xs">
                                                     {r.iva15 > 0 ? formatMoneda(r.iva15) : '—'}
                                                 </td>
+                                                <td className="py-2 px-3 text-right text-xs font-medium">
+                                                    {formatMoneda(r.base_cero + r.base_iva5 + r.base_iva15)}
+                                                </td>
                                                 <td className="py-2 px-3 text-right font-semibold text-xs">
                                                     {formatMoneda(r.total)}
                                                 </td>
@@ -381,7 +416,7 @@ export function ConsultaComprasPage() {
                                             </tr>
                                             {isExp && (
                                                 <tr key={`${r.id}-det`} className="bg-slate-50 border-b border-slate-100">
-                                                    <td colSpan={12} className="px-8 py-3">
+                                                    <td colSpan={13} className="px-8 py-3">
                                                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Detalle</p>
                                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs font-mono text-slate-600">
                                                             <div><span className="text-slate-400">Base 0%:</span> {r.base_cero.toFixed(2)}</div>
@@ -418,6 +453,7 @@ export function ConsultaComprasPage() {
                                     <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.iva5)}</td>
                                     <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.base15)}</td>
                                     <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.iva15)}</td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.totalBases)}</td>
                                     <td className="py-2.5 px-3 text-right">{formatMoneda(totales.total)}</td>
                                     <td className="py-2.5 px-3 text-center text-xs text-slate-500">
                                         {totales.retenido > 0 ? formatMoneda(totales.retenido) : ''}
