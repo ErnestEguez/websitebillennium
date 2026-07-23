@@ -37,6 +37,21 @@ export interface AsientoPagoProveedorInput {
     pagoId?:          string
 }
 
+export interface AsientoNCProveedorInput {
+    empresaId:        string
+    portalRuc:        string
+    fecha:            string
+    proveedorNombre:  string
+    tipo:             'DEVOLUCION_MERCADERIA' | 'NC_VALOR'
+    /** Base/subtotal a acreditar (Inventario o cuenta contra, según tipo) */
+    baseTotal:        number
+    valorIva:         number
+    total:            number
+    /** Override manual de la cuenta contra (BuscadorCuentaContable); si es null usa el mapeo PAGOS:NOTA_CREDITO */
+    cuentaContraId?:  string | null
+    ncId?:            string
+}
+
 export const contabilidadComprasService = {
 
     async crearAsientoCompra(input: AsientoCompraInput): Promise<void> {
@@ -440,6 +455,181 @@ export const contabilidadComprasService = {
         await db.rpc('lp_actualizar_saldos', { p_comprobante_id: comp.id, p_operacion: 'sumar' })
 
         console.log(`[asientoPagoProveedor] ✅ ${numeroFinal} creado — DEBE/HABER ${monto}`)
+        return comp.id
+    },
+
+    /** Genera el asiento contable de una Nota de Crédito de Proveedor. */
+    async crearAsientoNCProveedor(input: AsientoNCProveedorInput): Promise<string> {
+        const db = supabaseContabilidad as any
+        const { empresaId, portalRuc, fecha, proveedorNombre, tipo,
+                baseTotal, valorIva, total, cuentaContraId, ncId } = input
+
+        const r2 = (n: number) => Math.round(n * 100) / 100
+
+        // ── 1. Mapeo contable ────────────────────────────────────
+        const mapeoMap = await contableConfigService.getMapeoAsMap(empresaId)
+        const cuenta = (proceso: string, concepto: string): string | null =>
+            mapeoMap[`${proceso}:${concepto}`]?.cuenta_id ?? null
+
+        // ── 2. LP empresa ────────────────────────────────────────
+        const { data: memberships } = await db
+            .from('lp_usuarios_empresa')
+            .select('empresa_id, empresa:lp_empresas(id, ruc)')
+            .eq('activo', true)
+
+        const lista: Array<{ empresa_id: string; empresa: { id: string; ruc?: string | null } }> = memberships ?? []
+        if (!lista.length) throw new Error('Sin empresa LP configurada. Verifica que tienes acceso a LedgerPro.')
+
+        let lpEmpresaId = lista[0].empresa_id
+        if (portalRuc) {
+            const match = lista.find(m => m.empresa?.ruc === portalRuc)
+            if (match) lpEmpresaId = match.empresa_id
+        }
+
+        // ── 3. Período abierto ───────────────────────────────────
+        const [año, mes] = fecha.split('-').map(Number)
+        const { data: periodo, error: errPeriodo } = await db
+            .from('lp_periodos')
+            .select('id')
+            .eq('empresa_id', lpEmpresaId)
+            .eq('año', año)
+            .eq('mes', mes)
+            .in('estado', ['abierto'])
+            .maybeSingle()
+
+        if (errPeriodo) throw new Error(`Error consultando período LP: ${errPeriodo.message}`)
+        if (!periodo) throw new Error(`No hay período abierto en LedgerPro para ${mes}/${año}. Ábrelo en Contabilidad → Períodos.`)
+
+        // ── 4. Tipo comprobante ──────────────────────────────────
+        const { data: tipos } = await db
+            .from('lp_tipos_comprobante')
+            .select('id, codigo')
+            .eq('activo', true)
+            .order('codigo')
+
+        const listaTipos: Array<{ id: string; codigo: string }> = tipos ?? []
+        const tipoPrefs = ['CP', 'CO', 'CI', 'V']
+        let tipoId: string | null = null
+        let tipoCodigo = 'CP'
+
+        for (const pref of tipoPrefs) {
+            const t = listaTipos.find(t => t.codigo === pref)
+            if (t) { tipoId = t.id; tipoCodigo = t.codigo; break }
+        }
+        if (!tipoId && listaTipos.length > 0) {
+            tipoId = listaTipos[0].id
+            tipoCodigo = listaTipos[0].codigo
+        }
+        if (!tipoId) throw new Error('Sin tipos de comprobante en LedgerPro.')
+
+        // ── 5. Número correlativo propio (con reintento) ─────────
+        const { data: lastComp } = await db
+            .from('lp_comprobantes')
+            .select('secuencial')
+            .eq('empresa_id', lpEmpresaId)
+            .eq('tipo_comprobante_id', tipoId)
+            .eq('periodo_id', periodo.id)
+            .order('secuencial', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        const nextSecuencial = ((lastComp?.secuencial as number) ?? 0) + 1
+        const mesStr = String(mes).padStart(2, '0')
+        let numeroFinal = `${tipoCodigo}-${año}${mesStr}-${String(nextSecuencial).padStart(4, '0')}`
+
+        // ── 6. Cuentas DEBE / HABER ───────────────────────────────
+        const ctaCxP = cuenta('COMPRAS', 'PROVEEDORES_CXP')
+        if (!ctaCxP) throw new Error('Cuenta COMPRAS:PROVEEDORES_CXP no mapeada. Ve a Ajustes → Contabilidad → sección Compras.')
+
+        // Devolución de mercadería: HABER Inventario (reversa lo que entró).
+        // N/C Valor: HABER cuenta_contra (override manual) o mapeo PAGOS:NOTA_CREDITO.
+        let ctaBase: string | null
+        let descBase: string
+        if (tipo === 'DEVOLUCION_MERCADERIA') {
+            ctaBase = cuenta('COMPRAS', 'INVENTARIO')
+            descBase = 'Devolución de mercadería a proveedor'
+            if (!ctaBase) throw new Error('Cuenta COMPRAS:INVENTARIO no mapeada. Ve a Ajustes → Contabilidad → sección Compras.')
+        } else {
+            ctaBase = cuentaContraId || cuenta('PAGOS', 'NOTA_CREDITO')
+            descBase = 'Nota de crédito de proveedor'
+            if (!ctaBase) throw new Error('Cuenta PAGOS:NOTA_CREDITO no mapeada. Ve a Ajustes → Contabilidad → sección "Pagos a Proveedores", o elige una cuenta manualmente.')
+        }
+
+        const ctaIva = cuenta('COMPRAS', 'IVA_PAGADO')
+
+        type Linea = { cuenta_id: string; monto: number; desc: string }
+        const debe: Linea[] = [{ cuenta_id: ctaCxP, monto: r2(total), desc: 'Proveedores / CxP' }]
+        const haber: Linea[] = []
+        if (baseTotal > 0.001) haber.push({ cuenta_id: ctaBase, monto: r2(baseTotal), desc: descBase })
+        if (valorIva > 0.001) {
+            if (!ctaIva) throw new Error('Cuenta COMPRAS:IVA_PAGADO no mapeada. Ve a Ajustes → Contabilidad → sección Compras.')
+            haber.push({ cuenta_id: ctaIva, monto: r2(valorIva), desc: 'Reverso IVA en compras' })
+        }
+
+        if (haber.length === 0) throw new Error('Asiento sin líneas de HABER — revisa los valores de la N/C.')
+
+        const totalDebe  = r2(debe.reduce((s, l) => s + l.monto, 0))
+        const totalHaber = r2(haber.reduce((s, l) => s + l.monto, 0))
+        if (Math.abs(totalDebe - totalHaber) > 0.02)
+            console.warn(`[asientoNCProveedor] Descuadre residual: DEBE=${totalDebe} HABER=${totalHaber}`)
+
+        // ── 7. Insertar comprobante LP (con reintento de número) ──
+        const tipoLabel = tipo === 'DEVOLUCION_MERCADERIA' ? 'devolución de mercadería' : 'nota de crédito de valor'
+        const glosa = `N/C proveedor (${tipoLabel}) — ${proveedorNombre}`
+
+        const comprobanteBase = {
+            empresa_id:          lpEmpresaId,
+            periodo_id:          periodo.id,
+            tipo_comprobante_id: tipoId,
+            secuencial:          nextSecuencial,
+            fecha,
+            glosa,
+            estado:              'confirmado',
+            total_debe:          totalDebe,
+            total_haber:         totalHaber,
+            moneda_id:           null,
+            tipo_cambio:         1,
+            origen:              'quickinvoice',
+            referencia_externa:  ncId ?? null,
+            created_by:          null,
+        }
+
+        let comp: { id: string }
+        const primero = await db
+            .from('lp_comprobantes')
+            .insert({ ...comprobanteBase, numero: numeroFinal })
+            .select('id')
+            .single()
+
+        if (primero.error || !primero.data) {
+            const dup = primero.error?.code === '23505' || primero.error?.status === 409
+            if (!dup) throw primero.error ?? new Error('Error creando comprobante LP')
+
+            numeroFinal = `${tipoCodigo}-${año}${mesStr}-${Date.now()}`
+            const reintento = await db
+                .from('lp_comprobantes')
+                .insert({ ...comprobanteBase, numero: numeroFinal })
+                .select('id')
+                .single()
+            if (reintento.error || !reintento.data) throw reintento.error ?? new Error('Error creando comprobante LP')
+            comp = reintento.data
+        } else {
+            comp = primero.data
+        }
+
+        // ── 8. Insertar líneas ────────────────────────────────────
+        const lineas = [
+            ...debe.map((l, i) => ({ comprobante_id: comp.id, empresa_id: lpEmpresaId, cuenta_id: l.cuenta_id, descripcion: l.desc, debe: l.monto, haber: 0, orden: i })),
+            ...haber.map((l, i) => ({ comprobante_id: comp.id, empresa_id: lpEmpresaId, cuenta_id: l.cuenta_id, descripcion: l.desc, debe: 0, haber: l.monto, orden: debe.length + i })),
+        ]
+
+        const { error: errLineas } = await db.from('lp_comprobante_lineas').insert(lineas)
+        if (errLineas) throw errLineas
+
+        // ── 9. Actualizar saldos LP ───────────────────────────────
+        await db.rpc('lp_actualizar_saldos', { p_comprobante_id: comp.id, p_operacion: 'sumar' })
+
+        console.log(`[asientoNCProveedor] ✅ ${numeroFinal} creado — DEBE/HABER ${totalDebe}`)
         return comp.id
     },
 

@@ -64,6 +64,7 @@ const MODULOS = [
         items: [
             { field: 'perm_proveedores',    label: 'Proveedores' },
             { field: 'perm_compras',        label: 'Compras' },
+            { field: 'perm_nc_proveedores', label: 'Notas de Crédito Proveedores' },
             { field: 'perm_cxp',            label: 'Cuentas por Pagar' },
             { field: 'perm_reportes_cxp',   label: 'Reportes Compras' },
         ],
@@ -165,6 +166,7 @@ export function AdminPermisosPage() {
                     perm_estado_cuenta:      r.perm_estado_cuenta      ?? def.perm_estado_cuenta,
                     perm_proveedores:        r.perm_proveedores        ?? def.perm_proveedores,
                     perm_compras:            r.perm_compras            ?? def.perm_compras,
+                    perm_nc_proveedores:     r.perm_nc_proveedores     ?? def.perm_nc_proveedores,
                     perm_cxp:                r.perm_cxp               ?? def.perm_cxp,
                     perm_reportes_cxp:       r.perm_reportes_cxp       ?? def.perm_reportes_cxp,
                     perm_bancos:             r.perm_bancos             ?? def.perm_bancos,

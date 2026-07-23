@@ -79,6 +79,8 @@ const RetencionRidePage            = lz(() => import('./pages/vendor/RetencionRi
 const LiquidacionesCompraPage      = lz(() => import('./pages/vendor/LiquidacionesCompraPage'), 'LiquidacionesCompraPage')
 const NuevaLiquidacionCompraPage   = lz(() => import('./pages/vendor/NuevaLiquidacionCompraPage'), 'NuevaLiquidacionCompraPage')
 const LiquidacionCompraRidePage    = lz(() => import('./pages/vendor/LiquidacionCompraRidePage'), 'LiquidacionCompraRidePage')
+const NotasCreditoProveedorPage    = lz(() => import('./pages/vendor/NotasCreditoProveedorPage'), 'NotasCreditoProveedorPage')
+const NuevaNcProveedorPage         = lz(() => import('./pages/vendor/NuevaNcProveedorPage'), 'NuevaNcProveedorPage')
 
 // ── Módulo Contabilidad ───────────────────────────────────────────────────────
 const ContaDashboard               = lz(() => import('./pages/contabilidad/DashboardPage'), 'DashboardPage')
@@ -643,6 +645,8 @@ function App() {
               <Route path="/compras" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><ComprasPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/nueva-inventario" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaCompraInventarioPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/nueva-servicio" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaCompraServicioPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
+              <Route path="/compras/notas-credito" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NotasCreditoProveedorPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
+              <Route path="/compras/notas-credito/nueva" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaNcProveedorPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/ordenes" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><OrdenesCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/ordenes/nueva" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaOrdenCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/ordenes/:id" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaOrdenCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />

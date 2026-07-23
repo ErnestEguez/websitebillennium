@@ -73,6 +73,7 @@ export interface Permisos {
     perm_productos:             boolean
     perm_ordenes_compra:        boolean
     perm_compras_inventario:    boolean
+    perm_nc_proveedores:        boolean
     perm_ajuste_inventario:     boolean
     perm_transferencia_bodega:  boolean
     perm_inventario_valorizado: boolean
@@ -153,6 +154,7 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_productos:             true,
     perm_ordenes_compra:        true,
     perm_compras_inventario:    true,
+    perm_nc_proveedores:        true,
     perm_ajuste_inventario:     true,
     perm_transferencia_bodega:  true,
     perm_inventario_valorizado: true,
@@ -313,6 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_productos:             permData.perm_productos             ?? true,
                     perm_ordenes_compra:        permData.perm_ordenes_compra        ?? true,
                     perm_compras_inventario:    permData.perm_compras_inventario    ?? true,
+                    perm_nc_proveedores:        permData.perm_nc_proveedores        ?? true,
                     perm_ajuste_inventario:     permData.perm_ajuste_inventario     ?? true,
                     perm_transferencia_bodega:  permData.perm_transferencia_bodega  ?? true,
                     perm_inventario_valorizado: permData.perm_inventario_valorizado ?? true,
