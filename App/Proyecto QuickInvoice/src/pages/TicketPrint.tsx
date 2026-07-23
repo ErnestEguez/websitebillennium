@@ -97,6 +97,14 @@ export function TicketPrint() {
                                 <td className="text-right">{formatCurrency(item.subtotal)}</td>
                             </tr>
                         ))}
+                        {/* Fallback: facturas directas (sin pedido) usan comprobante_detalles */}
+                        {!factura.pedidos?.pedido_detalles && factura.comprobante_detalles?.map((item: any) => (
+                            <tr key={item.id}>
+                                <td className="py-1 uppercase">{item.nombre_producto}</td>
+                                <td className="text-center">{item.cantidad}</td>
+                                <td className="text-right">{formatCurrency(item.subtotal)}</td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
 
@@ -105,8 +113,9 @@ export function TicketPrint() {
                         (1 + tasa/100), eso descuadraba contra el RIDE. Igual que InvoicePrint.tsx. */}
                     {(() => {
                         const breakdown: Record<number, number> = {}
-                        factura.pedidos?.pedido_detalles?.forEach((det: any) => {
-                            const rate = det.productos?.iva_porcentaje || 0
+                        const items = factura.pedidos?.pedido_detalles || factura.comprobante_detalles || []
+                        items.forEach((det: any) => {
+                            const rate = det.productos?.iva_porcentaje || det.iva_porcentaje || 0
                             breakdown[rate] = (breakdown[rate] || 0) + Number(det.subtotal || 0)
                         })
                         return Object.entries(breakdown).map(([rate, base]) => (
@@ -117,8 +126,9 @@ export function TicketPrint() {
                         ))
                     })()}
                     {(() => {
-                        const totalIva = factura.pedidos?.pedido_detalles?.reduce((sum: number, det: any) => {
-                            const rate = det.productos?.iva_porcentaje || 0
+                        const items = factura.pedidos?.pedido_detalles || factura.comprobante_detalles || []
+                        const totalIva = items.reduce((sum: number, det: any) => {
+                            const rate = det.productos?.iva_porcentaje || det.iva_porcentaje || 0
                             const iva = Number(det.iva_valor ?? (Number(det.subtotal || 0) * rate / 100))
                             return sum + iva
                         }, 0)
