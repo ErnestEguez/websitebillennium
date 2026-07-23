@@ -101,11 +101,13 @@ export function TicketPrint() {
                 </table>
 
                 <div className="border-t border-dashed border-black pt-2 space-y-1">
+                    {/* det.subtotal ya viene SIN impuestos (base) — no dividir de nuevo por
+                        (1 + tasa/100), eso descuadraba contra el RIDE. Igual que InvoicePrint.tsx. */}
                     {(() => {
                         const breakdown: Record<number, number> = {}
                         factura.pedidos?.pedido_detalles?.forEach((det: any) => {
                             const rate = det.productos?.iva_porcentaje || 0
-                            breakdown[rate] = (breakdown[rate] || 0) + (det.subtotal / (1 + rate / 100))
+                            breakdown[rate] = (breakdown[rate] || 0) + Number(det.subtotal || 0)
                         })
                         return Object.entries(breakdown).map(([rate, base]) => (
                             <div key={rate} className="flex justify-between">
@@ -117,8 +119,8 @@ export function TicketPrint() {
                     {(() => {
                         const totalIva = factura.pedidos?.pedido_detalles?.reduce((sum: number, det: any) => {
                             const rate = det.productos?.iva_porcentaje || 0
-                            const base = det.subtotal / (1 + rate / 100)
-                            return sum + (det.subtotal - base)
+                            const iva = Number(det.iva_valor ?? (Number(det.subtotal || 0) * rate / 100))
+                            return sum + iva
                         }, 0)
                         return (
                             <div className="flex justify-between">

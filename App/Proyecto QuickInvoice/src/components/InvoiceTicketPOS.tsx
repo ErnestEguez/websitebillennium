@@ -69,12 +69,15 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
             </table>
 
             <div className="border-t border-dashed border-black pt-2 space-y-1">
+                {/* Nota: det.subtotal ya viene SIN impuestos (base) — no se debe volver a
+                    dividir por (1 + tasa/100), eso extraía IVA de un valor que ya era la base
+                    y descuadraba contra el RIDE. Mismo criterio que InvoicePrint.tsx. */}
                 {(() => {
                     const breakdown: Record<number, number> = {}
                     const items = factura.pedidos?.pedido_detalles || factura.comprobante_detalles || []
                     items.forEach((det: any) => {
                         const rate = det.productos?.iva_porcentaje || det.iva_porcentaje || 0
-                        breakdown[rate] = (breakdown[rate] || 0) + (det.subtotal / (1 + rate / 100))
+                        breakdown[rate] = (breakdown[rate] || 0) + Number(det.subtotal || 0)
                     })
                     return Object.entries(breakdown).map(([rate, base]) => (
                         <div key={rate} className="flex justify-between">
@@ -87,8 +90,8 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                     const items = factura.pedidos?.pedido_detalles || factura.comprobante_detalles || []
                     const totalIva = items.reduce((sum: number, det: any) => {
                         const rate = det.productos?.iva_porcentaje || det.iva_porcentaje || 0
-                        const base = det.subtotal / (1 + rate / 100)
-                        return sum + (det.subtotal - base)
+                        const iva = Number(det.iva_valor ?? (Number(det.subtotal || 0) * rate / 100))
+                        return sum + iva
                     }, 0)
                     return (
                         <div className="flex justify-between">
