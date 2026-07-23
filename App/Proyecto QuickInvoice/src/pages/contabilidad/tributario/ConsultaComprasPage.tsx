@@ -7,7 +7,7 @@ import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
 
 interface Compra {
     id: string
-    tipo: 'compra' | 'venta'
+    tipo: 'compra'
     proveedor_ruc: string
     proveedor_nombre: string
     numero: string
@@ -29,12 +29,10 @@ interface Compra {
 
 const TIPO_LABEL: Record<string, string> = {
     compra: 'Compra',
-    venta:  'Venta',
 }
 
 const TIPO_STYLE: Record<string, string> = {
     compra: 'bg-blue-100 text-blue-700',
-    venta:  'bg-emerald-100 text-emerald-700',
 }
 
 export function ConsultaComprasPage() {
@@ -42,7 +40,6 @@ export function ConsultaComprasPage() {
 
     const [año, setAño]           = useState(new Date().getFullYear())
     const [mes, setMes]           = useState(0)
-    const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'compra' | 'venta'>('todos')
     const [busqueda, setBusqueda] = useState('')
     const [expandido, setExpandido] = useState<string | null>(null)
 
@@ -67,24 +64,14 @@ export function ConsultaComprasPage() {
             : `${año}-12-31`
 
         try {
-            const [comprasRes, ventasRes] = await Promise.all([
-                supabase
-                    .from('ingresos_stock')
-                    .select('id, numero_factura, clave_acceso, fecha_emision, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, tipo_compra, proveedor:proveedores(ruc, nombre_empresa), retenciones:retenciones_compras(codigo_retencion, porcentaje, valor)')
-                    .eq('empresa_id', empresa.id)
-                    .eq('estado', 'ACTIVO')
-                    .gte('fecha_emision', desde)
-                    .lte('fecha_emision', hasta)
-                    .order('fecha_emision', { ascending: false }),
-
-                supabase
-                    .from('comprobantes')
-                    .select('id, secuencial, clave_acceso, created_at, total, cliente:clientes(identificacion, nombre), comprobante_detalles(subtotal, iva_porcentaje, iva_valor)')
-                    .eq('empresa_id', empresa.id)
-                    .gte('created_at', desde)
-                    .lte('created_at', hasta + 'T23:59:59')
-                    .order('created_at', { ascending: false }),
-            ])
+            const comprasRes = await supabase
+                .from('ingresos_stock')
+                .select('id, numero_factura, clave_acceso, fecha_emision, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, tipo_compra, proveedor:proveedores(ruc, nombre_empresa), retenciones:retenciones_compras(codigo_retencion, porcentaje, valor)')
+                .eq('empresa_id', empresa.id)
+                .eq('estado', 'ACTIVO')
+                .gte('fecha_emision', desde)
+                .lte('fecha_emision', hasta)
+                .order('fecha_emision', { ascending: false })
 
             const compras: Compra[] = (comprasRes.data ?? []).map((r: any) => {
                 const b5  = r.base_iva_5  ?? 0
@@ -114,43 +101,9 @@ export function ConsultaComprasPage() {
                 }
             })
 
-            const ventas: Compra[] = (ventasRes.data ?? []).map((r: any) => {
-                const dets = r.comprobante_detalles ?? []
-                let b0 = 0, b5 = 0, b15 = 0, iv5 = 0, iv15 = 0
-                for (const d of dets) {
-                    const pct = d.iva_porcentaje ?? 0
-                    const sub = d.subtotal ?? 0
-                    const ivd = d.iva_valor  ?? 0
-                    if (pct === 0)       { b0  += sub; }
-                    else if (pct === 5)  { b5  += sub; iv5  += ivd; }
-                    else                 { b15 += sub; iv15 += ivd; }
-                }
-                return {
-                    id:               r.id,
-                    tipo:             'venta' as const,
-                    proveedor_ruc:    r.cliente?.identificacion ?? '',
-                    proveedor_nombre: r.cliente?.nombre ?? '',
-                    numero:           r.secuencial ?? '',
-                    clave_acceso:     r.clave_acceso,
-                    fecha_emision:    r.created_at?.slice(0, 10) ?? '',
-                    base_cero:        b0,
-                    base_iva5:        b5,
-                    iva5:             Math.round(iv5  * 100) / 100,
-                    base_iva15:       b15,
-                    iva15:            Math.round(iv15 * 100) / 100,
-                    base_iva:         b5 + b15,
-                    iva:              Math.round((iv5 + iv15) * 100) / 100,
-                    total:            r.total ?? 0,
-                    codigo_retencion: null,
-                    porcentaje_ret:   null,
-                    valor_retenido:   null,
-                }
-            })
-
             if (comprasRes.error) setError(comprasRes.error.message)
-            if (ventasRes.error) setError(prev => prev ? prev + ' | ' + ventasRes.error!.message : ventasRes.error!.message)
 
-            setDatos([...compras, ...ventas].sort((a, b) => b.fecha_emision.localeCompare(a.fecha_emision)))
+            setDatos(compras.sort((a, b) => b.fecha_emision.localeCompare(a.fecha_emision)))
         } catch (e: any) {
             setError(e.message ?? 'Error cargando datos')
         }
@@ -158,7 +111,6 @@ export function ConsultaComprasPage() {
     }
 
     const filtradas = datos.filter(r => {
-        if (tipoFiltro !== 'todos' && r.tipo !== tipoFiltro) return false
         if (busqueda.trim()) {
             const b = busqueda.toLowerCase()
             return (
@@ -171,8 +123,7 @@ export function ConsultaComprasPage() {
     })
 
     const totales = {
-        compras:   datos.filter(r => r.tipo === 'compra').length,
-        ventas:    datos.filter(r => r.tipo === 'venta').length,
+        compras:   datos.length,
         base0:     filtradas.reduce((s, r) => s + r.base_cero,   0),
         base5:     filtradas.reduce((s, r) => s + r.base_iva5,   0),
         iva5:      filtradas.reduce((s, r) => s + r.iva5,         0),
@@ -224,7 +175,7 @@ export function ConsultaComprasPage() {
         const periodo = `${mes > 0 ? mesNombre(mes) : 'Año completo'} ${año}`
 
         const aoa = [
-            ['Consulta Tributaria — Compras y Ventas'],
+            ['Consulta Tributaria — Compras'],
             [`Empresa: ${nombreEmpresa}`],
             [`Período: ${periodo}`],
             [],
@@ -235,16 +186,16 @@ export function ConsultaComprasPage() {
 
         const ws = XLSX.utils.aoa_to_sheet(aoa)
         const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Compras y Ventas')
-        XLSX.writeFile(wb, `Tributario_${empresa?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.xlsx`)
+        XLSX.utils.book_append_sheet(wb, ws, 'Compras')
+        XLSX.writeFile(wb, `Tributario_Compras_${empresa?.ruc ?? 'RUC'}_${año}${mes > 0 ? String(mes).padStart(2, '0') : ''}.xlsx`)
     }
 
     return (
         <div className="space-y-5 max-w-6xl">
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Consulta Tributaria — Compras y Ventas</h1>
+                <h1 className="text-2xl font-bold text-slate-900">Consulta Tributaria — Compras</h1>
                 <p className="text-slate-500 text-sm mt-0.5">
-                    Facturas de compra y venta registradas en el sistema
+                    Facturas de compra registradas en el sistema
                 </p>
             </div>
 
@@ -274,14 +225,6 @@ export function ConsultaComprasPage() {
                             ))}
                         </select>
                     </div>
-                    <div>
-                        <label className="label">Tipo</label>
-                        <select className="input" value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value as typeof tipoFiltro)}>
-                            <option value="todos">Todos</option>
-                            <option value="compra">Compras</option>
-                            <option value="venta">Ventas</option>
-                        </select>
-                    </div>
                     <div className="flex-1 min-w-[200px]">
                         <label className="label">Buscar</label>
                         <input
@@ -306,7 +249,7 @@ export function ConsultaComprasPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                     { label: 'Compras',        value: totales.compras,              color: 'text-blue-600' },
-                    { label: 'Ventas',         value: totales.ventas,               color: 'text-emerald-600' },
+                    { label: 'Total Bases',    value: formatMoneda(totales.totalBases), color: 'text-amber-600' },
                     { label: 'Total IVA',      value: formatMoneda(totales.iva),    color: 'text-indigo-600' },
                     { label: 'Total General',  value: formatMoneda(totales.total),  color: 'text-slate-800' },
                 ].map(({ label, value, color }) => (

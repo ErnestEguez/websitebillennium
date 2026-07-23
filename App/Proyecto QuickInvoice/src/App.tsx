@@ -102,6 +102,7 @@ const ContaCompras                 = lz(() => import('./pages/contabilidad/tribu
 const ConsultaRetencionesPage      = lz(() => import('./pages/contabilidad/tributario/ConsultaRetencionesPage'), 'ConsultaRetencionesPage')
 const ConsultaFacturasVentasPage   = lz(() => import('./pages/contabilidad/tributario/ConsultaFacturasVentasPage'), 'ConsultaFacturasVentasPage')
 const ConsultaNcNdPage             = lz(() => import('./pages/contabilidad/tributario/ConsultaNcNdPage'), 'ConsultaNcNdPage')
+const ConsultaNcProveedoresPage    = lz(() => import('./pages/contabilidad/tributario/ConsultaNcProveedoresPage'), 'ConsultaNcProveedoresPage')
 const AtsPage                      = lz(() => import('./pages/contabilidad/tributario/AtsPage'), 'AtsPage')
 const Formulario104Page            = lz(() => import('./pages/contabilidad/tributario/Formulario104Page'), 'Formulario104Page')
 const ContaConfig                  = lz(() => import('./pages/contabilidad/ConfiguracionPage'), 'ConfiguracionPage')
@@ -715,6 +716,7 @@ function App() {
                           <Route path="tributario/retenciones"         element={<ConsultaRetencionesPage />} />
                           <Route path="tributario/facturas-ventas"     element={<ConsultaFacturasVentasPage />} />
                           <Route path="tributario/nc-nd"               element={<ConsultaNcNdPage />} />
+                          <Route path="tributario/nc-proveedores"      element={<ConsultaNcProveedoresPage />} />
                           <Route path="tributario/ats"                 element={<AtsPage />} />
                           <Route path="tributario/104"                 element={<Formulario104Page />} />
                           <Route path="tributario/104/:id"             element={<Formulario104DetallePage />} />
