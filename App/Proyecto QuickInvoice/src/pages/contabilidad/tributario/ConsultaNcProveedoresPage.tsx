@@ -116,7 +116,7 @@ export function ConsultaNcProveedoresPage() {
             'numero', 'tipo', 'secuencial', 'clave_autorizacion', 'ruc_emisor', 'nombre_emisor',
             'fecha_emision', 'numero_documento_modificado', 'FECHA_documento_modificado',
             'subtotal_cero', 'subtotal_iva_15', 'subtotal_iva_5', 'Total_Bases',
-            'iva 5%', 'iva 15%', 'total_SinImpuestos', 'valor_Modificacion',
+            'iva 5%', 'iva 15%', 'Total_IVA', 'total_SinImpuestos', 'valor_Modificacion',
         ]
 
         const filas = filtradas.map((r, i) => [
@@ -135,6 +135,7 @@ export function ConsultaNcProveedoresPage() {
             totalBases(r),
             iva5(r),
             iva15(r),
+            r.valor_iva,
             totalBases(r),
             r.total,
         ])
@@ -147,6 +148,7 @@ export function ConsultaNcProveedoresPage() {
             totales.totalBases,
             filtradas.reduce((s, r) => s + iva5(r), 0),
             filtradas.reduce((s, r) => s + iva15(r), 0),
+            totales.iva,
             totales.totalBases,
             totales.total,
         ]

@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useFormDraft } from '../../hooks/useFormDraft'
 import { compraService } from '../../services/vendorService'
-import { ncProveedorService, type TipoNCProveedor } from '../../services/ncProveedorService'
+import { ncProveedorService, type TipoNCProveedor, type NCProveedor } from '../../services/ncProveedorService'
 import type { CompraConDetalle } from '../../types/vendors'
 import { supabase } from '../../lib/supabase'
 import { BuscadorCuentaContable } from '../../components/BuscadorCuentaContable'
+import { HelpButton } from '../../components/help/HelpButton'
 import { formatCurrency, cn } from '../../lib/utils'
 import {
     Search, ChevronRight, ChevronLeft, AlertCircle,
-    CheckCircle2, Loader2, FileMinus, X,
+    CheckCircle2, Loader2, FileMinus, X, LogOut, ListFilter, ChevronDown, ChevronUp,
 } from 'lucide-react'
 
 type Step = 1 | 2 | 3 | 4
@@ -67,6 +69,62 @@ export function NuevaNcProveedorPage() {
     const [errStep, setErrStep] = useState('')
     const [procesando, setProcesando] = useState(false)
     const [ncCreada, setNcCreada] = useState<any>(null)
+
+    // ── Ver N/C ya registradas (sin salir de esta pantalla) ─
+    const [mostrarListado, setMostrarListado] = useState(false)
+    const [listado, setListado] = useState<NCProveedor[]>([])
+    const [cargandoListado, setCargandoListado] = useState(false)
+    const [busquedaListado, setBusquedaListado] = useState('')
+
+    // ── Draft — evita perder la digitación al salir a otra área del ERP ────────
+    const clearDraft = useFormDraft(
+        'draft_nc_proveedor',
+        () => ({ step, compra, tipo, numeroNc, autorizacionNc, fechaNc, observacion, items, baseIva0, baseIva5, baseIva15, cuentaContraId, aplicarMismaFactura, cxpDestinoId }),
+        (d) => {
+            if (!d.compra) return
+            if (d.compra) setCompra(d.compra)
+            if (d.tipo) setTipo(d.tipo)
+            if (d.numeroNc) setNumeroNc(d.numeroNc)
+            if (d.autorizacionNc) setAutorizacionNc(d.autorizacionNc)
+            if (d.fechaNc) setFechaNc(d.fechaNc)
+            if (d.observacion) setObservacion(d.observacion)
+            if (d.items?.length) setItems(d.items)
+            if (d.baseIva0) setBaseIva0(d.baseIva0)
+            if (d.baseIva5) setBaseIva5(d.baseIva5)
+            if (d.baseIva15) setBaseIva15(d.baseIva15)
+            if (d.cuentaContraId) setCuentaContraId(d.cuentaContraId)
+            if (typeof d.aplicarMismaFactura === 'boolean') setAplicarMismaFactura(d.aplicarMismaFactura)
+            if (d.cxpDestinoId) setCxpDestinoId(d.cxpDestinoId)
+            if (d.step && d.step < 4) setStep(d.step)
+        },
+        [step, compra, tipo, numeroNc, autorizacionNc, fechaNc, observacion, items, baseIva0, baseIva5, baseIva15, cuentaContraId, aplicarMismaFactura, cxpDestinoId],
+    )
+
+    function finalizarSinGrabar() {
+        if (!confirm('¿Salir sin guardar esta Nota de Crédito? Se perderá lo digitado.')) return
+        clearDraft()
+        navigate('/compras/notas-credito')
+    }
+
+    async function toggleListado() {
+        const abrir = !mostrarListado
+        setMostrarListado(abrir)
+        if (abrir && empresa?.id) {
+            setCargandoListado(true)
+            try { setListado(await ncProveedorService.listar(empresa.id)) }
+            finally { setCargandoListado(false) }
+        }
+    }
+
+    const listadoFiltrado = listado.filter(nc => {
+        if (!busquedaListado.trim()) return true
+        const b = busquedaListado.toLowerCase()
+        return (
+            (nc.numero_nc ?? '').toLowerCase().includes(b) ||
+            nc.proveedor?.nombre_empresa?.toLowerCase().includes(b) ||
+            nc.compra?.numero_factura?.toLowerCase().includes(b)
+        )
+    })
 
     // ─── Buscar compras ────────────────────────────────────
     useEffect(() => {
@@ -203,6 +261,7 @@ export function NuevaNcProveedorPage() {
                 portalRuc: (empresa as any)?.ruc ?? '',
                 proveedorNombre: compra.proveedor?.nombre_empresa ?? '',
             })
+            clearDraft()
             setNcCreada(nc)
             setStep(4)
         } catch (e: any) {
@@ -214,18 +273,74 @@ export function NuevaNcProveedorPage() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
-            <div className="flex items-center gap-3">
-                <button onClick={() => navigate('/compras/notas-credito')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400">
-                    <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div>
-                    <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                        <FileMinus className="w-5 h-5 text-orange-500" />
-                        Nueva Nota de Crédito de Proveedor
-                    </h1>
-                    <p className="text-xs text-slate-500">Pasos: Factura origen → Datos de la N/C → Confirmar</p>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => navigate('/compras/notas-credito')} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400">
+                        <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <div>
+                        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                            <FileMinus className="w-5 h-5 text-orange-500" />
+                            Nueva Nota de Crédito de Proveedor
+                        </h1>
+                        <p className="text-xs text-slate-500">Pasos: Factura origen → Datos de la N/C → Confirmar</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="nc-proveedores" />
+                    <button onClick={toggleListado} className="btn border border-slate-200 text-slate-600 gap-2 hover:bg-slate-50 text-sm">
+                        <ListFilter className="w-4 h-4" /> Ver N/C Registradas
+                        {mostrarListado ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+                    {step !== 4 && (
+                        <button onClick={finalizarSinGrabar} className="btn border border-red-200 text-red-600 gap-2 hover:bg-red-50 text-sm">
+                            <LogOut className="w-4 h-4" /> Finalizar Sin Grabar
+                        </button>
+                    )}
                 </div>
             </div>
+
+            {mostrarListado && (
+                <div className="card p-4 space-y-3">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar por N° N/C, proveedor o factura..."
+                            className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                            value={busquedaListado}
+                            onChange={e => setBusquedaListado(e.target.value)}
+                        />
+                    </div>
+                    {cargandoListado ? (
+                        <div className="py-6 text-center text-slate-400 text-sm">
+                            <Loader2 className="w-4 h-4 animate-spin inline mr-2" />Cargando...
+                        </div>
+                    ) : listadoFiltrado.length === 0 ? (
+                        <p className="py-4 text-center text-sm text-slate-400">Sin notas de crédito registradas.</p>
+                    ) : (
+                        <div className="max-h-64 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-100">
+                            {listadoFiltrado.map(nc => (
+                                <div key={nc.id} className="px-3 py-2 flex items-center justify-between text-sm">
+                                    <div>
+                                        <span className="font-mono text-xs text-slate-600">{nc.numero_nc || nc.id.slice(0, 8)}</span>
+                                        <span className="mx-2 text-slate-300">·</span>
+                                        <span className="text-slate-700">{nc.proveedor?.nombre_empresa}</span>
+                                        <span className="mx-2 text-slate-300">·</span>
+                                        <span className="text-xs text-slate-400">{nc.tipo === 'DEVOLUCION_MERCADERIA' ? 'Devolución' : 'Valor'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium', nc.estado === 'ACTIVA' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600')}>
+                                            {nc.estado}
+                                        </span>
+                                        <span className="font-mono font-semibold">{formatCurrency(nc.total)}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             <div className="flex items-center gap-2">
                 {[1, 2, 3].map(s => (

@@ -1337,6 +1337,17 @@ export function ProformaPage() {
                                             <p className="text-xs text-indigo-600 font-mono">{proformaEditando.factura_numero}</p>
                                         </div>
                                     )}
+                                    <button
+                                        onClick={() => {
+                                            if (!confirm('¿Salir sin guardar los cambios de esta proforma?')) return
+                                            clearDraft()
+                                            setVista('lista')
+                                            setSavedProforma(null)
+                                        }}
+                                        className="w-full flex items-center justify-center gap-2 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold text-sm transition-colors">
+                                        <ArrowLeft className="w-4 h-4" />
+                                        Salir sin Grabar
+                                    </button>
                                 </div>
                             </div>
                         </div>

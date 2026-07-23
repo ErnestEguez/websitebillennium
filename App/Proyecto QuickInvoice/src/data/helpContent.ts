@@ -83,6 +83,38 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    // ─── NOTAS DE CRÉDITO DE PROVEEDORES ────────────────────────────────────
+    'nc-proveedores': {
+        titulo: 'Notas de Crédito de Proveedores',
+        subtitulo: 'Registra devoluciones de mercadería y ajustes de valor recibidos de tus proveedores',
+        secciones: [
+            {
+                titulo: '1. Selecciona la factura de compra origen',
+                texto: 'Busca por número de factura del proveedor. Toda N/C debe referenciar la compra a la que corresponde.',
+            },
+            {
+                titulo: '2. Elige el tipo de N/C',
+                texto: '• Devolución de Mercadería: cuando devuelves productos al proveedor — afecta el Kardex (sale el stock) y reduce el inventario contablemente.\n• N/C Valor: un descuento o ajuste de valor del proveedor, sin devolver mercadería — no toca el Kardex.',
+                tips: [
+                    'En Devolución, la cantidad máxima a devolver por línea está limitada a lo que aún no se haya devuelto antes.',
+                    'Las bases (0%/5%/15%) se capturan a mano según el documento del proveedor.',
+                ],
+            },
+            {
+                titulo: '3. Aplicación a la Cuenta por Pagar',
+                texto: 'Si la factura origen ya no tiene saldo pendiente, o el valor de la N/C lo supera, el sistema te deja elegir otra factura pendiente del mismo proveedor para aplicar el valor.',
+            },
+            {
+                titulo: 'Ver N/C ya registradas',
+                texto: 'Usa el botón "Ver N/C Registradas" para buscar y revisar notas de crédito ya ingresadas sin perder lo que estás digitando en el formulario actual.',
+            },
+            {
+                titulo: 'Salir sin guardar',
+                texto: 'Si te equivocaste al elegir la factura o el tipo, usa "Finalizar Sin Grabar" para volver al listado sin registrar nada.',
+            },
+        ],
+    },
+
     // ─── CLIENTES ───────────────────────────────────────────────────────────
     'clientes': {
         titulo: 'Gestión de Clientes',

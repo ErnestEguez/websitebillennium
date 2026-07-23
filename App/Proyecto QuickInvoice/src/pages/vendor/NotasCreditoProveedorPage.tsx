@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { ncProveedorService, type NCProveedor } from '../../services/ncProveedorService'
+import { HelpButton } from '../../components/help/HelpButton'
 import { formatCurrency, cn } from '../../lib/utils'
 import { FileMinus, Plus, Search, Ban, Loader2, AlertCircle, X } from 'lucide-react'
 
@@ -81,9 +82,12 @@ export function NotasCreditoProveedorPage() {
                     </h1>
                     <p className="text-slate-500 text-sm mt-0.5">Devoluciones de mercadería y ajustes de valor recibidos de proveedores</p>
                 </div>
-                <button onClick={() => navigate('/compras/notas-credito/nueva')} className="btn bg-primary-600 text-white gap-2 hover:bg-primary-700">
-                    <Plus className="w-4 h-4" /> Nueva N/C
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="nc-proveedores" />
+                    <button onClick={() => navigate('/compras/notas-credito/nueva')} className="btn bg-primary-600 text-white gap-2 hover:bg-primary-700">
+                        <Plus className="w-4 h-4" /> Nueva N/C
+                    </button>
+                </div>
             </div>
 
             {error && (
