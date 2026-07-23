@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { HelpButton } from '../components/help/HelpButton'
 import { sriService } from '../services/sriService'
 import { facturacionService } from '../services/facturacionService'
+import { kardexService } from '../services/kardexService'
 import type { SriConfig } from '../services/facturacionService'
 import type { Comprobante } from '../services/sriService'
 import { supabase } from '../lib/supabase'
@@ -24,6 +25,7 @@ import {
     Printer,
     Mail,
     Ban,
+    Trash2,
     WifiOff,
     AlertTriangle,
 } from 'lucide-react'
@@ -37,6 +39,7 @@ export function InvoicingPage() {
     const [offlineQueue, setOfflineQueue] = useState<SyncQueueItem[]>([])
     const [loading, setLoading] = useState(true)
     const [anulando, setAnulando] = useState<string | null>(null)
+    const [eliminando, setEliminando] = useState<string | null>(null)
     const [resendingEmail, setResendingEmail] = useState<string | null>(null)
     const [search, setSearch] = useState('')
     const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
@@ -122,6 +125,68 @@ export function InvoicingPage() {
             alert('Error al anular: ' + e.message)
         } finally {
             setAnulando(null)
+        }
+    }
+
+    // Elimina definitivamente un comprobante que NUNCA llegó a autorizarse en el
+    // SRI (bloqueado si estado_sri === 'AUTORIZADO', tanto en la UI como aquí).
+    // Revierte primero el Kardex (la salida de stock ya corrió en segundo plano
+    // al crear la factura, sin esperar al SRI), luego borra el registro.
+    async function handleEliminar(doc: Comprobante) {
+        if (doc.estado_sri === 'AUTORIZADO') return
+        if (!confirm(`¿Eliminar definitivamente la factura ${doc.secuencial}?\nNo se pudo autorizar en el SRI. Esta acción no se puede deshacer.`)) return
+        try {
+            setEliminando(doc.id)
+
+            const { data: comprobante, error: errComp } = await supabase
+                .from('comprobantes')
+                .select('bodega_id')
+                .eq('id', doc.id)
+                .single()
+            if (errComp) throw errComp
+
+            const { data: detalles, error: errDet } = await supabase
+                .from('comprobante_detalles')
+                .select('producto_id, cantidad')
+                .eq('comprobante_id', doc.id)
+            if (errDet) throw errDet
+
+            const bodegaId = comprobante?.bodega_id ?? undefined
+            const hoy = new Date().toISOString().split('T')[0]
+
+            for (const det of (detalles ?? [])) {
+                if (!det.producto_id || Number(det.cantidad) <= 0) continue
+                const { data: prod } = await supabase
+                    .from('productos')
+                    .select('maneja_stock')
+                    .eq('id', det.producto_id)
+                    .single()
+                if (!prod?.maneja_stock) continue
+
+                await kardexService.registrarMovimiento({
+                    empresa_id:           empresa!.id,
+                    producto_id:          det.producto_id,
+                    bodega_id:            bodegaId,
+                    tipo_movimiento:      'ENTRADA',
+                    motivo:               `Eliminación factura no autorizada ${doc.secuencial}`,
+                    documento_referencia: doc.id,
+                    cantidad:             Number(det.cantidad),
+                    fecha:                hoy,
+                })
+            }
+
+            // Cartera CxC (venta a crédito) — no debe quedar un cobro fantasma
+            await supabase.from('cartera_cxc').delete().eq('comprobante_id', doc.id)
+
+            // comprobante_detalles / comprobante_pagos se eliminan en cascada
+            const { error: errDelete } = await supabase.from('comprobantes').delete().eq('id', doc.id)
+            if (errDelete) throw errDelete
+
+            await loadData()
+        } catch (e: any) {
+            alert('Error al eliminar: ' + e.message)
+        } finally {
+            setEliminando(null)
         }
     }
 
@@ -473,6 +538,19 @@ export function InvoicingPage() {
                                                     {anulando === doc.id
                                                         ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
                                                         : <Ban className="w-4 h-4" />
+                                                    }
+                                                </button>
+                                            )}
+                                            {doc.estado_sri !== 'AUTORIZADO' && (
+                                                <button
+                                                    onClick={() => handleEliminar(doc)}
+                                                    disabled={eliminando === doc.id}
+                                                    title="Eliminar (solo si no está autorizada)"
+                                                    className="p-2 hover:bg-red-100 rounded-lg text-red-400 hover:text-red-700 transition-colors"
+                                                >
+                                                    {eliminando === doc.id
+                                                        ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                                                        : <Trash2 className="w-4 h-4" />
                                                     }
                                                 </button>
                                             )}
