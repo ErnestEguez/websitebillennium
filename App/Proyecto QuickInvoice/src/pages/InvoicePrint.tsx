@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { facturacionService } from '../services/facturacionService'
 import { sriService } from '../services/sriService'
+import { politicaPrivacidadService } from '../services/lopdp/politicaPrivacidadService'
 import { format } from 'date-fns'
 import { Loader2, Printer, ChevronLeft, Download } from 'lucide-react'
 
@@ -14,8 +15,25 @@ export function InvoicePrint() {
     const navigate = useNavigate()
     const [factura, setFactura] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    // LOPDP Fase 4: opcional — si la empresa no tiene el módulo configurado,
+    // simplemente queda null y no se muestra nada. Nunca bloquea el RIDE.
+    const [avisoLopdp, setAvisoLopdp] = useState<string | null>(null)
 
     useEffect(() => { if (id) loadFactura() }, [id])
+
+    useEffect(() => {
+        const empresaId = factura?.empresas?.id
+        if (!empresaId) return
+        let cancelled = false
+        politicaPrivacidadService.obtener(empresaId)
+            .then(cfg => {
+                if (cancelled || !cfg?.slug || !cfg.aviso_lopdp_texto) return
+                const url = `${window.location.origin}/p/${cfg.slug}`
+                setAvisoLopdp(`${cfg.aviso_lopdp_texto} ${url}`)
+            })
+            .catch(() => {})
+        return () => { cancelled = true }
+    }, [factura?.empresas?.id])
 
     async function loadFactura() {
         try {
@@ -322,6 +340,13 @@ export function InvoicePrint() {
                                         </div>
                                     )}
                                 </div>
+
+                                {avisoLopdp && (
+                                    <div className="mt-2 pt-1 border-t border-slate-200">
+                                        <p className="font-bold text-[7.5px] uppercase text-slate-500">Aviso de Privacidad (LOPDP)</p>
+                                        <p className="text-[7.5px] text-slate-500 leading-snug">{avisoLopdp}</p>
+                                    </div>
+                                )}
 
                                 {pagos.length > 0 && (
                                     <div className="mt-2">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { facturacionService } from '../services/facturacionService'
+import { politicaPrivacidadService } from '../services/lopdp/politicaPrivacidadService'
 import { formatCurrency } from '../lib/utils'
 import { format } from 'date-fns'
 import { Printer, ChevronLeft } from 'lucide-react'
@@ -11,10 +12,26 @@ export function TicketPrint() {
     const [searchParams] = useSearchParams()
     const [factura, setFactura] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    // LOPDP Fase 4: opcional, nunca bloquea la impresión del ticket.
+    const [avisoLopdp, setAvisoLopdp] = useState<string | null>(null)
 
     useEffect(() => {
         if (id) loadFactura()
     }, [id])
+
+    useEffect(() => {
+        const empresaId = factura?.empresas?.id
+        if (!empresaId) return
+        let cancelled = false
+        politicaPrivacidadService.obtener(empresaId)
+            .then(cfg => {
+                if (cancelled || !cfg?.slug || !cfg.aviso_lopdp_corto) return
+                const url = `${window.location.origin}/p/${cfg.slug}`
+                setAvisoLopdp(`${cfg.aviso_lopdp_corto} ${url}`)
+            })
+            .catch(() => {})
+        return () => { cancelled = true }
+    }, [factura?.empresas?.id])
 
     async function loadFactura() {
         try {
@@ -186,6 +203,11 @@ export function TicketPrint() {
                     <p>FECHA AUT.: {factura.fecha_autorizacion ? format(new Date(factura.fecha_autorizacion), 'dd/MM/yyyy HH:mm') : 'PENDIENTE'}</p>
                     <p>AMBIENTE: {factura.ambiente || 'PRUEBAS'}</p>
                     <p>EMISIÓN: NORMAL</p>
+                    {avisoLopdp && (
+                        <p className="mt-3 pt-2 border-t border-dashed border-black leading-snug">
+                            {avisoLopdp}
+                        </p>
+                    )}
                     <p className="mt-4 text-center border-t border-dashed border-black pt-2 italic">
                         Gracias por su visita
                     </p>

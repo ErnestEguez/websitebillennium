@@ -4,6 +4,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { proveedorService } from '../../services/vendorService'
 import type { Proveedor } from '../../types/vendors'
 import { REGIMEN_LABELS } from '../../types/vendors'
+import { BASE_LEGAL_TRATAMIENTO_LABELS } from '../../services/facturacionService'
+import { useLopdpEnabled } from '../../hooks/useLopdpEnabled'
 import {
     Building2, Plus, Edit2, Save, X, Search,
     Phone, Mail, MapPin, AlertCircle,
@@ -41,6 +43,7 @@ function Badge({ estado }: { estado: string }) {
 
 export function ProveedoresPage() {
     const { empresa } = useAuth()
+    const { enabled: lopdpEnabled } = useLopdpEnabled()
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
     const [loading, setLoading] = useState(true)
     const [busqueda, setBusqueda] = useState('')
@@ -448,6 +451,32 @@ export function ProveedoresPage() {
                                             Esta información se utiliza para la generación del ATS y para determinar si corresponde aplicar retenciones al momento de la compra.
                                         </p>
                                     </div>
+
+                                    {lopdpEnabled && (
+                                        <div className="space-y-3 pt-3 border-t border-slate-100">
+                                            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Protección de Datos (LOPDP)</p>
+                                            <div>
+                                                <label className="label">Base legal del tratamiento</label>
+                                                <select className="input" value={editando.base_legal_tratamiento ?? ''}
+                                                    onChange={e => set('base_legal_tratamiento', (e.target.value || null) as any)}>
+                                                    <option value="">No especificado</option>
+                                                    {Object.entries(BASE_LEGAL_TRATAMIENTO_LABELS).map(([k, v]) => (
+                                                        <option key={k} value={k}>{v}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <label className="flex items-center gap-3 cursor-pointer">
+                                                <input type="checkbox"
+                                                    className="w-4 h-4 rounded border-slate-300 text-primary-600"
+                                                    checked={!!editando.consentimiento_explicito}
+                                                    onChange={e => {
+                                                        set('consentimiento_explicito', e.target.checked)
+                                                        set('consentimiento_fecha', e.target.checked ? new Date().toISOString() : null)
+                                                    }} />
+                                                <span className="text-sm text-slate-600">Consentimiento explícito para usos secundarios (ej. marketing)</span>
+                                            </label>
+                                        </div>
+                                    )}
                                 </>
                             )}
 

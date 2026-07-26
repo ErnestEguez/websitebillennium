@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { HelpButton } from '../components/help/HelpButton'
-import { facturacionService } from '../services/facturacionService'
-import type { Cliente } from '../services/facturacionService'
+import { facturacionService, BASE_LEGAL_TRATAMIENTO_LABELS } from '../services/facturacionService'
+import type { Cliente, BaseLegalTratamiento } from '../services/facturacionService'
 import { useAuth } from '../contexts/AuthContext'
+import { useLopdpEnabled } from '../hooks/useLopdpEnabled'
 import {
     Plus,
     Search,
@@ -23,6 +24,7 @@ import { validateIdentificacion } from '../lib/utils'
 
 export function ClientsPage() {
     const { empresa } = useAuth()
+    const { enabled: lopdpEnabled } = useLopdpEnabled()
     const [clientes, setClientes] = useState<Cliente[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
@@ -392,6 +394,36 @@ export function ClientsPage() {
                                     onChange={(e) => setEditingCliente({ ...editingCliente, telefono: e.target.value })}
                                 />
                             </div>
+
+                            {lopdpEnabled && (
+                                <div className="pt-3 border-t border-slate-100 space-y-3">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Protección de Datos (LOPDP)</p>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Base legal del tratamiento</label>
+                                        <select
+                                            className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none"
+                                            value={editingCliente?.base_legal_tratamiento ?? ''}
+                                            onChange={(e) => setEditingCliente({ ...editingCliente, base_legal_tratamiento: (e.target.value || null) as BaseLegalTratamiento | null })}
+                                        >
+                                            <option value="">No especificado</option>
+                                            {Object.entries(BASE_LEGAL_TRATAMIENTO_LABELS).map(([k, v]) => (
+                                                <option key={k} value={k}>{v}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <label className="flex items-center gap-3 cursor-pointer">
+                                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-primary-600"
+                                            checked={!!editingCliente?.consentimiento_explicito}
+                                            onChange={(e) => setEditingCliente({
+                                                ...editingCliente,
+                                                consentimiento_explicito: e.target.checked,
+                                                consentimiento_fecha: e.target.checked ? new Date().toISOString() : null,
+                                            })} />
+                                        <span className="text-sm text-slate-600">Consentimiento explícito para usos secundarios (ej. marketing)</span>
+                                    </label>
+                                </div>
+                            )}
+
                             <div className="pt-4 flex gap-3">
                                 <button
                                     type="button"

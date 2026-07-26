@@ -38,6 +38,36 @@ async function sha1b64(input: string | Uint8Array): Promise<string> {
     return btoa(md.digest().getBytes());
 }
 
+// ─── Módulo LOPDP (Fase 4): aviso de tratamiento de datos ──────────
+// Lee lopdp.politicas_privacidad (schema separado, solo lectura) y arma
+// las 2 versiones del aviso ya con la URL pública anexada. La URL SIEMPRE
+// la construye este código a partir del slug — nunca es texto libre.
+// Si la empresa no tiene LOPDP configurado, no se agrega nada (silencioso).
+const LOPDP_PUBLIC_BASE_URL = Deno.env.get("LOPDP_PUBLIC_BASE_URL") || "https://websitebillennium-quickinvoice.vercel.app";
+const LOPDP_CAMPO_ADICIONAL_MAX = 300; // límite del SRI para el valor de <campoAdicional>
+
+async function resolverAvisoLopdp(supabase: any, empresaId: string): Promise<{ corto: string; texto: string } | null> {
+    try {
+        const { data } = await supabase
+            .schema("lopdp")
+            .from("politicas_privacidad")
+            .select("slug, aviso_lopdp_texto, aviso_lopdp_corto")
+            .eq("empresa_id", empresaId)
+            .maybeSingle();
+
+        if (!data?.slug) return null;
+
+        const url = `${LOPDP_PUBLIC_BASE_URL}/p/${data.slug}`;
+        return {
+            corto: `${data.aviso_lopdp_corto} ${url}`.substring(0, LOPDP_CAMPO_ADICIONAL_MAX),
+            texto: `${data.aviso_lopdp_texto} ${url}`,
+        };
+    } catch (_e) {
+        // Nunca debe romper la emisión de la factura por un problema en LOPDP
+        return null;
+    }
+}
+
 function hexToB64(hex: string): string {
     if (hex.length % 2 !== 0) hex = '0' + hex;
     const binary = hex.match(/.{1,2}/g)?.map(byte => String.fromCharCode(parseInt(byte, 16))).join('') || '';
@@ -374,8 +404,21 @@ async function generarRidePdf(comprobante: any): Promise<Uint8Array> {
         { label: 'Email',       val: cliente.email },
         { label: 'Observación', val: comprobante.observacion },
     ].filter(it => it.val);
+
+    // LOPDP Fase 4: aviso de privacidad (opcional — solo si la empresa lo
+    // configuró). splitTextToSize evita que el texto se corte o se salga
+    // de la columna; la altura calculada abajo entra en S5_H para que la
+    // caja crezca y la paginación automática (línea siguiente) actúe si
+    // no cabe en la página actual.
+    const LOPDP_FS = 6.5;
+    doc.setFontSize(LOPDP_FS); doc.setFont('helvetica', 'normal');
+    const avisoLopdpLines: string[] = comprobante.lopdp_aviso_texto
+        ? doc.splitTextToSize(String(comprobante.lopdp_aviso_texto), LW - 4)
+        : [];
+    const avisoLopdpH = avisoLopdpLines.length > 0 ? 6 + avisoLopdpLines.length * 3.2 : 0;
+
     const PagoColH=5.5; const PagoRH=5;
-    const leftH = 8 + infoItems.length*4.5 + (pagos.length>0 ? 7+PagoColH+pagos.length*PagoRH : 0);
+    const leftH = 8 + infoItems.length*4.5 + (pagos.length>0 ? 7+PagoColH+pagos.length*PagoRH : 0) + avisoLopdpH;
     const S5_H = Math.max(totH, leftH) + 4;
 
     if (y+S5_H+9 > PH) { doc.addPage(); y = 10; }
@@ -428,6 +471,18 @@ async function generarRidePdf(comprobante: any): Promise<Uint8Array> {
             doc.text(Number(p.valor).toFixed(2), PAG_X[1]+20, infoY+2, { align: 'right' });
             doc.text(String(p.dias_plazo??p.plazo??0), PAG_X[2]+16, infoY+2, { align: 'right' });
             infoY += PagoRH;
+        });
+    }
+    if (avisoLopdpLines.length > 0) {
+        infoY += pagos.length > 0 ? 3 : 2;
+        doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(100,100,100);
+        doc.text('AVISO DE PRIVACIDAD (LOPDP)', ML+2, infoY+2);
+        sd2(); doc.line(ML+1, infoY+4, DIV-1, infoY+4);
+        infoY += 6;
+        doc.setFontSize(LOPDP_FS); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+        avisoLopdpLines.forEach(line => {
+            doc.text(line, ML+2, infoY);
+            infoY += 3.2;
         });
     }
     y += S5_H;
@@ -1082,6 +1137,13 @@ serve(async (req) => {
             .single();
 
         if (!comprobante) throw new Error("Comprobante no encontrado");
+
+        // LOPDP Fase 4: transitorio en memoria, nunca se persiste — solo
+        // vive durante esta ejecución para pasar de la consulta a
+        // generarXml()/generarRidePdf() más abajo.
+        const avisoLopdp = await resolverAvisoLopdp(supabase, comprobante.empresas.id);
+        comprobante.lopdp_aviso_corto = avisoLopdp?.corto ?? null;
+        comprobante.lopdp_aviso_texto = avisoLopdp?.texto ?? null;
 
         const configSri = comprobante.empresas.config_sri;
         const ambiente = configSri.ambiente === "PRODUCCION" ? "PRODUCCION" : "PRUEBAS";

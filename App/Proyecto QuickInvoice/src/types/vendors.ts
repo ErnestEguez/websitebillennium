@@ -62,6 +62,13 @@ export interface Proveedor {
     // Retenciones automáticas predeterminadas (solo código; porcentaje viene de codigos_retencion)
     ret_fuente_codigo?:      string | null
     ret_iva_codigo?:         string | null
+    // Fase 4 LOPDP: opcionales, nunca bloquean la operación normal. Mismos
+    // 6 valores que lopdp.base_legal_enum / facturacion.clientes, pero un
+    // tipo separado a propósito (ver BaseLegalTratamiento en facturacionService.ts).
+    base_legal_tratamiento?:   'consentimiento' | 'ejecucion_contrato' | 'obligacion_legal'
+                              | 'interes_vital' | 'interes_publico' | 'interes_legitimo' | null
+    consentimiento_explicito?: boolean
+    consentimiento_fecha?:     string | null
     created_at?: string
     updated_at?: string
 }

@@ -203,6 +203,32 @@ export function PoliticaPrivacidadPage() {
                     </div>
                 </div>
 
+                <div className="pt-2 border-t border-slate-100 space-y-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                        Aviso LOPDP en facturas y tickets
+                    </p>
+
+                    <div>
+                        <label className="label">Mensaje largo (RIDE de la factura)</label>
+                        <textarea className="input" rows={3} value={config.aviso_lopdp_texto ?? ''}
+                            onChange={e => set('aviso_lopdp_texto', e.target.value)}
+                            placeholder="Tratamiento de datos personales: conforme al Art. 7 de la LOPDP..." />
+                        <p className="text-xs text-slate-400 mt-1">
+                            El link a esta política se agrega solo al final — nunca lo escribas tú, para que nunca quede pegado mal.{config.slug && ` Quedará: "...${window.location.origin}/p/${config.slug}"`}
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="label">Mensaje corto (comprobante XML y ticket 80mm)</label>
+                        <textarea className="input" rows={2} value={config.aviso_lopdp_corto ?? ''}
+                            onChange={e => set('aviso_lopdp_corto', e.target.value)}
+                            placeholder="Datos tratados conforme al Art. 7 LOPDP..." />
+                        <p className="text-xs text-slate-400 mt-1">
+                            Debe ser breve: el comprobante electrónico del SRI solo admite 300 caracteres en este campo (incluyendo el link, que también se agrega automáticamente).
+                        </p>
+                    </div>
+                </div>
+
                 {mensaje && <p className="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2">{mensaje}</p>}
 
                 <div className="flex flex-wrap gap-3 justify-end pt-2">

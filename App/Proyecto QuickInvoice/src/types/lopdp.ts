@@ -180,6 +180,11 @@ export interface PoliticaPrivacidad {
     email_contacto?:         string | null
     email_arco_pol:          string
 
+    // Fase 4: mensaje legal editable — la URL pública NUNCA se guarda aquí,
+    // el código siempre la concatena a partir de `slug` en tiempo de uso.
+    aviso_lopdp_texto:       string   // largo — RIDE (PDF y HTML)
+    aviso_lopdp_corto:       string   // corto — XML campoAdicional y ticket
+
     created_at?:             string
     updated_at?:             string
     created_by?:             string | null

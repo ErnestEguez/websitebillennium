@@ -4,6 +4,25 @@ import { kardexService } from './kardexService'
 // Nota: emailService ya no se usa directamente aquí.
 // El correo se envía desde la Edge Function sri-signer vía Resend.
 
+// Fase 4 LOPDP: mismos 6 valores que lopdp.base_legal_enum, pero un tipo
+// separado a propósito — facturacion no depende estructuralmente de lopdp.
+export type BaseLegalTratamiento =
+    | 'consentimiento'
+    | 'ejecucion_contrato'
+    | 'obligacion_legal'
+    | 'interes_vital'
+    | 'interes_publico'
+    | 'interes_legitimo'
+
+export const BASE_LEGAL_TRATAMIENTO_LABELS: Record<BaseLegalTratamiento, string> = {
+    consentimiento:     'Consentimiento del titular',
+    ejecucion_contrato: 'Ejecución de un contrato',
+    obligacion_legal:   'Cumplimiento de una obligación legal',
+    interes_vital:      'Protección de intereses vitales',
+    interes_publico:    'Cumplimiento de una misión de interés público',
+    interes_legitimo:   'Interés legítimo del responsable',
+}
+
 export interface Cliente {
     id: string
     empresa_id: string
@@ -13,6 +32,10 @@ export interface Cliente {
     direccion: string
     telefono?: string
     activo?: boolean
+    // Fase 4 LOPDP: opcionales, nunca bloquean la operación normal
+    base_legal_tratamiento?:   BaseLegalTratamiento | null
+    consentimiento_explicito?: boolean
+    consentimiento_fecha?:     string | null
 }
 
 export interface SriConfig {
