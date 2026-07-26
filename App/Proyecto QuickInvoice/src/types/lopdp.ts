@@ -139,3 +139,80 @@ export interface SolicitudTitular {
     created_by?:            string | null
     updated_by?:            string | null
 }
+
+// ─── Fase 3: Política de Privacidad Pública ─────────────────────────────────
+
+export interface EncargadoTercero {
+    nombre: string
+    tipo:   string
+    fijo?:  boolean   // true = QuickInvoice, no editable/eliminable desde la UI
+}
+
+export const ENCARGADO_QUICKINVOICE: EncargadoTercero = {
+    nombre: 'QuickInvoice (Billennium System)',
+    tipo:   'Encargado de tratamiento — proveedor de la plataforma tecnológica',
+    fijo:   true,
+}
+
+export const FINALIDADES_SUGERIDAS = [
+    'Facturación y cumplimiento tributario',
+    'Gestión de nómina y talento humano',
+    'Atención al cliente y soporte',
+    'Gestión de proveedores y compras',
+    'Marketing y comunicaciones comerciales',
+    'Cumplimiento de obligaciones legales',
+]
+
+// Configuración "viva" / editable — un registro por empresa
+export interface PoliticaPrivacidad {
+    empresa_id:              string
+    slug:                    string
+
+    finalidades_tratamiento: string[]
+    plazo_conservacion?:     string | null
+
+    tiene_dpd:               boolean
+    dpd_nombre?:             string | null
+    dpd_contacto?:           string | null
+
+    encargados_terceros:     EncargadoTercero[]
+
+    email_contacto?:         string | null
+    email_arco_pol:          string
+
+    created_at?:             string
+    updated_at?:             string
+    created_by?:             string | null
+    updated_by?:             string | null
+}
+
+// Snapshot autocontenido, tal como queda congelado en cada versión publicada
+export interface PoliticaPrivacidadContenido {
+    razon_social:             string
+    nombre_comercial:         string
+    ruc:                      string
+    direccion?:               string | null
+    finalidades_tratamiento:  string[]
+    plazo_conservacion?:      string | null
+    tiene_dpd:                boolean
+    dpd_nombre?:              string | null
+    dpd_contacto?:            string | null
+    encargados_terceros:      EncargadoTercero[]
+    email_contacto?:          string | null
+    email_arco_pol:           string
+}
+
+// Histórico interno (oficina/admin) — incluye publicado_por
+export interface PoliticaPrivacidadVersion {
+    id:                string
+    empresa_id:        string
+    numero_version:    number
+    fecha_publicacion: string
+    publicado_por?:    string | null
+    slug:              string
+    contenido:         PoliticaPrivacidadContenido
+}
+
+// Lo único que expone la vista pública (coincide con el GRANT de columnas a anon)
+export type PoliticaPrivacidadPublica = Pick<PoliticaPrivacidadVersion,
+    'empresa_id' | 'slug' | 'numero_version' | 'fecha_publicacion' | 'contenido'>

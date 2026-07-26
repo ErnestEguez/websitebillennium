@@ -124,6 +124,8 @@ const EstructuraOrganizativaPage   = lz(() => import('./pages/talento/Estructura
 // ── Módulo LOPDP (Fase 1: RAT) ────────────────────────────────────────────────
 const RatPage                      = lz(() => import('./pages/lopdp/RatPage'), 'RatPage')
 const SolicitudesPage              = lz(() => import('./pages/lopdp/SolicitudesPage'), 'SolicitudesPage')
+const PoliticaPrivacidadPage       = lz(() => import('./pages/lopdp/PoliticaPrivacidadPage'), 'PoliticaPrivacidadPage')
+const PoliticaPublicaPage          = lz(() => import('./pages/PoliticaPublicaPage'), 'PoliticaPublicaPage')
 
 // ── Módulo Nóminas ────────────────────────────────────────────────────────────
 const ConceptosNominaPage          = lz(() => import('./pages/nominas/ConceptosNominaPage'), 'ConceptosNominaPage')
@@ -221,6 +223,11 @@ function App() {
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+
+              {/* Página pública de política de privacidad — SIN auth, fuera
+                  de ProtectedRoute a propósito. Debe funcionar igual con o
+                  sin sesión activa de QuickInvoice. */}
+              <Route path="/p/:slug" element={<PoliticaPublicaPage />} />
 
               <Route path="/" element={
                 <ProtectedRoute>
@@ -744,9 +751,10 @@ function App() {
                     <Layout>
                       <LopdpFeatureGate>
                         <Routes>
-                          <Route path="rat"         element={<RatPage />} />
-                          <Route path="solicitudes" element={<SolicitudesPage />} />
-                          <Route path="*"           element={<Navigate to="/lopdp/rat" replace />} />
+                          <Route path="rat"                  element={<RatPage />} />
+                          <Route path="solicitudes"          element={<SolicitudesPage />} />
+                          <Route path="politica-privacidad"  element={<PoliticaPrivacidadPage />} />
+                          <Route path="*"                    element={<Navigate to="/lopdp/rat" replace />} />
                         </Routes>
                       </LopdpFeatureGate>
                     </Layout>

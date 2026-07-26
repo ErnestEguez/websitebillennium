@@ -1582,4 +1582,45 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
         ],
     },
+
+    // ─── LOPDP: POLÍTICA DE PRIVACIDAD PÚBLICA ──────────────────────────────
+    'lopdp-politica-privacidad': {
+        titulo: 'Política de Privacidad Pública',
+        subtitulo: 'La página que cualquier persona puede ver para saber cómo tratas sus datos',
+        secciones: [
+            {
+                titulo: '¿Para qué sirve esta página?',
+                texto: 'La LOPDP (Art. 10) exige que toda empresa informe de forma clara y accesible cómo trata los datos personales que recibe. Lo que armas aquí se publica en una URL pública (sin necesidad de iniciar sesión) para que tus clientes, empleados o proveedores puedan consultarla en cualquier momento — por ejemplo, enlazándola desde tu sitio web o desde el pie de tus facturas.',
+                alerta: 'Tu empresa es la "Responsable del tratamiento" — la que legalmente responde ante la Superintendencia (SPDP) por estos datos. QuickInvoice/Billennium System solo aparece como "Encargado de tratamiento" (el proveedor tecnológico que procesa los datos por instrucción tuya). Esto queda explícito en la página pública y no se puede quitar ni editar — es un requisito legal, no una opción de personalización.',
+            },
+            {
+                titulo: '1. Borrador vs. Publicado — la diferencia importa',
+                texto: 'Todo lo que edites en este formulario es un BORRADOR — nadie fuera de tu empresa lo ve todavía. "Guardar borrador" solo guarda tu progreso. La página pública real solo se actualiza cuando presionas "Publicar".',
+                tips: [
+                    'Usa "Vista previa" cuantas veces quieras antes de publicar — te muestra exactamente cómo se vería la página pública con los datos actuales.',
+                    'Una vez publicada, esa versión queda congelada para siempre (no se puede editar ni borrar) — es lo que garantiza que un aviso legal impreso en una factura antigua siga siendo verificable contra el texto vigente en esa fecha.',
+                ],
+            },
+            {
+                titulo: '2. Finalidades del tratamiento',
+                texto: 'Enumera para qué usa tu empresa los datos personales que recibe (facturación, nómina, marketing, etc.). Esto es lo primero que un titular necesita saber al leer tu política.',
+            },
+            {
+                titulo: '3. Delegado de Protección de Datos (DPD)',
+                texto: 'Si tu empresa designó formalmente un DPD (obligatorio para algunas empresas según su tamaño/actividad, opcional para otras), actívalo aquí y registra cómo contactarlo. Si no tienes uno, deja la opción apagada — la página pública lo indicará correctamente.',
+            },
+            {
+                titulo: '4. Encargados de tratamiento',
+                texto: 'Aquí declaras a qué terceros les compartes datos para que los procesen en tu nombre (tu contador externo, un courier, una aseguradora, etc.). QuickInvoice ya aparece de forma fija como encargado tecnológico — no se puede quitar ni editar, pero puedes agregar los propios de tu negocio.',
+            },
+            {
+                titulo: '5. Email para ARCO-POL',
+                texto: 'Este es el correo que la página pública muestra para que cualquier persona ejerza sus derechos (acceso, rectificación, cancelación, oposición, portabilidad, limitación) — debe ser una cuenta que realmente revises, ya que de ahí saldrán las solicitudes que gestionas en la pantalla "Solicitudes ARCO-POL".',
+            },
+            {
+                titulo: '6. Historial de versiones',
+                texto: 'Cada vez que publicas, se crea una nueva versión numerada con la fecha exacta. Puedes revisar el contenido completo de cualquier versión anterior desde "Ver contenido" — es de solo lectura, ninguna versión publicada puede modificarse. La página pública, en cambio, solo muestra la versión más reciente.',
+            },
+        ],
+    },
 }
