@@ -123,6 +123,7 @@ const EstructuraOrganizativaPage   = lz(() => import('./pages/talento/Estructura
 
 // ── Módulo LOPDP (Fase 1: RAT) ────────────────────────────────────────────────
 const RatPage                      = lz(() => import('./pages/lopdp/RatPage'), 'RatPage')
+const SolicitudesPage              = lz(() => import('./pages/lopdp/SolicitudesPage'), 'SolicitudesPage')
 
 // ── Módulo Nóminas ────────────────────────────────────────────────────────────
 const ConceptosNominaPage          = lz(() => import('./pages/nominas/ConceptosNominaPage'), 'ConceptosNominaPage')
@@ -743,8 +744,9 @@ function App() {
                     <Layout>
                       <LopdpFeatureGate>
                         <Routes>
-                          <Route path="rat" element={<RatPage />} />
-                          <Route path="*"   element={<Navigate to="/lopdp/rat" replace />} />
+                          <Route path="rat"         element={<RatPage />} />
+                          <Route path="solicitudes" element={<SolicitudesPage />} />
+                          <Route path="*"           element={<Navigate to="/lopdp/rat" replace />} />
                         </Routes>
                       </LopdpFeatureGate>
                     </Layout>

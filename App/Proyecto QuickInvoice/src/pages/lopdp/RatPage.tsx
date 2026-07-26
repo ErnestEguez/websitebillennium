@@ -1,21 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { ShieldCheck, Plus, Edit2, Archive, Search } from 'lucide-react'
+import { ShieldCheck, Plus, Edit2, Archive, Search, Printer, Download } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { actividadesTratamientoService } from '../../services/lopdp/actividadesTratamientoService'
 import { BASE_LEGAL_LABELS, type ActividadTratamiento } from '../../types/lopdp'
 import { RatFormModal } from '../../components/lopdp/RatFormModal'
-import { PrintExportBar } from '../../components/vendor/PrintExportBar'
-
-const COLUMNAS_EXPORT = {
-    nombre:               'Actividad',
-    finalidad:            'Finalidad',
-    categorias_datos_txt: 'Categorías de datos',
-    categoria_titulares_txt: 'Categorías de titulares',
-    base_legal_txt:       'Base legal',
-    plazo_retencion:      'Plazo de retención',
-    terceros_detalle:     'Transferencia a terceros',
-    pais_transferencia:   'Transferencia internacional (país)',
-}
+import { HelpButton } from '../../components/help/HelpButton'
+import { imprimirReporteRAT } from '../../services/lopdp/ratReporte'
+import { exportarExcelProfesional } from '../../lib/excelUtils'
 
 export function RatPage() {
     const { empresa, user } = useAuth()
@@ -81,12 +72,39 @@ export function RatPage() {
         return a.nombre.toLowerCase().includes(q) || a.finalidad.toLowerCase().includes(q)
     })
 
-    const datosExport = visibles.map(a => ({
-        ...a,
-        categorias_datos_txt:    a.categorias_datos?.join(', ') ?? '',
-        categoria_titulares_txt: a.categoria_titulares?.join(', ') ?? '',
-        base_legal_txt:          BASE_LEGAL_LABELS[a.base_legal] ?? a.base_legal,
-    }))
+    function handleImprimir() {
+        imprimirReporteRAT({ nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' }, visibles)
+    }
+
+    function handleExportarExcel() {
+        exportarExcelProfesional({
+            empresa:  { nombre: empresa?.nombre ?? '', ruc: empresa?.ruc ?? '' },
+            titulo:   'Registro de Actividades de Tratamiento (RAT)',
+            nombreArchivo: 'rat_actividades_tratamiento',
+            columnas: [
+                { key: 'nombre',       label: 'Actividad',                              width: 26 },
+                { key: 'finalidad',    label: 'Finalidad',                              width: 34 },
+                { key: 'categorias',   label: 'Categorías de datos',                    width: 26 },
+                { key: 'titulares',    label: 'Categorías de titulares',                width: 24 },
+                { key: 'baseLegal',    label: 'Base legal (Art. 7 LOPDP)',              width: 26 },
+                { key: 'retencion',    label: 'Plazo de retención',                     width: 26 },
+                { key: 'terceros',     label: 'Transferencia a terceros',               width: 30 },
+                { key: 'internacional', label: 'Transferencia internacional',           width: 24 },
+                { key: 'medidas',      label: 'Medidas de seguridad',                   width: 30 },
+            ],
+            filas: visibles.map(a => ({
+                nombre:        a.nombre,
+                finalidad:     a.finalidad,
+                categorias:    a.categorias_datos?.join(', ') ?? '',
+                titulares:     a.categoria_titulares?.join(', ') ?? '',
+                baseLegal:     BASE_LEGAL_LABELS[a.base_legal] ?? a.base_legal,
+                retencion:     a.plazo_retencion,
+                terceros:      a.hay_transferencia_terceros ? (a.terceros_detalle || 'Sí') : 'No aplica',
+                internacional: a.transferencia_internacional ? (a.pais_transferencia || 'Sí') : 'No aplica',
+                medidas:       a.medidas_seguridad ?? '',
+            })),
+        })
+    }
 
     if (loading) return (
         <div className="flex items-center justify-center h-64 text-slate-400">
@@ -102,9 +120,12 @@ export function RatPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Registro de Actividades de Tratamiento (RAT)</h1>
                     <p className="text-slate-500 text-sm">{actividades.length} actividades registradas · Art. 38 Reglamento LOPDP</p>
                 </div>
-                <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" /> Nueva Actividad
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="lopdp-rat" />
+                    <button onClick={abrirNuevo} className="btn btn-primary flex items-center gap-2">
+                        <Plus className="w-4 h-4" /> Nueva Actividad
+                    </button>
+                </div>
             </div>
 
             {/* Filtros + export */}
@@ -118,7 +139,14 @@ export function RatPage() {
                         onChange={e => setBusqueda(e.target.value)}
                     />
                 </div>
-                <PrintExportBar datos={datosExport} nombreArchivo="rat_actividades_tratamiento" columnas={COLUMNAS_EXPORT} />
+                <div className="flex items-center gap-2">
+                    <button onClick={handleExportarExcel} className="btn btn-secondary flex items-center gap-2 text-sm py-1.5 px-3" title="Exportar a Excel">
+                        <Download className="w-4 h-4 text-green-600" /> Excel
+                    </button>
+                    <button onClick={handleImprimir} className="btn btn-secondary flex items-center gap-2 text-sm py-1.5 px-3" title="Generar reporte formal">
+                        <Printer className="w-4 h-4 text-slate-500" /> Reporte RAT
+                    </button>
+                </div>
             </div>
 
             {/* Listado */}

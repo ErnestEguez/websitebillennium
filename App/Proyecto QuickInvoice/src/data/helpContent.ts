@@ -1478,4 +1478,108 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
         ],
     },
+
+    // ─── LOPDP: REGISTRO DE ACTIVIDADES DE TRATAMIENTO (RAT) ────────────────
+    'lopdp-rat': {
+        titulo: 'Registro de Actividades de Tratamiento (RAT)',
+        subtitulo: 'Documenta cómo tu empresa trata datos personales, según la LOPDP de Ecuador',
+        secciones: [
+            {
+                titulo: '¿Qué es el RAT y por qué lo pide la ley?',
+                texto: 'El Registro de Actividades de Tratamiento (RAT) es un documento obligatorio del Art. 38 del Reglamento a la LOPDP. Lista cada "actividad" en la que tu empresa usa datos personales (ej. "Nómina de empleados", "Facturación a clientes", "Gestión de proveedores") y explica para qué, con qué base legal, cuánto tiempo se conservan y si se comparten con terceros. Es lo primero que pide la Superintendencia de Protección de Datos (SPDP) si hay una auditoría o una queja.',
+                tips: [
+                    'Piensa en "actividades" separadas por proceso de negocio, no por cada dato individual: una actividad agrupa varios campos con la misma finalidad.',
+                    'Si no sabes por dónde empezar, registra primero: Nómina, Facturación/Clientes y Proveedores — son las tres que casi toda empresa tiene.',
+                ],
+            },
+            {
+                titulo: '1. Nombre y finalidad',
+                texto: 'El "Nombre" es solo para identificar la actividad en tu lista (ej. "Gestión de nómina de empleados"). La "Finalidad" debe explicar en una frase para qué usas esos datos — esto es lo que la SPDP y tus propios titulares (clientes/empleados) leerán para entender por qué tienes su información.',
+            },
+            {
+                titulo: '2. Categorías de datos y de titulares',
+                texto: 'Marca qué TIPOS de datos maneja esta actividad (ej. Identificación, Contacto, Financieros, Laborales, Salud) y de QUIÉNES son esos datos (Clientes, Empleados, Proveedores, etc.). Hay sugerencias rápidas con un clic, pero también puedes escribir un valor propio si no está en la lista y presionar Enter.',
+                tips: [
+                    'Si la actividad incluye datos de salud, biométricos o de menores de edad, es especialmente sensible — sé preciso al elegir estas categorías.',
+                ],
+            },
+            {
+                titulo: '3. Base legal (Art. 7 LOPDP)',
+                texto: 'Toda actividad de tratamiento necesita una justificación legal para existir. Las más comunes:\n• Consentimiento: el titular aceptó explícitamente (ej. marketing).\n• Ejecución de un contrato: es necesario para cumplir lo pactado (ej. nómina, facturación).\n• Obligación legal: una norma te obliga a guardar esos datos (ej. retenciones tributarias).\n• Interés legítimo: un interés justificado del negocio que no perjudica al titular.',
+                tips: [
+                    'La mayoría de procesos internos (nómina, facturación a clientes con contrato) usan "Ejecución de contrato" u "Obligación legal", no "Consentimiento".',
+                    'Reserva "Consentimiento" para usos que el titular podría rechazar sin afectar el servicio (ej. enviarle publicidad).',
+                ],
+            },
+            {
+                titulo: '4. Plazo de retención',
+                texto: 'Describe cuánto tiempo guardas estos datos y por qué (ej. "5 años tras finalizar la relación laboral, por obligación del Código de Trabajo"). La LOPDP prohíbe guardar datos indefinidamente sin justificación.',
+            },
+            {
+                titulo: '5. Transferencias a terceros / internacionales',
+                texto: 'Activa "¿Hay transferencia a terceros?" si compartes estos datos con alguien fuera de tu empresa (ej. una aseguradora, el SRI, un proveedor de nómina externo) y describe con quién. Activa "¿Hay transferencia internacional?" si esos datos salen de Ecuador (ej. un servidor o proveedor en el extranjero) e indica el país.',
+                alerta: 'QuickInvoice, como tu proveedor tecnológico, ya actúa como encargado del tratamiento de estos datos — no necesitas declararlo aquí como "tercero", eso se documenta en la Política de Privacidad (Fase 3 del módulo).',
+            },
+            {
+                titulo: '6. Archivar en vez de eliminar',
+                texto: 'El botón "Archivar" no borra la actividad — la oculta del listado activo pero la conserva como evidencia histórica de cumplimiento. Nunca se elimina físicamente un registro del RAT, ya que podrías necesitar demostrar qué política tenías vigente en una fecha pasada.',
+            },
+            {
+                titulo: '7. Exportar',
+                texto: 'Usa el botón "Excel" para descargar el RAT completo en una hoja de cálculo con el encabezado de tu empresa (útil para un asesor legal o para revisión interna). Usa "Reporte RAT" para generar un documento formal — un bloque estructurado por actividad, con los datos de tu empresa y la referencia legal al Art. 38 del Reglamento — listo para imprimir o guardar como PDF desde el navegador y entregar a la Superintendencia (SPDP) si te lo solicitan.',
+            },
+        ],
+    },
+
+    // ─── LOPDP: SOLICITUDES ARCO-POL ────────────────────────────────────────
+    'lopdp-solicitudes': {
+        titulo: 'Solicitudes ARCO-POL',
+        subtitulo: 'Gestiona los reclamos de tus clientes, empleados o proveedores sobre sus datos personales',
+        secciones: [
+            {
+                titulo: '¿Qué es "ARCO-POL"?',
+                texto: 'Es el conjunto de derechos que la LOPDP (Arts. 11 al 24) le da a cualquier persona sobre sus propios datos. Cuando alguien te escribe pidiendo algo relacionado a su información personal, casi siempre cae en uno de estos 6 tipos:',
+                tips: [
+                    'Acceso: "¿Qué datos míos tienen?"',
+                    'Rectificación: "Este dato mío está mal, corríjanlo."',
+                    'Cancelación: "Borren mis datos."',
+                    'Oposición: "No quiero que usen mis datos para X."',
+                    'Portabilidad: "Denme mis datos para llevármelos a otro proveedor."',
+                    'Limitación: "No borren nada, pero dejen de usar mis datos mientras resolvemos esto."',
+                ],
+                alerta: 'La ley te da 15 días hábiles para responder — no 15 días corridos. El sistema calcula esto automáticamente usando el calendario oficial de feriados de Ecuador (incluye Carnaval, Semana Santa y los feriados con traslado de la Ley de Fines de Semana).',
+            },
+            {
+                titulo: '1. Registrar una solicitud nueva',
+                texto: 'Registra la solicitud el mismo día que la recibes (por correo, verbal, WhatsApp, donde sea) — la "Fecha de recepción" es el punto de partida legal del plazo, así que debe ser real, no la fecha en que por fin tuviste tiempo de anotarla. Elige el tipo correcto de la lista (cada uno muestra una explicación corta debajo del selector) y describe con tus palabras qué pidió el titular.',
+                tips: [
+                    'Si tienes la cédula o RUC del titular, regístrala — permite exportar automáticamente sus datos reales del sistema (clientes/proveedores/empleados) al resolver una solicitud de Acceso o Portabilidad.',
+                ],
+            },
+            {
+                titulo: '2. Fecha límite y alertas',
+                texto: 'El sistema calcula solo: la fecha límite (15 días hábiles desde recepción) y una fecha de "por vencer" (3 días hábiles antes del límite). Verás una etiqueta ámbar "Por vencer" en el listado cuando quede poco tiempo, y las tarjetas de arriba resumen cuántas están por vencer o ya vencidas.',
+                alerta: 'Si una solicitud pasa la fecha límite sin que la hayas marcado como resuelta, el sistema la pasa automáticamente a "Vencida sin resolver" — esto queda registrado para siempre como parte del historial de cumplimiento, no se puede "deshacer" editando la fecha.',
+            },
+            {
+                titulo: '3. Prórroga (10 días hábiles adicionales)',
+                texto: 'Si genuinamente necesitas más tiempo, usa el botón "Prórroga" antes de que venza el plazo original. Debes escribir un motivo — queda guardado como respaldo. La nueva fecha límite pasa a ser 25 días hábiles desde la recepción (15 + 10). Solo se puede aplicar una vez por solicitud.',
+            },
+            {
+                titulo: '4. Marcar como resuelta',
+                texto: 'Usa el botón "Resolver" y escribe la respuesta real que le diste al titular (o un resumen fiel). El sistema NO te deja elegir manualmente si quedó "a tiempo" o "fuera de plazo" — lo decide automáticamente comparando la fecha de hoy contra la fecha límite vigente. Esto es intencional: es lo que le da valor real al indicador ante una eventual auditoría de la SPDP.',
+            },
+            {
+                titulo: '5. Exportar datos del titular (Portabilidad / Acceso)',
+                texto: 'Los botones "JSON" y "CSV" en cada solicitud generan un paquete con los datos que el sistema tiene de esa persona: los datos propios de la solicitud, más — si registraste su cédula/RUC — lo que exista en Clientes, Proveedores o Empleados con esa misma identificación. Esto es lo que le entregas al titular para cumplir su derecho de acceso o portabilidad.',
+                tips: [
+                    'Si no aparece nada en "Como cliente/proveedor/empleado", revisa que la identificación registrada en la solicitud coincida exactamente con la de su ficha en el sistema.',
+                ],
+            },
+            {
+                titulo: '6. Archivar',
+                texto: 'Igual que en el RAT, "Archivar" no borra la solicitud — la oculta del listado activo pero se conserva como evidencia histórica. Útil para casos duplicados o registrados por error.',
+            },
+        ],
+    },
 }

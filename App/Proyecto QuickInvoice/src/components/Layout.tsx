@@ -563,7 +563,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/nominas/parametros"    icon={Settings}       label="Parámetros de Nómina"      active={location.pathname === '/nominas/parametros'} sub disabled={!p.perm_th_nomina_parametros} />
                         </ModuleSection>}
 
-                        {/* ── MÓDULO: LOPDP (Fase 1: RAT) ────────────────── */}
+                        {/* ── MÓDULO: LOPDP (Fase 1: RAT · Fase 2: Solicitudes ARCO-POL) ── */}
                         {esOficina && lopdpEnabled && <ModuleSection
                             label="LOPDP"
                             icon={ShieldCheck}
@@ -573,7 +573,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={location.pathname.startsWith('/lopdp/')}
                         >
-                            <SidebarItem to="/lopdp/rat" icon={ShieldCheck} label="Registro de Actividades (RAT)" active={location.pathname === '/lopdp/rat'} sub />
+                            <SidebarItem to="/lopdp/rat"         icon={ShieldCheck} label="Registro de Actividades (RAT)" active={location.pathname === '/lopdp/rat'} sub />
+                            <SidebarItem to="/lopdp/solicitudes" icon={UserCog}     label="Solicitudes ARCO-POL"          active={location.pathname === '/lopdp/solicitudes'} sub />
                         </ModuleSection>}
 
                     </nav>
