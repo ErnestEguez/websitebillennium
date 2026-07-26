@@ -43,10 +43,12 @@ import {
     Trash2,
     Receipt,
     Palette,
+    ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
+import { useLopdpEnabled } from '../hooks/useLopdpEnabled'
 
 interface SidebarItemProps {
     to: string
@@ -217,6 +219,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const mods: Modules = modules ?? { vendor: false, finance: false, ledgerpro: false, talento_humano: false }
     const ROLES_ESPECIALES = ['mesero', 'cocina', 'admin_plataforma']
     const esOficina = profile?.rol && !ROLES_ESPECIALES.includes(profile.rol)
+
+    // LOPDP: flag independiente de `mods` (vive en lopdp.empresas_config, no
+    // en facturacion.user_modules) — ver useLopdpEnabled.ts
+    const { enabled: lopdpEnabled } = useLopdpEnabled()
 
     return (
         <div className="min-h-screen bg-slate-50 flex">
@@ -555,6 +561,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/nominas/conceptos"     icon={BookOpen}       label="Conceptos de Nómina"       active={location.pathname === '/nominas/conceptos'}  sub disabled={!p.perm_th_conceptos_nomina} />
                             <SidebarItem to="/nominas/cuentas-nomina" icon={CreditCard}   label="Cuentas Contables"         active={location.pathname === '/nominas/cuentas-nomina'} sub disabled={!p.perm_th_nomina_parametros} />
                             <SidebarItem to="/nominas/parametros"    icon={Settings}       label="Parámetros de Nómina"      active={location.pathname === '/nominas/parametros'} sub disabled={!p.perm_th_nomina_parametros} />
+                        </ModuleSection>}
+
+                        {/* ── MÓDULO: LOPDP (Fase 1: RAT) ────────────────── */}
+                        {esOficina && lopdpEnabled && <ModuleSection
+                            label="LOPDP"
+                            icon={ShieldCheck}
+                            colorClass="text-emerald-600"
+                            isOpen={openGroups.includes('lopdp')}
+                            onToggle={() => toggleGroup('lopdp')}
+                            isSidebarOpen={isSidebarOpen}
+                            anyActive={location.pathname.startsWith('/lopdp/')}
+                        >
+                            <SidebarItem to="/lopdp/rat" icon={ShieldCheck} label="Registro de Actividades (RAT)" active={location.pathname === '/lopdp/rat'} sub />
                         </ModuleSection>}
 
                     </nav>

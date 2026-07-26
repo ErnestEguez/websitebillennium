@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage'
 import { Dashboard } from './pages/Dashboard'
 import { ContabilidadProvider } from './contexts/contabilidad/ContabilidadContext'
 import { ProtectedRoute as RoleProtectedRoute } from './components/ProtectedRoute'
+import { LopdpFeatureGate } from './components/lopdp/LopdpFeatureGate'
 
 // ── Lazy loader helper ────────────────────────────────────────────────────────
 // Vite statically analyses import() string literals even inside lambdas.
@@ -119,6 +120,9 @@ const ClimaPage                    = lz(() => import('./pages/talento/ClimaPage'
 const DashboardTalentoPage         = lz(() => import('./pages/talento/DashboardTalentoPage'), 'DashboardTalentoPage')
 const FiniquitoPage                = lz(() => import('./pages/talento/FiniquitoPage'), 'FiniquitoPage')
 const EstructuraOrganizativaPage   = lz(() => import('./pages/talento/EstructuraOrganizativaPage'), 'EstructuraOrganizativaPage')
+
+// ── Módulo LOPDP (Fase 1: RAT) ────────────────────────────────────────────────
+const RatPage                      = lz(() => import('./pages/lopdp/RatPage'), 'RatPage')
 
 // ── Módulo Nóminas ────────────────────────────────────────────────────────────
 const ConceptosNominaPage          = lz(() => import('./pages/nominas/ConceptosNominaPage'), 'ConceptosNominaPage')
@@ -725,6 +729,25 @@ function App() {
                         </Routes>
                       </Layout>
                     </ContabilidadProvider>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              {/* ── Módulo LOPDP (Fase 1: RAT) ──
+                   Doble candado además del RLS de base de datos: solo rol
+                   "oficina" (RoleProtectedRoute) Y flag lopdp_enabled activo
+                   por empresa (LopdpFeatureGate, independiente de AuthContext). */}
+              <Route path="/lopdp/*" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <LopdpFeatureGate>
+                        <Routes>
+                          <Route path="rat" element={<RatPage />} />
+                          <Route path="*"   element={<Navigate to="/lopdp/rat" replace />} />
+                        </Routes>
+                      </LopdpFeatureGate>
+                    </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>
               } />
