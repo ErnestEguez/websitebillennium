@@ -48,6 +48,18 @@ const LOPDP_CAMPO_ADICIONAL_MAX = 300; // límite del SRI para el valor de <camp
 
 async function resolverAvisoLopdp(supabase: any, empresaId: string): Promise<{ corto: string; texto: string } | null> {
     try {
+        // Interruptor de apagado real: si el flag está apagado, no se agrega
+        // el aviso aunque la empresa ya tenga una política publicada. Así
+        // desactivar lopdp_enabled basta — no depende de vaciar el slug.
+        const { data: config } = await supabase
+            .schema("lopdp")
+            .from("empresas_config")
+            .select("lopdp_enabled")
+            .eq("empresa_id", empresaId)
+            .maybeSingle();
+
+        if (!config?.lopdp_enabled) return null;
+
         const { data } = await supabase
             .schema("lopdp")
             .from("politicas_privacidad")
