@@ -58,6 +58,21 @@ function splitCsvLine(line: string, delimiter: string): string[] {
     return fields
 }
 
+// Decodifica el archivo probando UTF-8 estricto primero (la mayoría de
+// exports modernos ya lo son). Si el buffer tiene algún byte que no forma
+// una secuencia UTF-8 válida, TextDecoder con fatal:true lanza — eso pasa
+// típicamente con CSV exportado por Excel en Windows con codificación
+// ANSI/Windows-1252, donde tildes y ñ quedan como bytes sueltos inválidos
+// en UTF-8. En ese caso, se vuelve a decodificar todo el buffer como
+// Windows-1252, que sí asigna un carácter válido a cada byte 0x00-0xFF.
+function decodeCsvBuffer(buffer: ArrayBuffer): string {
+    try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(buffer)
+    } catch {
+        return new TextDecoder('windows-1252').decode(buffer)
+    }
+}
+
 function parseCsvClientes(text: string): CsvRow[] {
     const lines = text.split(/\r?\n/)
     const rows: CsvRow[] = []
@@ -137,13 +152,14 @@ export function ImportarClientesPage() {
         const reader = new FileReader()
         reader.onload = (ev) => {
             try {
-                const text = ev.target?.result as string
+                const buffer = ev.target?.result as ArrayBuffer
+                const text = decodeCsvBuffer(buffer)
                 const parsed = parseCsvClientes(text)
                 if (!parsed.length) { setParseError('No se encontraron filas válidas.'); setAllRows([]); return }
                 setAllRows(parsed)
             } catch { setParseError('Error al leer el archivo.'); setAllRows([]) }
         }
-        reader.readAsText(file, 'UTF-8')
+        reader.readAsArrayBuffer(file)
     }, [])
 
     const handleClear = useCallback(() => {
@@ -160,17 +176,37 @@ export function ImportarClientesPage() {
         const result: ImportSummary = { inserted: 0, skipped: 0, errors: 0, errorMessages: [] }
 
         try {
-            // Identificaciones ya existentes
+            // Identificaciones ya existentes en la BD
             const ids = allRows.map(r => r.identificacion)
             const { data: existentes } = await supabase
                 .from('clientes').select('identificacion').eq('empresa_id', empresa.id).in('identificacion', ids)
             const setExist = new Set((existentes ?? []).map((c: any) => c.identificacion))
 
-            const total = allRows.length
+            // Deduplicar identificaciones repetidas DENTRO del propio archivo
+            // (se queda con la primera aparición). Sin esto, dos filas con la
+            // misma identificación cayendo en el mismo lote de 100 hacen
+            // fallar el lote ENTERO por la restricción UNIQUE(empresa_id,
+            // identificacion) — perdiendo también las ~99 filas buenas.
+            const vistos = new Set<string>()
+            const rowsUnicas: CsvRow[] = []
+            let duplicadosEnArchivo = 0
+            for (const r of allRows) {
+                if (vistos.has(r.identificacion)) { duplicadosEnArchivo++; continue }
+                vistos.add(r.identificacion)
+                rowsUnicas.push(r)
+            }
+            if (duplicadosEnArchivo > 0) {
+                result.skipped += duplicadosEnArchivo
+                result.errorMessages.push(
+                    `${duplicadosEnArchivo} fila(s) con identificación repetida dentro del propio archivo — se usó solo la primera aparición de cada una.`
+                )
+            }
+
+            const total = rowsUnicas.length
             setProgress({ current: 0, total })
 
             for (let i = 0; i < total; i += BATCH_SIZE) {
-                const batch = allRows.slice(i, i + BATCH_SIZE)
+                const batch = rowsUnicas.slice(i, i + BATCH_SIZE)
                 const toInsert = batch
                     .filter(r => !setExist.has(r.identificacion))
                     .map(r => ({
@@ -186,11 +222,22 @@ export function ImportarClientesPage() {
 
                 if (toInsert.length > 0) {
                     const { error } = await supabase.from('clientes').insert(toInsert)
-                    if (error) {
-                        result.errors += toInsert.length
-                        result.errorMessages.push(`Error lote ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`)
-                    } else {
+                    if (!error) {
                         result.inserted += toInsert.length
+                    } else {
+                        // El lote completo falló — se reintenta fila por fila
+                        // para no perder las filas buenas del lote y para
+                        // capturar el error real de cada fila problemática
+                        // (en vez de un solo mensaje genérico para las 100).
+                        for (const row of toInsert) {
+                            const { error: rowError } = await supabase.from('clientes').insert(row)
+                            if (rowError) {
+                                result.errors++
+                                result.errorMessages.push(`${row.identificacion} (${row.nombre}): ${rowError.message}`)
+                            } else {
+                                result.inserted++
+                            }
+                        }
                     }
                 }
                 setProgress({ current: Math.min(i + BATCH_SIZE, total), total })
