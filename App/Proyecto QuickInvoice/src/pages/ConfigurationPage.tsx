@@ -391,15 +391,28 @@ export function ConfigurationPage() {
             }
 
             let error
+            let empresaId: string | undefined = editingEmpresa.id
             if (editingEmpresa.id) {
                 const result = await supabase.from('empresas').update(payload).eq('id', editingEmpresa.id)
                 error = result.error
             } else {
-                const result = await supabase.from('empresas').insert(payload)
+                const result = await supabase.from('empresas').insert(payload).select('id').single()
                 error = result.error
+                empresaId = result.data?.id
             }
 
             if (error) throw error
+
+            // LOPDP: upsert del flag junto con el resto del guardado — mismo
+            // botón "Guardar Empresa", sin un paso separado. Vive en su propio
+            // schema (lopdp.empresas_config), no en facturacion.empresas.
+            if (empresaId) {
+                const { error: lopdpError } = await supabase
+                    .schema('lopdp')
+                    .from('empresas_config')
+                    .upsert({ empresa_id: empresaId, lopdp_enabled: !!editingEmpresa.lopdp_enabled })
+                if (lopdpError) throw lopdpError
+            }
 
             setIsEmpresaModalOpen(false)
             setEditingEmpresa(null)
@@ -2160,9 +2173,24 @@ export function ConfigurationPage() {
                                                                     <Bomb className="w-4 h-4" />
                                                                 </button>
                                                                 <button
-                                                                    onClick={() => {
+                                                                    onClick={async () => {
                                                                         setEditingEmpresa(emp)
                                                                         setIsEmpresaModalOpen(true)
+                                                                        // LOPDP: no es columna de facturacion.empresas — se lee
+                                                                        // aparte desde su propio schema y se fusiona al estado.
+                                                                        try {
+                                                                            const { data } = await supabase
+                                                                                .schema('lopdp')
+                                                                                .from('empresas_config')
+                                                                                .select('lopdp_enabled')
+                                                                                .eq('empresa_id', emp.id)
+                                                                                .maybeSingle()
+                                                                            setEditingEmpresa((prev: any) =>
+                                                                                prev ? { ...prev, lopdp_enabled: !!data?.lopdp_enabled } : prev
+                                                                            )
+                                                                        } catch {
+                                                                            // si falla, queda destildado por defecto
+                                                                        }
                                                                     }}
                                                                     className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors"
                                                                     title="Editar"
@@ -2550,6 +2578,20 @@ export function ConfigurationPage() {
                                         className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
                                         checked={!!editingEmpresa?.usar_vendor_management}
                                         onChange={e => setEditingEmpresa({ ...editingEmpresa, usar_vendor_management: e.target.checked })}
+                                    />
+                                </label>
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Módulo LOPDP (Protección de Datos Personales)</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Habilita el RAT, Solicitudes ARCO-POL, Política de Privacidad y el resto del módulo LOPDP para esta empresa.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingEmpresa?.lopdp_enabled}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, lopdp_enabled: e.target.checked })}
                                     />
                                 </label>
                             </div>
