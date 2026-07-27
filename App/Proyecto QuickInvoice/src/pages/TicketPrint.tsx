@@ -182,6 +182,14 @@ export function TicketPrint() {
                     </div>
                 )}
 
+                {/* Observación libre */}
+                {factura.observacion && (
+                    <div className="mt-2 border-t border-dashed border-black pt-2">
+                        <p className="font-bold">OBSERVACIÓN:</p>
+                        <p className="leading-snug">{factura.observacion}</p>
+                    </div>
+                )}
+
                 {/* Efectivo recibido / vuelto (desde params de URL) */}
                 {montoUrl > 0 && (
                     <div className="mt-2 border-t border-dashed border-black pt-2 space-y-1">

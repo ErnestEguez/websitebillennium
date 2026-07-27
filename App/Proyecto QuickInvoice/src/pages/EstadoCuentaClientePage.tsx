@@ -12,6 +12,14 @@ const ESTADO_BADGE: Record<string, string> = {
     anulada:   'bg-red-100 text-red-800',
 }
 
+const LABEL_METODO_PAGO: Record<string, string> = {
+    retencion_fuente: 'Retención Fuente',
+    retencion_iva: 'Retención IVA',
+}
+function labelMetodoPago(metodo: string): string {
+    return LABEL_METODO_PAGO[metodo] || metodo.replace(/_/g, ' ')
+}
+
 export function EstadoCuentaClientePage() {
     const { empresa } = useAuth()
     const [clientes, setClientes]       = useState<any[]>([])
@@ -82,7 +90,7 @@ export function EstadoCuentaClientePage() {
             const pagoRows = (c.pagos || []).map((p: any) => `
                 <tr style="background:#f0fdf4">
                     <td style="padding:3px 6px;font-size:10px;color:#555;padding-left:20px">└ Pago ${p.fecha_pago}</td>
-                    <td style="padding:3px 6px;font-size:10px;color:#555">${p.metodo_pago}${p.referencia ? ' / ' + p.referencia : ''}</td>
+                    <td style="padding:3px 6px;font-size:10px;color:#555">${labelMetodoPago(p.metodo_pago)}${p.referencia ? ' / ' + p.referencia : ''}</td>
                     <td></td>
                     <td style="padding:3px 6px;font-size:10px;text-align:right;color:#16a34a;font-weight:bold">+ ${formatCurrency(p.valor)}</td>
                     <td></td>
@@ -339,7 +347,7 @@ export function EstadoCuentaClientePage() {
                                                                     {c.pagos.map((p: any) => (
                                                                         <tr key={p.id}>
                                                                             <td className="py-1.5 text-slate-600">{p.fecha_pago}</td>
-                                                                            <td className="py-1.5 text-slate-600 capitalize">{p.metodo_pago.replace('_', ' ')}</td>
+                                                                            <td className="py-1.5 text-slate-600">{labelMetodoPago(p.metodo_pago)}</td>
                                                                             <td className="py-1.5 text-slate-500">{p.referencia || '—'}</td>
                                                                             <td className="py-1.5 text-right font-bold text-green-700">{formatCurrency(p.valor)}</td>
                                                                         </tr>

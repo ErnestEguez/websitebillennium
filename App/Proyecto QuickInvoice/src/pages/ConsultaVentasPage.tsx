@@ -25,6 +25,8 @@ interface FilaVenta {
     cheque: number
     credito: number
     otros: number
+    ret_fuente: number
+    ret_iva: number
     estado_sri: string
     estado_sistema: string
 }
@@ -143,6 +145,8 @@ export function ConsultaVentasPage() {
                     cheque:         getPago('cheque'),
                     credito:        getPago('credito'),
                     otros:          getPago('otros'),
+                    ret_fuente:     getPago('retencion_fuente'),
+                    ret_iva:        getPago('retencion_iva'),
                     estado_sri:     c.estado_sri,
                     estado_sistema: c.estado_sistema || 'VIGENTE',
                 }
@@ -159,16 +163,18 @@ export function ConsultaVentasPage() {
         const headers = [
             'Nro Factura', 'Fecha', 'Cliente', 'Identificación', 'Vendedor',
             'Base IVA', 'Base 0%', 'Suma Bases', 'IVA', 'Total',
-            'Efectivo', 'Tarjeta', 'Transferencia', 'Cheque', 'Crédito', 'Otros', 'Estado SRI'
+            'Efectivo', 'Tarjeta', 'Transferencia', 'Cheque', 'Crédito', 'Otros',
+            'Ret. Fuente', 'Ret. IVA', 'Estado SRI'
         ]
         const rows = filas.map(f => [
             f.secuencial, f.fecha, f.cliente, f.identificacion, f.vendedor,
             +f.base_iva.toFixed(2), +f.base_cero.toFixed(2), +f.suma_bases.toFixed(2), +f.iva.toFixed(2), +f.total.toFixed(2),
             +f.efectivo.toFixed(2), +f.tarjeta.toFixed(2), +f.transferencia.toFixed(2),
-            +f.cheque.toFixed(2), +f.credito.toFixed(2), +f.otros.toFixed(2), f.estado_sri
+            +f.cheque.toFixed(2), +f.credito.toFixed(2), +f.otros.toFixed(2),
+            +f.ret_fuente.toFixed(2), +f.ret_iva.toFixed(2), f.estado_sri
         ])
         const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-        ws['!cols'] = [10,12,30,14,20,10,10,12,10,12,10,10,14,10,10,10,14].map(wch => ({ wch }))
+        ws['!cols'] = [10,12,30,14,20,10,10,12,10,12,10,10,14,10,10,10,12,10,14].map(wch => ({ wch }))
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, 'Ventas')
         XLSX.writeFile(wb, `Ventas_${fechaInicio}_${fechaFin}.xlsx`)
@@ -187,7 +193,9 @@ export function ConsultaVentasPage() {
         cheque: acc.cheque + f.cheque,
         credito: acc.credito + f.credito,
         otros: acc.otros + f.otros,
-    }), { base_iva:0, base_cero:0, suma_bases:0, iva:0, total:0, efectivo:0, tarjeta:0, transferencia:0, cheque:0, credito:0, otros:0 })
+        ret_fuente: acc.ret_fuente + f.ret_fuente,
+        ret_iva: acc.ret_iva + f.ret_iva,
+    }), { base_iva:0, base_cero:0, suma_bases:0, iva:0, total:0, efectivo:0, tarjeta:0, transferencia:0, cheque:0, credito:0, otros:0, ret_fuente:0, ret_iva:0 })
 
     return (
         <div className="space-y-4">
@@ -273,6 +281,8 @@ export function ConsultaVentasPage() {
                                         <th className="px-3 py-3 text-right font-semibold text-slate-600">Cheque</th>
                                         <th className="px-3 py-3 text-right font-semibold text-slate-600">Crédito</th>
                                         <th className="px-3 py-3 text-right font-semibold text-slate-600">Otros</th>
+                                        <th className="px-3 py-3 text-right font-semibold text-amber-700">Ret. Fuente</th>
+                                        <th className="px-3 py-3 text-right font-semibold text-amber-700">Ret. IVA</th>
                                         <th className="px-3 py-3 text-center font-semibold text-slate-600">SRI</th>
                                     </tr>
                                 </thead>
@@ -320,6 +330,8 @@ export function ConsultaVentasPage() {
                                             <td className="px-3 py-2 text-right">{!anulada && f.cheque > 0 ? formatCurrency(f.cheque) : '—'}</td>
                                             <td className="px-3 py-2 text-right">{!anulada && f.credito > 0 ? formatCurrency(f.credito) : '—'}</td>
                                             <td className="px-3 py-2 text-right">{!anulada && f.otros > 0 ? formatCurrency(f.otros) : '—'}</td>
+                                            <td className="px-3 py-2 text-right text-amber-700">{!anulada && f.ret_fuente > 0 ? formatCurrency(f.ret_fuente) : '—'}</td>
+                                            <td className="px-3 py-2 text-right text-amber-700">{!anulada && f.ret_iva > 0 ? formatCurrency(f.ret_iva) : '—'}</td>
                                             <td className="px-3 py-2 text-center">
                                                 {anulada
                                                     ? <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">ANULADA</span>
@@ -403,6 +415,8 @@ export function ConsultaVentasPage() {
                                         <td className="px-3 py-3 text-right font-bold text-xs">{formatCurrency(tot.cheque)}</td>
                                         <td className="px-3 py-3 text-right font-bold text-xs">{formatCurrency(tot.credito)}</td>
                                         <td className="px-3 py-3 text-right font-bold text-xs">{formatCurrency(tot.otros)}</td>
+                                        <td className="px-3 py-3 text-right font-bold text-xs">{formatCurrency(tot.ret_fuente)}</td>
+                                        <td className="px-3 py-3 text-right font-bold text-xs">{formatCurrency(tot.ret_iva)}</td>
                                         <td />
                                     </tr>
                                 </tfoot>

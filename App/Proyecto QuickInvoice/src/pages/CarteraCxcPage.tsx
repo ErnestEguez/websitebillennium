@@ -15,6 +15,7 @@ import { cuentasBancariasService } from '../services/finance/bancosService'
 import type { CuentaBancaria } from '../types/finance'
 import { contabilidadVentasService } from '../services/contabilidadVentasService'
 import { contableConfigService } from '../services/contableConfigService'
+import { codigoRetencionService, type CodigoRetencion } from '../services/codigoRetencionService'
 
 const METODOS_PAGO: { value: CarteraCxcPago['metodo_pago']; label: string }[] = [
     { value: 'efectivo',      label: 'Efectivo' },
@@ -22,6 +23,8 @@ const METODOS_PAGO: { value: CarteraCxcPago['metodo_pago']; label: string }[] = 
     { value: 'cheque',        label: 'Cheque' },
     { value: 'tarjeta',       label: 'Tarjeta' },
     { value: 'nota_credito',  label: 'Nota de Crédito' },
+    { value: 'retencion_fuente', label: '📄 Retención en la Fuente' },
+    { value: 'retencion_iva',    label: '📄 Retención de IVA' },
     { value: 'otros',         label: 'Otros' },
 ]
 
@@ -69,6 +72,15 @@ export function CarteraCxcPage() {
     const [pagoCuentaId, setPagoCuentaId] = useState('')          // cuenta bancaria destino (transferencia)
     const [savingPago, setSavingPago]   = useState(false)
 
+    // ── Retención del cliente (llega después, con el saldo ya en cartera) ──
+    const [codigosRet, setCodigosRet]   = useState<CodigoRetencion[]>([])
+    const [pagoRetCodigo, setPagoRetCodigo] = useState('')
+    const [pagoRetBase, setPagoRetBase]     = useState('')
+    const [pagoRetPct, setPagoRetPct]       = useState('')
+    const esPagoRetencion = pagoMetodo === 'retencion_fuente' || pagoMetodo === 'retencion_iva'
+    const pagoRetTipo: 'FUENTE' | 'IVA' = pagoMetodo === 'retencion_iva' ? 'IVA' : 'FUENTE'
+    const pagoRetValor = Math.round((parseFloat(pagoRetBase) || 0) * (parseFloat(pagoRetPct) || 0) / 100 * 100) / 100
+
     // ── Modal pago multi-factura ──
     const [multiModal, setMultiModal]   = useState(false)
     const [multiCliente, setMultiCliente] = useState('')
@@ -92,6 +104,9 @@ export function CarteraCxcPage() {
         if (empresa?.id) {
             cuentasBancariasService.listar(empresa.id)
                 .then(data => setCuentasBancarias(data.filter(c => c.estado === 'activa')))
+                .catch(() => {})
+            codigoRetencionService.listar(empresa.id)
+                .then(data => setCodigosRet(data.filter(c => c.activo)))
                 .catch(() => {})
         }
     }, [empresa?.id])
@@ -193,6 +208,39 @@ export function CarteraCxcPage() {
     // ── Pago individual ──
     async function handleRegistrarPago() {
         if (!pagoModal) return
+
+        if (esPagoRetencion) {
+            const codigoObj = codigosRet.find(c => c.codigo === pagoRetCodigo && c.tipo === pagoRetTipo)
+            if (!codigoObj) { alert('Selecciona un código de retención'); return }
+            if (pagoRetValor <= 0) { alert('La base imponible debe ser mayor a 0'); return }
+            if (pagoRetValor > pagoModal.saldo) { alert(`El valor no puede superar el saldo (${formatCurrency(pagoModal.saldo)})`); return }
+
+            try {
+                setSavingPago(true)
+                await carteraCxcService.registrarPagoRetencion(
+                    { id: pagoModal.id, comprobante_id: pagoModal.comprobante_id, cliente_id: pagoModal.cliente_id },
+                    empresa!.id,
+                    { tipo: pagoRetTipo, codigo: codigoObj.codigo, descripcion: codigoObj.descripcion, base: parseFloat(pagoRetBase) || 0, pct: codigoObj.porcentaje, valor: pagoRetValor },
+                    pagoRef || undefined,
+                )
+                const nuevoSaldo = Math.round((pagoModal.saldo - pagoRetValor) * 100) / 100
+
+                imprimirComprobante(
+                    [{ cartera: { ...pagoModal, saldo: pagoModal.saldo }, aplicado: pagoRetValor }],
+                    pagoRetValor, pagoMetodo, pagoRef, nuevoSaldo, ''
+                )
+
+                setPagoModal(null); setPagoValor(''); setPagoRef(''); setPagoBanco(''); setPagoCuentaId('')
+                setPagoRetCodigo(''); setPagoRetBase(''); setPagoRetPct('')
+                await loadCartera()
+            } catch (e: any) {
+                alert(`Error al registrar retención: ${e.message}`)
+            } finally {
+                setSavingPago(false)
+            }
+            return
+        }
+
         const valor = parseFloat(pagoValor)
         if (isNaN(valor) || valor <= 0) { alert('Ingresa un valor válido mayor a 0'); return }
         if (valor > pagoModal.saldo) { alert(`El valor no puede superar el saldo (${formatCurrency(pagoModal.saldo)})`); return }
@@ -1210,26 +1258,78 @@ export function CarteraCxcPage() {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Valor del abono <span className="text-red-500">*</span></label>
-                                <input
-                                    type="number" min="0.01" step="0.01" max={pagoModal.saldo}
-                                    value={pagoValor}
-                                    onChange={e => setPagoValor(e.target.value)}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
-                                    autoFocus
-                                />
-                            </div>
+                            {!esPagoRetencion && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor del abono <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="number" min="0.01" step="0.01" max={pagoModal.saldo}
+                                        value={pagoValor}
+                                        onChange={e => setPagoValor(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                        autoFocus
+                                    />
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Método de pago</label>
                                 <select
                                     value={pagoMetodo}
-                                    onChange={e => { setPagoMetodo(e.target.value as CarteraCxcPago['metodo_pago']); setPagoBanco(''); setPagoCuentaId('') }}
+                                    onChange={e => {
+                                        setPagoMetodo(e.target.value as CarteraCxcPago['metodo_pago'])
+                                        setPagoBanco(''); setPagoCuentaId('')
+                                        setPagoRetCodigo(''); setPagoRetBase(''); setPagoRetPct('')
+                                    }}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
                                 >
                                     {METODOS_PAGO.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                 </select>
                             </div>
+
+                            {/* Retención del cliente — llegó después de facturar, se rebaja de la cartera */}
+                            {esPagoRetencion && (
+                                <div className="space-y-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Código de retención <span className="text-red-500">*</span></label>
+                                        <select
+                                            value={pagoRetCodigo}
+                                            onChange={e => {
+                                                const codigo = e.target.value
+                                                setPagoRetCodigo(codigo)
+                                                const obj = codigosRet.find(c => c.codigo === codigo && c.tipo === pagoRetTipo)
+                                                setPagoRetPct(obj ? String(obj.porcentaje) : '')
+                                            }}
+                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                        >
+                                            <option value="">— Selecciona código —</option>
+                                            {codigosRet.filter(c => c.tipo === pagoRetTipo).map(c => (
+                                                <option key={c.id} value={c.codigo}>{c.codigo} - {c.descripcion} ({c.porcentaje}%)</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Base imponible <span className="text-red-500">*</span></label>
+                                            <input
+                                                type="number" min="0.01" step="0.01"
+                                                value={pagoRetBase}
+                                                onChange={e => setPagoRetBase(e.target.value)}
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">% Retención</label>
+                                            <input
+                                                type="text" value={pagoRetPct ? `${pagoRetPct}%` : '—'} disabled
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-slate-100 text-slate-600"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-1 border-t border-amber-200">
+                                        <span className="text-sm font-medium text-slate-700">Valor a rebajar del saldo:</span>
+                                        <span className="font-bold text-amber-700">{formatCurrency(pagoRetValor)}</span>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Banco emisor — solo para cheque */}
                             {pagoMetodo === 'cheque' && (
@@ -1264,19 +1364,23 @@ export function CarteraCxcPage() {
 
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                                    {pagoMetodo === 'cheque' ? 'Número de cheque' : pagoMetodo === 'transferencia' ? 'Número de comprobante / referencia' : 'Referencia / Número'}
+                                    {esPagoRetencion ? 'Número de retención' : pagoMetodo === 'cheque' ? 'Número de cheque' : pagoMetodo === 'transferencia' ? 'Número de comprobante / referencia' : 'Referencia / Número'}
                                 </label>
                                 <input
                                     type="text" value={pagoRef} onChange={e => setPagoRef(e.target.value)}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
-                                    placeholder={pagoMetodo === 'cheque' ? 'Nro. cheque' : pagoMetodo === 'transferencia' ? 'Nro. comprobante' : 'Referencia'}
+                                    placeholder={esPagoRetencion ? 'Nro. retención' : pagoMetodo === 'cheque' ? 'Nro. cheque' : pagoMetodo === 'transferencia' ? 'Nro. comprobante' : 'Referencia'}
                                 />
                             </div>
                         </div>
 
                         <div className="p-6 border-t border-slate-200 flex gap-3 justify-end">
                             <button onClick={() => setPagoModal(null)} className="btn btn-secondary" disabled={savingPago}>Cancelar</button>
-                            <button onClick={handleRegistrarPago} className="btn btn-primary flex items-center gap-2" disabled={savingPago}>
+                            <button
+                                onClick={handleRegistrarPago}
+                                className="btn btn-primary flex items-center gap-2"
+                                disabled={savingPago || (esPagoRetencion && (!pagoRetCodigo || pagoRetValor <= 0))}
+                            >
                                 {savingPago
                                     ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                     : <Save className="w-4 h-4" />}

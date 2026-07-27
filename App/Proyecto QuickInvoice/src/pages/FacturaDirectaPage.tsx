@@ -12,8 +12,12 @@ import {
     calcularLinea,
     calcularTotalesFactura,
     type DetalleFacturaDirecta,
-    type PagoFactura
+    type PagoFactura,
+    type RetencionFactura
 } from '../services/facturaDirectaService'
+import { RetencionesEditor } from '../components/vendor/RetencionesEditor'
+import type { RetLine } from '../components/vendor/RetencionesEditor'
+import { codigoRetencionService, type CodigoRetencion } from '../services/codigoRetencionService'
 import { InvoiceTicketPOS } from '../components/InvoiceTicketPOS'
 import { formatCurrency, validateIdentificacion } from '../lib/utils'
 import {
@@ -120,6 +124,14 @@ export function FacturaDirectaPage() {
     const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([])
     const [notasCredito, setNotasCredito] = useState<any[]>([])
 
+    // Estado: retenciones que el CLIENTE le practica a la empresa (inverso de
+    // retenciones a proveedores) + observación libre del comprobante
+    const [retSeccion, setRetSeccion]           = useState(false)
+    const [numeroRetencion, setNumeroRetencion] = useState('')
+    const [retenciones, setRetenciones]         = useState<RetLine[]>([])
+    const [codigosRet, setCodigosRet]           = useState<CodigoRetencion[]>([])
+    const [observacionFactura, setObservacionFactura] = useState('')
+
     // Estado: proceso
     const [saving, setSaving] = useState(false)
     const [facturaFinal, setFacturaFinal] = useState<any>(null)
@@ -130,7 +142,10 @@ export function FacturaDirectaPage() {
     // ── Draft ────────────────────────────────────────────────────
     const clearDraft = useFormDraft(
         'draft_factura_directa',
-        () => ({ selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, detalles, pagos, montoRecibido, esModoServicio }),
+        () => ({
+            selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, detalles, pagos, montoRecibido, esModoServicio,
+            retenciones, numeroRetencion, observacionFactura,
+        }),
         (d) => {
             if (d.selectedCliente)    setSelectedCliente(d.selectedCliente)
             if (d.selectedVendedorId) setSelectedVendedorId(d.selectedVendedorId)
@@ -140,8 +155,12 @@ export function FacturaDirectaPage() {
             if (d.pagos?.length)      setPagos(d.pagos)
             if (d.montoRecibido)      setMontoRecibido(d.montoRecibido)
             if (d.esModoServicio)     setEsModoServicio(d.esModoServicio)
+            if (d.retenciones?.length) { setRetenciones(d.retenciones); setRetSeccion(true) }
+            if (d.numeroRetencion)    setNumeroRetencion(d.numeroRetencion)
+            if (d.observacionFactura) setObservacionFactura(d.observacionFactura)
         },
-        [selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, detalles, pagos, montoRecibido, esModoServicio],
+        [selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, detalles, pagos, montoRecibido, esModoServicio,
+            retenciones, numeroRetencion, observacionFactura],
     )
     const printRef = useRef<HTMLDivElement>(null)
 
@@ -238,13 +257,14 @@ export function FacturaDirectaPage() {
     async function loadData() {
         try {
             // Use catalog cache (stale-while-revalidate, works offline)
-            const [clientsList, prodList, vendedoresList, cuentasBanc, bodsList, puntoEmision] = await Promise.all([
+            const [clientsList, prodList, vendedoresList, cuentasBanc, bodsList, puntoEmision, codigosRetList] = await Promise.all([
                 catalogCacheService.getClientes(empresa!.id),
                 catalogCacheService.getProductos(empresa!.id),
                 isOnline ? vendedorService.getVendedoresActivos(empresa!.id).catch(() => []) : [],
                 isOnline ? cuentasBancariasService.listar(empresa!.id).catch(() => []) : [],
                 isOnline ? bodegaService.listar(empresa!.id).catch(() => []) : [],
                 isOnline ? puntoEmisionService.resolverParaDispositivo(empresa!.id).catch(() => null) : null,
+                isOnline ? codigoRetencionService.listar(empresa!.id).catch(() => []) : [],
             ])
             setClientes(clientsList)
             setProductos(prodList)
@@ -252,6 +272,7 @@ export function FacturaDirectaPage() {
             setCuentasBancarias(cuentasBanc.filter((c: CuentaBancaria) => c.estado === 'activa'))
             setBodegas(bodsList)
             setPuntoEmisionActivo(puntoEmision)
+            setCodigosRet(codigosRetList.filter((c: CodigoRetencion) => c.activo))
             if (vendedoresList.length === 1) setSelectedVendedorId(vendedoresList[0].id)
             if (bodsList.length > 0 && !selectedBodegaId) {
                 const principal = bodsList.find((b: Bodega) => b.es_principal) ?? bodsList[0]
@@ -405,8 +426,22 @@ export function FacturaDirectaPage() {
 
     // ─── TOTALES ──────────────────────────────────────────
     const totales = calcularTotalesFactura(detalles)
-    const totalPagado = pagos.reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
+    const totalRetenciones = retenciones.reduce((sum, r) => sum + (Number(r.valor) || 0), 0)
+    // La retención rebaja lo que hay que cubrir con efectivo/tarjeta/crédito/etc.
+    const totalPagado = pagos.reduce((sum, p) => sum + (Number(p.valor) || 0), 0) + totalRetenciones
     const pendiente = totales.total - totalPagado
+
+    // Mantiene la base de las retenciones sincronizada con el subtotal/IVA
+    // reales de la factura mientras se editan los productos (mismo patrón
+    // que el lado de compras).
+    useEffect(() => {
+        if (retenciones.length === 0) return
+        setRetenciones(prev => prev.map(r => {
+            const base = r.tipo === 'FUENTE' ? totales.subtotal : totales.iva
+            return { ...r, base, valor: Math.round(base * r.pct / 100 * 100) / 100 }
+        }))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [totales.subtotal, totales.iva])
     // Vuelto solo aplica si hay pago en efectivo
     const tieneEfectivo = pagos.some(p => p.metodo === 'efectivo')
     const vuelto = tieneEfectivo ? Math.max(0, montoRecibido - totales.total) : 0
@@ -491,6 +526,10 @@ export function FacturaDirectaPage() {
                         caja_sesion_id: cajaSesion?.id ?? null,
                         vendedor_id: selectedVendedorId || null,
                         dias_plazo_credito: diasPlazoCredito,
+                        observaciones: observacionFactura || undefined,
+                        retenciones: retenciones.filter(r => r.valor > 0) as RetencionFactura[],
+                        numero_retencion: numeroRetencion || undefined,
+                        created_by: profile?.id ?? null,
                     },
                 })
                 setOfflineSaved(true)
@@ -520,6 +559,10 @@ export function FacturaDirectaPage() {
                 vendedor_id: selectedVendedorId || null,
                 dias_plazo_credito: diasPlazoCredito,
                 bodega_id: selectedBodegaId || null,
+                observaciones: observacionFactura || undefined,
+                retenciones: retenciones.filter(r => r.valor > 0) as RetencionFactura[],
+                numero_retencion: numeroRetencion || undefined,
+                created_by: profile?.id ?? null,
             })
 
             const facturaCompleta = await facturaDirectaService.getComprobanteCompleto(factura.id)
@@ -548,6 +591,10 @@ export function FacturaDirectaPage() {
         setDetalles([{ ...DETALLE_VACIO }])
         setPagos([{ metodo: 'efectivo', valor: 0, referencia: '' }])
         setMontoRecibido(0)
+        setRetenciones([])
+        setNumeroRetencion('')
+        setRetSeccion(false)
+        setObservacionFactura('')
         setSearchCliente('')
         setSearchProducto({})
         sessionStorage.removeItem(PREP_IDS_KEY)
@@ -1280,6 +1327,51 @@ export function FacturaDirectaPage() {
                         )}
                     </div>
 
+                    {/* ── OBSERVACIÓN ───────────────────── */}
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-2">
+                        <h2 className="font-bold text-slate-900 text-sm">Observación</h2>
+                        <textarea
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+                            rows={2}
+                            maxLength={500}
+                            placeholder="Nota libre — se imprime en el ticket y en el RIDE"
+                            value={observacionFactura}
+                            onChange={e => setObservacionFactura(e.target.value)}
+                        />
+                    </div>
+
+                    {/* ── RETENCIONES DEL CLIENTE ───────── */}
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                        <button onClick={() => setRetSeccion(v => !v)}
+                            className="w-full flex items-center justify-between p-6 hover:bg-slate-50 transition-colors">
+                            <div className="flex items-center gap-2">
+                                <h2 className="font-bold text-slate-900 text-sm">Retenciones del cliente</h2>
+                                {totalRetenciones > 0 && (
+                                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                                        {retenciones.filter(r => r.valor > 0).length} ret. — {formatCurrency(totalRetenciones)}
+                                    </span>
+                                )}
+                            </div>
+                            {retSeccion ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                        </button>
+                        {retSeccion && (
+                            <div className="p-6 pt-0 border-t border-slate-100">
+                                <p className="text-xs text-slate-400 mb-2">
+                                    Si el cliente no trae los datos de la retención en el momento, deja esta sección vacía — el valor quedará como Crédito y se podrá bajar después desde Cartera cuando llegue el comprobante físico.
+                                </p>
+                                <RetencionesEditor
+                                    numeroRetencion={numeroRetencion}
+                                    onChangeNumero={setNumeroRetencion}
+                                    retenciones={retenciones}
+                                    onChange={setRetenciones}
+                                    baseDefault={totales.subtotal}
+                                    baseIva={totales.iva}
+                                    codigos={codigosRet}
+                                />
+                            </div>
+                        )}
+                    </div>
+
                     {/* ── TOTALES ───────────────────────── */}
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
                         <h2 className="font-bold text-slate-900">Resumen</h2>
@@ -1305,8 +1397,14 @@ export function FacturaDirectaPage() {
                         </div>
 
                         <div className="border-t border-slate-100 pt-3 space-y-2 text-sm">
+                            {totalRetenciones > 0 && (
+                                <div className="flex justify-between text-amber-700">
+                                    <span>Retenciones del cliente</span>
+                                    <span className="font-medium">-{formatCurrency(totalRetenciones)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between">
-                                <span className="text-slate-500">Distribuido</span>
+                                <span className="text-slate-500">Distribuido (pagos + retenciones)</span>
                                 <span className={cn('font-bold', totalPagado >= totales.total - 0.01 ? 'text-emerald-600' : 'text-amber-500')}>
                                     {formatCurrency(totalPagado)}
                                 </span>

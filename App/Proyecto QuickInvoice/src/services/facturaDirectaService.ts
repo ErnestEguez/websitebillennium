@@ -28,6 +28,17 @@ export interface PagoFactura {
     observaciones?: string | null                // observaciones adicionales
 }
 
+// Retención que el CLIENTE le practica a esta empresa (inverso de la
+// retención a proveedores) — mismo catálogo facturacion.codigos_retencion.
+export interface RetencionFactura {
+    tipo:        'FUENTE' | 'IVA'
+    codigo:      string
+    descripcion: string
+    base:        number
+    pct:         number
+    valor:       number
+}
+
 export interface FacturaDirectaInput {
     empresa_id: string
     cliente_id: string
@@ -38,6 +49,9 @@ export interface FacturaDirectaInput {
     vendedor_id?: string | null      // FK a vendedores.id (puede ser null)
     dias_plazo_credito?: number      // Solo aplica cuando hay pago a crédito; default 30
     bodega_id?: string | null        // Bodega desde la que se descuenta el stock
+    retenciones?: RetencionFactura[] // Retenciones que trae el cliente (opcional)
+    numero_retencion?: string        // N° del comprobante de retención del cliente (aplica a todas las líneas)
+    created_by?: string | null       // profile.id de quien factura (para retenciones_ventas.created_by)
 }
 
 // Calcula los valores de una línea de detalle
@@ -72,7 +86,10 @@ export function calcularTotalesFactura(detalles: DetalleFacturaDirecta[]) {
 export const facturaDirectaService = {
 
     async generarFacturaDirecta(input: FacturaDirectaInput) {
-        const { empresa_id, cliente_id, detalles, pagos, caja_sesion_id, vendedor_id, dias_plazo_credito, bodega_id } = input
+        const {
+            empresa_id, cliente_id, detalles, pagos, caja_sesion_id, vendedor_id,
+            dias_plazo_credito, bodega_id, observaciones, retenciones, numero_retencion, created_by,
+        } = input
 
         // 1. Obtener configuración SRI
         const { data: empData } = await supabase
@@ -165,6 +182,7 @@ export const facturaDirectaService = {
                 caja_sesion_id: caja_sesion_id || null,
                 vendedor_id: vendedor_id || null,
                 bodega_id: bodega_id || null,
+                observacion: observaciones || null,
             })
             .select()
             .single()
@@ -199,7 +217,7 @@ export const facturaDirectaService = {
         }
 
         // 6. Insertar pagos
-        const pagosFormateados = pagos.map(p => {
+        const pagosFormateados: { comprobante_id: string; metodo_pago: string; valor: number; referencia: string | null }[] = pagos.map(p => {
             let ref = p.referencia || null
             if (p.numero_documento) ref = ref ? `${ref} | N° ${p.numero_documento}` : `N° ${p.numero_documento}`
             if (p.observaciones)    ref = ref ? `${ref} | ${p.observaciones}` : p.observaciones || null
@@ -211,11 +229,49 @@ export const facturaDirectaService = {
             }
         })
 
+        // Retenciones del cliente: cada línea con valor > 0 se registra TAMBIÉN
+        // como un pago (metodo_pago 'retencion_fuente'/'retencion_iva') — así la
+        // distribución del pago cuadra sin necesitar lógica aparte, y sin crear
+        // cartera_cxc por ese monto (no es una deuda, es un valor retenido).
+        const retencionesValidas = (retenciones ?? []).filter(r => r.valor > 0)
+        for (const r of retencionesValidas) {
+            pagosFormateados.push({
+                comprobante_id: factura.id,
+                metodo_pago: r.tipo === 'FUENTE' ? 'retencion_fuente' : 'retencion_iva',
+                valor: r.valor,
+                referencia: numero_retencion || null,
+            })
+        }
+
         if (pagosFormateados.length > 0) {
             const { error: errorPagos } = await supabase
                 .from('comprobante_pagos')
                 .insert(pagosFormateados)
             if (errorPagos) console.error('Error insertando pagos:', errorPagos)
+        }
+
+        // 6.0 Detalle de las retenciones — mismo shape que retenciones_compras,
+        // para reportes y para saber exactamente qué código/base/% se usó.
+        if (retencionesValidas.length > 0) {
+            const fechaHoy = new Date().toISOString().split('T')[0]
+            const { error: errorRet } = await supabase
+                .from('retenciones_ventas')
+                .insert(retencionesValidas.map(r => ({
+                    empresa_id,
+                    comprobante_id: factura.id,
+                    cliente_id,
+                    numero_retencion: numero_retencion || null,
+                    fecha_emision: fechaHoy,
+                    tipo: r.tipo,
+                    codigo_retencion: r.codigo,
+                    descripcion: r.descripcion || null,
+                    base_imponible: r.base,
+                    porcentaje: r.pct,
+                    valor: r.valor,
+                    origen: 'FACTURA',
+                    created_by: created_by || null,
+                })))
+            if (errorRet) console.error('Error insertando retenciones_ventas:', errorRet)
         }
 
         // 6.1 Cartera CxC — solo cuando hay pago a crédito

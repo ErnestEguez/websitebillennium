@@ -25,7 +25,7 @@ export interface CarteraCxcPago {
     empresa_id: string
     fecha_pago: string
     valor: number
-    metodo_pago: 'efectivo' | 'transferencia' | 'cheque' | 'tarjeta' | 'nota_credito' | 'otros'
+    metodo_pago: 'efectivo' | 'transferencia' | 'cheque' | 'tarjeta' | 'nota_credito' | 'otros' | 'retencion_fuente' | 'retencion_iva'
     referencia: string | null
     usuario_id: string | null
     created_at: string
@@ -98,6 +98,61 @@ export const carteraCxcService = {
         if (error) throw error
         // El trigger fn_actualizar_saldo_cxc actualiza el saldo y estado automáticamente
         return data as CarteraCxcPago
+    },
+
+    /**
+     * Registra una retención que llegó DESPUÉS de facturar (el cliente no la
+     * traía al momento de la venta, quedó como crédito, y ahora llega su
+     * comprobante físico). Inserta el pago (rebaja el saldo vía el mismo
+     * trigger de siempre) Y el detalle en retenciones_ventas (origen='CARTERA'),
+     * igual que se hace al capturarla directo en la factura.
+     */
+    async registrarPagoRetencion(
+        cartera: { id: string; comprobante_id: string; cliente_id: string },
+        empresaId: string,
+        retencion: { tipo: 'FUENTE' | 'IVA'; codigo: string; descripcion: string; base: number; pct: number; valor: number },
+        numeroRetencion: string | undefined,
+    ): Promise<CarteraCxcPago> {
+        const { data: { user } } = await supabase.auth.getUser()
+        const metodo: CarteraCxcPago['metodo_pago'] = retencion.tipo === 'FUENTE' ? 'retencion_fuente' : 'retencion_iva'
+        const fecha = new Date().toISOString().split('T')[0]
+
+        const { data: pago, error } = await supabase
+            .from('cartera_cxc_pagos')
+            .insert({
+                cartera_id: cartera.id,
+                empresa_id: empresaId,
+                fecha_pago: fecha,
+                valor: retencion.valor,
+                metodo_pago: metodo,
+                referencia: numeroRetencion || null,
+                usuario_id: user?.id || null,
+            })
+            .select()
+            .single()
+        if (error) throw error
+
+        const { error: errorRet } = await supabase
+            .from('retenciones_ventas')
+            .insert({
+                empresa_id: empresaId,
+                comprobante_id: cartera.comprobante_id,
+                cliente_id: cartera.cliente_id,
+                numero_retencion: numeroRetencion || null,
+                fecha_emision: fecha,
+                tipo: retencion.tipo,
+                codigo_retencion: retencion.codigo,
+                descripcion: retencion.descripcion || null,
+                base_imponible: retencion.base,
+                porcentaje: retencion.pct,
+                valor: retencion.valor,
+                origen: 'CARTERA',
+                created_by: user?.id || null,
+            })
+        if (errorRet) console.error('Error registrando retenciones_ventas (cartera):', errorRet)
+
+        // El trigger fn_actualizar_saldo_cxc actualiza el saldo y estado automáticamente
+        return pago as CarteraCxcPago
     },
 
     /** Vincula el asiento contable (lp_comprobantes) generado para un pago. */

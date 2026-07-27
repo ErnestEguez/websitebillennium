@@ -96,6 +96,8 @@ export function InvoicePrint() {
         credito:                      'SIN UTILIZACION DEL SISTEMA FINANCIERO',
         otros:                        'OTROS',
         sin_utilizacion_sistema_financiero: 'SIN UTILIZACION DEL SISTEMA FINANCIERO',
+        retencion_fuente:             'RETENCIÓN EN LA FUENTE',
+        retencion_iva:                'RETENCIÓN DE IVA',
     }
 
     return (
