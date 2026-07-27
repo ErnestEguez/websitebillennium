@@ -45,6 +45,8 @@ import {
     Palette,
     ShieldCheck,
     Globe,
+    Building2,
+    AlertOctagon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -574,8 +576,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isSidebarOpen={isSidebarOpen}
                             anyActive={location.pathname.startsWith('/lopdp/')}
                         >
+                            <SidebarItem to="/lopdp/dashboard"            icon={LayoutDashboard} label="Panel de Cumplimiento"       active={location.pathname === '/lopdp/dashboard'} sub />
                             <SidebarItem to="/lopdp/rat"                 icon={ShieldCheck} label="Registro de Actividades (RAT)" active={location.pathname === '/lopdp/rat'} sub />
                             <SidebarItem to="/lopdp/solicitudes"          icon={UserCog}     label="Solicitudes ARCO-POL"          active={location.pathname === '/lopdp/solicitudes'} sub />
+                            <SidebarItem to="/lopdp/encargados"           icon={Building2}   label="Encargados de Tratamiento"     active={location.pathname === '/lopdp/encargados'} sub />
+                            <SidebarItem to="/lopdp/brechas"              icon={AlertOctagon} label="Brechas de Seguridad"          active={location.pathname === '/lopdp/brechas'} sub />
                             <SidebarItem to="/lopdp/politica-privacidad"  icon={Globe}       label="Política de Privacidad"        active={location.pathname === '/lopdp/politica-privacidad'} sub />
                         </ModuleSection>}
 

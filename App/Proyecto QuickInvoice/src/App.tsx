@@ -125,6 +125,9 @@ const EstructuraOrganizativaPage   = lz(() => import('./pages/talento/Estructura
 const RatPage                      = lz(() => import('./pages/lopdp/RatPage'), 'RatPage')
 const SolicitudesPage              = lz(() => import('./pages/lopdp/SolicitudesPage'), 'SolicitudesPage')
 const PoliticaPrivacidadPage       = lz(() => import('./pages/lopdp/PoliticaPrivacidadPage'), 'PoliticaPrivacidadPage')
+const EncargadosPage               = lz(() => import('./pages/lopdp/EncargadosPage'), 'EncargadosPage')
+const BrechasPage                  = lz(() => import('./pages/lopdp/BrechasPage'), 'BrechasPage')
+const DashboardCumplimientoPage    = lz(() => import('./pages/lopdp/DashboardCumplimientoPage'), 'DashboardCumplimientoPage')
 const PoliticaPublicaPage          = lz(() => import('./pages/PoliticaPublicaPage'), 'PoliticaPublicaPage')
 
 // ── Módulo Nóminas ────────────────────────────────────────────────────────────
@@ -751,10 +754,13 @@ function App() {
                     <Layout>
                       <LopdpFeatureGate>
                         <Routes>
+                          <Route path="dashboard"             element={<DashboardCumplimientoPage />} />
                           <Route path="rat"                  element={<RatPage />} />
                           <Route path="solicitudes"          element={<SolicitudesPage />} />
+                          <Route path="encargados"           element={<EncargadosPage />} />
+                          <Route path="brechas"              element={<BrechasPage />} />
                           <Route path="politica-privacidad"  element={<PoliticaPrivacidadPage />} />
-                          <Route path="*"                    element={<Navigate to="/lopdp/rat" replace />} />
+                          <Route path="*"                    element={<Navigate to="/lopdp/dashboard" replace />} />
                         </Routes>
                       </LopdpFeatureGate>
                     </Layout>

@@ -221,3 +221,86 @@ export interface PoliticaPrivacidadVersion {
 // Lo único que expone la vista pública (coincide con el GRANT de columnas a anon)
 export type PoliticaPrivacidadPublica = Pick<PoliticaPrivacidadVersion,
     'empresa_id' | 'slug' | 'numero_version' | 'fecha_publicacion' | 'contenido'>
+
+// ─── Fase 5: Encargados de Tratamiento, Brechas de Seguridad, Dashboard ─────
+
+export interface EncargadoTratamiento {
+    id:                     string
+    empresa_id:             string
+
+    nombre:                 string
+    tipo_servicio:          string
+
+    tiene_contrato_dpa:     boolean
+    fecha_vigencia?:        string | null
+
+    nota_destruccion?:      string | null
+    destruccion_confirmada: boolean
+
+    activo:                 boolean
+    created_at?:            string
+    updated_at?:            string
+    created_by?:            string | null
+    updated_by?:            string | null
+}
+
+// Umbral para considerar un encargado "por vencer" — días calendario,
+// no días hábiles (es un recordatorio de gestión, no un plazo legal).
+export const ENCARGADO_DIAS_ALERTA_VIGENCIA = 30
+
+export type SeveridadBrecha = 'bajo' | 'medio' | 'alto'
+
+export const SEVERIDAD_BRECHA_LABELS: Record<SeveridadBrecha, string> = {
+    bajo:  'Bajo',
+    medio: 'Medio',
+    alto:  'Alto (requiere notificar también a los titulares)',
+}
+
+// Mismas etiquetas que ARCO-POL (mismo enum, lopdp.estado_solicitud_enum)
+// pero con wording de "notificación" en vez de "resolución".
+export const ESTADO_NOTIFICACION_LABELS: Record<EstadoSolicitud, string> = {
+    pendiente:               'Pendiente',
+    en_proceso:              'En proceso',
+    resuelta_a_tiempo:       'Notificado a tiempo',
+    resuelta_fuera_de_plazo: 'Notificado fuera de plazo',
+    vencida_sin_resolver:    'Vencido sin notificar',
+}
+
+export interface BrechaSeguridad {
+    id:                          string
+    empresa_id:                  string
+
+    fecha_deteccion:             string
+    descripcion:                 string
+    alcance_titulares_estimado?: number | null
+    severidad:                   SeveridadBrecha
+
+    plazo_spdp:                  string
+    plazo_titulares?:            string | null
+
+    fecha_notificacion_spdp?:    string | null
+    estado_spdp:                 EstadoSolicitud
+
+    fecha_notificacion_titulares?: string | null
+    estado_titulares?:             EstadoSolicitud | null
+
+    plantilla_notificacion?:     string | null
+
+    activo:                      boolean
+    created_at?:                 string
+    updated_at?:                 string
+    created_by?:                 string | null
+    updated_by?:                 string | null
+}
+
+// Umbral de "política desactualizada" — único lugar donde vive este
+// número; cambiarlo aquí basta, no requiere migración.
+export const LOPDP_POLITICA_DESACTUALIZADA_MESES = 6
+
+export interface DashboardCumplimiento {
+    rat: { total: number; completas: number }
+    solicitudes: { abiertas: number; por_vencer: number; vencidas: number }
+    encargados: { total: number; sin_contrato_vigente: number }
+    brechas: { abiertas: number; vencidas: number }
+    politica_ultima_publicacion: string | null
+}

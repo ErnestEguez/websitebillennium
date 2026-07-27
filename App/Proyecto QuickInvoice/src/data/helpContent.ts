@@ -1623,4 +1623,78 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
         ],
     },
+
+    // ─── LOPDP: ENCARGADOS DE TRATAMIENTO ───────────────────────────────────
+    'lopdp-encargados': {
+        titulo: 'Encargados de Tratamiento',
+        subtitulo: 'Terceros que procesan datos personales por cuenta de tu empresa',
+        secciones: [
+            {
+                titulo: '¿Qué es un "encargado de tratamiento"?',
+                texto: 'Es cualquier tercero al que le entregas datos personales para que los procese siguiendo TUS instrucciones — no son responsables, son tus proveedores de confianza. Ejemplos típicos: un contador externo, una empresa de courier, un proveedor de nómina externo, un servicio de correo masivo.',
+                alerta: 'QuickInvoice ya aparece arriba de la lista como encargado fijo (bloqueado, no editable) — es tu proveedor tecnológico. Esta pantalla es para los encargados PROPIOS de tu negocio, no para volver a registrar a QuickInvoice.',
+            },
+            {
+                titulo: '¿Por qué importa tener el contrato/DPA al día?',
+                texto: 'La LOPDP exige que exista un acuerdo (contrato o "Acuerdo de Encargo del Tratamiento", DPA) que obligue al tercero a proteger los datos igual que tú. Si un encargado tuyo tiene una brecha de seguridad, tu empresa puede seguir siendo responsable si nunca formalizaste ese acuerdo.',
+                tips: [
+                    'Si no tienes fecha de vigencia registrada, el sistema lo trata igual que "por vencer" — no asumas que "sin fecha" es seguro.',
+                    'La alerta de vigencia usa días calendario (30 días), no días hábiles — es un recordatorio de gestión, no un plazo legal con conteo especial.',
+                ],
+            },
+            {
+                titulo: 'Destrucción o devolución de datos al finalizar',
+                texto: 'Cuando termine tu relación con un encargado, la ley espera que los datos que le entregaste se destruyan o se te devuelvan (con un plazo de referencia de 5 días). Usa la nota de destrucción para dejar registrado qué se acordó, y marca "Destrucción confirmada" solo cuando eso ya haya ocurrido realmente.',
+            },
+        ],
+    },
+
+    // ─── LOPDP: BRECHAS DE SEGURIDAD ─────────────────────────────────────────
+    'lopdp-brechas': {
+        titulo: 'Brechas de Seguridad',
+        subtitulo: 'Documenta y no pierdas el plazo cuando ocurra un incidente con datos personales',
+        secciones: [
+            {
+                titulo: '¿Qué cuenta como "brecha de seguridad"?',
+                texto: 'Cualquier incidente que comprometa la confidencialidad, integridad o disponibilidad de datos personales: un correo enviado a la persona equivocada con datos sensibles, una base de datos expuesta, un dispositivo robado con información de clientes, un acceso no autorizado a tus sistemas.',
+            },
+            {
+                titulo: '1. Registrar el incidente apenas se detecta',
+                texto: 'La "Fecha de detección" es el punto de partida legal de los plazos — regístrala el mismo día que te enteras, no cuando termines de investigar qué pasó. La severidad determina si aplica una obligación adicional: con riesgo "Alto", además de notificar a la SPDP, debes notificar también a los titulares afectados.',
+            },
+            {
+                titulo: '2. Los dos plazos (se calculan solos)',
+                texto: 'Notificación a la SPDP (Superintendencia): 5 días hábiles desde la detección, siempre aplica.\nNotificación a los titulares afectados: 3 días hábiles desde la detección, solo si marcaste severidad "Alto".\nAmbos usan el mismo calendario de feriados de Ecuador que ya usa el módulo de Solicitudes ARCO-POL.',
+            },
+            {
+                titulo: '3. Plantilla de notificación',
+                texto: 'Al presionar "Notificar SPDP" o "Notificar Titulares" se abre un texto sugerido con los datos del incidente ya completados donde es posible — revísalo, complétalo (impacto, medidas tomadas, contacto) y edítalo libremente. El sistema NO envía nada por ti: es tu responsabilidad hacer llegar esa notificación por el canal correspondiente. Solo al confirmar "ya se notificó" queda registrada la fecha real.',
+                alerta: 'Igual que con las Solicitudes ARCO-POL, el sistema decide automáticamente si quedó "a tiempo" o "fuera de plazo" comparando la fecha que confirmes contra el plazo calculado — no se puede elegir manualmente.',
+            },
+            {
+                titulo: '4. Estados independientes',
+                texto: 'Cada incidente de riesgo "Alto" tiene DOS estados que avanzan por separado: uno para la SPDP y otro para los titulares. Es normal que uno esté "Notificado a tiempo" mientras el otro sigue "Pendiente" — son dos obligaciones distintas con plazos distintos.',
+            },
+        ],
+    },
+
+    // ─── LOPDP: DASHBOARD DE CUMPLIMIENTO ────────────────────────────────────
+    'lopdp-dashboard': {
+        titulo: 'Panel de Cumplimiento LOPDP',
+        subtitulo: 'La foto general de qué tan al día está tu empresa con la LOPDP',
+        secciones: [
+            {
+                titulo: '¿Qué muestra cada tarjeta?',
+                texto: 'RAT: qué porcentaje de tus actividades de tratamiento tienen bien llenadas las categorías de datos, titulares y medidas de seguridad (no solo los campos obligatorios mínimos).\nSolicitudes ARCO-POL: cuántas están abiertas, por vencer o ya vencidas.\nEncargados de Tratamiento: cuántos no tienen contrato/DPA vigente registrado.\nBrechas de Seguridad: cuántos incidentes siguen abiertos o vencieron sin notificar.\nPolítica de Privacidad: si está publicada, nunca se publicó, o lleva mucho tiempo sin actualizarse.',
+            },
+            {
+                titulo: 'Tarjetas en ámbar = necesitan tu atención',
+                texto: 'Cualquier tarjeta resaltada en ámbar con un ícono de alerta tiene algo pendiente. Haz clic en cualquier tarjeta para ir directo a esa sección y resolverlo.',
+            },
+            {
+                titulo: '¿Por qué la política puede salir "desactualizada"?',
+                texto: 'Si pasó bastante tiempo desde tu última publicación, el sistema lo marca como recordatorio para que confirmes si los datos siguen siendo correctos (nuevas finalidades, nuevos encargados, cambios de DPD, etc.) — no significa que algo esté mal, solo que conviene revisarla.',
+            },
+        ],
+    },
 }
