@@ -39,13 +39,14 @@ interface ImportSummary {
 
 type FieldDelimiter = ';' | ','
 
-/** Convierte DD/MM/YYYY → YYYY-MM-DD. Devuelve null si inválido o vacío. */
+/** Convierte DD/MM/YYYY o DD-MM-YYYY → YYYY-MM-DD. Devuelve null si inválido o vacío. */
 function parseFecha(raw: string): string | null {
     const t = raw.trim()
     if (!t) return null
-    const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    const m = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
     if (!m) return null
     const [, d, mo, y] = m
+    if (Number(mo) > 12 || Number(d) > 31) return null
     return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
@@ -210,7 +211,7 @@ export function MigrarCarteraPage() {
             }
             const fechaEm = parseFecha(row.fecha_emision)
             if (!fechaEm) {
-                results.push({ row: rowNum, identificacion: row.identificacion, numero_documento: row.numero_documento, status: 'error', message: `Fecha emisión inválida: "${row.fecha_emision}" (use DD/MM/YYYY)` })
+                results.push({ row: rowNum, identificacion: row.identificacion, numero_documento: row.numero_documento, status: 'error', message: `Fecha emisión inválida: "${row.fecha_emision}" (use DD/MM/YYYY o DD-MM-YYYY)` })
                 errors++; continue
             }
             if (row.valor_original <= 0) {
@@ -387,8 +388,8 @@ CREATE INDEX IF NOT EXISTS idx_cartera_cxc_origen
                             {[
                                 ['identificacion',    '✅', 'Cédula o RUC del cliente (debe existir en el sistema)'],
                                 ['numero_documento',  '✅', 'Número de factura/documento del sistema anterior'],
-                                ['fecha_emision',     '✅', 'Fecha DD/MM/YYYY'],
-                                ['fecha_vencimiento', '—',  'Fecha DD/MM/YYYY — dejar vacío si no aplica'],
+                                ['fecha_emision',     '✅', 'Fecha DD/MM/YYYY o DD-MM-YYYY'],
+                                ['fecha_vencimiento', '—',  'Fecha DD/MM/YYYY o DD-MM-YYYY — dejar vacío si no aplica'],
                                 ['valor_original',    '✅', 'Monto total original del documento (ej: 1500.00)'],
                                 ['saldo',             '✅', 'Saldo pendiente actual (puede ser menor si hay abonos)'],
                                 ['observaciones',     '—',  'Notas opcionales'],
