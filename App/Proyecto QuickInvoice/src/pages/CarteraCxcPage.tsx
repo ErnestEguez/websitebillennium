@@ -92,6 +92,15 @@ export function CarteraCxcPage() {
     // volvía a disparar y la base quedaba en blanco después del primer intento.)
     useEffect(() => {
         if (!pagoModal) { setBaseFactura(null); setBaseFacturaError(''); return }
+        // Carteras migradas desde CSV (MigrarCarteraPage) no tienen comprobante_id
+        // — no existe factura interna con detalle de líneas de la cual leer la
+        // base, así que no hay nada que consultar. Se avisa y se deja el campo
+        // en blanco para ingreso manual, en vez de mandar "null" a Postgres.
+        if (!pagoModal.comprobante_id) {
+            setBaseFactura(null)
+            setBaseFacturaError('Esta cartera fue migrada y no tiene factura interna vinculada — ingresa la base manualmente.')
+            return
+        }
         let cancelled = false
         setLoadingBaseFactura(true)
         setBaseFacturaError('')
@@ -1350,7 +1359,7 @@ export function CarteraCxcPage() {
                                                 disabled={loadingBaseFactura}
                                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500 disabled:bg-slate-100"
                                             />
-                                            <p className={`text-xs mt-1 ${baseFacturaError ? 'text-red-600' : 'text-slate-400'}`}>
+                                            <p className={`text-xs mt-1 ${!baseFacturaError ? 'text-slate-400' : pagoModal.comprobante_id ? 'text-red-600' : 'text-amber-600'}`}>
                                                 {loadingBaseFactura
                                                     ? 'Calculando base desde la factura...'
                                                     : baseFacturaError
