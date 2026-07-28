@@ -79,22 +79,32 @@ export function CarteraCxcPage() {
     const [pagoRetPct, setPagoRetPct]       = useState('')
     const [baseFactura, setBaseFactura]     = useState<{ baseFuente: number; baseIva: number } | null>(null)
     const [loadingBaseFactura, setLoadingBaseFactura] = useState(false)
+    const [baseFacturaError, setBaseFacturaError] = useState('')
     const esPagoRetencion = pagoMetodo === 'retencion_fuente' || pagoMetodo === 'retencion_iva'
     const pagoRetTipo: 'FUENTE' | 'IVA' = pagoMetodo === 'retencion_iva' ? 'IVA' : 'FUENTE'
     const pagoRetValor = Math.round((parseFloat(pagoRetBase) || 0) * (parseFloat(pagoRetPct) || 0) / 100 * 100) / 100
 
-    // Trae las bases reales de la factura (subtotal sin IVA / valor IVA) para
-    // autocompletar la retención en vez de pedirle al usuario que las calcule.
+    // Trae las bases reales de la factura (subtotal sin IVA / valor IVA) apenas
+    // se abre el modal de abono — sin importar qué método esté seleccionado —
+    // para que ya estén listas en memoria cuando el usuario elija Fuente o IVA.
+    // (Antes dependía de esPagoRetencion, y alternar entre Fuente <-> IVA no
+    // cambia esa bandera ni el comprobante_id, así que el fetch nunca se
+    // volvía a disparar y la base quedaba en blanco después del primer intento.)
     useEffect(() => {
-        if (!esPagoRetencion || !pagoModal) return
+        if (!pagoModal) { setBaseFactura(null); setBaseFacturaError(''); return }
         let cancelled = false
         setLoadingBaseFactura(true)
+        setBaseFacturaError('')
         carteraCxcService.getBaseImponibleFactura(pagoModal.comprobante_id)
             .then(b => { if (!cancelled) setBaseFactura(b) })
-            .catch(() => { if (!cancelled) setBaseFactura(null) })
+            .catch((e: any) => {
+                if (cancelled) return
+                setBaseFactura(null)
+                setBaseFacturaError(e?.message || 'No se pudo leer la base de la factura. Ingrésala manualmente.')
+            })
             .finally(() => { if (!cancelled) setLoadingBaseFactura(false) })
         return () => { cancelled = true }
-    }, [esPagoRetencion, pagoModal?.comprobante_id])
+    }, [pagoModal?.comprobante_id])
 
     // Al saber la base real (o al cambiar entre Fuente/IVA) precarga el campo
     useEffect(() => {
@@ -1299,10 +1309,6 @@ export function CarteraCxcPage() {
                                     onChange={e => {
                                         setPagoMetodo(e.target.value as CarteraCxcPago['metodo_pago'])
                                         setPagoBanco(''); setPagoCuentaId('')
-                                        // OJO: no limpiar baseFactura aquí — ya trae ambas bases (Fuente
-                                        // e IVA) juntas desde un solo fetch; borrarla en cada cambio de
-                                        // método rompía el auto-llenado al alternar Fuente <-> IVA porque
-                                        // el efecto que la carga no se re-dispara (mismo comprobante_id).
                                         setPagoRetCodigo(''); setPagoRetPct('')
                                     }}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
@@ -1344,10 +1350,12 @@ export function CarteraCxcPage() {
                                                 disabled={loadingBaseFactura}
                                                 className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500 disabled:bg-slate-100"
                                             />
-                                            <p className="text-xs text-slate-400 mt-1">
+                                            <p className={`text-xs mt-1 ${baseFacturaError ? 'text-red-600' : 'text-slate-400'}`}>
                                                 {loadingBaseFactura
                                                     ? 'Calculando base desde la factura...'
-                                                    : pagoRetTipo === 'FUENTE' ? 'Autocompletada: subtotal sin IVA de la factura' : 'Autocompletada: valor de IVA de la factura'}
+                                                    : baseFacturaError
+                                                        ? baseFacturaError
+                                                        : pagoRetTipo === 'FUENTE' ? 'Autocompletada: subtotal sin IVA de la factura' : 'Autocompletada: valor de IVA de la factura'}
                                             </p>
                                         </div>
                                         <div>
