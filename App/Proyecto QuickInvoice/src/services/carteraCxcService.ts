@@ -155,6 +155,26 @@ export const carteraCxcService = {
         return pago as CarteraCxcPago
     },
 
+    /**
+     * Bases imponibles reales de la factura para autocompletar la retención
+     * capturada después desde Cartera: Fuente = subtotal sin IVA, IVA = valor
+     * de IVA a pagar. Se suman desde comprobante_detalles (no hay columnas de
+     * resumen en comprobantes).
+     */
+    async getBaseImponibleFactura(comprobanteId: string): Promise<{ baseFuente: number; baseIva: number }> {
+        const { data, error } = await supabase
+            .from('comprobante_detalles')
+            .select('subtotal, iva_valor')
+            .eq('comprobante_id', comprobanteId)
+        if (error) throw error
+        const baseFuente = (data || []).reduce((s, d: any) => s + Number(d.subtotal || 0), 0)
+        const baseIva = (data || []).reduce((s, d: any) => s + Number(d.iva_valor || 0), 0)
+        return {
+            baseFuente: Math.round(baseFuente * 100) / 100,
+            baseIva: Math.round(baseIva * 100) / 100,
+        }
+    },
+
     /** Vincula el asiento contable (lp_comprobantes) generado para un pago. */
     async actualizarComprobantePago(pagoId: string, lpComprobanteId: string): Promise<void> {
         const { error } = await supabase

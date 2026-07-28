@@ -77,9 +77,31 @@ export function CarteraCxcPage() {
     const [pagoRetCodigo, setPagoRetCodigo] = useState('')
     const [pagoRetBase, setPagoRetBase]     = useState('')
     const [pagoRetPct, setPagoRetPct]       = useState('')
+    const [baseFactura, setBaseFactura]     = useState<{ baseFuente: number; baseIva: number } | null>(null)
+    const [loadingBaseFactura, setLoadingBaseFactura] = useState(false)
     const esPagoRetencion = pagoMetodo === 'retencion_fuente' || pagoMetodo === 'retencion_iva'
     const pagoRetTipo: 'FUENTE' | 'IVA' = pagoMetodo === 'retencion_iva' ? 'IVA' : 'FUENTE'
     const pagoRetValor = Math.round((parseFloat(pagoRetBase) || 0) * (parseFloat(pagoRetPct) || 0) / 100 * 100) / 100
+
+    // Trae las bases reales de la factura (subtotal sin IVA / valor IVA) para
+    // autocompletar la retención en vez de pedirle al usuario que las calcule.
+    useEffect(() => {
+        if (!esPagoRetencion || !pagoModal) return
+        let cancelled = false
+        setLoadingBaseFactura(true)
+        carteraCxcService.getBaseImponibleFactura(pagoModal.comprobante_id)
+            .then(b => { if (!cancelled) setBaseFactura(b) })
+            .catch(() => { if (!cancelled) setBaseFactura(null) })
+            .finally(() => { if (!cancelled) setLoadingBaseFactura(false) })
+        return () => { cancelled = true }
+    }, [esPagoRetencion, pagoModal?.comprobante_id])
+
+    // Al saber la base real (o al cambiar entre Fuente/IVA) precarga el campo
+    useEffect(() => {
+        if (!esPagoRetencion || !baseFactura) return
+        const base = pagoRetTipo === 'FUENTE' ? baseFactura.baseFuente : baseFactura.baseIva
+        setPagoRetBase(String(base))
+    }, [esPagoRetencion, pagoRetTipo, baseFactura])
 
     // ── Modal pago multi-factura ──
     const [multiModal, setMultiModal]   = useState(false)
@@ -231,7 +253,7 @@ export function CarteraCxcPage() {
                 )
 
                 setPagoModal(null); setPagoValor(''); setPagoRef(''); setPagoBanco(''); setPagoCuentaId('')
-                setPagoRetCodigo(''); setPagoRetBase(''); setPagoRetPct('')
+                setPagoRetCodigo(''); setPagoRetBase(''); setPagoRetPct(''); setBaseFactura(null)
                 await loadCartera()
             } catch (e: any) {
                 alert(`Error al registrar retención: ${e.message}`)
@@ -1233,8 +1255,8 @@ export function CarteraCxcPage() {
             ═══════════════════════════════════════════════════ */}
             {pagoModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-                        <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+                        <div className="p-6 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
                             <div>
                                 <h2 className="text-xl font-bold text-slate-900">Registrar Abono</h2>
                                 <p className="text-sm text-slate-500 mt-0.5">
@@ -1246,7 +1268,7 @@ export function CarteraCxcPage() {
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-4">
+                        <div className="p-6 space-y-4 overflow-y-auto flex-1">
                             <div className="bg-slate-50 rounded-xl p-4 flex justify-between text-sm">
                                 <div>
                                     <p className="text-slate-500">Valor original</p>
@@ -1277,7 +1299,7 @@ export function CarteraCxcPage() {
                                     onChange={e => {
                                         setPagoMetodo(e.target.value as CarteraCxcPago['metodo_pago'])
                                         setPagoBanco(''); setPagoCuentaId('')
-                                        setPagoRetCodigo(''); setPagoRetBase(''); setPagoRetPct('')
+                                        setPagoRetCodigo(''); setPagoRetBase(''); setPagoRetPct(''); setBaseFactura(null)
                                     }}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
                                 >
@@ -1308,13 +1330,21 @@ export function CarteraCxcPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 mb-1">Base imponible <span className="text-red-500">*</span></label>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                Base imponible <span className="text-red-500">*</span>
+                                            </label>
                                             <input
                                                 type="number" min="0.01" step="0.01"
                                                 value={pagoRetBase}
                                                 onChange={e => setPagoRetBase(e.target.value)}
-                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                                disabled={loadingBaseFactura}
+                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500 disabled:bg-slate-100"
                                             />
+                                            <p className="text-xs text-slate-400 mt-1">
+                                                {loadingBaseFactura
+                                                    ? 'Calculando base desde la factura...'
+                                                    : pagoRetTipo === 'FUENTE' ? 'Autocompletada: subtotal sin IVA de la factura' : 'Autocompletada: valor de IVA de la factura'}
+                                            </p>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 mb-1">% Retención</label>
@@ -1374,7 +1404,7 @@ export function CarteraCxcPage() {
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-slate-200 flex gap-3 justify-end">
+                        <div className="p-6 border-t border-slate-200 flex gap-3 justify-end flex-shrink-0">
                             <button onClick={() => setPagoModal(null)} className="btn btn-secondary" disabled={savingPago}>Cancelar</button>
                             <button
                                 onClick={handleRegistrarPago}
