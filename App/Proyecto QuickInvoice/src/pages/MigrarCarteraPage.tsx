@@ -37,6 +37,8 @@ interface ImportSummary {
 
 /* ── Utilidades ─────────────────────────────────────────────────────────── */
 
+type FieldDelimiter = ';' | ','
+
 /** Convierte DD/MM/YYYY → YYYY-MM-DD. Devuelve null si inválido o vacío. */
 function parseFecha(raw: string): string | null {
     const t = raw.trim()
@@ -47,18 +49,60 @@ function parseFecha(raw: string): string | null {
     return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
-function parseNumero(raw: string): number | null {
-    const n = parseFloat(raw.replace(',', '.').trim())
+// Acepta "1500,00" y "1500.00" indistintamente. Si trae ambos separadores
+// (ej. "1.500,00" o "1,500.00"), asume que el último es el decimal.
+function parseNumero(val: string): number | null {
+    let s = (val ?? '').trim()
+    if (!s) return null
+    const hasComma = s.includes(',')
+    const hasDot = s.includes('.')
+    if (hasComma && hasDot) {
+        s = s.lastIndexOf(',') > s.lastIndexOf('.')
+            ? s.replace(/\./g, '').replace(',', '.')
+            : s.replace(/,/g, '')
+    } else if (hasComma) {
+        s = s.replace(',', '.')
+    }
+    const n = Number(s)
     return isNaN(n) ? null : n
 }
 
-function parseCsv(text: string): CsvRow[] {
+// Separa una línea de CSV respetando comillas (RFC 4180): un campo que
+// empieza con " puede contener el delimitador o comillas escapadas como ""
+// sin que se corten las columnas (ej. observaciones con comas si el
+// separador elegido es punto y coma).
+function splitCsvLine(line: string, delimiter: string): string[] {
+    const fields: string[] = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        if (inQuotes) {
+            if (char === '"') {
+                if (line[i + 1] === '"') { current += '"'; i++ }
+                else { inQuotes = false }
+            } else {
+                current += char
+            }
+        } else if (char === '"' && current === '') {
+            inQuotes = true
+        } else if (char === delimiter) {
+            fields.push(current); current = ''
+        } else {
+            current += char
+        }
+    }
+    fields.push(current)
+    return fields
+}
+
+function parseCsv(text: string, delimiter: FieldDelimiter): CsvRow[] {
     const lines = text.split(/\r?\n/)
     const rows: CsvRow[] = []
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim()
         if (!line) continue
-        const p = line.split(';')
+        const p = splitCsvLine(line, delimiter)
         const identificacion   = (p[0] ?? '').trim()
         const numero_documento = (p[1] ?? '').trim()
         const fecha_emision    = (p[2] ?? '').trim()
@@ -80,7 +124,10 @@ export function MigrarCarteraPage() {
     const fileRef = useRef<HTMLInputElement>(null)
 
     const [file, setFile] = useState<File | null>(null)
+    const [rawText, setRawText] = useState('')
+    const [delimiter, setDelimiter] = useState<FieldDelimiter>(';')
     const [rows, setRows] = useState<CsvRow[]>([])
+    const [parseError, setParseError] = useState('')
     const [importing, setImporting] = useState(false)
     const [summary, setSummary] = useState<ImportSummary | null>(null)
     const [migrationReady, setMigrationReady] = useState<boolean | null>(null)  // null=checking
@@ -110,15 +157,36 @@ export function MigrarCarteraPage() {
         if (!f) return
         setFile(f)
         setSummary(null)
+        setParseError('')
 
         const reader = new FileReader()
         reader.onload = ev => {
             const text = ev.target?.result as string
-            const parsed = parseCsv(text)
-            setRows(parsed)
+            setRawText(text)
         }
+        reader.onerror = () => setParseError('Error al leer el archivo CSV.')
         reader.readAsText(f, 'UTF-8')
     }
+
+    // Reparsea si cambia el archivo o el separador de campo elegido — así el
+    // usuario puede cambiar de ; a , (o viceversa) sin tener que reseleccionar
+    // el archivo si al inicio no detecta filas válidas.
+    useEffect(() => {
+        if (!rawText) return
+        try {
+            const parsed = parseCsv(rawText, delimiter)
+            if (parsed.length === 0) {
+                setParseError('No se encontraron filas válidas con este separador. Prueba cambiar el separador de campo.')
+                setRows([])
+                return
+            }
+            setParseError('')
+            setRows(parsed)
+        } catch {
+            setParseError('Error al leer el archivo CSV.')
+            setRows([])
+        }
+    }, [rawText, delimiter])
 
     /* ── Importar ─────────────────────────────────────────────────────── */
     async function handleImport() {
@@ -219,12 +287,13 @@ export function MigrarCarteraPage() {
 
     /* ── Descargar plantilla ─────────────────────────────────────────── */
     function downloadTemplate() {
-        const header = 'identificacion;numero_documento;fecha_emision;fecha_vencimiento;valor_original;saldo;observaciones'
+        const cols = ['identificacion', 'numero_documento', 'fecha_emision', 'fecha_vencimiento', 'valor_original', 'saldo', 'observaciones']
+        const header = cols.join(delimiter)
         const example = [
-            '0912345678001;FAC-2025-0001;15/01/2025;14/02/2025;1500.00;1200.00;Saldo de factura enero',
-            '1712345678;001-001-000000123;20/03/2025;;800.00;800.00;',
-            '9999999999999;NC-2025-005;01/04/2025;30/04/2025;250.00;250.00;Nota de crédito',
-        ]
+            ['0912345678001', 'FAC-2025-0001', '15/01/2025', '14/02/2025', '1500.00', '1200.00', 'Saldo de factura enero'],
+            ['1712345678', '001-001-000000123', '20/03/2025', '', '800.00', '800.00', ''],
+            ['9999999999999', 'NC-2025-005', '01/04/2025', '30/04/2025', '250.00', '250.00', 'Nota de crédito'],
+        ].map(row => row.join(delimiter))
         const csv = [header, ...example].join('\n')
         const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
         const url = URL.createObjectURL(blob)
@@ -286,8 +355,24 @@ CREATE INDEX IF NOT EXISTS idx_cartera_cxc_origen
 
             {/* Info CSV */}
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 space-y-3">
-                <p className="text-sm font-bold text-blue-800 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> Formato del archivo CSV (separador: punto y coma)
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                    <p className="text-sm font-bold text-blue-800 flex items-center gap-2">
+                        <FileText className="w-4 h-4" /> Formato del archivo CSV
+                    </p>
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm font-semibold text-blue-700 whitespace-nowrap">Separador de campo:</label>
+                        <select
+                            value={delimiter}
+                            onChange={e => setDelimiter(e.target.value as FieldDelimiter)}
+                            className="px-3 py-1.5 border border-blue-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500 outline-none"
+                        >
+                            <option value=";">Punto y coma ( ; )</option>
+                            <option value=",">Coma ( , )</option>
+                        </select>
+                    </div>
+                </div>
+                <p className="text-xs text-blue-600 -mt-1">
+                    Los decimales de <strong>valor_original</strong> y <strong>saldo</strong> pueden ir con coma o con punto (ej. 1500,00 o 1500.00).
                 </p>
                 <div className="overflow-x-auto">
                     <table className="text-xs w-full">
@@ -343,9 +428,18 @@ CREATE INDEX IF NOT EXISTS idx_cartera_cxc_origen
                     ) : (
                         <p className="text-sm text-slate-500">Haga clic para seleccionar el archivo CSV</p>
                     )}
-                    <p className="text-xs text-slate-400 mt-1">Solo archivos .csv, separados por punto y coma (;)</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                        Solo archivos .csv — separador seleccionado arriba: {delimiter === ';' ? 'punto y coma ( ; )' : 'coma ( , )'}
+                    </p>
                     <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
                 </div>
+
+                {parseError && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-700">{parseError}</p>
+                    </div>
+                )}
 
                 {rows.length > 0 && (
                     <div className="space-y-3">

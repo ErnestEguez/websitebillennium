@@ -1299,7 +1299,11 @@ export function CarteraCxcPage() {
                                     onChange={e => {
                                         setPagoMetodo(e.target.value as CarteraCxcPago['metodo_pago'])
                                         setPagoBanco(''); setPagoCuentaId('')
-                                        setPagoRetCodigo(''); setPagoRetBase(''); setPagoRetPct(''); setBaseFactura(null)
+                                        // OJO: no limpiar baseFactura aquí — ya trae ambas bases (Fuente
+                                        // e IVA) juntas desde un solo fetch; borrarla en cada cambio de
+                                        // método rompía el auto-llenado al alternar Fuente <-> IVA porque
+                                        // el efecto que la carga no se re-dispara (mismo comprobante_id).
+                                        setPagoRetCodigo(''); setPagoRetPct('')
                                     }}
                                     className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
                                 >
