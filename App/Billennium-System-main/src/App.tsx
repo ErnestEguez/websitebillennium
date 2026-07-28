@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { FileText, Plus, List, RefreshCw, Package, LogOut, User, BarChart3, Users } from 'lucide-react';
+import { FileText, Plus, List, RefreshCw, Package, LogOut, User, BarChart3, Users, UploadCloud } from 'lucide-react';
 import { ProformaForm } from './components/ProformaForm';
 import { DocumentosList } from './components/DocumentosList';
 import { ArticulosManager } from './components/ArticulosManager';
+import { ImportarArticulosModal } from './components/ImportarArticulosModal';
 import { Dashboard } from './components/Dashboard';
 import { Login } from './components/Login';
 import { AdminPanel } from './components/AdminPanel';
@@ -21,6 +22,8 @@ function App() {
   const [refrescarListado, setRefrescarListado] = useState(0);
   const [proformaEditando, setProformaEditando] = useState<ProformaCompleta | null>(null);
   const [empresa, setEmpresa] = useState<Empresa | null>(null);
+  const [mostrarImportarArticulos, setMostrarImportarArticulos] = useState(false);
+  const [refrescarArticulos, setRefrescarArticulos] = useState(0);
 
   useEffect(() => {
     if (vendedor?.empresa_id) {
@@ -207,6 +210,13 @@ function App() {
               >
                 <Package className="h-5 w-5" />
               </button>
+              <button
+                onClick={() => setMostrarImportarArticulos(true)}
+                className="flex items-center px-4 py-2 rounded-lg font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                title="Actualizar Artículos desde Excel"
+              >
+                <UploadCloud className="h-5 w-5" />
+              </button>
             </div>
           </div>
         </div>
@@ -216,7 +226,7 @@ function App() {
         {vistaActual === 'clientes' ? (
           <ConsultaClientes />
         ) : vistaActual === 'articulos' ? (
-          <ArticulosManager />
+          <ArticulosManager key={`articulos-${refrescarArticulos}`} />
         ) : vistaActual === 'dashboard' ? (
           <Dashboard />
         ) : vistaActual === 'nueva-proforma' || vistaActual === 'nueva-pedido' ? (
@@ -256,6 +266,12 @@ function App() {
         </div>
       </footer>
       <ChatBubble />
+      {mostrarImportarArticulos && (
+        <ImportarArticulosModal
+          onClose={() => setMostrarImportarArticulos(false)}
+          onImportado={() => setRefrescarArticulos(prev => prev + 1)}
+        />
+      )}
     </div>
   );
 }
