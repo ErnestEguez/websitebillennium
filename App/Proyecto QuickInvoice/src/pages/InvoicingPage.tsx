@@ -196,7 +196,18 @@ export function InvoicingPage() {
             const { data, error } = await supabase.functions.invoke('resend-factura-email', {
                 body: { comprobante_id: doc.id }
             })
-            if (error) throw new Error(error.message)
+            if (error) {
+                // La Edge Function manda el motivo real en el body JSON (ej. "SMTP no
+                // configurado"), pero supabase-js solo expone un mensaje genérico en
+                // error.message ("Edge Function returned a non-2xx status code"). El
+                // body real vive en error.context (la Response cruda del fetch).
+                let mensaje = error.message
+                try {
+                    const body = await error.context?.json?.()
+                    if (body?.error) mensaje = body.error
+                } catch { /* sin body legible: nos quedamos con el mensaje genérico */ }
+                throw new Error(mensaje)
+            }
             if (data?.error) throw new Error(data.error)
             alert('Correo reenviado correctamente a: ' + (data?.message || 'cliente'))
         } catch (e: any) {
