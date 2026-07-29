@@ -14,15 +14,16 @@ App/Blog-Portal/
 │   ├── layout.tsx              Header/Footer compartido, metadata base
 │   ├── page.tsx                Listado (equivale a /blog)
 │   ├── [slug]/page.tsx         Detalle (equivale a /blog/:slug) + SEO/OG
-│   ├── studio/[[...tool]]/     Sanity Studio embebido (equivale a /blog/studio)
 │   └── api/revalidate/         Webhook: Sanity → revalida ISR al publicar
 ├── components/                 Header, Footer, PostCard, PortableTextRenderer
 ├── lib/                        Cliente Sanity, queries GROQ, tipos
-├── schemaTypes/                Modelo de contenido (post, table)
 ├── scripts/migrate-existing-posts.mjs   Migración de los 4 artículos actuales
-├── sanity.config.ts             Config del Studio
 └── vercel.json                  ignoreCommand (mismo patrón que las otras Apps)
 ```
+
+El Sanity Studio (modelo de contenido y editor) **no vive aquí**: es el proyecto
+standalone en `App/studio-blog-billennium/`, hermano de esta carpeta. Este
+proyecto solo consume el contenido (`lib/sanity.client.ts` + `next-sanity`).
 
 ## Configuración pendiente (a hacer una sola vez)
 
@@ -35,29 +36,33 @@ App/Blog-Portal/
    npm install
    npm run migrate:posts
    ```
-6. `npm run dev` y entrar a `http://localhost:3000` (listado) y `http://localhost:3000/studio` (editor) para verificar que todo cargó bien.
+6. `npm run dev` y entrar a `http://localhost:3000` (listado) para verificar que todo cargó bien. Para el editor, correr `npm run dev` dentro de `App/studio-blog-billennium` (Studio standalone, `http://localhost:3333`).
 7. **Desplegar en Vercel como proyecto nuevo** (Root Directory = `App/Blog-Portal`), agregando las mismas env vars de `.env.local` en el dashboard de Vercel, más `SANITY_REVALIDATE_SECRET` (un valor random que tú inventes).
 8. Probar el deployment en su URL de Vercel propia (`*.vercel.app`) — **todavía sin tocar el Portal principal**.
 9. En Sanity → API → Webhooks: crear un webhook a `https://<url-del-deploy>/api/revalidate`, dataset `production`, filtro `_type == "post"`, y el mismo secreto de `SANITY_REVALIDATE_SECRET`.
-10. Validar: editar un artículo en `/studio`, publicar, y confirmar que el cambio aparece en la URL de Vercel en segundos (sin redeploy).
-11. **Solo cuando todo lo anterior esté validado**: agregar el rewrite en el `vercel.json` del Portal raíz (ver abajo) para que `billenniumsystem.com/blog` sirva desde aquí. Este paso lo hacemos juntos cuando confirmes que ya probaste el punto 10.
+10. Validar: editar un artículo en el Studio standalone (`App/studio-blog-billennium`), publicar, y confirmar que el cambio aparece en la URL de Vercel en segundos (sin redeploy).
+11. Rewrite activado en el Portal raíz (ver abajo) para que `billenniumsystem.com/blog` sirva desde el deployment de Blog-Portal.
 
-## Rewrite pendiente en el Portal (NO aplicado todavía)
+## Rewrite en el Portal raíz
 
-En el `vercel.json` de la raíz del repo (el que usa el proyecto `websitebillennium-k4qc`), agregar:
+El rewrite está en `frontend/vercel.json` (proyecto `websitebillennium-k4qc`, el que sirve `billenniumsystem.com`), justo antes del catch-all `/(.*) → /index.html` que sirve el CRA:
 
 ```json
 {
-  "rewrites": [
-    { "source": "/blog", "destination": "https://<url-del-deploy-blog>/" },
-    { "source": "/blog/:path*", "destination": "https://<url-del-deploy-blog>/:path*" }
-  ]
+  "source": "/blog",
+  "destination": "https://blog-billennium2026.vercel.app/"
+},
+{
+  "source": "/blog/:path*",
+  "destination": "https://blog-billennium2026.vercel.app/:path*"
 }
 ```
 
+`https://blog-billennium2026.vercel.app` es la URL de producción del proyecto Vercel de Blog-Portal. Si ese dominio cambia en el futuro (ej. se le asigna un dominio custom o se recrea el proyecto), actualizar las dos ocurrencias en `frontend/vercel.json`.
+
 ## Flujo de publicación (para el editor, sin tocar código)
 
-1. Entrar a `billenniumsystem.com/blog/studio` (o la URL de Sanity Studio).
+1. Entrar al Sanity Studio standalone (`App/studio-blog-billennium`, local en `http://localhost:3333` o su URL desplegada en `*.sanity.studio`).
 2. "Nuevo Artículo de Blog" → llenar título, slug, resumen, fecha, categoría, color, contenido, y los campos de SEO/Open Graph.
 3. Publicar.
 4. Sanity dispara el webhook → `/api/revalidate` revalida `/` y `/[slug]` → el artículo queda visible en segundos, sin ningún `git push` ni build manual.

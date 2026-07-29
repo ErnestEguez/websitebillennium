@@ -401,7 +401,7 @@ async function migrate() {
     console.log(`[migrate] ✓ ${article.id}`);
   }
 
-  console.log('\n[migrate] Listo. Revisa los 4 artículos en Sanity Studio (/studio) antes de publicar el rewrite.');
+  console.log('\n[migrate] Listo. Revisa los 4 artículos en Sanity Studio (carpeta studio-blog-billennium, "npm run dev") antes de publicar el rewrite.');
   console.log('[migrate] Nota: quedaron como documentos publicados (createOrReplace), no como drafts.');
 }
 

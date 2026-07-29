@@ -28,6 +28,14 @@
       "destination": "/api/index.py"
     },
     {
+      "source": "/blog",
+      "destination": "https://blog-billennium2026.vercel.app/"
+    },
+    {
+      "source": "/blog/:path*",
+      "destination": "https://blog-billennium2026.vercel.app/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

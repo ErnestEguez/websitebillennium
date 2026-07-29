@@ -13,13 +13,11 @@
     "@portabletext/react": "^3.2.1",
     "@sanity/client": "^6.24.1",
     "@sanity/image-url": "^1.1.0",
-    "@sanity/vision": "^3.68.3",
     "lucide-react": "^0.469.0",
     "next": "15.5.22",
     "next-sanity": "^9.8.60",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "sanity": "^3.68.3"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",

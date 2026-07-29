@@ -1,5 +1,5 @@
 import type { PortableTextBlock } from '@portabletext/react';
-import type { Image } from 'sanity';
+import type { SanityImageSource } from '@sanity/image-url/lib/types/types';
 
 export interface PostSummary {
   _id: string;
@@ -16,5 +16,5 @@ export interface PostFull extends PostSummary {
   body: PortableTextBlock[];
   seoTitle: string | null;
   seoDescription: string | null;
-  ogImage: Image | null;
+  ogImage: SanityImageSource | null;
 }
