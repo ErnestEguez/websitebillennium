@@ -16,6 +16,7 @@ interface CsvRow {
     categoria: string
     costo: number
     stock: number
+    iva_porcentaje: number
 }
 
 interface ImportSummary {
@@ -34,6 +35,9 @@ interface CorrectionSummary {
 }
 
 const MOTIVO_SALDO_INICIAL = ['Importación masiva inicial', 'Corrección saldo inicial (import)']
+
+// Tarifas de IVA válidas en Ecuador para este import (0%, 5%, 15%).
+const IVA_RATES_VALIDAS = [0, 5, 15]
 
 type FieldDelimiter = ';' | ','
 
@@ -57,6 +61,15 @@ function parseNumber(val: string): number {
     }
     const n = Number(s)
     return isNaN(n) ? 0 : n
+}
+
+// Columna de IVA opcional: si no viene o el valor no es 0/5/15, se usa 15%
+// (mismo valor por defecto que ya usaba el import antes de soportar esta columna).
+function parseIvaPorcentaje(val: string): number {
+    const raw = (val ?? '').trim()
+    if (!raw) return 15
+    const n = parseNumber(raw)
+    return IVA_RATES_VALIDAS.includes(n) ? n : 15
 }
 
 // Separa una línea de CSV respetando comillas (RFC 4180): un campo que
@@ -103,11 +116,12 @@ function parseCsvRows(text: string, delimiter: FieldDelimiter): CsvRow[] {
         const categoria = (parts[3] ?? '').trim()
         const costo    = parseNumber(parts[4] ?? '')   // col 5 (opcional)
         let   stock    = parseNumber(parts[5] ?? '')   // col 6 (opcional)
+        const iva_porcentaje = parseIvaPorcentaje(parts[6] ?? '')   // col 7 (opcional, 0/5/15)
 
         if (!codigo && !nombre && !categoria) continue
         if (stock < 0) stock = 0
 
-        rows.push({ codigo, nombre, precio_venta: precio, categoria, costo, stock })
+        rows.push({ codigo, nombre, precio_venta: precio, categoria, costo, stock, iva_porcentaje })
     }
     return rows
 }
@@ -264,7 +278,7 @@ export function ImportarArticulosPage() {
                         descripcion:    row.nombre,
                         precio_venta:   row.precio_venta,
                         costo_promedio: row.costo,
-                        iva_porcentaje: 15,
+                        iva_porcentaje: row.iva_porcentaje,
                         activo:         true,
                         maneja_stock:   true,
                         codigo:         row.codigo,
@@ -539,10 +553,11 @@ export function ImportarArticulosPage() {
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
                 <p className="font-semibold mb-1">Formato del archivo CSV (separador de campo seleccionado arriba)</p>
                 <p className="font-mono text-xs bg-white border border-blue-100 rounded px-3 py-2 mt-1">
-                    {['codigo', 'nombre', 'precio_venta', 'categoria', 'costo', 'stock'].join(delimiter)}
+                    {['codigo', 'nombre', 'precio_venta', 'categoria', 'costo', 'stock', 'iva'].join(delimiter)}
                 </p>
                 <p className="text-xs text-blue-600 mt-1.5">
-                    Las columnas <strong>costo</strong> y <strong>stock</strong> son opcionales (dejar en 0 si no aplica).
+                    Las columnas <strong>costo</strong>, <strong>stock</strong> e <strong>iva</strong> son opcionales.
+                    <strong> iva</strong> acepta 0, 5 o 15 (si se deja vacío o trae un valor distinto, se usa 15%).
                     Los decimales pueden ir con coma o con punto (ej. 4,00 o 4.00). La primera fila se omite (encabezados).
                     {mode === 'corregir' && (
                         <> <strong>Modo corrección:</strong> no crea productos nuevos. Inserta el saldo inicial con la fecha indicada y recalcula el saldo corrido de las ventas ya registradas para ese producto; no sobrescribe el stock actual, lo ajusta. Productos que ya tengan un saldo inicial cargado se omiten.</>
@@ -641,6 +656,7 @@ export function ImportarArticulosPage() {
                                     <th className="px-4 py-2.5 font-semibold">Categoría</th>
                                     <th className="px-4 py-2.5 font-semibold text-right">Costo</th>
                                     <th className="px-4 py-2.5 font-semibold text-right">Stock</th>
+                                    <th className="px-4 py-2.5 font-semibold text-right">IVA</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -655,6 +671,7 @@ export function ImportarArticulosPage() {
                                         </td>
                                         <td className="px-4 py-2 text-right tabular-nums text-emerald-700 font-medium">{row.costo.toFixed(2)}</td>
                                         <td className="px-4 py-2 text-right tabular-nums">{row.stock}</td>
+                                        <td className="px-4 py-2 text-right tabular-nums">{row.iva_porcentaje}%</td>
                                     </tr>
                                 ))}
                             </tbody>
