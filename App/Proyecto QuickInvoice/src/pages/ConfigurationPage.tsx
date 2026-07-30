@@ -378,6 +378,11 @@ export function ConfigurationPage() {
                 logo_url: editingEmpresa.logo_url || null,
                 usar_vendor_management: !!editingEmpresa.usar_vendor_management,
                 config_sri: {
+                    // Preserva TODOS los campos existentes (mail_host, mail_port, mail_pass,
+                    // mail_ssl, mail_cc, y cualquier campo futuro que este formulario no
+                    // gestione explícitamente) — antes se reconstruía el objeto desde cero
+                    // con una lista fija de campos, borrando silenciosamente el resto.
+                    ...(editingEmpresa.config_sri || {}),
                     ambiente: editingEmpresa.config_sri?.ambiente || 'PRUEBAS',
                     establecimiento: editingEmpresa.config_sri?.establecimiento || '001',
                     punto_emision: editingEmpresa.config_sri?.punto_emision || '001',
