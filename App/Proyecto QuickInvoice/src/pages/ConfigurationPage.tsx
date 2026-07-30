@@ -414,6 +414,16 @@ export function ConfigurationPage() {
                 if (lopdpError) throw lopdpError
             }
 
+            // Sesión única: upsert del flag junto con el resto del guardado,
+            // mismo botón "Guardar Empresa". Vive en facturacion.sesion_unica_config
+            // (schema default del cliente, sin .schema()).
+            if (empresaId) {
+                const { error: sesionUnicaError } = await supabase
+                    .from('sesion_unica_config')
+                    .upsert({ empresa_id: empresaId, enabled: !!editingEmpresa.sesion_unica_enabled })
+                if (sesionUnicaError) throw sesionUnicaError
+            }
+
             setIsEmpresaModalOpen(false)
             setEditingEmpresa(null)
             loadData()
@@ -2191,6 +2201,18 @@ export function ConfigurationPage() {
                                                                         } catch {
                                                                             // si falla, queda destildado por defecto
                                                                         }
+                                                                        try {
+                                                                            const { data: suData } = await supabase
+                                                                                .from('sesion_unica_config')
+                                                                                .select('enabled')
+                                                                                .eq('empresa_id', emp.id)
+                                                                                .maybeSingle()
+                                                                            setEditingEmpresa((prev: any) =>
+                                                                                prev ? { ...prev, sesion_unica_enabled: !!suData?.enabled } : prev
+                                                                            )
+                                                                        } catch {
+                                                                            // si falla, queda destildado por defecto
+                                                                        }
                                                                     }}
                                                                     className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors"
                                                                     title="Editar"
@@ -2592,6 +2614,21 @@ export function ConfigurationPage() {
                                         className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
                                         checked={!!editingEmpresa?.lopdp_enabled}
                                         onChange={e => setEditingEmpresa({ ...editingEmpresa, lopdp_enabled: e.target.checked })}
+                                    />
+                                </label>
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Sesión única por usuario</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Al iniciar sesión desde otro dispositivo, cierra automáticamente cualquier
+                                            sesión anterior de ese mismo usuario en todo QuickInvoice.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingEmpresa?.sesion_unica_enabled}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, sesion_unica_enabled: e.target.checked })}
                                     />
                                 </label>
                             </div>

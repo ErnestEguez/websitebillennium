@@ -1,5 +1,5 @@
-import React, { Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import React, { Suspense, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { OfflineBanner } from './components/OfflineBanner'
@@ -52,6 +52,7 @@ const DashboardGerencialPage       = lz(() => import('./pages/DashboardGerencial
 const AdminPermisosPage            = lz(() => import('./pages/AdminPermisosPage'), 'AdminPermisosPage')
 const AdminUserEmpresasPage        = lz(() => import('./pages/AdminUserEmpresasPage'), 'AdminUserEmpresasPage')
 const AdminDepuracionPage          = lz(() => import('./pages/admin/AdminDepuracionPage'), 'AdminDepuracionPage')
+const LogSesionesPage              = lz(() => import('./pages/admin/LogSesionesPage'), 'LogSesionesPage')
 const ImportarClientesPage         = lz(() => import('./pages/ImportarClientesPage'), 'ImportarClientesPage')
 const MigrarCarteraPage            = lz(() => import('./pages/MigrarCarteraPage'), 'MigrarCarteraPage')
 const ImportarArticulosPage        = lz(() => import('./pages/ImportarArticulosPage'), 'ImportarArticulosPage')
@@ -178,7 +179,14 @@ function SyncManager() {
 
 // Componente para proteger rutas (Auth simple)
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, loading, checkSesionUnicaSiToca } = useAuth()
+  const location = useLocation()
+
+  // Solo llama al chequeo si hay sesión — evita la llamada (y la carga del
+  // hook de useAuth de checkSesionUnicaSiToca) cuando aún no hay usuario.
+  useEffect(() => {
+    if (user) checkSesionUnicaSiToca?.()
+  }, [location.pathname, user])
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -521,6 +529,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
                     <Layout>
                       <AdminDepuracionPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/admin/log-sesiones" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
+                    <Layout>
+                      <LogSesionesPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

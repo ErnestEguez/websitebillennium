@@ -4,6 +4,8 @@ import { offlineDb } from '../lib/offlineDb'
 import type { User } from '@supabase/supabase-js'
 import { EmpresaSelectorScreen } from '../components/EmpresaSelectorScreen'
 import type { EmpresaOption } from '../components/EmpresaSelectorScreen'
+import { sesionUnicaService } from '../services/sesionUnicaService'
+import { SesionDesplazadaModal } from '../components/SesionDesplazadaModal'
 
 export type { EmpresaOption }
 
@@ -99,6 +101,7 @@ interface AuthContextType {
     empresasDisponibles: EmpresaOption[]
     selectEmpresa: (empresaId: string) => Promise<void>
     refreshEmpresa: () => Promise<void>
+    checkSesionUnicaSiToca: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -181,6 +184,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [needsEmpresaSelection, setNeedsEmpresaSelection] = useState(false)
     const isMounted = React.useRef(true)
 
+    // ── Sesión única activa por usuario ─────────────────────────
+    // (feature flag por empresa — sin flag activo, todo esto es no-op)
+    const [sesionDesplazada, setSesionDesplazada] = useState(false)
+    const sesionUnicaEnabledRef = React.useRef(false)
+    const sessionJustSignedIn   = React.useRef(false)
+    const userIdRef    = React.useRef<string | null>(null)
+    const lastSessionCheckAt = React.useRef(Date.now())
+    const checkEnCurso      = React.useRef(false)
+
+    useEffect(() => { userIdRef.current = user?.id ?? null }, [user])
+
+    function chequearSesionSiCorresponde() {
+        if (!sesionUnicaEnabledRef.current || checkEnCurso.current) return
+        if (!userIdRef.current) return
+        if (Date.now() - lastSessionCheckAt.current < sesionUnicaService.SESSION_CHECK_INTERVAL_MS) return
+        checkEnCurso.current = true
+        sesionUnicaService.verificarSesionVigente(userIdRef.current)
+            .then(vigente => {
+                lastSessionCheckAt.current = Date.now()
+                if (!vigente && isMounted.current) setSesionDesplazada(true)
+            })
+            .catch(() => { /* falla de red: se reintenta en el próximo disparador disponible */ })
+            .finally(() => { checkEnCurso.current = false })
+    }
+
+    useEffect(() => {
+        const interval = setInterval(chequearSesionSiCorresponde, 60_000)
+        const onVisible = () => { if (document.visibilityState === 'visible') chequearSesionSiCorresponde() }
+        document.addEventListener('visibilitychange', onVisible)
+        return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
+    }, [])
+
     useEffect(() => {
         isMounted.current = true
         const initializeAuth = async () => {
@@ -210,6 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             if (!isMounted.current) return
             if (_event === 'SIGNED_IN') {
+                sessionJustSignedIn.current = true
                 setUser(session?.user ?? null)
                 if (session?.user) setTimeout(() => { if (isMounted.current) fetchProfile(session.user.id) }, 0)
             } else if (_event === 'SIGNED_OUT') {
@@ -254,6 +290,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             offlineDb.setAppCache(`empresa:${empresaData.id}`, empresaData).catch(() => {})
         }
         guardarEmpresaActual(userId, empresaId)
+
+        try {
+            // El flag es por empresa (control de rollout), pero la sesión es
+            // GLOBAL por usuario: una vez activado en esta sesión de navegador,
+            // no se vuelve a apagar aunque después cargue una empresa sin el
+            // flag — "OR acumulativo", nunca pasa de true a false.
+            const flagEnabled = await sesionUnicaService.isEnabled(empresaId)
+            if (flagEnabled) sesionUnicaEnabledRef.current = true
+            if (sesionUnicaEnabledRef.current) {
+                // sessionJustSignedIn=true → genera session_id nuevo (desplaza el
+                // dispositivo anterior). false → reusa el existente (cambio de
+                // empresa o recarga de página, no debe autodesplazar a nadie).
+                await sesionUnicaService.registrarSesion(userId, empresaId, sessionJustSignedIn.current)
+                sessionJustSignedIn.current = false
+                lastSessionCheckAt.current = Date.now()
+            }
+        } catch (e) {
+            console.error('Error en sesión única:', e) // nunca bloquea el login normal
+        }
 
         await validarCaja(userId, empresaId, userRol)
 
@@ -534,12 +589,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const signOut = async () => {
+        if (sesionUnicaEnabledRef.current) {
+            sesionUnicaService.cerrarSesion('logout_manual').catch(() => {}) // fire-and-forget: no bloquea el resto del logout
+        }
         supabase.auth.signOut().catch(() => {})
         Object.keys(localStorage).forEach(k => {
             if (!k.startsWith('sb-')) localStorage.removeItem(k)
         })
         sessionStorage.clear()
         window.close()
+    }
+
+    // Se llama al hacer click en el modal de sesión desplazada. Deliberadamente
+    // SIN llamar a cerrar_sesion RPC — eso borraría la sesión NUEVA y legítima
+    // del otro dispositivo, no la propia.
+    const confirmarSesionDesplazada = async () => {
+        setSesionDesplazada(false)
+        await supabase.auth.signOut().catch(() => {})
+        Object.keys(localStorage).forEach(k => {
+            if (!k.startsWith('sb-')) localStorage.removeItem(k)
+        })
+        sessionStorage.clear()
+        window.location.href = '/login'
     }
 
     // ── Renders especiales ──────────────────────────────────────
@@ -606,8 +677,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user, profile, empresa, modules, permisos, isAdmin,
             loading, signOut, cajaSesion,
             empresasDisponibles, selectEmpresa, refreshEmpresa,
+            checkSesionUnicaSiToca: chequearSesionSiCorresponde,
         } as any}>
             {children}
+            <SesionDesplazadaModal open={sesionDesplazada} onConfirm={confirmarSesionDesplazada} />
         </AuthContext.Provider>
     )
 }
