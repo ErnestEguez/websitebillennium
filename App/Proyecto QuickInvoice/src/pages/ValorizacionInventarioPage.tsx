@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { bodegaService } from '../services/bodegaService'
+import { useFormDraft } from '../hooks/useFormDraft'
 import { formatCurrency } from '../lib/utils'
 import { Printer, Download, RefreshCw, Loader2, Package, BarChart3, Filter, Hash, Warehouse } from 'lucide-react'
 import type { Bodega } from '../types/vendors'
@@ -37,16 +38,49 @@ export function ValorizacionInventarioPage() {
     const [bodegaId, setBodegaId]     = useState<string>('')   // '' = todas
     const [fechaCorte, setFechaCorte] = useState<string>(hoy())
     const [showCodigo, setShowCodigo] = useState(true)
+    const [incluirStockCero, setIncluirStockCero] = useState(false)   // incluye stock 0 y negativo cuando hay bodega filtrada
 
     const handlePrint = useReactToPrint({
         contentRef: printRef,
         documentTitle: `Inventario_${fechaCorte}`,
     })
 
+    // true si useFormDraft encontró un borrador guardado (aunque bodegaId haya
+    // quedado en '' a propósito, ej. el usuario eligió "Todas" antes de salir).
+    // Distingue "nunca se restauró nada" de "se restauró un valor vacío" para
+    // no pisar esa elección con el default de bodega principal, más abajo.
+    const bodegaRestauradaRef = useRef(false)
+
+    // Preserva filtros Y los datos ya cargados al navegar a otra pantalla (ej.
+    // Kardex) y volver — se ve tal cual quedó, sin tener que volver a buscar.
+    useFormDraft(
+        'draft_inventario_valorizado',
+        () => ({ tipoCosto, catFiltro, bodegaId, fechaCorte, showCodigo, incluirStockCero, items }),
+        (d) => {
+            if (d.tipoCosto) setTipoCosto(d.tipoCosto)
+            if (d.catFiltro) setCatFiltro(d.catFiltro)
+            if (d.bodegaId !== undefined) { setBodegaId(d.bodegaId); bodegaRestauradaRef.current = true }
+            if (d.fechaCorte) setFechaCorte(d.fechaCorte)
+            if (d.showCodigo !== undefined) setShowCodigo(d.showCodigo)
+            if (d.incluirStockCero !== undefined) setIncluirStockCero(d.incluirStockCero)
+            if (d.items) setItems(d.items)
+        },
+        [tipoCosto, catFiltro, bodegaId, fechaCorte, showCodigo, incluirStockCero, items],
+    )
+
     useEffect(() => {
         if (empresa?.id) {
             // Solo carga bodegas y categorías al montar — datos solo al presionar Actualizar/Aplicar
-            bodegaService.listar(empresa.id).then(setBodegas).catch(console.error)
+            bodegaService.listar(empresa.id).then(lista => {
+                setBodegas(lista)
+                // Sin borrador previo: arranca en la bodega principal en vez de
+                // "Todas las bodegas". Si hubo borrador, se respeta tal cual
+                // (incluso si esa elección fue explícitamente "Todas").
+                if (!bodegaRestauradaRef.current) {
+                    const principal = lista.find(b => b.es_principal) ?? lista[0]
+                    setBodegaId(principal?.id ?? '')
+                }
+            }).catch(console.error)
         }
     }, [empresa?.id])
 
@@ -93,16 +127,26 @@ export function ValorizacionInventarioPage() {
             // Mapa de stock y costo para bodega específica
             const stockBodegaMap: Record<string, { cantidad: number; costo_promedio: number }> = {}
             if (bodegaFiltro && prodIds.length > 0) {
-                const { data: sbData } = await supabase
-                    .from('stock_bodega')
-                    .select('producto_id, cantidad, costo_promedio')
-                    .eq('empresa_id', empresa.id)
-                    .eq('bodega_id', bodegaFiltro)
-                for (const sb of (sbData ?? [])) {
-                    stockBodegaMap[sb.producto_id] = {
-                        cantidad:       Number(sb.cantidad),
-                        costo_promedio: Number(sb.costo_promedio),
+                // Paginado: sin .range() Supabase/PostgREST corta el resultado en
+                // 1000 filas por defecto — con empresas de muchos productos, el
+                // resto quedaba con stock=0 y se descartaba del reporte/export.
+                let sbFrom = 0
+                while (true) {
+                    const { data: sbData, error: sbErr } = await supabase
+                        .from('stock_bodega')
+                        .select('producto_id, cantidad, costo_promedio')
+                        .eq('empresa_id', empresa.id)
+                        .eq('bodega_id', bodegaFiltro)
+                        .range(sbFrom, sbFrom + PAGE - 1)
+                    if (sbErr) throw sbErr
+                    for (const sb of (sbData ?? [])) {
+                        stockBodegaMap[sb.producto_id] = {
+                            cantidad:       Number(sb.cantidad),
+                            costo_promedio: Number(sb.costo_promedio),
+                        }
                     }
+                    if (!sbData || sbData.length < PAGE) break
+                    sbFrom += PAGE
                 }
             }
 
@@ -129,7 +173,8 @@ export function ValorizacionInventarioPage() {
                             .order('created_at', { ascending: false })
                             .range(kfrom2, kfrom2 + KP - 1)
                         if (bodegaFiltro) q = (q as any).eq('bodega_id', bodegaFiltro)
-                        const { data: chunk } = await q
+                        const { data: chunk, error: kErr } = await q
+                        if (kErr) throw kErr
                         kardexAll = kardexAll.concat(chunk ?? [])
                         if (!chunk || chunk.length < KP) break
                         kfrom2 += KP
@@ -179,6 +224,12 @@ export function ValorizacionInventarioPage() {
                     }
                 })
             )
+        } catch (e: any) {
+            // Antes esto fallaba en silencio (sin catch): `items` se quedaba en
+            // el valor previo/parcial y el usuario exportaba/veía datos
+            // incompletos sin ningún aviso.
+            console.error('Error cargando inventario valorizado:', e)
+            alert(`Error al cargar el inventario: ${e.message || 'Error desconocido'}. Los datos en pantalla podrían no ser el total real — vuelve a intentar.`)
         } finally {
             setLoading(false)
         }
@@ -188,7 +239,7 @@ export function ValorizacionInventarioPage() {
 
     const filtrados = items
         .filter(i => catFiltro === 'TODOS' || i.categoria_id === catFiltro)
-        .filter(i => !bodegaId || i.stock > 0)   // cuando hay bodega, sólo con stock en ella
+        .filter(i => !bodegaId || incluirStockCero || i.stock > 0)   // con bodega filtrada, por defecto solo con stock > 0
         .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 
     const costo = (i: ItemInventario) =>
@@ -314,6 +365,18 @@ export function ValorizacionInventarioPage() {
                                 </option>
                             ))}
                         </select>
+                    </div>
+                )}
+
+                {/* Incluir stock 0/negativo — solo aplica cuando hay una bodega filtrada */}
+                {bodegaId && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-600 font-medium whitespace-nowrap">Incluir stock 0:</span>
+                        <button onClick={() => setIncluirStockCero(v => !v)}
+                            title="Incluir productos con stock 0 o negativo en esta bodega"
+                            className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors shrink-0 ${incluirStockCero ? 'bg-primary-600' : 'bg-slate-300'}`}>
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${incluirStockCero ? 'translate-x-5' : 'translate-x-1'}`} />
+                        </button>
                     </div>
                 )}
 

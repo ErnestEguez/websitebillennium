@@ -47,6 +47,8 @@ import {
     Globe,
     Building2,
     AlertOctagon,
+    Wrench,
+    History,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -256,6 +258,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 <SidebarItem to="/configuracion" icon={Settings} label="Plataforma" active={location.pathname === '/configuracion'} />
                                 <SidebarItem to="/admin/user-empresas" icon={ArrowLeftRight} label="Asignar empresas"  active={location.pathname === '/admin/user-empresas'} />
                                 <SidebarItem to="/admin/depuracion"   icon={Trash2}         label="Depuración de Datos" active={location.pathname === '/admin/depuracion'} />
+                                <SidebarItem to="/admin/reparar-stock" icon={Wrench}        label="Reparación de Inventario" active={location.pathname === '/admin/reparar-stock'} />
+                                <SidebarItem to="/admin/log-sesiones" icon={History}        label="Log de Sesiones" active={location.pathname === '/admin/log-sesiones'} />
                             </>
                         )}
 

@@ -8,6 +8,7 @@ import type { Bodega } from '../types/vendors'
 import { TrendingUp, TrendingDown, Package, Printer, Download, Warehouse, Search, X } from 'lucide-react'
 import { formatCurrency } from '../lib/utils'
 import { supabase } from '../lib/supabase'
+import { useFormDraft } from '../hooks/useFormDraft'
 
 export function KardexPage() {
     const { empresa } = useAuth()
@@ -42,6 +43,26 @@ export function KardexPage() {
     function productoActualNombre() {
         return productoActual?.nombre ?? 'producto'
     }
+
+    // Preserva selección de producto/bodega/fechas Y los datos ya cargados al
+    // navegar a otra pantalla (ej. Inventario Valorado) y volver — se ve tal
+    // cual quedó, sin tener que volver a buscar.
+    useFormDraft(
+        'draft_kardex',
+        () => ({ productoSeleccionado, productoNombre, bodegaSeleccionada, fechaInicio, fechaFin, productoActual, movimientos, saldoInicial, stockBodega }),
+        (d) => {
+            if (d.productoSeleccionado) setProductoSeleccionado(d.productoSeleccionado)
+            if (d.productoNombre) setProductoNombre(d.productoNombre)
+            if (d.bodegaSeleccionada !== undefined) setBodegaSeleccionada(d.bodegaSeleccionada)
+            if (d.fechaInicio) setFechaInicio(d.fechaInicio)
+            if (d.fechaFin) setFechaFin(d.fechaFin)
+            if (d.productoActual) setProductoActual(d.productoActual)
+            if (d.movimientos) setMovimientos(d.movimientos)
+            if (d.saldoInicial !== undefined) setSaldoInicial(d.saldoInicial)
+            if (d.stockBodega !== undefined) setStockBodega(d.stockBodega)
+        },
+        [productoSeleccionado, productoNombre, bodegaSeleccionada, fechaInicio, fechaFin, productoActual, movimientos, saldoInicial, stockBodega],
+    )
 
     useEffect(() => {
         if (empresa?.id) cargarCatalogos()

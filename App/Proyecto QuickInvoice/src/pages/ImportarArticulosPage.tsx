@@ -301,6 +301,7 @@ export function ImportarArticulosPage() {
                         bodega_id:   bodegaId,
                         empresa_id:  empresa.id,
                         cantidad:    row.stock,
+                        costo_promedio: row.costo,
                     }))
                     const { error: stockErr } = await supabase.from('stock_bodega').insert(stockRows)
                     if (stockErr) result.errorMessages.push(`Error stock lote ${Math.floor(i / BATCH_SIZE) + 1}: ${stockErr.message}`)

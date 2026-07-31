@@ -53,6 +53,7 @@ const AdminPermisosPage            = lz(() => import('./pages/AdminPermisosPage'
 const AdminUserEmpresasPage        = lz(() => import('./pages/AdminUserEmpresasPage'), 'AdminUserEmpresasPage')
 const AdminDepuracionPage          = lz(() => import('./pages/admin/AdminDepuracionPage'), 'AdminDepuracionPage')
 const LogSesionesPage              = lz(() => import('./pages/admin/LogSesionesPage'), 'LogSesionesPage')
+const AdminReparacionStockPage     = lz(() => import('./pages/admin/AdminReparacionStockPage'), 'AdminReparacionStockPage')
 const ImportarClientesPage         = lz(() => import('./pages/ImportarClientesPage'), 'ImportarClientesPage')
 const MigrarCarteraPage            = lz(() => import('./pages/MigrarCarteraPage'), 'MigrarCarteraPage')
 const ImportarArticulosPage        = lz(() => import('./pages/ImportarArticulosPage'), 'ImportarArticulosPage')
@@ -539,6 +540,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
                     <Layout>
                       <LogSesionesPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/admin/reparar-stock" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
+                    <Layout>
+                      <AdminReparacionStockPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>
