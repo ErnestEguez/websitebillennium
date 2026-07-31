@@ -61,7 +61,7 @@ export function CierreCajaModal({ isOpen, onClose, onSuccess }: CierreCajaModalP
 
         try {
             setLoading(true);
-            await cajaService.cerrarCaja(cajaSesion.id, totales);
+            await cajaService.cerrarCaja(cajaSesion.id, totales, empresa?.id);
 
 
 

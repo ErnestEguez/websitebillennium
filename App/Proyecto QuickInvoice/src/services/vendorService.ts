@@ -4,6 +4,7 @@
 
 import { supabase } from '../lib/supabase'
 import { kardexService } from './kardexService'
+import { auditService } from './auditoria/auditService'
 import type {
     Proveedor, Compra, CompraConDetalle,
     DetalleInventario, DetalleServicio,
@@ -217,6 +218,17 @@ export const compraService = {
 
         const result = await compraService.obtenerConDetalle(compra.id)
         if (cxpError) result.cxpError = cxpError
+
+        auditService.logEvent({
+            empresaId: cabecera.empresa_id,
+            modulo: 'compras',
+            accion: 'crear',
+            entidad: 'ingreso_stock',
+            entidadId: compra.id,
+            numeroDocumento: cabecera.numero_factura ?? undefined,
+            resumen: `Compra Inventario a ${(result as any).proveedor?.nombre_empresa ?? 'proveedor'}${cabecera.numero_factura ? ` No. ${cabecera.numero_factura}` : ''}`,
+        })
+
         return result
     },
 
@@ -263,6 +275,17 @@ export const compraService = {
 
         const result = await compraService.obtenerConDetalle(compra.id)
         if (cxpError) result.cxpError = cxpError
+
+        auditService.logEvent({
+            empresaId: cabecera.empresa_id,
+            modulo: 'compras',
+            accion: 'crear',
+            entidad: 'ingreso_stock',
+            entidadId: compra.id,
+            numeroDocumento: cabecera.numero_factura ?? undefined,
+            resumen: `Compra Servicio a ${(result as any).proveedor?.nombre_empresa ?? 'proveedor'}${cabecera.numero_factura ? ` No. ${cabecera.numero_factura}` : ''}`,
+        })
+
         return result
     },
 
@@ -300,6 +323,18 @@ export const compraService = {
                 .update({ estado: 'ANULADO', updated_at: new Date().toISOString() })
                 .eq('id', compra.cxp.id)
         }
+
+        auditService.logEvent({
+            empresaId: compra.empresa_id,
+            modulo: 'compras',
+            accion: 'anular',
+            entidad: 'ingreso_stock',
+            entidadId: id,
+            numeroDocumento: compra.numero_factura ?? undefined,
+            resumen: `Anulación de compra${compra.numero_factura ? ` No. ${compra.numero_factura}` : ` ${id}`}`,
+            detalle: { motivo },
+            nivel: 'sensible',
+        })
     },
 }
 

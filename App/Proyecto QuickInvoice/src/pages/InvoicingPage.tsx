@@ -119,7 +119,7 @@ export function InvoicingPage() {
         if (!confirm(`¿Anular definitivamente la factura ${doc.secuencial}?\nEsta acción no se puede revertir.`)) return
         try {
             setAnulando(doc.id)
-            await sriService.anularComprobante(doc.id, motivo.trim(), profile?.id || '')
+            await sriService.anularComprobante(doc.id, motivo.trim(), profile?.id || '', empresa?.id, doc.secuencial)
             await loadData()
         } catch (e: any) {
             alert('Error al anular: ' + e.message)

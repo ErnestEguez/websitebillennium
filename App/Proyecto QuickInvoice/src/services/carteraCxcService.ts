@@ -1,5 +1,6 @@
 import { contabilidadVentasService } from './contabilidadVentasService'
 import { supabase } from '../lib/supabase'
+import { auditService } from './auditoria/auditService'
 
 export interface CarteraCxc {
     id: string
@@ -192,7 +193,7 @@ export const carteraCxcService = {
     async reversarPago(pagoId: string, motivo?: string): Promise<void> {
         const { data: pago, error: errPago } = await supabase
             .from('cartera_cxc_pagos')
-            .select('id, estado, lp_comprobante_id')
+            .select('id, estado, lp_comprobante_id, empresa_id, cartera_id')
             .eq('id', pagoId)
             .single()
         if (errPago) throw errPago
@@ -226,9 +227,26 @@ export const carteraCxcService = {
         if (error) throw error
         if (!updated) throw new Error('No se pudo reversar el pago: el registro no se actualizó (revisa permisos/RLS de cartera_cxc_pagos).')
         // El trigger fn_actualizar_saldo_cxc recalcula saldo/estado de la cartera
+
+        auditService.logEvent({
+            empresaId: pago.empresa_id,
+            modulo: 'cartera_cxc',
+            accion: 'reversar',
+            entidad: 'cartera_cxc_pago',
+            entidadId: pagoId,
+            resumen: `Reversión de pago en cartera CxC`,
+            detalle: { motivo, cartera_id: pago.cartera_id },
+            nivel: 'sensible',
+        })
     },
 
     async anularCartera(carteraId: string, observacion?: string): Promise<void> {
+        const { data: carteraPrevia } = await supabase
+            .from('cartera_cxc')
+            .select('empresa_id, comprobantes(secuencial)')
+            .eq('id', carteraId)
+            .single()
+
         const { error } = await supabase
             .from('cartera_cxc')
             .update({
@@ -239,6 +257,21 @@ export const carteraCxcService = {
             .eq('id', carteraId)
 
         if (error) throw error
+
+        if (carteraPrevia) {
+            const secuencial = (carteraPrevia as any).comprobantes?.secuencial
+            auditService.logEvent({
+                empresaId: carteraPrevia.empresa_id,
+                modulo: 'cartera_cxc',
+                accion: 'anular',
+                entidad: 'cartera_cxc',
+                entidadId: carteraId,
+                numeroDocumento: secuencial,
+                resumen: `Anulación de cartera CxC${secuencial ? ` (factura No. ${secuencial})` : ''}`,
+                detalle: { observacion },
+                nivel: 'sensible',
+            })
+        }
     },
 
     async getCarteraActivaPorCliente(empresaId: string, clienteId: string): Promise<CarteraCxc[]> {

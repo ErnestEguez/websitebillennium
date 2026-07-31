@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { kardexService } from '../services/kardexService'
+import { auditService } from '../services/auditoria/auditService'
 import { formatCurrency } from '../lib/utils'
 import {
     Search, AlertTriangle, CheckCircle2, Copy, Check,
@@ -217,6 +218,13 @@ export function AnulacionFacturasPage() {
                 })
                 .eq('id', anulandoId)
             if (errComp) throw errComp
+
+            auditService.logEvent({
+                empresaId: empresa!.id, modulo: 'facturacion', accion: 'anular', entidad: 'comprobante',
+                entidadId: anulandoId, numeroDocumento: f.secuencial,
+                resumen: `Anulación de factura No. ${f.secuencial}`,
+                detalle: { motivo: motivo.trim() }, nivel: 'sensible',
+            })
 
             // 2. Si tiene cartera, marcarla como anulada
             if (f.cartera?.id) {

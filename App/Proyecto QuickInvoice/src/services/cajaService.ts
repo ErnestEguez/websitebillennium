@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { auditService } from './auditoria/auditService';
 
 export interface CajaSesion {
     id: string;
@@ -120,7 +121,7 @@ export const cajaService = {
     /**
      * Cierra la caja actual.
      */
-    async cerrarCaja(sesionId: string, totales: ResumenCierre): Promise<void> {
+    async cerrarCaja(sesionId: string, totales: ResumenCierre, empresaId?: string): Promise<void> {
         const { error } = await supabase
             .from('caja_sesiones')
             .update({
@@ -135,5 +136,17 @@ export const cajaService = {
             .eq('id', sesionId);
 
         if (error) throw error;
+
+        if (empresaId) {
+            auditService.logEvent({
+                empresaId,
+                modulo: 'cierres',
+                accion: 'cerrar',
+                entidad: 'caja_sesion',
+                entidadId: sesionId,
+                resumen: `Cierre de caja (POS)`,
+                detalle: totales,
+            });
+        }
     }
 };

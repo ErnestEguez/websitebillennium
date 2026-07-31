@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
 import { puntoEmisionService } from './puntoEmisionService'
+import { auditService } from './auditoria/auditService'
 
 // ─── Interfaces ───────────────────────────────────────────
 
@@ -277,6 +278,19 @@ export const ncService = {
                 .update({ config_sri: { ...configSri, secuencial_nc_actual: secActual } })
                 .eq('id', params.empresaId)
         }
+
+        auditService.logEvent({
+            empresaId: params.empresaId,
+            modulo: 'facturacion',
+            accion: 'crear',
+            entidad: 'nota_credito',
+            entidadId: nc.id,
+            tipoDocumento: 'NOTA_CREDITO',
+            numeroDocumento: secuencial,
+            resumen: `Nota de crédito No. ${secuencial}`,
+            detalle: { tipo_nc: params.tipoNc, motivo_sri: params.motivoSri, comprobante_origen_id: params.comprobanteOrigenId },
+            nivel: 'sensible',
+        })
 
         return nc as NotaCredito
     },

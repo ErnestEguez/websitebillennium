@@ -20,6 +20,9 @@ interface FacturaVenta {
     base_15: number
     iva_15: number
     total: number
+    estado_sistema: 'VIGENTE' | 'ANULADA'
+    fecha_anulacion: string | null
+    motivo_anulacion: string | null
 }
 
 // ── Componente ─────────────────────────────────────────────────────────────
@@ -30,6 +33,7 @@ export function ConsultaFacturasVentasPage() {
     const [año, setAño]           = useState(new Date().getFullYear())
     const [mes, setMes]           = useState(new Date().getMonth() + 1)
     const [busqueda, setBusqueda] = useState('')
+    const [vista, setVista]       = useState<'vigentes' | 'anuladas'>('vigentes')
 
     const [datos, setDatos]       = useState<FacturaVenta[]>([])
     const [cargando, setCargando] = useState(false)
@@ -57,7 +61,8 @@ export function ConsultaFacturasVentasPage() {
 
         const { data, error: err } = await supabase
             .from('comprobantes')
-            .select(`id, secuencial, created_at, total, estado_sri,
+            .select(`id, secuencial, created_at, total, estado_sri, estado_sistema,
+                     fecha_anulacion, motivo_anulacion,
                      cliente:clientes(identificacion, nombre),
                      comprobante_detalles(subtotal, iva_porcentaje, iva_valor)`)
             .eq('empresa_id', empresa.id)
@@ -92,6 +97,9 @@ export function ConsultaFacturasVentasPage() {
                 base_15: Math.round(b15  * 100) / 100,
                 iva_15:  Math.round(iv15 * 100) / 100,
                 total:   r.total ?? 0,
+                estado_sistema:   (r.estado_sistema === 'ANULADA' ? 'ANULADA' : 'VIGENTE') as 'VIGENTE' | 'ANULADA',
+                fecha_anulacion:  r.fecha_anulacion ?? null,
+                motivo_anulacion: r.motivo_anulacion ?? null,
             }
         })
 
@@ -99,7 +107,9 @@ export function ConsultaFacturasVentasPage() {
         setCargando(false)
     }
 
-    const filtradas = datos.filter(r => {
+    const datosVista = datos.filter(r => vista === 'anuladas' ? r.estado_sistema === 'ANULADA' : r.estado_sistema !== 'ANULADA')
+
+    const filtradas = datosVista.filter(r => {
         if (!busqueda.trim()) return true
         const b = busqueda.toLowerCase()
         return (
@@ -123,40 +133,44 @@ export function ConsultaFacturasVentasPage() {
     // ── Excel ──────────────────────────────────────────────────────────────
 
     function exportarExcel() {
-        const filas = filtradas.map(r => ({
-            'Fecha':       r.fecha,
-            'Cédula/RUC':  r.ruc,
-            'Nombre':      r.nombre,
-            'No. Factura': r.numero,
-            'Base 0%':     r.base_0,
-            'Base 5%':     r.base_5,
-            'IVA 5%':      r.iva_5,
-            'Base 15%':    r.base_15,
-            'IVA 15%':     r.iva_15,
-            'Total':       r.total,
-        }))
-        // Fila de totales
-        filas.push({
-            'Fecha':       'TOTALES',
-            'Cédula/RUC':  '',
-            'Nombre':      '',
-            'No. Factura': '',
-            'Base 0%':     tot.base_0,
-            'Base 5%':     tot.base_5,
-            'IVA 5%':      tot.iva_5,
-            'Base 15%':    tot.base_15,
-            'IVA 15%':     tot.iva_15,
-            'Total':       tot.total,
-        })
-        const ws = XLSX.utils.json_to_sheet(filas)
+        const esAnuladas = vista === 'anuladas'
+        const estadoLabel = esAnuladas ? 'ANULADAS' : 'VIGENTES'
+
+        const colHeaders = [
+            'Fecha', 'Cédula/RUC', 'Nombre', 'No. Factura',
+            ...(esAnuladas ? ['Fecha Anulación', 'Motivo Anulación'] : []),
+            'Base 0%', 'Base 5%', 'IVA 5%', 'Base 15%', 'IVA 15%', 'Total',
+        ]
+
+        const filas: (string | number)[][] = [
+            ['Empresa:', empresa?.nombre ?? ''],
+            ['RUC:', empresa?.ruc ?? ''],
+            ['Período:', periodo],
+            ['Estado:', estadoLabel],
+            [],
+            colHeaders,
+            ...filtradas.map(r => [
+                r.fecha, r.ruc, r.nombre, r.numero,
+                ...(esAnuladas ? [r.fecha_anulacion ? r.fecha_anulacion.slice(0, 10) : '', r.motivo_anulacion ?? ''] : []),
+                r.base_0, r.base_5, r.iva_5, r.base_15, r.iva_15, r.total,
+            ]),
+            [
+                'TOTALES', '', '', '',
+                ...(esAnuladas ? ['', ''] : []),
+                tot.base_0, tot.base_5, tot.iva_5, tot.base_15, tot.iva_15, tot.total,
+            ],
+        ]
+
+        const ws = XLSX.utils.aoa_to_sheet(filas)
         // Ancho de columnas
         ws['!cols'] = [
             { wch: 12 }, { wch: 15 }, { wch: 35 }, { wch: 20 },
+            ...(esAnuladas ? [{ wch: 14 }, { wch: 30 }] : []),
             { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 12 },
         ]
         const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, 'Facturas Autorizadas')
-        XLSX.writeFile(wb, `FacturasVentas_${empresa?.ruc ?? 'RUC'}_${año}${String(mes).padStart(2, '0')}.xlsx`)
+        XLSX.utils.book_append_sheet(wb, ws, `Facturas ${esAnuladas ? 'Anuladas' : 'Vigentes'}`)
+        XLSX.writeFile(wb, `FacturasVentas_${estadoLabel}_${empresa?.ruc ?? 'RUC'}_${año}${String(mes).padStart(2, '0')}.xlsx`)
     }
 
     // ── Render ─────────────────────────────────────────────────────────────
@@ -180,6 +194,22 @@ export function ConsultaFacturasVentasPage() {
             <div className="no-print">
                 <h1 className="text-2xl font-bold text-slate-900">Facturas Autorizadas — Ventas</h1>
                 <p className="text-slate-500 text-sm mt-0.5">Facturas electrónicas autorizadas por el SRI — {periodo}</p>
+            </div>
+
+            {/* Tabs Vigentes / Anuladas */}
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit no-print">
+                <button
+                    onClick={() => setVista('vigentes')}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${vista === 'vigentes' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'}`}
+                >
+                    Vigentes ({datos.filter(r => r.estado_sistema !== 'ANULADA').length})
+                </button>
+                <button
+                    onClick={() => setVista('anuladas')}
+                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${vista === 'anuladas' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-500'}`}
+                >
+                    Anuladas ({datos.filter(r => r.estado_sistema === 'ANULADA').length})
+                </button>
             </div>
 
             {error && (
@@ -230,8 +260,8 @@ export function ConsultaFacturasVentasPage() {
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 no-print">
                 <div className="card p-4">
-                    <p className="text-xl font-bold text-emerald-600">{filtradas.length}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Facturas autorizadas</p>
+                    <p className={`text-xl font-bold ${vista === 'anuladas' ? 'text-red-600' : 'text-emerald-600'}`}>{filtradas.length}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Facturas {vista === 'anuladas' ? 'anuladas' : 'vigentes'}</p>
                 </div>
                 <div className="card p-4">
                     <p className="text-xl font-bold text-slate-700">{formatMoneda(tot.base_0)}</p>
@@ -261,7 +291,7 @@ export function ConsultaFacturasVentasPage() {
                             <p className="text-sm text-gray-600">RUC: {empresa?.ruc ?? ''}</p>
                         </div>
                         <div className="text-right">
-                            <h3 className="text-base font-bold uppercase">Facturas Autorizadas — Ventas</h3>
+                            <h3 className="text-base font-bold uppercase">Facturas {vista === 'anuladas' ? 'Anuladas' : 'Vigentes'} — Ventas</h3>
                             <p className="text-sm text-gray-600">Período: {periodo}</p>
                             <p className="text-xs text-gray-400">Generado: {new Date().toLocaleString('es-EC')}</p>
                         </div>
@@ -270,10 +300,10 @@ export function ConsultaFacturasVentasPage() {
 
                 <div className="bg-emerald-700 px-5 py-3 text-white font-bold text-sm flex items-center gap-2 print:hidden">
                     <FileText className="w-4 h-4" />
-                    Facturas — {periodo}
-                    {filtradas.length !== datos.length && (
+                    Facturas {vista === 'anuladas' ? 'Anuladas' : 'Vigentes'} — {periodo}
+                    {filtradas.length !== datosVista.length && (
                         <span className="ml-2 text-xs font-normal opacity-80">
-                            ({filtradas.length} de {datos.length})
+                            ({filtradas.length} de {datosVista.length})
                         </span>
                     )}
                 </div>
@@ -285,7 +315,7 @@ export function ConsultaFacturasVentasPage() {
                 ) : filtradas.length === 0 ? (
                     <div className="py-12 text-center text-slate-400">
                         <FileText className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                        <p>Sin facturas autorizadas para el período seleccionado.</p>
+                        <p>Sin facturas {vista === 'anuladas' ? 'anuladas' : 'vigentes'} para el período seleccionado.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -298,6 +328,12 @@ export function ConsultaFacturasVentasPage() {
                                     <th rowSpan={2} className="py-2 px-3 border border-slate-600 whitespace-nowrap">Cédula/RUC</th>
                                     <th rowSpan={2} className="py-2 px-3 text-left border border-slate-600 min-w-[160px]">Nombre Cliente</th>
                                     <th rowSpan={2} className="py-2 px-3 border border-slate-600 whitespace-nowrap">No. Factura</th>
+                                    {vista === 'anuladas' && (
+                                        <>
+                                            <th rowSpan={2} className="py-2 px-3 border border-slate-600 whitespace-nowrap">Fecha Anulación</th>
+                                            <th rowSpan={2} className="py-2 px-3 text-left border border-slate-600 min-w-[160px]">Motivo</th>
+                                        </>
+                                    )}
                                     <th rowSpan={2} className="py-2 px-3 text-right border border-slate-600 whitespace-nowrap">Base 0%</th>
                                     <th colSpan={2} className="py-2 px-3 border border-slate-500 bg-blue-800 whitespace-nowrap">IVA 5%</th>
                                     <th colSpan={2} className="py-2 px-3 border border-slate-500 bg-indigo-800 whitespace-nowrap">IVA 15%</th>
@@ -319,6 +355,14 @@ export function ConsultaFacturasVentasPage() {
                                         <td className="py-1.5 px-3 border border-slate-200 font-mono whitespace-nowrap text-center">{r.ruc}</td>
                                         <td className="py-1.5 px-3 border border-slate-200">{r.nombre}</td>
                                         <td className="py-1.5 px-3 border border-slate-200 font-mono whitespace-nowrap text-center">{r.numero}</td>
+                                        {vista === 'anuladas' && (
+                                            <>
+                                                <td className="py-1.5 px-3 border border-slate-200 whitespace-nowrap">
+                                                    {r.fecha_anulacion ? new Date(r.fecha_anulacion).toLocaleDateString('es-EC') : '—'}
+                                                </td>
+                                                <td className="py-1.5 px-3 border border-slate-200">{r.motivo_anulacion ?? '—'}</td>
+                                            </>
+                                        )}
                                         <td className="py-1.5 px-3 border border-slate-200 text-right whitespace-nowrap">
                                             {r.base_0 > 0 ? f2(r.base_0) : '—'}
                                         </td>
@@ -342,7 +386,7 @@ export function ConsultaFacturasVentasPage() {
                             </tbody>
                             <tfoot>
                                 <tr className="bg-slate-100 border-t-2 border-slate-500 font-bold text-sm">
-                                    <td colSpan={5} className="py-2 px-3 text-right text-slate-600 uppercase text-xs border border-slate-300">
+                                    <td colSpan={vista === 'anuladas' ? 7 : 5} className="py-2 px-3 text-right text-slate-600 uppercase text-xs border border-slate-300">
                                         TOTALES ({filtradas.length} facturas)
                                     </td>
                                     <td className="py-2 px-3 text-right border border-slate-300 whitespace-nowrap">{f2(tot.base_0)}</td>

@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { sriService } from './sriService'
 import { kardexService } from './kardexService'
+import { auditService } from './auditoria/auditService'
 // Nota: emailService ya no se usa directamente aquí.
 // El correo se envía desde la Edge Function sri-signer vía Resend.
 
@@ -195,6 +196,7 @@ export const facturacionService = {
         vendedor_id?: string | null,
         dias_plazo_credito?: number,
     }) {
+        const correlationId = auditService.nuevaCorrelacion()
         try {
             const { clienteId, pagos, sri_utilizacion_sistema_financiero = false, vendedor_id, dias_plazo_credito } = data
             // 1. Obtener configuración SRI de la empresa
@@ -245,6 +247,18 @@ export const facturacionService = {
                 .single()
 
             if (errorFactura) throw errorFactura
+
+            auditService.logEvent({
+                empresaId: pedido.empresa_id,
+                correlationId,
+                modulo: 'facturacion',
+                accion: 'crear',
+                entidad: 'comprobante',
+                entidadId: factura.id,
+                tipoDocumento: 'FACTURA',
+                numeroDocumento: secuencialFormateado,
+                resumen: `Factura No. ${secuencialFormateado}`,
+            })
 
             // 1.1 Crear DETALLES (Snapshot)
             if (pedido.pedido_detalles && pedido.pedido_detalles.length > 0) {
@@ -334,14 +348,37 @@ export const facturacionService = {
                 if (sriErr) {
                     console.error('[sri-signer] Error invocando Edge Function:', sriErr)
                     // No tiramos error: el comprobante queda en PENDIENTE y se puede reintentar
+                    auditService.logEvent({
+                        empresaId: pedido.empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
+                        entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                        resumen: `Factura No. ${secuencialFormateado} — error al invocar firma/autorización SRI`,
+                        estado: 'fallido', errorMensaje: sriErr.message,
+                    })
                 } else if (sriResult?.success) {
                     console.log('[sri-signer] Resultado:', sriResult)
+                    auditService.logEvent({
+                        empresaId: pedido.empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
+                        entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                        resumen: `Factura No. ${secuencialFormateado} autorizada por el SRI`,
+                    })
                 } else {
                     console.warn('[sri-signer] Respuesta inesperada:', sriResult)
+                    auditService.logEvent({
+                        empresaId: pedido.empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
+                        entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                        resumen: `Factura No. ${secuencialFormateado} — respuesta inesperada del SRI`,
+                        estado: 'fallido',
+                    })
                 }
-            } catch (edgeFnErr) {
+            } catch (edgeFnErr: any) {
                 console.error('[sri-signer] Excepción al invocar Edge Function:', edgeFnErr)
                 // El comprobante sigue en PENDIENTE — no bloquea el flujo del cajero
+                auditService.logEvent({
+                    empresaId: pedido.empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
+                    entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                    resumen: `Factura No. ${secuencialFormateado} — excepción al invocar firma/autorización SRI`,
+                    estado: 'fallido', errorMensaje: edgeFnErr?.message,
+                })
             }
 
             // 6. Obtener estado actualizado del comprobante (post firma SRI)
@@ -352,8 +389,13 @@ export const facturacionService = {
                 .single()
 
             return facturaActualizada || factura
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error en el flujo de facturación:', error)
+            auditService.logEvent({
+                empresaId: pedido.empresa_id, correlationId, modulo: 'facturacion', accion: 'crear',
+                entidad: 'comprobante', resumen: `Error al generar factura para pedido ${pedido.id}`,
+                estado: 'fallido', errorMensaje: error?.message,
+            })
             throw error
         }
     },

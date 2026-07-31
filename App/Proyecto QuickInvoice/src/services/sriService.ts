@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
+import { auditService } from './auditoria/auditService'
 
 export interface Comprobante {
     id: string
@@ -130,7 +131,7 @@ export const sriService = {
         }
     },
 
-    async anularComprobante(id: string, motivo: string, usuarioId: string): Promise<void> {
+    async anularComprobante(id: string, motivo: string, usuarioId: string, empresaId?: string, secuencial?: string): Promise<void> {
         const { error } = await supabase
             .from('comprobantes')
             .update({
@@ -142,6 +143,15 @@ export const sriService = {
             .eq('id', id)
 
         if (error) throw error
+
+        if (empresaId) {
+            auditService.logEvent({
+                empresaId, modulo: 'facturacion', accion: 'anular', entidad: 'comprobante',
+                entidadId: id, numeroDocumento: secuencial,
+                resumen: `Anulación de factura${secuencial ? ` No. ${secuencial}` : ` ${id}`}`,
+                detalle: { motivo }, nivel: 'sensible',
+            })
+        }
     },
 
     async descargarXml(comprobanteId: string, secuencial: string) {

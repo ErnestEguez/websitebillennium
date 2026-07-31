@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { auditService } from './auditoria/auditService'
 
 export interface MovimientoCajaGeneral {
     id: string
@@ -226,6 +227,16 @@ export const cajaGeneralService = {
             .eq('fecha', datos.fecha!)
             .eq('estado', 'ACTIVO')
             .is('cierre_id', null)
+
+        auditService.logEvent({
+            empresaId: datos.empresa_id!,
+            modulo: 'cierres',
+            accion: 'cerrar',
+            entidad: 'caja_general_cierre',
+            entidadId: cierreId,
+            resumen: `Cierre de caja general del ${datos.fecha}`,
+            nivel: 'sensible',
+        })
     },
 
     // Actualizar borrador (sin cerrar)
@@ -242,6 +253,12 @@ export const cajaGeneralService = {
 
     // Reversar cierre
     async reversarCierre(cierreId: string, motivo: string, userId: string): Promise<void> {
+        const { data: cierrePrevio } = await supabase
+            .from('caja_general_cierres')
+            .select('empresa_id, fecha')
+            .eq('id', cierreId)
+            .single()
+
         const { error } = await supabase
             .from('caja_general_cierres')
             .update({
@@ -258,6 +275,19 @@ export const cajaGeneralService = {
             .from('caja_general_movimientos')
             .update({ cierre_id: null })
             .eq('cierre_id', cierreId)
+
+        if (cierrePrevio) {
+            auditService.logEvent({
+                empresaId: cierrePrevio.empresa_id,
+                modulo: 'cierres',
+                accion: 'anular',
+                entidad: 'caja_general_cierre',
+                entidadId: cierreId,
+                resumen: `Reversión de cierre de caja general del ${cierrePrevio.fecha}`,
+                detalle: { motivo },
+                nivel: 'sensible',
+            })
+        }
     },
 
     // Historical closings

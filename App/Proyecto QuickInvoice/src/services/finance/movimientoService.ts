@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabaseFinance'
 import { supabaseFacturacion } from '../../lib/supabase'
+import { auditService } from '../auditoria/auditService'
 import { cuentasBancariasService } from './bancosService'
 import { contableConfigService } from '../contableConfigService'
 import { contabilidadTesoreriaService } from '../contabilidadTesoreriaService'
@@ -42,6 +43,17 @@ export const movimientoService = {
             .from('movimientos_bancarios').insert(mov).select().single()
         if (error) throw error
         const movimiento = data as MovimientoBancario
+
+        auditService.logEvent({
+            empresaId: mov.empresa_id,
+            modulo: 'bancos',
+            accion: 'crear',
+            entidad: 'movimiento_bancario',
+            entidadId: movimiento.id,
+            resumen: `Movimiento bancario ${mov.sentido === 'DEBITO' ? 'débito' : 'crédito'} por ${mov.monto} — ${mov.descripcion ?? ''}`.trim(),
+            detalle: { tipo: mov.tipo, sentido: mov.sentido, monto: mov.monto, cuenta_bancaria_id: mov.cuenta_bancaria_id },
+            nivel: 'sensible',
+        })
 
         // Asiento contable LedgerPro (no-fatal: el movimiento ya quedó registrado)
         let avisoContable: string | null = null
@@ -88,7 +100,7 @@ export const movimientoService = {
     async anular(id: string): Promise<void> {
         const { data: mov, error: getErr } = await supabase
             .from('movimientos_bancarios')
-            .select('tiene_asiento, comprobante_contable_id')
+            .select('empresa_id, tiene_asiento, comprobante_contable_id, descripcion')
             .eq('id', id)
             .single()
         if (getErr) throw getErr
@@ -103,6 +115,16 @@ export const movimientoService = {
         if (tiene_asiento && comprobante_contable_id) {
             await contabilidadTesoreriaService.anularAsientoMovimiento(comprobante_contable_id)
         }
+
+        auditService.logEvent({
+            empresaId: (mov as any).empresa_id,
+            modulo: 'bancos',
+            accion: 'anular',
+            entidad: 'movimiento_bancario',
+            entidadId: id,
+            resumen: `Anulación de movimiento bancario${(mov as any).descripcion ? ` — ${(mov as any).descripcion}` : ''}`,
+            nivel: 'sensible',
+        })
     },
 
     async marcarConciliado(ids: string[], conciliacionId: string): Promise<void> {

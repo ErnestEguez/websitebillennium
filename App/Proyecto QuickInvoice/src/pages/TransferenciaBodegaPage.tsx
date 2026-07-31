@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { kardexService } from '../services/kardexService'
+import { auditService } from '../services/auditoria/auditService'
 import { bodegaService } from '../services/bodegaService'
 import { useFormDraft } from '../hooks/useFormDraft'
 import type { Bodega } from '../types/vendors'
@@ -279,6 +280,21 @@ export function TransferenciaBodegaPage() {
                     costo_unitario:       costoTransfer,
                 })
             }
+
+            auditService.logEvent({
+                empresaId: empresa!.id,
+                modulo: 'bodegas',
+                accion: 'transferir',
+                entidad: 'transferencia',
+                bodegaId: bodegaDestino,
+                numeroDocumento: referencia,
+                resumen: `Transferencia entre bodegas ${bodOrigen.nombre} → ${bodDestino.nombre}`,
+                detalle: {
+                    bodega_origen: bodOrigen.nombre,
+                    bodega_destino: bodDestino.nombre,
+                    productos: validas.map(l => ({ producto: l.producto_nombre, cantidad: l.cantidad })),
+                },
+            })
 
             clearDraft()
             alert(`Transferencia ${referencia} registrada correctamente.\n${validas.length} producto${validas.length !== 1 ? 's' : ''} transferido${validas.length !== 1 ? 's' : ''} de ${bodOrigen.nombre} → ${bodDestino.nombre}.`)

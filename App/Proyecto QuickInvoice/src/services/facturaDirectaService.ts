@@ -4,6 +4,7 @@ import { kardexService } from './kardexService'
 import { contableConfigService } from './contableConfigService'
 import { contabilidadVentasService } from './contabilidadVentasService'
 import { puntoEmisionService } from './puntoEmisionService'
+import { auditService } from './auditoria/auditService'
 
 export interface DetalleFacturaDirecta {
     producto_id: string | null
@@ -90,6 +91,7 @@ export const facturaDirectaService = {
             empresa_id, cliente_id, detalles, pagos, caja_sesion_id, vendedor_id,
             dias_plazo_credito, bodega_id, observaciones, retenciones, numero_retencion, created_by,
         } = input
+        const correlationId = auditService.nuevaCorrelacion()
 
         // 1. Obtener configuración SRI
         const { data: empData } = await supabase
@@ -188,6 +190,18 @@ export const facturaDirectaService = {
             .single()
 
         if (errorFactura) throw errorFactura
+
+        auditService.logEvent({
+            empresaId: empresa_id,
+            correlationId,
+            modulo: 'facturacion',
+            accion: 'crear',
+            entidad: 'comprobante',
+            entidadId: factura.id,
+            tipoDocumento: 'FACTURA',
+            numeroDocumento: secuencialFormateado,
+            resumen: `Factura No. ${secuencialFormateado}`,
+        })
 
         // 5. Insertar detalles del comprobante
         const detallesParaInsertar = detalles
@@ -336,10 +350,33 @@ export const facturaDirectaService = {
             const { data: sriResult, error: sriErr } = await supabase.functions.invoke('sri-signer', {
                 body: { comprobante_id: factura.id }
             })
-            if (sriErr) console.error('[sri-signer] Error:', sriErr)
-            else         console.log('[sri-signer] Resultado:', sriResult)
-        } catch (edgeFnErr) {
+            if (sriErr) {
+                console.error('[sri-signer] Error:', sriErr)
+                auditService.logEvent({
+                    empresaId: empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
+                    entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                    resumen: `Factura No. ${secuencialFormateado} — error al invocar firma/autorización SRI`,
+                    estado: 'fallido', errorMensaje: sriErr.message,
+                })
+            } else {
+                console.log('[sri-signer] Resultado:', sriResult)
+                auditService.logEvent({
+                    empresaId: empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
+                    entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                    resumen: sriResult?.success
+                        ? `Factura No. ${secuencialFormateado} autorizada por el SRI`
+                        : `Factura No. ${secuencialFormateado} — respuesta inesperada del SRI`,
+                    estado: sriResult?.success ? 'exitoso' : 'fallido',
+                })
+            }
+        } catch (edgeFnErr: any) {
             console.error('[sri-signer] Excepción:', edgeFnErr)
+            auditService.logEvent({
+                empresaId: empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
+                entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                resumen: `Factura No. ${secuencialFormateado} — excepción al invocar firma/autorización SRI`,
+                estado: 'fallido', errorMensaje: edgeFnErr?.message,
+            })
         }
 
         // 9. Leer comprobante actualizado (ya con nro de autorización) y retornar para imprimir
