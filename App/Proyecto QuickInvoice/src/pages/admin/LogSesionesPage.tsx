@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import { History, Loader2, Search, Users } from 'lucide-react'
+import { History, Loader2, Search, Users, Trash2, AlertTriangle } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 interface HistorialRow {
@@ -36,6 +36,8 @@ export function LogSesionesPage() {
     const [nombresPorUserId, setNombresPorUserId] = useState<Record<string, string>>({})
     const [loading, setLoading] = useState(false)
     const [buscado, setBuscado] = useState(false)
+    const [confirmText, setConfirmText] = useState('')
+    const [deleting, setDeleting] = useState(false)
 
     useEffect(() => {
         supabase.from('empresas').select('id, nombre, ruc').order('nombre')
@@ -76,6 +78,31 @@ export function LogSesionesPage() {
             setRows([])
         } finally {
             setLoading(false)
+        }
+    }
+
+    const empresaSeleccionada = empresas.find(e => e.id === empresaId)
+    const confirmacionEsperada = empresaSeleccionada ? `BORRAR ${empresaSeleccionada.nombre.toUpperCase()}` : ''
+
+    // Borrado permanente — siempre acotado a una empresa puntual (nunca
+    // "todas") y al mismo rango de fechas ya aplicado en la búsqueda.
+    async function borrar() {
+        if (!empresaId || confirmText.trim() !== confirmacionEsperada) return
+        setDeleting(true)
+        try {
+            const { data, error } = await supabase.rpc('borrar_historial_sesiones', {
+                p_empresa_id: empresaId,
+                p_desde: desde ? `${desde}T00:00:00` : null,
+                p_hasta: hasta ? `${hasta}T23:59:59` : null,
+            })
+            if (error) throw error
+            alert(`Se borraron ${data ?? 0} registros del historial.`)
+            setConfirmText('')
+            await buscar()
+        } catch (e: any) {
+            alert(`Error al borrar: ${e.message}`)
+        } finally {
+            setDeleting(false)
         }
     }
 
@@ -144,6 +171,39 @@ export function LogSesionesPage() {
                     Buscar
                 </button>
             </div>
+
+            {empresaId && buscado && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-3">
+                    <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-semibold text-red-800">Borrado permanente</p>
+                            <p className="text-sm text-red-700">
+                                Borra del historial los registros de <strong>{empresaSeleccionada?.nombre}</strong> entre
+                                {' '}{desde} y {hasta} — no se puede deshacer. Para confirmar, escribe exactamente:
+                                {' '}<span className="font-mono text-red-800">{confirmacionEsperada}</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="text"
+                            value={confirmText}
+                            onChange={e => setConfirmText(e.target.value)}
+                            placeholder={confirmacionEsperada}
+                            className="flex-1 px-3 py-2 border border-red-200 rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-red-400"
+                        />
+                        <button
+                            onClick={borrar}
+                            disabled={deleting || confirmText.trim() !== confirmacionEsperada}
+                            className="flex items-center gap-2 px-5 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 font-semibold shrink-0"
+                        >
+                            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            Borrar historial filtrado
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {dispositivosPorUsuario.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
