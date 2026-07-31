@@ -50,7 +50,7 @@ export const movimientoService = {
             accion: 'crear',
             entidad: 'movimiento_bancario',
             entidadId: movimiento.id,
-            resumen: `Movimiento bancario ${mov.sentido === 'DEBITO' ? 'débito' : 'crédito'} por ${mov.monto} — ${mov.descripcion ?? ''}`.trim(),
+            resumen: `Movimiento bancario ${mov.sentido === 'debito' ? 'débito' : 'crédito'} por ${mov.monto} — ${mov.descripcion ?? ''}`.trim(),
             detalle: { tipo: mov.tipo, sentido: mov.sentido, monto: mov.monto, cuenta_bancaria_id: mov.cuenta_bancaria_id },
             nivel: 'sensible',
         })

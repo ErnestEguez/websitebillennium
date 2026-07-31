@@ -145,7 +145,7 @@ export const cajaService = {
                 entidad: 'caja_sesion',
                 entidadId: sesionId,
                 resumen: `Cierre de caja (POS)`,
-                detalle: totales,
+                detalle: { ...totales },
             });
         }
     }
