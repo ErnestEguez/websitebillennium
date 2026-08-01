@@ -963,7 +963,7 @@ export function ProformaPage() {
                         <div className="xl:col-span-2 space-y-6">
 
                             {/* SECCIÓN CLIENTE */}
-                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
                                 <div
                                     className="flex items-center justify-between px-5 py-3 cursor-pointer select-none hover:bg-slate-50 transition-colors"
                                     onClick={() => !isClientFormOpen && setClienteCollapsed(c => !c)}>
@@ -1039,7 +1039,7 @@ export function ProformaPage() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="space-y-2 mt-3">
+                                            <div className="space-y-2 mt-3 relative">
                                                 <div className="relative">
                                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                                     <input type="text"
