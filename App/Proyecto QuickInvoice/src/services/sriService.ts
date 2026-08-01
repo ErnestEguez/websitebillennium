@@ -148,6 +148,7 @@ export const sriService = {
             auditService.logEvent({
                 empresaId, modulo: 'facturacion', accion: 'anular', entidad: 'comprobante',
                 entidadId: id, numeroDocumento: secuencial,
+                serie: secuencial ? secuencial.split('-').slice(0, 2).join('-') : undefined,
                 resumen: `Anulación de factura${secuencial ? ` No. ${secuencial}` : ` ${id}`}`,
                 detalle: { motivo }, nivel: 'sensible',
             })

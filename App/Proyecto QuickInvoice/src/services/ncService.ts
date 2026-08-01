@@ -287,6 +287,7 @@ export const ncService = {
             entidadId: nc.id,
             tipoDocumento: 'NOTA_CREDITO',
             numeroDocumento: secuencial,
+            serie: `${est}-${pto}`,
             resumen: `Nota de crédito No. ${secuencial}`,
             detalle: { tipo_nc: params.tipoNc, motivo_sri: params.motivoSri, comprobante_origen_id: params.comprobanteOrigenId },
             nivel: 'sensible',

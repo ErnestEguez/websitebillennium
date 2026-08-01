@@ -98,6 +98,22 @@ export const carteraCxcService = {
 
         if (error) throw error
         // El trigger fn_actualizar_saldo_cxc actualiza el saldo y estado automáticamente
+
+        const { data: carteraInfo } = await supabase
+            .from('cartera_cxc').select('comprobantes(secuencial)').eq('id', carteraId).maybeSingle()
+        const secuencial = (carteraInfo as any)?.comprobantes?.secuencial
+
+        auditService.logEvent({
+            empresaId,
+            modulo: 'cartera_cxc',
+            accion: 'crear',
+            entidad: 'cartera_cxc_pago',
+            entidadId: (data as any).id,
+            numeroDocumento: secuencial,
+            resumen: `Pago de cliente${secuencial ? ` — factura No. ${secuencial}` : ''} por ${valor}`,
+            detalle: { metodo_pago: metodoPago, valor, referencia, cartera_id: carteraId },
+        })
+
         return data as CarteraCxcPago
     },
 
@@ -153,6 +169,21 @@ export const carteraCxcService = {
         if (errorRet) console.error('Error registrando retenciones_ventas (cartera):', errorRet)
 
         // El trigger fn_actualizar_saldo_cxc actualiza el saldo y estado automáticamente
+
+        const { data: comprobanteInfo } = await supabase
+            .from('comprobantes').select('secuencial').eq('id', cartera.comprobante_id).maybeSingle()
+
+        auditService.logEvent({
+            empresaId,
+            modulo: 'cartera_cxc',
+            accion: 'crear',
+            entidad: 'cartera_cxc_pago',
+            entidadId: (pago as any).id,
+            numeroDocumento: comprobanteInfo?.secuencial ?? undefined,
+            resumen: `Retención de cliente registrada${comprobanteInfo?.secuencial ? ` — factura No. ${comprobanteInfo.secuencial}` : ''} por ${retencion.valor}`,
+            detalle: { tipo: retencion.tipo, codigo: retencion.codigo, valor: retencion.valor, cartera_id: cartera.id },
+        })
+
         return pago as CarteraCxcPago
     },
 

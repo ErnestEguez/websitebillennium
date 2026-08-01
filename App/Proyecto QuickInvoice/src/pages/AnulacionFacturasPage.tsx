@@ -222,6 +222,7 @@ export function AnulacionFacturasPage() {
             auditService.logEvent({
                 empresaId: empresa!.id, modulo: 'facturacion', accion: 'anular', entidad: 'comprobante',
                 entidadId: anulandoId, numeroDocumento: f.secuencial,
+                serie: f.secuencial ? f.secuencial.split('-').slice(0, 2).join('-') : undefined,
                 resumen: `Anulación de factura No. ${f.secuencial}`,
                 detalle: { motivo: motivo.trim() }, nivel: 'sensible',
             })

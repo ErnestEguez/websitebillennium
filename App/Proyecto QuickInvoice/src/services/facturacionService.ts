@@ -257,6 +257,7 @@ export const facturacionService = {
                 entidadId: factura.id,
                 tipoDocumento: 'FACTURA',
                 numeroDocumento: secuencialFormateado,
+                serie: `${est}-${pto}`,
                 resumen: `Factura No. ${secuencialFormateado}`,
             })
 
@@ -350,7 +351,7 @@ export const facturacionService = {
                     // No tiramos error: el comprobante queda en PENDIENTE y se puede reintentar
                     auditService.logEvent({
                         empresaId: pedido.empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
-                        entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                        entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado, serie: `${est}-${pto}`,
                         resumen: `Factura No. ${secuencialFormateado} — error al invocar firma/autorización SRI`,
                         estado: 'fallido', errorMensaje: sriErr.message,
                     })
@@ -358,14 +359,14 @@ export const facturacionService = {
                     console.log('[sri-signer] Resultado:', sriResult)
                     auditService.logEvent({
                         empresaId: pedido.empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
-                        entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                        entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado, serie: `${est}-${pto}`,
                         resumen: `Factura No. ${secuencialFormateado} autorizada por el SRI`,
                     })
                 } else {
                     console.warn('[sri-signer] Respuesta inesperada:', sriResult)
                     auditService.logEvent({
                         empresaId: pedido.empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
-                        entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                        entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado, serie: `${est}-${pto}`,
                         resumen: `Factura No. ${secuencialFormateado} — respuesta inesperada del SRI`,
                         estado: 'fallido',
                     })
@@ -375,7 +376,7 @@ export const facturacionService = {
                 // El comprobante sigue en PENDIENTE — no bloquea el flujo del cajero
                 auditService.logEvent({
                     empresaId: pedido.empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
-                    entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                    entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado, serie: `${est}-${pto}`,
                     resumen: `Factura No. ${secuencialFormateado} — excepción al invocar firma/autorización SRI`,
                     estado: 'fallido', errorMensaje: edgeFnErr?.message,
                 })

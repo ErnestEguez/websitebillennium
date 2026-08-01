@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { kardexService } from '../services/kardexService'
+import { auditService } from '../services/auditoria/auditService'
 import { bodegaService } from '../services/bodegaService'
 import { useFormDraft } from '../hooks/useFormDraft'
 import type { Bodega } from '../types/vendors'
@@ -260,6 +261,25 @@ export function AjusteInventarioPage() {
                     costo_unitario:       l.costo_unitario !== '' ? Number(l.costo_unitario) : undefined,
                 })
             }
+
+            const totalIng = lineasValidas.filter(l => l.tipo === 'INGRESO').reduce((s, l) => s + Number(l.cantidad), 0)
+            const totalEgr = lineasValidas.filter(l => l.tipo === 'EGRESO').reduce((s, l) => s + Number(l.cantidad), 0)
+            auditService.logEvent({
+                empresaId: empresa!.id,
+                modulo: 'bodegas',
+                accion: 'crear',
+                entidad: 'ajuste_inventario',
+                bodegaId: bodegaId || undefined,
+                numeroDocumento: referencia,
+                resumen: `Ajuste de inventario ${referencia} — ${bodegaActual?.nombre ?? ''}`,
+                detalle: {
+                    descripcion: descripcion.trim(),
+                    total_ingresos: totalIng,
+                    total_egresos: totalEgr,
+                    lineas: lineasValidas.map(l => ({ producto: l.producto_nombre, tipo: l.tipo, cantidad: l.cantidad })),
+                },
+                nivel: 'sensible',
+            })
 
             clearDraft()
             alert(`Ajuste ${referencia} registrado correctamente (${lineasValidas.length} movimiento${lineasValidas.length !== 1 ? 's' : ''}).`)

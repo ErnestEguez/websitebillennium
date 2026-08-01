@@ -611,6 +611,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     <SidebarItem to="/configuracion"      icon={Settings}  label="Configuración"       active={location.pathname === '/configuracion'} sub sentinelId="nav-configuracion" disabled={!p.perm_configuracion} />
                                     <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub disabled={!p.perm_codigos_retencion} />
                                     {isAdmin && <SidebarItem to="/ajustes/permisos" icon={UserCog} label="Permisos de usuario" active={location.pathname === '/ajustes/permisos'} sub />}
+                                    {esOficina && <SidebarItem to="/ajustes/auditoria" icon={ShieldCheck} label="Auditoría" active={location.pathname === '/ajustes/auditoria'} sub />}
                                     {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub disabled={!p.perm_vendedores} />}
                                     {esOficina && <SidebarItem to="/importar-articulos" icon={Upload} label="Importar Artículos" active={location.pathname === '/importar-articulos'} sub disabled={!p.perm_importar_articulos} />}
                                     {esOficina && <SidebarItem to="/importar-clientes"  icon={Users}  label="Clientes (Import/Export)" active={location.pathname === '/importar-clientes'} sub disabled={!p.perm_importar_clientes} />}

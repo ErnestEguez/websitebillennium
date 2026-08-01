@@ -50,6 +50,7 @@ const NuevaNcPage                  = lz(() => import('./pages/NuevaNcPage'), 'Nu
 const NcRidePage                   = lz(() => import('./pages/NcRidePage'), 'NcRidePage')
 const DashboardGerencialPage       = lz(() => import('./pages/DashboardGerencialPage'), 'DashboardGerencialPage')
 const AdminPermisosPage            = lz(() => import('./pages/AdminPermisosPage'), 'AdminPermisosPage')
+const AuditoriaPage                = lz(() => import('./pages/AuditoriaPage'), 'AuditoriaPage')
 const AdminUserEmpresasPage        = lz(() => import('./pages/AdminUserEmpresasPage'), 'AdminUserEmpresasPage')
 const AdminDepuracionPage          = lz(() => import('./pages/admin/AdminDepuracionPage'), 'AdminDepuracionPage')
 const LogSesionesPage              = lz(() => import('./pages/admin/LogSesionesPage'), 'LogSesionesPage')
@@ -510,6 +511,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <AdminPermisosPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/ajustes/auditoria" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <AuditoriaPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

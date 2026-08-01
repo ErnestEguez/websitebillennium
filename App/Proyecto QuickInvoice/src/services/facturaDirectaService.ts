@@ -200,6 +200,7 @@ export const facturaDirectaService = {
             entidadId: factura.id,
             tipoDocumento: 'FACTURA',
             numeroDocumento: secuencialFormateado,
+            serie: `${est.padStart(3, '0')}-${pto.padStart(3, '0')}`,
             resumen: `Factura No. ${secuencialFormateado}`,
         })
 
@@ -354,7 +355,7 @@ export const facturaDirectaService = {
                 console.error('[sri-signer] Error:', sriErr)
                 auditService.logEvent({
                     empresaId: empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
-                    entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                    entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado, serie: `${est.padStart(3, '0')}-${pto.padStart(3, '0')}`,
                     resumen: `Factura No. ${secuencialFormateado} — error al invocar firma/autorización SRI`,
                     estado: 'fallido', errorMensaje: sriErr.message,
                 })
@@ -362,7 +363,7 @@ export const facturaDirectaService = {
                 console.log('[sri-signer] Resultado:', sriResult)
                 auditService.logEvent({
                     empresaId: empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
-                    entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                    entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado, serie: `${est.padStart(3, '0')}-${pto.padStart(3, '0')}`,
                     resumen: sriResult?.success
                         ? `Factura No. ${secuencialFormateado} autorizada por el SRI`
                         : `Factura No. ${secuencialFormateado} — respuesta inesperada del SRI`,
@@ -373,7 +374,7 @@ export const facturaDirectaService = {
             console.error('[sri-signer] Excepción:', edgeFnErr)
             auditService.logEvent({
                 empresaId: empresa_id, correlationId, modulo: 'facturacion', accion: 'actualizar',
-                entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado,
+                entidad: 'comprobante', entidadId: factura.id, numeroDocumento: secuencialFormateado, serie: `${est.padStart(3, '0')}-${pto.padStart(3, '0')}`,
                 resumen: `Factura No. ${secuencialFormateado} — excepción al invocar firma/autorización SRI`,
                 estado: 'fallido', errorMensaje: edgeFnErr?.message,
             })

@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase'
 import { kardexService } from './kardexService'
 import { contableConfigService } from './contableConfigService'
 import { contabilidadComprasService } from './contabilidadComprasService'
+import { auditService } from './auditoria/auditService'
 
 export type TipoNCProveedor = 'DEVOLUCION_MERCADERIA' | 'NC_VALOR'
 export type EstadoNCProveedor = 'ACTIVA' | 'ANULADA'
@@ -214,6 +215,20 @@ export const ncProveedorService = {
             .select().single()
         if (eNc || !nc) throw eNc ?? new Error('Error creando N/C de proveedor')
 
+        auditService.logEvent({
+            empresaId: input.empresaId,
+            modulo: 'compras',
+            accion: 'crear',
+            entidad: 'nota_credito_proveedor',
+            entidadId: nc.id,
+            numeroDocumento: input.numeroNc ?? undefined,
+            resumen: input.tipo === 'DEVOLUCION_MERCADERIA'
+                ? `Devolución de compra a ${input.proveedorNombre}${input.numeroNc ? ` No. ${input.numeroNc}` : ''}`
+                : `Nota de crédito de proveedor ${input.proveedorNombre}${input.numeroNc ? ` No. ${input.numeroNc}` : ''}`,
+            detalle: { tipo: input.tipo, compra_id: input.compraId, total: input.total },
+            nivel: 'sensible',
+        })
+
         // 4. Detalle (solo DEVOLUCION_MERCADERIA)
         if (input.tipo === 'DEVOLUCION_MERCADERIA' && input.detalle?.length) {
             const { error: eDet } = await supabase
@@ -312,6 +327,18 @@ export const ncProveedorService = {
             updated_at: new Date().toISOString(),
         }).eq('id', id)
         if (error) throw error
+
+        auditService.logEvent({
+            empresaId: nc.empresa_id,
+            modulo: 'compras',
+            accion: 'anular',
+            entidad: 'nota_credito_proveedor',
+            entidadId: id,
+            numeroDocumento: nc.numero_nc ?? undefined,
+            resumen: `Anulación de nota de crédito de proveedor${nc.numero_nc ? ` No. ${nc.numero_nc}` : ''}`,
+            detalle: { motivo },
+            nivel: 'sensible',
+        })
 
         // 2. Revertir Kardex (ENTRADA — devuelve el stock que había salido), idempotente
         if (nc.tipo === 'DEVOLUCION_MERCADERIA' && nc.detalle?.length) {
