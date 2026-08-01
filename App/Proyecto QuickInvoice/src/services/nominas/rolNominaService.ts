@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase'
 import type { RolCabecera, RolLinea, Empleado, ConceptoNomina } from '../../types/nominas'
 import { parametrosNominaService } from './parametrosNominaService'
 import { contabilidadNominaService } from './contabilidadNominaService'
+import { auditService } from '../auditoria/auditService'
 
 const nominas = () => supabase.schema('nominas')
 
@@ -123,7 +124,7 @@ export const rolNominaService = {
 
         // Obtener empresa_id para contabilidad
         const { data: perData } = await nominas()
-            .from('periodos').select('empresa_id').eq('id', periodoId).single()
+            .from('periodos').select('empresa_id, nombre').eq('id', periodoId).single()
         const empresaId = perData?.empresa_id as string | undefined
 
         // 1. Marcar el período como liquidado
@@ -184,6 +185,15 @@ export const rolNominaService = {
         // Asientos contables — no bloqueantes
         if (empresaId) {
             contabilidadNominaService.postearRolMensual(periodoId, empresaId).catch(() => {})
+            auditService.logEvent({
+                empresaId,
+                modulo: 'nomina',
+                accion: 'liquidar',
+                entidad: 'periodo_nomina',
+                entidadId: periodoId,
+                resumen: `Liquidación de rol de pago — ${perData?.nombre ?? periodoId}`,
+                nivel: 'sensible',
+            })
         }
     },
 
@@ -442,7 +452,7 @@ export const rolNominaService = {
 
     async deshacerLiquidacion(periodoId: string): Promise<void> {
         const { data: perData } = await nominas()
-            .from('periodos').select('empresa_id').eq('id', periodoId).single()
+            .from('periodos').select('empresa_id, nombre').eq('id', periodoId).single()
 
         const { error } = await nominas()
             .from('periodos')
@@ -453,6 +463,15 @@ export const rolNominaService = {
         // Anular diarios LP del rol y provisión
         if (perData?.empresa_id) {
             contabilidadNominaService.anularRolMensual(periodoId, perData.empresa_id).catch(() => {})
+            auditService.logEvent({
+                empresaId: perData.empresa_id,
+                modulo: 'nomina',
+                accion: 'reversar',
+                entidad: 'periodo_nomina',
+                entidadId: periodoId,
+                resumen: `Reversión de liquidación de rol de pago — ${perData?.nombre ?? periodoId}`,
+                nivel: 'sensible',
+            })
         }
     },
 

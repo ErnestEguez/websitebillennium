@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import type { BrechaSeguridad, SeveridadBrecha } from '../../types/lopdp'
+import { auditService } from '../auditoria/auditService'
 
 const lopdp = () => supabase.schema('lopdp')
 
@@ -55,6 +56,17 @@ export const brechasService = {
             .select()
             .single()
         if (error) throw error
+
+        auditService.logEvent({
+            empresaId: (data as any).empresa_id,
+            modulo: 'lopdp',
+            accion: 'crear',
+            entidad: 'brecha_seguridad',
+            entidadId: (data as any).id,
+            resumen: `Reporte de brecha de seguridad — severidad ${(data as any).severidad}`,
+            detalle: { descripcion: (data as any).descripcion },
+            nivel: 'compliance',
+        })
         return data as BrechaSeguridad
     },
 
@@ -83,6 +95,16 @@ export const brechasService = {
             .select()
             .single()
         if (error) throw error
+
+        auditService.logEvent({
+            empresaId: (data as any).empresa_id,
+            modulo: 'lopdp',
+            accion: 'notificar',
+            entidad: 'brecha_seguridad',
+            entidadId: id,
+            resumen: `Notificación de brecha a la SPDP`,
+            nivel: 'compliance',
+        })
         return data as BrechaSeguridad
     },
 
@@ -98,6 +120,16 @@ export const brechasService = {
             .select()
             .single()
         if (error) throw error
+
+        auditService.logEvent({
+            empresaId: (data as any).empresa_id,
+            modulo: 'lopdp',
+            accion: 'notificar',
+            entidad: 'brecha_seguridad',
+            entidadId: id,
+            resumen: `Notificación de brecha a los titulares afectados`,
+            nivel: 'compliance',
+        })
         return data as BrechaSeguridad
     },
 

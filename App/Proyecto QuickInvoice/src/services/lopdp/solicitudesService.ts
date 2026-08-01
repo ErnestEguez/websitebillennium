@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import type { SolicitudTitular } from '../../types/lopdp'
+import { auditService } from '../auditoria/auditService'
 
 const lopdp = () => supabase.schema('lopdp')
 
@@ -76,6 +77,17 @@ export const solicitudesService = {
             .select()
             .single()
         if (error) throw error
+
+        auditService.logEvent({
+            empresaId: (data as any).empresa_id,
+            modulo: 'lopdp',
+            accion: 'actualizar',
+            entidad: 'solicitud_titular',
+            entidadId: id,
+            resumen: `Resolución de solicitud ${(data as any).tipo_solicitud} — ${(data as any).nombre_titular}`,
+            detalle: { estado_resultante: (data as any).estado },
+            nivel: 'compliance',
+        })
         return data as SolicitudTitular
     },
 

@@ -44,6 +44,7 @@ import type { Bodega } from '../types/vendors'
 import type { PuntoEmision } from '../types/puntosEmision'
 import { cn } from '../lib/utils'
 import { getPuntoEmisionDispositivo, setPuntoEmisionDispositivo } from '../lib/dispositivoPuntoEmision'
+import { auditService } from '../services/auditoria/auditService'
 
 // ── Campo verificador de código de artículo para preparaciones ───────────────
 function PrepPinturaCodeField({
@@ -369,6 +370,16 @@ export function ConfigurationPage() {
         try {
             setSaving(true)
 
+            // Snapshot ANTES de guardar — solo para detectar si cambiaron
+            // credenciales sensibles (nunca se guarda el valor en texto plano
+            // en el log de auditoría, solo la bandera de que cambió).
+            let configSriAntes: Record<string, any> | null = null
+            if (editingEmpresa.id) {
+                const { data: empresaAntes } = await supabase
+                    .from('empresas').select('config_sri').eq('id', editingEmpresa.id).single()
+                configSriAntes = empresaAntes?.config_sri ?? null
+            }
+
             // ✅ Solo campos que existen en la tabla empresas del schema real
             const payload: Record<string, any> = {
                 nombre: editingEmpresa.nombre || '',
@@ -429,6 +440,27 @@ export function ConfigurationPage() {
                 if (sesionUnicaError) throw sesionUnicaError
             }
 
+            if (empresaId) {
+                const cambios: Record<string, { antes: unknown; despues: unknown }> = {}
+                if ((configSriAntes?.firma_password || null) !== (payload.config_sri.firma_password || null)) {
+                    cambios.firma_password = { antes: configSriAntes?.firma_password ? 'configurada' : 'vacía', despues: payload.config_sri.firma_password ? 'configurada' : 'vacía' }
+                }
+                if ((configSriAntes?.mail_pass || null) !== (payload.config_sri.mail_pass || null)) {
+                    cambios.mail_pass = { antes: configSriAntes?.mail_pass ? 'configurada' : 'vacía', despues: payload.config_sri.mail_pass ? 'configurada' : 'vacía' }
+                }
+                auditService.logEvent({
+                    empresaId,
+                    modulo: 'configuracion',
+                    accion: 'actualizar',
+                    entidad: 'empresa',
+                    entidadId: empresaId,
+                    resumen: `Cambio de configuración de empresa — ${payload.nombre}`,
+                    cambios: Object.keys(cambios).length > 0 ? cambios : undefined,
+                    detalle: { lopdp_enabled: !!editingEmpresa.lopdp_enabled, sesion_unica_enabled: !!editingEmpresa.sesion_unica_enabled },
+                    nivel: 'compliance',
+                })
+            }
+
             setIsEmpresaModalOpen(false)
             setEditingEmpresa(null)
             loadData()
@@ -445,6 +477,12 @@ export function ConfigurationPage() {
         e.preventDefault()
         try {
             setSaving(true)
+
+            const { data: empresaAntes } = await supabase
+                .from('empresas').select('config_sri').eq('id', empresa!.id).single()
+            const configSriAntes = empresaAntes?.config_sri ?? null
+            const configSriNuevo = companyData.config_sri || {}
+
             const { error } = await supabase
                 .from('empresas')
                 .update({
@@ -453,7 +491,7 @@ export function ConfigurationPage() {
                     direccion: companyData.direccion || companyData.direccion_matriz || '',
                     telefono: companyData.telefono || null,
                     logo_url: companyData.logo_url || null,
-                    config_sri: companyData.config_sri || {},
+                    config_sri: configSriNuevo,
                     usar_vendor_management: companyData.usar_vendor_management ?? false,
                     tope_consumidor_final: companyData.tope_consumidor_final ?? null,
                     glosa_factura: companyData.glosa_factura || null,
@@ -469,6 +507,24 @@ export function ConfigurationPage() {
                 })
                 .eq('id', empresa!.id)
             if (error) throw error
+
+            const cambios: Record<string, { antes: unknown; despues: unknown }> = {}
+            if ((configSriAntes?.firma_password || null) !== (configSriNuevo.firma_password || null)) {
+                cambios.firma_password = { antes: configSriAntes?.firma_password ? 'configurada' : 'vacía', despues: configSriNuevo.firma_password ? 'configurada' : 'vacía' }
+            }
+            if ((configSriAntes?.mail_pass || null) !== (configSriNuevo.mail_pass || null)) {
+                cambios.mail_pass = { antes: configSriAntes?.mail_pass ? 'configurada' : 'vacía', despues: configSriNuevo.mail_pass ? 'configurada' : 'vacía' }
+            }
+            auditService.logEvent({
+                empresaId: empresa!.id,
+                modulo: 'configuracion',
+                accion: 'actualizar',
+                entidad: 'empresa',
+                entidadId: empresa!.id,
+                resumen: `Cambio de configuración de empresa — ${companyData.nombre}`,
+                cambios: Object.keys(cambios).length > 0 ? cambios : undefined,
+                nivel: 'compliance',
+            })
 
             alert('Configuración de empresa guardada correctamente')
         } catch (error: any) {

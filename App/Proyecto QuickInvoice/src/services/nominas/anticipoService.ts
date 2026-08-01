@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase'
 import type { AnticipoNomina, AnticipoLinea } from '../../types/nominas'
 import { contabilidadNominaService } from './contabilidadNominaService'
+import { auditService } from '../auditoria/auditService'
 
 const nominas = () => supabase.schema('nominas')
 const round2  = (n: number) => Math.round(n * 100) / 100
@@ -141,6 +142,16 @@ export const anticipoService = {
         contabilidadNominaService.postearAnticipo(anticipoId, empresaId)
             .catch(e => console.error('[nomContab] hook anticipo falló:', e))
 
+        auditService.logEvent({
+            empresaId,
+            modulo: 'nomina',
+            accion: 'liquidar',
+            entidad: 'anticipo_nomina',
+            entidadId: anticipoId,
+            resumen: `Liquidación definitiva de anticipo de nómina`,
+            nivel: 'sensible',
+        })
+
         // If the monthly rol already exists, insert ANTICIPO lines into it
         const { data: cabeceras } = await nominas()
             .from('rol_cabecera').select('id, empleado_id').eq('periodo_id', periodoId)
@@ -215,5 +226,15 @@ export const anticipoService = {
 
         // Anular asiento contable — no bloqueante
         contabilidadNominaService.anularAnticipo(anticipoId, anticipo.empresa_id).catch(() => {})
+
+        auditService.logEvent({
+            empresaId: anticipo.empresa_id,
+            modulo: 'nomina',
+            accion: 'reversar',
+            entidad: 'anticipo_nomina',
+            entidadId: anticipoId,
+            resumen: `Reversión de liquidación de anticipo de nómina`,
+            nivel: 'sensible',
+        })
     },
 }

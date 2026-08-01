@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase'
 import type { Finiquito, CausaTerminacion, EstadoFiniquito } from '../../types/nominas'
 import { contabilidadNominaService } from './contabilidadNominaService'
+import { auditService } from '../auditoria/auditService'
 
 const nominas = () => supabase.schema('nominas')
 const r2 = (n: number) => Math.round(n * 100) / 100
@@ -144,6 +145,19 @@ export const finiquitoService = {
             .select('*, empleado:empleados(nombres, apellidos, cedula)')
             .single()
         if (error) throw error
+
+        const empleadoNombre = (data as any)?.empleado ? `${(data as any).empleado.nombres} ${(data as any).empleado.apellidos}` : undefined
+        if (f.empresa_id) {
+            auditService.logEvent({
+                empresaId: f.empresa_id,
+                modulo: 'nomina',
+                accion: 'crear',
+                entidad: 'finiquito',
+                entidadId: (data as any).id,
+                resumen: `Finiquito creado${empleadoNombre ? ` — ${empleadoNombre}` : ''}`,
+                nivel: 'sensible',
+            })
+        }
         return data as Finiquito
     },
 
@@ -164,6 +178,15 @@ export const finiquitoService = {
 
         if (estado === 'pagado') {
             contabilidadNominaService.postearFiniquito(id, empresaId).catch(() => {})
+            auditService.logEvent({
+                empresaId,
+                modulo: 'nomina',
+                accion: 'liquidar',
+                entidad: 'finiquito',
+                entidadId: id,
+                resumen: `Pago de finiquito registrado`,
+                nivel: 'sensible',
+            })
         }
     },
 

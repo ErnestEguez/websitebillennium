@@ -12,6 +12,7 @@ interface AuditoriaRow {
     user_id: string | null
     user_nombre: string | null
     user_rol: string | null
+    user_email: string | null
     ip: string | null
     user_agent: string | null
     origen: string
@@ -106,7 +107,7 @@ export function AuditoriaPage() {
         if (estado) q = q.eq('estado', estado)
         if (texto.trim()) {
             const t = texto.trim()
-            q = q.or(`resumen.ilike.%${t}%,numero_documento.ilike.%${t}%,user_nombre.ilike.%${t}%`)
+            q = q.or(`resumen.ilike.%${t}%,numero_documento.ilike.%${t}%,user_nombre.ilike.%${t}%,user_email.ilike.%${t}%`)
         }
         return q
     }
@@ -164,9 +165,10 @@ export function AuditoriaPage() {
                 ['Filtros:', filtrosTexto],
                 ['Generado:', new Date().toLocaleString('es-EC')],
                 [],
-                ['Fecha', 'Usuario', 'Rol', 'Módulo', 'Acción', 'Entidad', 'Documento', 'Resumen', 'Estado', 'Nivel', 'IP'],
+                ['Fecha', 'Usuario (correo)', 'Nombre', 'Rol', 'Módulo', 'Acción', 'Entidad', 'Documento', 'Resumen', 'Estado', 'Nivel', 'IP'],
                 ...todas.map(r => [
                     new Date(r.created_at).toLocaleString('es-EC'),
+                    r.user_email ?? r.user_nombre ?? '',
                     r.user_nombre ?? '',
                     r.user_rol ?? '',
                     MODULO_LABEL[r.modulo] ?? r.modulo,
@@ -182,8 +184,8 @@ export function AuditoriaPage() {
 
             const ws = XLSX.utils.aoa_to_sheet(filas)
             ws['!cols'] = [
-                { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 12 },
-                { wch: 16 }, { wch: 20 }, { wch: 50 }, { wch: 10 }, { wch: 12 }, { wch: 15 },
+                { wch: 18 }, { wch: 26 }, { wch: 20 }, { wch: 14 }, { wch: 14 },
+                { wch: 12 }, { wch: 16 }, { wch: 20 }, { wch: 50 }, { wch: 10 }, { wch: 12 }, { wch: 15 },
             ]
             const wb = XLSX.utils.book_new()
             XLSX.utils.book_append_sheet(wb, ws, 'Auditoría')
@@ -321,7 +323,7 @@ export function AuditoriaPage() {
                                             {new Date(r.created_at).toLocaleString('es-EC')}
                                         </td>
                                         <td className="px-4 py-2 font-medium text-slate-800 whitespace-nowrap">
-                                            {r.user_nombre || '—'}
+                                            {r.user_email || r.user_nombre || '—'}
                                         </td>
                                         <td className="px-4 py-2 whitespace-nowrap">
                                             <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', NIVEL_BADGE[r.nivel])}>
@@ -344,6 +346,7 @@ export function AuditoriaPage() {
                                         <tr>
                                             <td colSpan={8} className="px-4 py-3 bg-slate-50 text-xs">
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+                                                    <div><span className="text-slate-400">Nombre:</span> {r.user_nombre || '—'}</div>
                                                     <div><span className="text-slate-400">Rol:</span> {r.user_rol || '—'}</div>
                                                     <div><span className="text-slate-400">IP:</span> {r.ip || '—'}</div>
                                                     <div><span className="text-slate-400">Serie:</span> {r.serie || '—'}</div>
