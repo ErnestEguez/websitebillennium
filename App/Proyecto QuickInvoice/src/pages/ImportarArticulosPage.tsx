@@ -17,6 +17,11 @@ interface CsvRow {
     costo: number
     stock: number
     iva_porcentaje: number
+    // true si la celda de origen traía punto Y coma a la vez — el parseo
+    // asume cuál es el decimal, pero es un caso ambiguo que vale la pena
+    // que el usuario confirme visualmente antes de importar.
+    costoAmbiguo: boolean
+    stockAmbiguo: boolean
 }
 
 interface ImportSummary {
@@ -61,6 +66,14 @@ function parseNumber(val: string): number {
     }
     const n = Number(s)
     return isNaN(n) ? 0 : n
+}
+
+// Trae punto Y coma a la vez → el parseo tiene que adivinar cuál es el
+// separador decimal (ver parseNumber). No es necesariamente un error, pero
+// vale la pena que el usuario lo confirme visualmente antes de importar.
+function isAmbiguousNumber(val: string): boolean {
+    const s = (val ?? '').trim()
+    return s.includes(',') && s.includes('.')
 }
 
 // Columna de IVA opcional: si no viene o el valor no es 0/5/15, se usa 15%
@@ -114,14 +127,20 @@ function parseCsvRows(text: string, delimiter: FieldDelimiter): CsvRow[] {
         const nombre   = (parts[1] ?? '').trim()
         const precio   = parseNumber(parts[2] ?? '')
         const categoria = (parts[3] ?? '').trim()
-        const costo    = parseNumber(parts[4] ?? '')   // col 5 (opcional)
-        let   stock    = parseNumber(parts[5] ?? '')   // col 6 (opcional)
+        const costoRaw = parts[4] ?? ''
+        const stockRaw = parts[5] ?? ''
+        const costo    = parseNumber(costoRaw)   // col 5 (opcional)
+        let   stock    = parseNumber(stockRaw)   // col 6 (opcional)
         const iva_porcentaje = parseIvaPorcentaje(parts[6] ?? '')   // col 7 (opcional, 0/5/15)
 
         if (!codigo && !nombre && !categoria) continue
         if (stock < 0) stock = 0
 
-        rows.push({ codigo, nombre, precio_venta: precio, categoria, costo, stock, iva_porcentaje })
+        rows.push({
+            codigo, nombre, precio_venta: precio, categoria, costo, stock, iva_porcentaje,
+            costoAmbiguo: isAmbiguousNumber(costoRaw),
+            stockAmbiguo: isAmbiguousNumber(stockRaw),
+        })
     }
     return rows
 }
@@ -477,6 +496,12 @@ export function ImportarArticulosPage() {
 
     const preview = allRows.slice(0, 20)
 
+    // Sumas de control — para comparar contra la misma SUMA() en Excel antes
+    // de importar. Sobre TODAS las filas válidas, no solo la vista previa.
+    const sumaCantidad = allRows.reduce((s, r) => s + r.stock, 0)
+    const sumaCosto    = allRows.reduce((s, r) => s + r.costo, 0)
+    const filasAmbiguas = allRows.filter(r => r.costoAmbiguo || r.stockAmbiguo)
+
     return (
         <div className="space-y-6">
             <div>
@@ -608,6 +633,34 @@ export function ImportarArticulosPage() {
             )}
 
             {allRows.length > 0 && !summary && !correctionSummary && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                    <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-2">
+                        Sumas de control — compara contra SUMA() en tu Excel antes de importar
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white rounded-lg border border-emerald-100 p-3">
+                            <p className="text-2xl font-bold text-slate-800 tabular-nums">{sumaCantidad.toLocaleString('es-EC', { maximumFractionDigits: 4 })}</p>
+                            <p className="text-xs text-slate-500">Suma columna "stock" (cantidad)</p>
+                        </div>
+                        <div className="bg-white rounded-lg border border-emerald-100 p-3">
+                            <p className="text-2xl font-bold text-slate-800 tabular-nums">{sumaCosto.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</p>
+                            <p className="text-xs text-slate-500">Suma columna "costo"</p>
+                        </div>
+                    </div>
+                    {filasAmbiguas.length > 0 && (
+                        <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-800">
+                                <strong>{filasAmbiguas.length} fila{filasAmbiguas.length !== 1 ? 's' : ''}</strong> tienen costo o stock con punto Y coma a la vez
+                                (ej. "44.296,00") — están marcadas en amarillo en la vista previa de abajo. Revísalas: el sistema asume
+                                cuál es el separador decimal, y en un valor así puede adivinar mal.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {allRows.length > 0 && !summary && !correctionSummary && (
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                         <h2 className="font-semibold text-slate-800">
@@ -662,7 +715,7 @@ export function ImportarArticulosPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {preview.map((row, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50">
+                                    <tr key={idx} className={cn('hover:bg-slate-50', (row.costoAmbiguo || row.stockAmbiguo) && 'bg-amber-50')}>
                                         <td className="px-4 py-2 text-slate-400">{idx + 1}</td>
                                         <td className="px-4 py-2 font-mono text-xs">{row.codigo}</td>
                                         <td className="px-4 py-2">{row.nombre}</td>
@@ -670,8 +723,12 @@ export function ImportarArticulosPage() {
                                         <td className="px-4 py-2">
                                             <span className="px-2 py-0.5 bg-slate-100 rounded text-xs font-medium">{row.categoria.trim()}</span>
                                         </td>
-                                        <td className="px-4 py-2 text-right tabular-nums text-emerald-700 font-medium">{row.costo.toFixed(2)}</td>
-                                        <td className="px-4 py-2 text-right tabular-nums">{row.stock}</td>
+                                        <td className={cn('px-4 py-2 text-right tabular-nums font-medium', row.costoAmbiguo ? 'text-amber-700' : 'text-emerald-700')} title={row.costoAmbiguo ? 'Valor de origen con punto y coma a la vez — verificar' : undefined}>
+                                            {row.costo.toFixed(2)}{row.costoAmbiguo && ' ⚠️'}
+                                        </td>
+                                        <td className={cn('px-4 py-2 text-right tabular-nums', row.stockAmbiguo && 'text-amber-700 font-medium')} title={row.stockAmbiguo ? 'Valor de origen con punto y coma a la vez — verificar' : undefined}>
+                                            {row.stock}{row.stockAmbiguo && ' ⚠️'}
+                                        </td>
                                         <td className="px-4 py-2 text-right tabular-nums">{row.iva_porcentaje}%</td>
                                     </tr>
                                 ))}

@@ -18,6 +18,9 @@ interface CsvRow {
     valor_original: number
     saldo: number
     observaciones: string
+    // true si la celda de origen traía punto Y coma a la vez — ver parseNumero.
+    valorOriginalAmbiguo: boolean
+    saldoAmbiguo: boolean
 }
 
 interface RowResult {
@@ -68,6 +71,14 @@ function parseNumero(val: string): number | null {
     return isNaN(n) ? null : n
 }
 
+// Trae punto Y coma a la vez → el parseo tiene que adivinar cuál es el
+// separador decimal (ver parseNumero). Vale la pena que el usuario lo
+// confirme visualmente antes de importar.
+function isAmbiguousNumber(val: string): boolean {
+    const s = (val ?? '').trim()
+    return s.includes(',') && s.includes('.')
+}
+
 // Separa una línea de CSV respetando comillas (RFC 4180): un campo que
 // empieza con " puede contener el delimitador o comillas escapadas como ""
 // sin que se corten las columnas (ej. observaciones con comas si el
@@ -108,12 +119,18 @@ function parseCsv(text: string, delimiter: FieldDelimiter): CsvRow[] {
         const numero_documento = (p[1] ?? '').trim()
         const fecha_emision    = (p[2] ?? '').trim()
         const fecha_vencimiento = (p[3] ?? '').trim()
-        const valor_original   = parseNumero(p[4] ?? '') ?? 0
-        const saldo            = parseNumero(p[5] ?? '') ?? 0
+        const valorOriginalRaw = p[4] ?? ''
+        const saldoRaw         = p[5] ?? ''
+        const valor_original   = parseNumero(valorOriginalRaw) ?? 0
+        const saldo            = parseNumero(saldoRaw) ?? 0
         const observaciones    = (p[6] ?? '').trim()
 
         if (!identificacion || !numero_documento) continue
-        rows.push({ identificacion, numero_documento, fecha_emision, fecha_vencimiento, valor_original, saldo, observaciones })
+        rows.push({
+            identificacion, numero_documento, fecha_emision, fecha_vencimiento, valor_original, saldo, observaciones,
+            valorOriginalAmbiguo: isAmbiguousNumber(valorOriginalRaw),
+            saldoAmbiguo: isAmbiguousNumber(saldoRaw),
+        })
     }
     return rows
 }
@@ -306,6 +323,8 @@ export function MigrarCarteraPage() {
     }
 
     const totalSaldo = rows.reduce((s, r) => s + r.saldo, 0)
+    const totalValorOriginal = rows.reduce((s, r) => s + r.valor_original, 0)
+    const filasAmbiguas = rows.filter(r => r.valorOriginalAmbiguo || r.saldoAmbiguo)
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
@@ -444,11 +463,30 @@ CREATE INDEX IF NOT EXISTS idx_cartera_cxc_origen
 
                 {rows.length > 0 && (
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                            <p className="text-sm text-slate-600">
-                                <strong>{rows.length}</strong> registros detectados ·
-                                Saldo total: <strong className="text-primary-700">{formatCurrency(totalSaldo)}</strong>
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                            <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest mb-2">
+                                {rows.length} registros — sumas de control (compara contra SUMA() en tu Excel antes de importar)
                             </p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white rounded-lg border border-emerald-100 p-3">
+                                    <p className="text-2xl font-bold text-slate-800 tabular-nums">{formatCurrency(totalValorOriginal)}</p>
+                                    <p className="text-xs text-slate-500">Suma columna "valor_original"</p>
+                                </div>
+                                <div className="bg-white rounded-lg border border-emerald-100 p-3">
+                                    <p className="text-2xl font-bold text-primary-700 tabular-nums">{formatCurrency(totalSaldo)}</p>
+                                    <p className="text-xs text-slate-500">Suma columna "saldo"</p>
+                                </div>
+                            </div>
+                            {filasAmbiguas.length > 0 && (
+                                <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                    <p className="text-xs text-amber-800">
+                                        <strong>{filasAmbiguas.length} fila{filasAmbiguas.length !== 1 ? 's' : ''}</strong> tienen valor_original o saldo con punto Y coma a la vez
+                                        (ej. "1.500,00") — marcadas en amarillo en la vista previa. El sistema asume cuál es el separador
+                                        decimal, y en un valor así puede adivinar mal.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Preview primeras 5 filas */}
@@ -466,13 +504,17 @@ CREATE INDEX IF NOT EXISTS idx_cartera_cxc_origen
                                 </thead>
                                 <tbody>
                                     {rows.slice(0, 5).map((r, i) => (
-                                        <tr key={i} className="border-t border-slate-100">
+                                        <tr key={i} className={cn('border-t border-slate-100', (r.valorOriginalAmbiguo || r.saldoAmbiguo) && 'bg-amber-50')}>
                                             <td className="px-3 py-2 text-slate-400">{i + 2}</td>
                                             <td className="px-3 py-2 font-mono">{r.identificacion}</td>
                                             <td className="px-3 py-2">{r.numero_documento}</td>
                                             <td className="px-3 py-2">{r.fecha_emision}</td>
-                                            <td className="px-3 py-2 text-right">{formatCurrency(r.valor_original)}</td>
-                                            <td className="px-3 py-2 text-right font-semibold text-primary-700">{formatCurrency(r.saldo)}</td>
+                                            <td className={cn('px-3 py-2 text-right', r.valorOriginalAmbiguo && 'text-amber-700 font-semibold')} title={r.valorOriginalAmbiguo ? 'Valor de origen con punto y coma a la vez — verificar' : undefined}>
+                                                {formatCurrency(r.valor_original)}{r.valorOriginalAmbiguo && ' ⚠️'}
+                                            </td>
+                                            <td className={cn('px-3 py-2 text-right font-semibold', r.saldoAmbiguo ? 'text-amber-700' : 'text-primary-700')} title={r.saldoAmbiguo ? 'Valor de origen con punto y coma a la vez — verificar' : undefined}>
+                                                {formatCurrency(r.saldo)}{r.saldoAmbiguo && ' ⚠️'}
+                                            </td>
                                         </tr>
                                     ))}
                                     {rows.length > 5 && (
