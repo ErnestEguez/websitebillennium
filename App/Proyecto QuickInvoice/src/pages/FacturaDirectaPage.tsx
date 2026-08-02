@@ -1533,6 +1533,7 @@ export function FacturaDirectaPage() {
             clientes={clientes}
             servicios={productos}
             onApply={handleVoiceApply}
+            empresaId={empresa!.id}
         />
         </>
     )

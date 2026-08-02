@@ -1,11 +1,12 @@
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string
-const GEMINI_MODEL   = 'gemini-2.5-flash-lite'
-const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
+import { supabase } from '../lib/supabase'
 
 interface GeminiPart {
     text?: string
     inline_data?: { mime_type: string; data: string }
 }
+
+// Debe coincidir con el CHECK de facturacion.consumo_ia
+export type OrigenIA = 'compra_inventario' | 'compra_servicio' | 'th_screening_cv' | 'asistente_voz'
 
 export interface ProductoOcr {
     codigo: string
@@ -38,32 +39,29 @@ export interface FacturaOcr {
     detalle: ProductoOcr[]
 }
 
-async function callGemini(parts: GeminiPart[], maxTokens = 1500): Promise<string> {
-    const res = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: maxTokens },
-        }),
+// Llama a Gemini vía la Edge Function gemini-client-proxy — nunca
+// directo desde el navegador (evita exponer la API key en el bundle
+// público) y de paso registra el consumo por empresa en
+// facturacion.consumo_ia.
+async function callGemini(parts: GeminiPart[], empresaId: string, origen: OrigenIA, maxTokens = 1500): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('gemini-client-proxy', {
+        body: { parts, maxTokens, empresa_id: empresaId, origen },
     })
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error((err as any).error?.message ?? `HTTP ${res.status}`)
-    }
-    const data = await res.json()
-    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+    if (error) throw new Error(error.message ?? 'Error al llamar a Gemini')
+    if (data?.error) throw new Error(data.error)
+    return data?.text ?? ''
 }
 
 export const geminiService = {
-    async generateContent(parts: GeminiPart[]): Promise<string> {
-        return callGemini(parts, 1500)
+    async generateContent(parts: GeminiPart[], empresaId: string, origen: OrigenIA): Promise<string> {
+        return callGemini(parts, empresaId, origen, 1500)
     },
 
     async analizarFacturaCompra(
         base64: string,
         mimeType: string,
         categorias: string[],
+        empresaId: string,
     ): Promise<FacturaOcr> {
         const catList = categorias.length > 0 ? categorias.join(', ') : 'General'
         const prompt = `Analiza esta factura de proveedor ecuatoriana y extrae todos sus datos.
@@ -102,6 +100,8 @@ Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional.
 }`
         const raw = await callGemini(
             [{ inline_data: { mime_type: mimeType, data: base64 } }, { text: prompt }],
+            empresaId,
+            'compra_inventario',
             4000,
         )
         const json = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()

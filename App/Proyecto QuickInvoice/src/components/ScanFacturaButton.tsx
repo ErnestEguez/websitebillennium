@@ -25,9 +25,10 @@ export interface FacturaEscaneada {
 
 interface Props {
     onAplicar: (data: FacturaEscaneada) => void
+    empresaId: string
 }
 
-export function ScanFacturaButton({ onAplicar }: Props) {
+export function ScanFacturaButton({ onAplicar, empresaId }: Props) {
     const [open, setOpen]         = useState(false)
     const [preview, setPreview]   = useState<string | null>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -76,7 +77,7 @@ export function ScanFacturaButton({ onAplicar }: Props) {
         setResultado(null)
         try {
             const { data, error: fnErr } = await supabase.functions.invoke('scan-invoice', {
-                body: { content: preview, mimeType },
+                body: { content: preview, mimeType, empresa_id: empresaId },
             })
             if (fnErr || data?.error) throw new Error(fnErr?.message ?? data?.error)
             setResultado(data as FacturaEscaneada)

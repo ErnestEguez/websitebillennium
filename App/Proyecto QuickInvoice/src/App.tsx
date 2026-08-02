@@ -55,6 +55,7 @@ const AdminUserEmpresasPage        = lz(() => import('./pages/AdminUserEmpresasP
 const AdminDepuracionPage          = lz(() => import('./pages/admin/AdminDepuracionPage'), 'AdminDepuracionPage')
 const LogSesionesPage              = lz(() => import('./pages/admin/LogSesionesPage'), 'LogSesionesPage')
 const AdminReparacionStockPage     = lz(() => import('./pages/admin/AdminReparacionStockPage'), 'AdminReparacionStockPage')
+const EstadisticasEmpresaPage      = lz(() => import('./pages/admin/EstadisticasEmpresaPage'), 'EstadisticasEmpresaPage')
 const ImportarClientesPage         = lz(() => import('./pages/ImportarClientesPage'), 'ImportarClientesPage')
 const MigrarCarteraPage            = lz(() => import('./pages/MigrarCarteraPage'), 'MigrarCarteraPage')
 const ImportarArticulosPage        = lz(() => import('./pages/ImportarArticulosPage'), 'ImportarArticulosPage')
@@ -572,6 +573,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
                     <Layout>
                       <AdminReparacionStockPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/admin/estadisticas-empresa" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
+                    <Layout>
+                      <EstadisticasEmpresaPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

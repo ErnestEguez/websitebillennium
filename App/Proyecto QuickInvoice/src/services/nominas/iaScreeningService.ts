@@ -82,7 +82,7 @@ export const iaScreeningService = {
         const texto = await geminiService.generateContent([
             { text: buildPrompt(vacante, nombreCandidato) },
             { inline_data: { mime_type, data } },
-        ])
+        ], vacante.empresa_id, 'th_screening_cv')
 
         // 4. Parsear la respuesta JSON
         return parsearRespuesta(texto)

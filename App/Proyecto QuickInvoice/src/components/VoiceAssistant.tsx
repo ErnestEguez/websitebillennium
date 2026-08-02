@@ -38,6 +38,7 @@ interface Props {
     clientes: any[]
     servicios: any[]
     onApply: (result: VoiceResult) => void
+    empresaId: string
 }
 
 declare global {
@@ -240,7 +241,7 @@ function Row({ label, icon, children }: {
     )
 }
 
-export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
+export function VoiceAssistant({ clientes, servicios, onApply, empresaId }: Props) {
     const [open, setOpen]               = useState(false)
     const [grabando, setGrabando]       = useState(false)
     const [procesando, setProcesando]   = useState(false)
@@ -339,7 +340,7 @@ export function VoiceAssistant({ clientes, servicios, onApply }: Props) {
         try {
             // Intentar con Gemini vía Edge Function
             const { data, error: fnErr } = await supabase.functions.invoke('voice-assistant', {
-                body: { transcripcion: t.trim(), clientes, servicios },
+                body: { transcripcion: t.trim(), clientes, servicios, empresa_id: empresaId },
             })
             if (fnErr || data?.error) throw new Error(fnErr?.message ?? data?.error ?? 'Error')
             setUsandoIA(true)

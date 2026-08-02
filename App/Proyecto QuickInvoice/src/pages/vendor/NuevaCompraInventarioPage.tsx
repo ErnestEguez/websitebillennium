@@ -237,7 +237,7 @@ export function NuevaCompraInventarioPage() {
             const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg')
 
             const ocr = await geminiService.analizarFacturaCompra(
-                base64, mimeType, categorias.map(c => c.nombre),
+                base64, mimeType, categorias.map(c => c.nombre), empresa!.id,
             )
 
             // ── Llenar cabecera ────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -37,8 +38,10 @@ Separa correctamente esos 3 grupos.`;
 serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+    let empresaId: string | undefined;
     try {
-        const { content, mimeType } = await req.json();
+        const { content, mimeType, empresa_id } = await req.json();
+        empresaId = empresa_id;
         if (!content) throw new Error("Contenido vacío");
 
         const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -82,13 +85,40 @@ serve(async (req) => {
 
         const resultado = JSON.parse(jsonMatch[0]);
 
+        if (empresaId) await registrarConsumo(empresaId, geminiData.usageMetadata ?? {}, true);
+
         return new Response(JSON.stringify(resultado), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     } catch (e: any) {
+        if (empresaId) await registrarConsumo(empresaId, {}, false);
         return new Response(JSON.stringify({ error: e.message }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 400,
         });
     }
 });
+
+async function registrarConsumo(
+    empresaId: string,
+    usage: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number },
+    exitoso: boolean,
+) {
+    try {
+        const supabase = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+            { db: { schema: "facturacion" } }
+        );
+        await supabase.from("consumo_ia").insert({
+            empresa_id: empresaId,
+            origen: "compra_servicio",
+            tokens_entrada: usage.promptTokenCount ?? null,
+            tokens_salida: usage.candidatesTokenCount ?? null,
+            tokens_total: usage.totalTokenCount ?? null,
+            exitoso,
+        });
+    } catch (e) {
+        console.error("[consumo_ia] no se pudo registrar:", e);
+    }
+}

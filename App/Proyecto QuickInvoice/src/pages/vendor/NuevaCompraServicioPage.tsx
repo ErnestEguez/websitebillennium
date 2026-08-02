@@ -325,7 +325,7 @@ export function NuevaCompraServicioPage() {
                     <p className="text-slate-500 text-sm">Honorarios, arrend., servicios básicos, etc.</p>
                 </div>
                 <HelpButton pageKey="compras-servicios" />
-                <ScanFacturaButton onAplicar={handleScanAplicar} />
+                <ScanFacturaButton onAplicar={handleScanAplicar} empresaId={empresa!.id} />
             </div>
 
             <div className="card p-5 space-y-4">
