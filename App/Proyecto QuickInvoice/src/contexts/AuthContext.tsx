@@ -86,6 +86,7 @@ export interface Permisos {
     perm_vendedores:            boolean
     perm_importar_clientes:     boolean
     perm_migracion_cartera:     boolean
+    perm_eliminar_compra:       boolean
 }
 
 interface AuthContextType {
@@ -168,6 +169,9 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_vendedores:            true,
     perm_importar_clientes:     true,
     perm_migracion_cartera:     true,
+    // false por defecto a propósito (a diferencia de todos los demás
+    // perm_*): borrado permanente de compras, debe concederse explícito.
+    perm_eliminar_compra:       false,
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -410,6 +414,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_vendedores:            permData.perm_vendedores            ?? true,
                     perm_importar_clientes:     permData.perm_importar_clientes     ?? true,
                     perm_migracion_cartera:     permData.perm_migracion_cartera     ?? true,
+                    perm_eliminar_compra:       permData.perm_eliminar_compra       ?? false,
                 } : DEFAULT_PERMISOS)
             }
         } catch {
