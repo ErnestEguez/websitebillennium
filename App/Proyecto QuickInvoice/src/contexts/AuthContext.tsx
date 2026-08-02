@@ -218,8 +218,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         isMounted.current = true
+
+        // true si la URL trae un enlace mágico sin procesar todavía —
+        // ya sea el formato implícito (#access_token=...) que el SDK
+        // detecta solo, o el formato ?token_hash=...&type=... que
+        // requiere canjearlo explícitamente (ver más abajo).
+        function hayMagicLinkEnUrl(): boolean {
+            return (
+                window.location.hash.includes('access_token') ||
+                window.location.hash.includes('type=magiclink') ||
+                new URLSearchParams(window.location.search).get('token_hash') !== null
+            )
+        }
+
         const initializeAuth = async () => {
             try {
+                // Algunas plantillas de correo de Supabase enlazan directo al
+                // sitio con ?token_hash=...&type=..., en vez de pasar primero
+                // por /auth/v1/verify (que sí deja el session en #access_token
+                // y el SDK detecta solo). Ese caso hay que canjearlo a mano con
+                // verifyOtp — si no, la sesión nunca se establece y el login
+                // queda en loop pidiendo el correo otra vez.
+                const tokenHash = new URLSearchParams(window.location.search).get('token_hash')
+                const tipoParam = new URLSearchParams(window.location.search).get('type')
+                if (tokenHash && tipoParam) {
+                    const { error: otpError } = await supabase.auth.verifyOtp({
+                        token_hash: tokenHash,
+                        type: tipoParam as 'magiclink' | 'email' | 'recovery' | 'invite',
+                    })
+                    if (!otpError) window.history.replaceState({}, '', window.location.pathname)
+                }
+
                 const sessionPromise = supabase.auth.getSession()
                 const timeoutPromise = new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
@@ -230,14 +259,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUser(session.user)
                     setTimeout(() => { if (isMounted.current) fetchProfile(session.user.id) }, 0)
                 } else {
-                    const hasMagicLink =
-                        window.location.hash.includes('access_token') ||
-                        window.location.hash.includes('type=magiclink') ||
-                        new URLSearchParams(window.location.search).get('token_hash') !== null
-                    if (!hasMagicLink) setLoading(false)
+                    if (!hayMagicLinkEnUrl()) setLoading(false)
                 }
             } catch {
-                if (isMounted.current) setLoading(false)
+                // Si sigue habiendo un enlace mágico sin procesar (ej. la
+                // verificación de arriba tardó más que el timeout de la
+                // carrera), no mandar a /login todavía — se resuelve con el
+                // evento SIGNED_IN o con el timeout de seguridad de abajo.
+                if (isMounted.current && !hayMagicLinkEnUrl()) setLoading(false)
             }
         }
         initializeAuth()
