@@ -236,8 +236,8 @@ export const AdminUsers = () => {
         u.id === userId ? { ...u, is_active: !currentActive } : u
       ));
       toast.success(`Usuario ${!currentActive ? 'activado' : 'desactivado'}`);
-    } catch {
-      toast.error('Error al actualizar el usuario');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Error al actualizar el usuario');
     } finally {
       setToggling(null);
     }
