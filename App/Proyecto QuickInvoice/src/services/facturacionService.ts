@@ -55,6 +55,21 @@ export interface SriConfig {
     mail_cc?: string
     obligado_contabilidad?: 'SI' | 'NO'
     regimen_rimpe?: boolean
+    // Configuración del ticket térmico 80mm (POS) — cada empresa puede tener
+    // una impresora/driver distinto, el ancho imprimible real varía.
+    impresion_pos?: {
+        ancho_papel_mm?: number       // 58 | 80, default 80
+        margen_horizontal_mm?: number // default 4 (contenido = ancho - 2*margen)
+        escala_pct?: number           // default 100
+        lineas_avance_final?: number  // default 0
+    }
+}
+
+export const IMPRESION_POS_DEFAULTS: Required<NonNullable<SriConfig['impresion_pos']>> = {
+    ancho_papel_mm: 80,
+    margen_horizontal_mm: 4,
+    escala_pct: 100,
+    lineas_avance_final: 0,
 }
 
 export const facturacionService = {

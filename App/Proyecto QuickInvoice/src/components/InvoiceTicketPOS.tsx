@@ -1,19 +1,37 @@
-import { forwardRef } from 'react'
+import { forwardRef, useId } from 'react'
 import { formatCurrency } from '../lib/utils'
 import { format } from 'date-fns'
+import { IMPRESION_POS_DEFAULTS, type SriConfig } from '../services/facturacionService'
 
 interface InvoiceTicketPOSProps {
     factura: any
     montoRecibido?: number
     vuelto?: number
+    // Config en borrador (para vista previa antes de guardar). Si no se pasa,
+    // se lee de factura.empresas.config_sri.impresion_pos (config guardada).
+    configOverride?: SriConfig['impresion_pos']
+    avisoLopdp?: string | null
 }
 
-export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps>(({ factura, montoRecibido, vuelto }, ref) => {
+export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps>(({ factura, montoRecibido, vuelto, configOverride, avisoLopdp }, ref) => {
+    const reactId = useId()
+    const zoomClass = `ticket-zoom-${reactId.replace(/:/g, '')}`
+
     if (!factura) return null
 
+    const config = { ...IMPRESION_POS_DEFAULTS, ...(configOverride ?? factura.empresas?.config_sri?.impresion_pos ?? {}) }
+    const anchoContenido = config.ancho_papel_mm - config.margen_horizontal_mm * 2
+
     return (
-        <div ref={ref} className="bg-white p-[5mm] w-[72mm] font-mono text-[10px] leading-tight text-black print:p-0">
-            <style dangerouslySetInnerHTML={{ __html: '@page { size: 80mm auto; margin: 0; }' }} />
+        <div
+            ref={ref}
+            className={`mx-auto bg-white p-[5mm] font-mono text-[10px] leading-tight text-black print:p-0 ${zoomClass}`}
+            style={{ width: `${anchoContenido}mm` }}
+        >
+            <style dangerouslySetInnerHTML={{ __html: `
+                @page { size: ${config.ancho_papel_mm}mm auto; margin: 0; }
+                @media print { .${zoomClass} { zoom: ${config.escala_pct}%; } }
+            ` }} />
             {/* Header Logos */}
             <div className="flex justify-center mb-4">
                 {factura.empresas?.logo_url ? (
@@ -152,6 +170,11 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                 <p>FECHA AUT.: {factura.fecha_autorizacion ? format(new Date(factura.fecha_autorizacion), 'dd/MM/yyyy HH:mm') : 'PENDIENTE'}</p>
                 <p>AMBIENTE: {factura.ambiente || 'PRUEBAS'}</p>
                 <p>EMISIÓN: NORMAL</p>
+                {avisoLopdp && (
+                    <p className="mt-3 pt-2 border-t border-dashed border-black leading-snug">
+                        {avisoLopdp}
+                    </p>
+                )}
 
                 <p className="mt-4 text-center border-t border-dashed border-black pt-2 italic">
                     Este documento es una representación impresa de un comprobante electrónico.
@@ -176,6 +199,9 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                 )}
                 <p className="text-center font-bold">¡GRACIAS POR SU VISITA!</p>
             </div>
+            {config.lineas_avance_final > 0 && Array.from({ length: config.lineas_avance_final }).map((_, i) => (
+                <p key={i}>&nbsp;</p>
+            ))}
         </div>
     )
 })

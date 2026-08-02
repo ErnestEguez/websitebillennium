@@ -45,6 +45,7 @@ import type { PuntoEmision } from '../types/puntosEmision'
 import { cn } from '../lib/utils'
 import { getPuntoEmisionDispositivo, setPuntoEmisionDispositivo } from '../lib/dispositivoPuntoEmision'
 import { auditService } from '../services/auditoria/auditService'
+import { ConfigImpresionTicketModal } from '../components/ConfigImpresionTicketModal'
 
 // ── Campo verificador de código de artículo para preparaciones ───────────────
 function PrepPinturaCodeField({
@@ -161,6 +162,8 @@ export function ConfigurationPage() {
     const [isPuntoEmisionModalOpen, setIsPuntoEmisionModalOpen] = useState(false)
     const [editingPuntoEmision, setEditingPuntoEmision] = useState<Partial<PuntoEmision> | null>(null)
     const [dispositivoPeId, setDispositivoPeId] = useState<string | null>(null)
+
+    const [isImpresionModalOpen, setIsImpresionModalOpen] = useState(false)
 
     // Plataforma State (Admin)
     const [allEmpresas, setAllEmpresas] = useState<any[]>([])
@@ -1478,6 +1481,18 @@ export function ConfigurationPage() {
                                         ? <><CheckCheck className="w-3.5 h-3.5 text-emerald-600" /> Copiado</>
                                         : <><Copy className="w-3.5 h-3.5" /> Copiar comando</>
                                     }
+                                </button>
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-100">
+                                <p className="text-xs text-slate-500 mb-2">
+                                    Si el ticket sale descentrado, cortado o con márgenes incorrectos en esta impresora, ajusta el ancho de papel y los márgenes aquí:
+                                </p>
+                                <button
+                                    onClick={() => setIsImpresionModalOpen(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold hover:bg-primary-700 transition-colors"
+                                >
+                                    <Printer className="w-3.5 h-3.5" /> Configurar márgenes y ancho de ticket
                                 </button>
                             </div>
                         </div>
@@ -3352,6 +3367,14 @@ export function ConfigurationPage() {
                     </div>
                 )
             }
+
+            {isImpresionModalOpen && empresa?.id && (
+                <ConfigImpresionTicketModal
+                    empresaId={empresa.id}
+                    empresaNombre={empresa.nombre}
+                    onClose={() => setIsImpresionModalOpen(false)}
+                />
+            )}
         </div >
     )
 }
