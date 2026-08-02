@@ -6,6 +6,7 @@ export interface MovimientoKardex {
     empresa_id: string
     producto_id: string
     bodega_id?: string
+    compra_id?: string
     fecha: string
     tipo_movimiento: 'ENTRADA' | 'SALIDA'
     motivo: string

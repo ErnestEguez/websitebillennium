@@ -183,6 +183,7 @@ export const compraService = {
                 empresa_id:           cabecera.empresa_id,
                 producto_id:          d.producto_id,
                 bodega_id:            cabecera.bodega_id ?? d.bodega_id,
+                compra_id:            compra.id,
                 tipo_movimiento:      'ENTRADA',
                 motivo:               'Compra inventario',
                 documento_referencia: cabecera.numero_factura ?? compra.id,
@@ -290,51 +291,56 @@ export const compraService = {
         return result
     },
 
-    async anular(id: string, motivo: string, anuladoPor: string): Promise<void> {
-        // Obtener compra para ver si necesita revertir kardex
-        const compra = await compraService.obtenerConDetalle(id)
-        if (compra.estado !== 'ACTIVO') throw new Error('Solo se pueden anular compras activas')
+    // Anulación con reversa completa: kardex (stock/costo recalculado),
+    // CxP, retenciones y asiento contable, todo dentro de una sola
+    // transacción en Postgres (facturacion.fn_anular_compra). A diferencia
+    // de eliminarPermanente, aquí NO se borra nada — la compra, su detalle
+    // y las retenciones quedan conservados con estado ANULADO. Bloquea si
+    // la CxP ya tiene pagos aplicados o si existe una N/C de proveedor.
+    async anular(id: string, motivo: string, _anuladoPor?: string): Promise<void> {
+        const compraPrevia = await compraService.obtenerConDetalle(id)
 
-        // 1. Marcar cabecera como anulada
-        const { error } = await supabase.from('ingresos_stock').update({
-            estado: 'ANULADO',
-            motivo_anulacion: motivo,
-            fecha_anulacion: new Date().toISOString().split('T')[0],
-            anulado_por: anuladoPor,
-        }).eq('id', id)
+        const { data: snapshot, error } = await supabase.rpc('fn_anular_compra', {
+            p_compra_id: id,
+            p_motivo: motivo,
+        })
         if (error) throw error
 
-        // 2. Si era inventario, revertir ENTRADA en kardex con SALIDA
-        if (compra.tipo_compra === 'INVENTARIO' && compra.detalle_ingresos_stock?.length) {
-            const reversos = compra.detalle_ingresos_stock.map(d => ({
-                empresa_id: compra.empresa_id,
-                producto_id: d.producto_id,
-                tipo_movimiento: 'SALIDA',
-                motivo: `Anulación compra ${compra.numero_factura ?? id}`,
-                documento_referencia: id,
-                cantidad: d.cantidad,
-                costo_unitario: d.costo_unitario,
-            }))
-            await supabase.from('kardex').insert(reversos)
-        }
+        auditService.logEvent({
+            empresaId: compraPrevia.empresa_id,
+            modulo: 'compras',
+            accion: 'anular',
+            entidad: compraPrevia.tipo_compra === 'SERVICIO' ? 'compra_servicio' : 'compra_inventario',
+            entidadId: id,
+            numeroDocumento: compraPrevia.numero_factura ?? undefined,
+            bodegaId: (compraPrevia as any).bodega_id ?? undefined,
+            resumen: `Anulación de compra${compraPrevia.numero_factura ? ` No. ${compraPrevia.numero_factura}` : ` ${id}`}`,
+            detalle: { motivo, snapshot },
+            nivel: 'sensible',
+        })
+    },
 
-        // 3. Anular CxP si existe
-        if (compra.cxp) {
-            await supabase.from('cuentas_por_pagar')
-                .update({ estado: 'ANULADO', updated_at: new Date().toISOString() })
-                .eq('id', compra.cxp.id)
-        }
+    // Borrado permanente — reversa kardex (saldo corrido recalculado), CxP,
+    // retenciones y asiento contable dentro de una sola transacción en
+    // Postgres (facturacion.fn_eliminar_compra). Bloquea si la CxP ya tiene
+    // pagos aplicados o si existe una N/C de proveedor asociada.
+    async eliminarPermanente(compra: CompraConDetalle, motivo: string): Promise<void> {
+        const { data: snapshot, error } = await supabase.rpc('fn_eliminar_compra', {
+            p_compra_id: compra.id,
+            p_motivo: motivo,
+        })
+        if (error) throw error
 
         auditService.logEvent({
             empresaId: compra.empresa_id,
             modulo: 'compras',
-            accion: 'anular',
+            accion: 'eliminar',
             entidad: compra.tipo_compra === 'SERVICIO' ? 'compra_servicio' : 'compra_inventario',
-            entidadId: id,
+            entidadId: compra.id,
             numeroDocumento: compra.numero_factura ?? undefined,
             bodegaId: (compra as any).bodega_id ?? undefined,
-            resumen: `Anulación de compra${compra.numero_factura ? ` No. ${compra.numero_factura}` : ` ${id}`}`,
-            detalle: { motivo },
+            resumen: `Eliminación permanente de compra${compra.numero_factura ? ` No. ${compra.numero_factura}` : ` ${compra.id}`}`,
+            detalle: { motivo, snapshot },
             nivel: 'sensible',
         })
     },

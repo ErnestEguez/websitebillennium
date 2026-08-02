@@ -69,6 +69,7 @@ const OrdersPage                   = lz(() => import('./pages/OrdersPage'), 'Ord
 // ── Módulo Cuentas por Pagar (Vendor) ────────────────────────────────────────
 const VMProveedoresPage            = lz(() => import('./pages/vendor/ProveedoresPage'), 'ProveedoresPage')
 const ComprasPage                  = lz(() => import('./pages/vendor/ComprasPage'), 'ComprasPage')
+const EliminarCompraPage           = lz(() => import('./pages/vendor/EliminarCompraPage'), 'EliminarCompraPage')
 const NuevaCompraInventarioPage    = lz(() => import('./pages/vendor/NuevaCompraInventarioPage'), 'NuevaCompraInventarioPage')
 const NuevaCompraServicioPage      = lz(() => import('./pages/vendor/NuevaCompraServicioPage'), 'NuevaCompraServicioPage')
 const OrdenesCompraPage            = lz(() => import('./pages/vendor/OrdenesCompraPage'), 'OrdenesCompraPage')
@@ -521,6 +522,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <AuditoriaPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/ajustes/eliminar-compra" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina', 'admin_plataforma']}>
+                    <Layout>
+                      <EliminarCompraPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>
