@@ -37,6 +37,20 @@ export function FacturacionMasivaPage() {
 
     useEffect(() => { if (empresa?.id) cargar() }, [empresa?.id])
 
+    // La tasa de IVA general de la cabecera se propaga a TODAS las filas —
+    // igual que la fecha de vencimiento, que ya se recalcula sola en la
+    // grilla. Si el usuario ya editó una fila a mano, un cambio posterior
+    // en la cabecera la vuelve a igualar (mismo criterio que la fecha, que
+    // tampoco "recuerda" ediciones puntuales).
+    useEffect(() => {
+        setFilas(prev => {
+            if (!prev.length) return prev
+            setValidado(false)
+            return prev.map(f => ({ ...f, tasaIva: tasaIvaGeneral }))
+        })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tasaIvaGeneral])
+
     async function cargar() {
         if (!empresa?.id) return
         setLoading(true); setError(''); setValidado(false); setPaso('config'); setResumen(null)

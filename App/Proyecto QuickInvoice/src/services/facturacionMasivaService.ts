@@ -67,6 +67,7 @@ export const facturacionMasivaService = {
             .select('*')
             .eq('empresa_id', empresaId)
             .eq('activo', true)
+            .eq('excluido_facturacion_masiva', false)
             .order('nombre')
         if (error) throw error
         return (data ?? []) as ClienteFacturable[]

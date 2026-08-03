@@ -421,6 +421,12 @@ export function ClientsPage() {
                                     </div>
                                 </div>
                                 <p className="text-xs text-slate-400">Cargo recurrente mensual usado por Facturación Masiva de Clientes (Facturación → Facturación Masiva).</p>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingCliente?.excluido_facturacion_masiva}
+                                        onChange={(e) => setEditingCliente({ ...editingCliente, excluido_facturacion_masiva: e.target.checked })} />
+                                    <span className="text-sm text-slate-600">Excluir de Facturación Masiva (Consumidor Final, clientes eventuales)</span>
+                                </label>
                             </div>
 
                             {lopdpEnabled && (

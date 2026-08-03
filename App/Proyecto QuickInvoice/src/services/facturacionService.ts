@@ -36,6 +36,8 @@ export interface Cliente {
     // Facturación Masiva: valor recurrente a facturar mensualmente (sin IVA) y su tasa
     valor_facturar?: number
     tasa_iva?: number
+    // true = nunca entra al lote mensual (Consumidor Final, clientes eventuales)
+    excluido_facturacion_masiva?: boolean
     // Fase 4 LOPDP: opcionales, nunca bloquean la operación normal
     base_legal_tratamiento?:   BaseLegalTratamiento | null
     consentimiento_explicito?: boolean
