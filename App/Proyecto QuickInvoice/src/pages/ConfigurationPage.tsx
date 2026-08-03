@@ -457,6 +457,15 @@ export function ConfigurationPage() {
                 if (iaError) throw iaError
             }
 
+            // Facturación Masiva: apagada por defecto, solo admin_plataforma
+            // puede activarla por empresa (mismo patrón que arriba).
+            if (empresaId) {
+                const { error: facturacionMasivaError } = await supabase
+                    .from('facturacion_masiva_config')
+                    .upsert({ empresa_id: empresaId, enabled: !!editingEmpresa.facturacion_masiva_enabled })
+                if (facturacionMasivaError) throw facturacionMasivaError
+            }
+
             if (empresaId) {
                 const cambios: Record<string, { antes: unknown; despues: unknown }> = {}
                 if ((configSriAntes?.firma_password || null) !== (payload.config_sri.firma_password || null)) {
@@ -479,6 +488,7 @@ export function ConfigurationPage() {
                         ia_compras_enabled: !!editingEmpresa.ia_compras_enabled,
                         ia_voz_enabled: !!editingEmpresa.ia_voz_enabled,
                         ia_cv_enabled: !!editingEmpresa.ia_cv_enabled,
+                        facturacion_masiva_enabled: !!editingEmpresa.facturacion_masiva_enabled,
                     },
                     nivel: 'compliance',
                 })
@@ -2324,6 +2334,18 @@ export function ConfigurationPage() {
                                                                         } catch {
                                                                             // si falla, quedan destildadas por defecto
                                                                         }
+                                                                        try {
+                                                                            const { data: fmData } = await supabase
+                                                                                .from('facturacion_masiva_config')
+                                                                                .select('enabled')
+                                                                                .eq('empresa_id', emp.id)
+                                                                                .maybeSingle()
+                                                                            setEditingEmpresa((prev: any) =>
+                                                                                prev ? { ...prev, facturacion_masiva_enabled: !!fmData?.enabled } : prev
+                                                                            )
+                                                                        } catch {
+                                                                            // si falla, queda destildado por defecto
+                                                                        }
                                                                     }}
                                                                     className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors"
                                                                     title="Editar"
@@ -2782,6 +2804,20 @@ export function ConfigurationPage() {
                                         className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
                                         checked={!!editingEmpresa?.ia_cv_enabled}
                                         onChange={e => setEditingEmpresa({ ...editingEmpresa, ia_cv_enabled: e.target.checked })}
+                                    />
+                                </label>
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Facturación Masiva de Clientes</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Habilita el proceso mensual de facturación electrónica en lote a todos los clientes activos.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingEmpresa?.facturacion_masiva_enabled}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, facturacion_masiva_enabled: e.target.checked })}
                                     />
                                 </label>
                             </div>

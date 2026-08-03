@@ -14,6 +14,7 @@ import {
     Truck,
     BarChart3,
     FilePlus,
+    FileStack,
     ShoppingCart,
     BookOpen,
     UserCheck,
@@ -54,6 +55,7 @@ import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
 import { useLopdpEnabled } from '../hooks/useLopdpEnabled'
+import { useFacturacionMasivaEnabled } from '../hooks/useFacturacionMasivaEnabled'
 
 interface SidebarItemProps {
     to: string
@@ -228,6 +230,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     // LOPDP: flag independiente de `mods` (vive en lopdp.empresas_config, no
     // en facturacion.user_modules) — ver useLopdpEnabled.ts
     const { enabled: lopdpEnabled } = useLopdpEnabled()
+    const { enabled: facturacionMasivaEnabled } = useFacturacionMasivaEnabled()
 
     return (
         <div className="min-h-screen bg-slate-50 flex">
@@ -286,10 +289,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('facturacion')}
                             onToggle={() => toggleGroup('facturacion')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/nueva-factura','/proformas','/facturacion','/vendedores','/notas-credito','/anulacion-facturas','/guias-remision','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/nueva-factura','/proformas','/facturacion','/facturacion-masiva','/vendedores','/notas-credito','/anulacion-facturas','/guias-remision','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/nueva-factura"      icon={FilePlus}        label="Nueva Factura"      active={location.pathname === '/nueva-factura'} sub disabled={!p.perm_nueva_factura} sentinelId="nav-nueva-factura" />
                             <SidebarItem to="/proformas"          icon={FileText}        label="Proformas"          active={location.pathname.startsWith('/proformas')} sub disabled={!p.perm_nueva_factura} />
+                            {facturacionMasivaEnabled && <SidebarItem to="/facturacion-masiva" icon={FileStack} label="Facturación Masiva" active={location.pathname === '/facturacion-masiva'} sub />}
                             <SidebarItem to="/facturacion"        icon={FileText}        label="Comprobantes"       active={location.pathname === '/facturacion'} sub disabled={!p.perm_comprobantes} />
                             <SidebarItem to="/notas-credito"      icon={FileMinus}       label="Notas de Crédito"   active={location.pathname === '/notas-credito'} sub disabled={!p.perm_notas_credito} />
                             <SidebarItem to="/anulacion-facturas" icon={Ban}             label="Anulación Facturas" active={location.pathname === '/anulacion-facturas'} sub disabled={!p.perm_anulacion_facturas} />
