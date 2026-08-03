@@ -39,6 +39,7 @@ import { useNetworkStatus } from '../lib/networkStatus'
 import { offlineDb } from '../lib/offlineDb'
 import { cn } from '../lib/utils'
 import { VoiceAssistant, type VoiceResult } from '../components/VoiceAssistant'
+import { useIaFeatureEnabled } from '../hooks/useIaFeatureEnabled'
 
 // ─────────────────────────────────────────────────────
 // TIPOS DE PAGO (incluye Tarjeta D/C)
@@ -79,6 +80,7 @@ export function FacturaDirectaPage() {
     const [searchParams] = useSearchParams()
     const prepId = searchParams.get('prep_id')
     const { empresa, cajaSesion, profile } = useAuth()
+    const { enabled: vozIaHabilitada } = useIaFeatureEnabled('voz')
     const { isOnline } = useNetworkStatus()
     const [offlineSaved, setOfflineSaved] = useState(false)
 
@@ -1529,12 +1531,14 @@ export function FacturaDirectaPage() {
         </div>
 
         {/* Asistente de voz flotante */}
-        <VoiceAssistant
-            clientes={clientes}
-            servicios={productos}
-            onApply={handleVoiceApply}
-            empresaId={empresa!.id}
-        />
+        {vozIaHabilitada && (
+            <VoiceAssistant
+                clientes={clientes}
+                servicios={productos}
+                onApply={handleVoiceApply}
+                empresaId={empresa!.id}
+            />
+        )}
         </>
     )
 }

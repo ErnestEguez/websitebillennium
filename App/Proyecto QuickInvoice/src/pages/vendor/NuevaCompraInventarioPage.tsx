@@ -15,6 +15,7 @@ import { TIPO_SUSTENTO_LABELS } from '../../types/vendors'
 import { RetencionesEditor } from '../../components/vendor/RetencionesEditor'
 import type { RetLine } from '../../components/vendor/RetencionesEditor'
 import { geminiService } from '../../services/geminiService'
+import { useIaFeatureEnabled } from '../../hooks/useIaFeatureEnabled'
 import { productoService } from '../../services/productoService'
 import type { Categoria } from '../../services/productoService'
 import type { TipoProveedor } from '../../types/vendors'
@@ -73,6 +74,7 @@ function wordSimilarity(a: string, b: string): number {
 
 export function NuevaCompraInventarioPage() {
     const { empresa, profile } = useAuth()
+    const { enabled: ocrIaHabilitado } = useIaFeatureEnabled('compras')
     const navigate = useNavigate()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -638,35 +640,37 @@ export function NuevaCompraInventarioPage() {
                 <HelpButton pageKey="compras-inventario" />
             </div>
 
-            {/* ── OCR: cargar factura ───────────────────────────────────────────── */}
-            <div className="card p-4 border-2 border-dashed border-primary-200 bg-primary-50">
-                <div className="flex items-center gap-4">
-                    <ScanLine className="w-8 h-8 text-primary-400 shrink-0" />
-                    <div className="flex-1">
-                        <p className="font-semibold text-primary-700 text-sm">Cargar factura del proveedor (PDF o imagen)</p>
-                        <p className="text-xs text-primary-500 mt-0.5">
-                            Gemini AI extrae cabecera y detalle automáticamente — revisa y corrige antes de guardar
-                        </p>
+            {/* ── OCR: cargar factura (solo si Billennium habilitó esta IA) ───────── */}
+            {ocrIaHabilitado && (
+                <div className="card p-4 border-2 border-dashed border-primary-200 bg-primary-50">
+                    <div className="flex items-center gap-4">
+                        <ScanLine className="w-8 h-8 text-primary-400 shrink-0" />
+                        <div className="flex-1">
+                            <p className="font-semibold text-primary-700 text-sm">Cargar factura del proveedor (PDF o imagen)</p>
+                            <p className="text-xs text-primary-500 mt-0.5">
+                                Gemini AI extrae cabecera y detalle automáticamente — revisa y corrige antes de guardar
+                            </p>
+                        </div>
+                        <label className={cn(
+                            'btn btn-primary btn-sm flex items-center gap-2 cursor-pointer',
+                            ocrLoading && 'opacity-60 cursor-not-allowed pointer-events-none',
+                        )}>
+                            {ocrLoading
+                                ? <><Loader2 className="w-4 h-4 animate-spin" /> Analizando...</>
+                                : <><Upload className="w-4 h-4" /> Cargar factura</>
+                            }
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".pdf,image/*"
+                                className="hidden"
+                                disabled={ocrLoading}
+                                onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFile(f) }}
+                            />
+                        </label>
                     </div>
-                    <label className={cn(
-                        'btn btn-primary btn-sm flex items-center gap-2 cursor-pointer',
-                        ocrLoading && 'opacity-60 cursor-not-allowed pointer-events-none',
-                    )}>
-                        {ocrLoading
-                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Analizando...</>
-                            : <><Upload className="w-4 h-4" /> Cargar factura</>
-                        }
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".pdf,image/*"
-                            className="hidden"
-                            disabled={ocrLoading}
-                            onChange={e => { const f = e.target.files?.[0]; if (f) handleOcrFile(f) }}
-                        />
-                    </label>
                 </div>
-            </div>
+            )}
 
             {/* Vincular Orden de Compra */}
             {ordenesCompra.length > 0 && (

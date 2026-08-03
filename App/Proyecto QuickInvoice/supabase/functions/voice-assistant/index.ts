@@ -35,6 +35,11 @@ serve(async (req) => {
         const { transcripcion, clientes, servicios, empresa_id } = await req.json();
         empresaId = empresa_id;
         if (!transcripcion?.trim()) throw new Error("Transcripción vacía");
+        if (!empresaId) throw new Error("Falta 'empresa_id'");
+
+        if (!(await featureHabilitada(empresaId, "voz_enabled"))) {
+            throw new Error("Esta función de IA no está habilitada para tu empresa. Contacta a Billennium si la necesitas.");
+        }
 
         const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
         if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY no configurada");
@@ -113,4 +118,18 @@ async function registrarConsumo(
     } catch (e) {
         console.error("[consumo_ia] no se pudo registrar:", e);
     }
+}
+
+async function featureHabilitada(empresaId: string, columna: string): Promise<boolean> {
+    const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        { db: { schema: "facturacion" } }
+    );
+    const { data } = await supabase
+        .from("ia_features_config")
+        .select(columna)
+        .eq("empresa_id", empresaId)
+        .maybeSingle();
+    return !!(data as any)?.[columna];
 }

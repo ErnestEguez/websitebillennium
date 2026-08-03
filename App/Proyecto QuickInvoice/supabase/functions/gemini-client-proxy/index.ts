@@ -16,6 +16,32 @@ const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
 const ORIGENES_VALIDOS = ["compra_inventario", "compra_servicio", "th_screening_cv", "asistente_voz"];
 
+// Cada origen se autoriza por separado — feature flag en
+// facturacion.ia_features_config (ver 20260803b_ia_features_config.sql).
+// Deshabilitado por defecto: sin fila = false.
+const FEATURE_COLUMN: Record<string, string> = {
+    compra_inventario: "compras_enabled",
+    compra_servicio: "compras_enabled",
+    th_screening_cv: "cv_enabled",
+    asistente_voz: "voz_enabled",
+};
+
+async function featureHabilitada(empresaId: string, origen: string): Promise<boolean> {
+    const columna = FEATURE_COLUMN[origen];
+    if (!columna) return false;
+    const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+        { db: { schema: "facturacion" } }
+    );
+    const { data } = await supabase
+        .from("ia_features_config")
+        .select(columna)
+        .eq("empresa_id", empresaId)
+        .maybeSingle();
+    return !!(data as any)?.[columna];
+}
+
 serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -31,6 +57,10 @@ serve(async (req) => {
         if (!parts) throw new Error("Falta 'parts'");
         if (!empresaId) throw new Error("Falta 'empresa_id'");
         if (!origen || !ORIGENES_VALIDOS.includes(origen)) throw new Error("'origen' inválido");
+
+        if (!(await featureHabilitada(empresaId, origen))) {
+            throw new Error("Esta función de IA no está habilitada para tu empresa. Contacta a Billennium si la necesitas.");
+        }
 
         const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
         if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY no configurada");

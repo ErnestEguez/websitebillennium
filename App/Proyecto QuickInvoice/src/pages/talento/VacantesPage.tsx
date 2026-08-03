@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { storageService } from '../../services/storageService'
 import { iaScreeningService } from '../../services/nominas/iaScreeningService'
+import { useIaFeatureEnabled } from '../../hooks/useIaFeatureEnabled'
 import { cn } from '../../lib/utils'
 
 // ─── Helpers de etiqueta/color ────────────────────────────────────────────────
@@ -145,6 +146,7 @@ const EMPTY_EVT: FormEvento = {
 
 export function VacantesPage() {
     const { empresa } = useAuth() as any
+    const { enabled: cvIaHabilitado } = useIaFeatureEnabled('cv')
     const [vacantes, setVacantes] = useState<Vacante[]>([])
     const [candidatos, setCandidatos] = useState<Candidato[]>([])
     const [eventos, setEventos] = useState<CandidatoEvento[]>([])
@@ -634,13 +636,15 @@ export function VacantesPage() {
                                         {iaProgreso.actual}/{iaProgreso.total} {iaProgreso.nombre && `· ${iaProgreso.nombre}`}
                                     </span>
                                 )}
-                                <button onClick={evaluarTodosConIA}
-                                    disabled={iaEvaluando || candidatos.filter(c => c.cv_url).length === 0}
-                                    title="Evaluar todos los CVs con IA"
-                                    className="btn text-sm flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
-                                    {iaEvaluando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                                    Evaluar con IA
-                                </button>
+                                {cvIaHabilitado && (
+                                    <button onClick={evaluarTodosConIA}
+                                        disabled={iaEvaluando || candidatos.filter(c => c.cv_url).length === 0}
+                                        title="Evaluar todos los CVs con IA"
+                                        className="btn text-sm flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50">
+                                        {iaEvaluando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                                        Evaluar con IA
+                                    </button>
+                                )}
                                 <button onClick={() => abrirNuevoCandidato()}
                                     className="btn btn-primary text-sm flex items-center gap-1.5">
                                     <UserPlus className="w-3.5 h-3.5" /> Candidato
@@ -1040,7 +1044,9 @@ export function VacantesPage() {
                                         <div className="text-center py-10 text-slate-400">
                                             <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-40" />
                                             <p className="font-semibold text-slate-500">Sin evaluación IA</p>
-                                            {candidatoActivo?.cv_url ? (
+                                            {!cvIaHabilitado ? (
+                                                <p className="text-xs mt-2">Esta función de IA no está habilitada para tu empresa</p>
+                                            ) : candidatoActivo?.cv_url ? (
                                                 <button onClick={() => reevaluarCandidato(candidatoActivo!)}
                                                     disabled={iaEvaluando}
                                                     className="mt-4 btn text-sm flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white mx-auto disabled:opacity-50">
@@ -1068,12 +1074,14 @@ export function VacantesPage() {
                                                         Evaluado el {new Date(candidatoActivo!.ia_evaluado_at!).toLocaleDateString('es-EC')}
                                                     </p>
                                                 </div>
-                                                <button onClick={() => reevaluarCandidato(candidatoActivo!)}
-                                                    disabled={iaEvaluando || !candidatoActivo?.cv_url}
-                                                    title="Re-evaluar"
-                                                    className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40">
-                                                    {iaEvaluando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                                                </button>
+                                                {cvIaHabilitado && (
+                                                    <button onClick={() => reevaluarCandidato(candidatoActivo!)}
+                                                        disabled={iaEvaluando || !candidatoActivo?.cv_url}
+                                                        title="Re-evaluar"
+                                                        className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors disabled:opacity-40">
+                                                        {iaEvaluando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                                    </button>
+                                                )}
                                             </div>
 
                                             {candidatoActivo!.ia_resumen && (

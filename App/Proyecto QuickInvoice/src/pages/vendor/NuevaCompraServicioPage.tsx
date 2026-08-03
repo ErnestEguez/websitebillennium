@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { ScanFacturaButton, type FacturaEscaneada } from '../../components/ScanFacturaButton'
+import { useIaFeatureEnabled } from '../../hooks/useIaFeatureEnabled'
 
 const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white'
 
@@ -31,6 +32,7 @@ type LineaServicio = Omit<DetalleServicio, 'id' | 'empresa_id' | 'compra_id'>
 
 export function NuevaCompraServicioPage() {
     const { empresa, profile } = useAuth()
+    const { enabled: ocrIaHabilitado } = useIaFeatureEnabled('compras')
     const navigate = useNavigate()
 
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
@@ -325,7 +327,7 @@ export function NuevaCompraServicioPage() {
                     <p className="text-slate-500 text-sm">Honorarios, arrend., servicios básicos, etc.</p>
                 </div>
                 <HelpButton pageKey="compras-servicios" />
-                <ScanFacturaButton onAplicar={handleScanAplicar} empresaId={empresa!.id} />
+                {ocrIaHabilitado && <ScanFacturaButton onAplicar={handleScanAplicar} empresaId={empresa!.id} />}
             </div>
 
             <div className="card p-5 space-y-4">

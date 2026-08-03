@@ -443,6 +443,20 @@ export function ConfigurationPage() {
                 if (sesionUnicaError) throw sesionUnicaError
             }
 
+            // Funciones de IA (Gemini): cada una se autoriza por separado, apagadas
+            // por defecto — solo admin_plataforma puede activarlas por empresa.
+            if (empresaId) {
+                const { error: iaError } = await supabase
+                    .from('ia_features_config')
+                    .upsert({
+                        empresa_id: empresaId,
+                        compras_enabled: !!editingEmpresa.ia_compras_enabled,
+                        voz_enabled: !!editingEmpresa.ia_voz_enabled,
+                        cv_enabled: !!editingEmpresa.ia_cv_enabled,
+                    })
+                if (iaError) throw iaError
+            }
+
             if (empresaId) {
                 const cambios: Record<string, { antes: unknown; despues: unknown }> = {}
                 if ((configSriAntes?.firma_password || null) !== (payload.config_sri.firma_password || null)) {
@@ -459,7 +473,13 @@ export function ConfigurationPage() {
                     entidadId: empresaId,
                     resumen: `Cambio de configuración de empresa — ${payload.nombre}`,
                     cambios: Object.keys(cambios).length > 0 ? cambios : undefined,
-                    detalle: { lopdp_enabled: !!editingEmpresa.lopdp_enabled, sesion_unica_enabled: !!editingEmpresa.sesion_unica_enabled },
+                    detalle: {
+                        lopdp_enabled: !!editingEmpresa.lopdp_enabled,
+                        sesion_unica_enabled: !!editingEmpresa.sesion_unica_enabled,
+                        ia_compras_enabled: !!editingEmpresa.ia_compras_enabled,
+                        ia_voz_enabled: !!editingEmpresa.ia_voz_enabled,
+                        ia_cv_enabled: !!editingEmpresa.ia_cv_enabled,
+                    },
                     nivel: 'compliance',
                 })
             }
@@ -2289,6 +2309,21 @@ export function ConfigurationPage() {
                                                                         } catch {
                                                                             // si falla, queda destildado por defecto
                                                                         }
+                                                                        try {
+                                                                            const { data: iaData } = await supabase
+                                                                                .from('ia_features_config')
+                                                                                .select('compras_enabled, voz_enabled, cv_enabled')
+                                                                                .eq('empresa_id', emp.id)
+                                                                                .maybeSingle()
+                                                                            setEditingEmpresa((prev: any) => prev ? {
+                                                                                ...prev,
+                                                                                ia_compras_enabled: !!iaData?.compras_enabled,
+                                                                                ia_voz_enabled: !!iaData?.voz_enabled,
+                                                                                ia_cv_enabled: !!iaData?.cv_enabled,
+                                                                            } : prev)
+                                                                        } catch {
+                                                                            // si falla, quedan destildadas por defecto
+                                                                        }
                                                                     }}
                                                                     className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors"
                                                                     title="Editar"
@@ -2705,6 +2740,48 @@ export function ConfigurationPage() {
                                         className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
                                         checked={!!editingEmpresa?.sesion_unica_enabled}
                                         onChange={e => setEditingEmpresa({ ...editingEmpresa, sesion_unica_enabled: e.target.checked })}
+                                    />
+                                </label>
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">IA — OCR de facturas de compra (Gemini)</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Permite leer automáticamente facturas de proveedor (PDF/imagen) en Compra Inventario y Compra Servicio.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingEmpresa?.ia_compras_enabled}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, ia_compras_enabled: e.target.checked })}
+                                    />
+                                </label>
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">IA — Asistente de voz (Gemini)</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Habilita el asistente de voz para crear facturas por comando de voz en Nueva Factura.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingEmpresa?.ia_voz_enabled}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, ia_voz_enabled: e.target.checked })}
+                                    />
+                                </label>
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">IA — Screening de CV (Gemini)</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Habilita la evaluación automática de hojas de vida en Talento Humano → Vacantes.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingEmpresa?.ia_cv_enabled}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, ia_cv_enabled: e.target.checked })}
                                     />
                                 </label>
                             </div>
