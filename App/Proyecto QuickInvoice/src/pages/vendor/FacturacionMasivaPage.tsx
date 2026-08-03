@@ -107,6 +107,8 @@ export function FacturacionMasivaPage() {
         setPaso('progreso'); setErrorProceso('')
         setProgreso({ actual: 0, total: seleccionadas.length, nombre: '' })
         try {
+            // Lo crítico es generar las facturas — una vez que esto termina,
+            // el resumen SIEMPRE se muestra, pase lo que pase con el log.
             const res = await facturacionMasivaService.ejecutarLote(
                 filas,
                 {
@@ -118,11 +120,20 @@ export function FacturacionMasivaPage() {
                 (actual, total, nombre) => setProgreso({ actual, total, nombre }),
             )
             setResumen(res)
-            await facturacionMasivaService.guardarLog(
-                empresa.id, user?.id ?? null, mesFacturado, res,
-                filas.length - seleccionadas.length,
-            )
             setPaso('resumen')
+
+            // El log de auditoría es best-effort: si falla (ej. falta correr
+            // la migración), nunca debe ocultar el resumen que el usuario ya
+            // ganó — solo se avisa aparte, sin bloquear nada.
+            try {
+                await facturacionMasivaService.guardarLog(
+                    empresa.id, user?.id ?? null, mesFacturado, res,
+                    filas.length - seleccionadas.length,
+                )
+            } catch (logErr: any) {
+                console.error('[facturacion_masiva_log] no se pudo guardar:', logErr)
+                setErrorProceso(`Las facturas se generaron correctamente, pero no se pudo guardar el log de auditoría: ${logErr.message ?? logErr}`)
+            }
         } catch (e: any) {
             setErrorProceso(e.message ?? String(e))
             setPaso('config')
