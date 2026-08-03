@@ -323,8 +323,8 @@ export function ClientsPage() {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
                             <h2 className="text-lg font-bold text-slate-900">
                                 {editingCliente?.id ? 'Editar Cliente' : 'Nuevo Cliente'}
                             </h2>
@@ -332,7 +332,8 @@ export function ClientsPage() {
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                        <div className="p-6 space-y-4 overflow-y-auto">
                             <div className="relative">
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Identificación (RUC/Cédula)</label>
                                 <input
@@ -395,6 +396,33 @@ export function ClientsPage() {
                                 />
                             </div>
 
+                            <div className="pt-3 border-t border-slate-100 space-y-3">
+                                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Facturación Masiva</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Valor a facturar (sin IVA)</label>
+                                        <input
+                                            type="number" step="0.01" min="0"
+                                            className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none"
+                                            value={editingCliente?.valor_facturar ?? ''}
+                                            onChange={(e) => setEditingCliente({ ...editingCliente, valor_facturar: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Tasa IVA</label>
+                                        <select
+                                            className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none"
+                                            value={editingCliente?.tasa_iva ?? 15}
+                                            onChange={(e) => setEditingCliente({ ...editingCliente, tasa_iva: Number(e.target.value) })}
+                                        >
+                                            <option value={15}>15%</option>
+                                            <option value={0}>0%</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-400">Cargo recurrente mensual usado por Facturación Masiva de Clientes (Facturación → Facturación Masiva).</p>
+                            </div>
+
                             {lopdpEnabled && (
                                 <div className="pt-3 border-t border-slate-100 space-y-3">
                                     <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Protección de Datos (LOPDP)</p>
@@ -423,24 +451,25 @@ export function ClientsPage() {
                                     </label>
                                 </div>
                             )}
+                        </div>
 
-                            <div className="pt-4 flex gap-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    data-sentinel="btn-guardar-cliente"
-                                    type="submit"
-                                    className="flex-1 bg-primary-600 text-white rounded-lg px-4 py-2 font-bold hover:bg-primary-700 shadow-lg shadow-primary-200 flex items-center justify-center gap-2"
-                                >
-                                    <Save className="w-4 h-4" />
-                                    Guardar
-                                </button>
-                            </div>
+                        <div className="p-6 pt-4 border-t border-slate-100 flex gap-3 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                data-sentinel="btn-guardar-cliente"
+                                type="submit"
+                                className="flex-1 bg-primary-600 text-white rounded-lg px-4 py-2 font-bold hover:bg-primary-700 shadow-lg shadow-primary-200 flex items-center justify-center gap-2"
+                            >
+                                <Save className="w-4 h-4" />
+                                Guardar
+                            </button>
+                        </div>
                         </form>
                     </div>
                 </div>

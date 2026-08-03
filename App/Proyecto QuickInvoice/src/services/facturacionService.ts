@@ -33,6 +33,9 @@ export interface Cliente {
     direccion: string
     telefono?: string
     activo?: boolean
+    // Facturación Masiva: valor recurrente a facturar mensualmente (sin IVA) y su tasa
+    valor_facturar?: number
+    tasa_iva?: number
     // Fase 4 LOPDP: opcionales, nunca bloquean la operación normal
     base_legal_tratamiento?:   BaseLegalTratamiento | null
     consentimiento_explicito?: boolean
