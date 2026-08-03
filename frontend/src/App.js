@@ -14,8 +14,6 @@ import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import MySubscriptions from "./pages/MySubscriptions";
-import { Blog } from "./pages/Blog";
-import { BlogPost } from "./pages/BlogPost";
 import UserDashboard from "./pages/UserDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -60,8 +58,11 @@ function App() {
           <Route path="/planes" element={<PublicPage><Planes /></PublicPage>} />
           <Route path="/nosotros" element={<PublicPage><About /></PublicPage>} />
           <Route path="/contacto" element={<PublicPage><Contact /></PublicPage>} />
-          <Route path="/blog" element={<PublicPage><Blog /></PublicPage>} />
-          <Route path="/blog/:id" element={<PublicPage><BlogPost /></PublicPage>} />
+          {/* /blog y /blog/:slug NO se registran aquí a propósito: viven en
+              un proyecto Next.js/Sanity aparte, servidos vía rewrite de
+              Vercel (frontend/vercel.json). Si se registran acá, react-router
+              los intercepta client-side y esa petición nunca llega al
+              servidor, mostrando esta SPA en vez del blog real. */}
 
           {/* Auth Routes (no layout) */}
           <Route path="/login" element={<Login />} />

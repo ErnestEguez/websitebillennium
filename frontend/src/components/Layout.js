@@ -46,15 +46,30 @@ const Header = () => {
 
           <nav className="hidden lg:flex items-center gap-8">
             {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                data-testid={`nav-${link.label.toLowerCase()}`}
-                className={`text-sm font-medium transition-colors hover:text-blue-600 ${location.pathname === link.href ? 'text-blue-600' : 'text-slate-700'
-                  }`}
-              >
-                {link.label}
-              </Link>
+              link.href === '/blog' ? (
+                // Navegación completa (no react-router): /blog vive en un
+                // proyecto Next.js/Sanity aparte, servido vía rewrite de
+                // Vercel — un <Link> de react-router nunca dispara esa
+                // petición al servidor y muestra la página vieja hardcodeada.
+                <a
+                  key={link.href}
+                  href={link.href}
+                  data-testid={`nav-${link.label.toLowerCase()}`}
+                  className="text-sm font-medium transition-colors hover:text-blue-600 text-slate-700"
+                >
+                  {link.label}
+                </a>
+              ) : (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  data-testid={`nav-${link.label.toLowerCase()}`}
+                  className={`text-sm font-medium transition-colors hover:text-blue-600 ${location.pathname === link.href ? 'text-blue-600' : 'text-slate-700'
+                    }`}
+                >
+                  {link.label}
+                </Link>
+              )
             ))}
           </nav>
 
@@ -130,15 +145,25 @@ const Header = () => {
             <div className="container mx-auto px-4 py-4">
               <nav className="flex flex-col gap-4">
                 {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    to={link.href}
-                    onClick={() => setIsOpen(false)}
-                    className={`text-base font-medium py-2 ${location.pathname === link.href ? 'text-blue-600' : 'text-slate-700'
-                      }`}
-                  >
-                    {link.label}
-                  </Link>
+                  link.href === '/blog' ? (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      className="text-base font-medium py-2 text-slate-700"
+                    >
+                      {link.label}
+                    </a>
+                  ) : (
+                    <Link
+                      key={link.href}
+                      to={link.href}
+                      onClick={() => setIsOpen(false)}
+                      className={`text-base font-medium py-2 ${location.pathname === link.href ? 'text-blue-600' : 'text-slate-700'
+                        }`}
+                    >
+                      {link.label}
+                    </Link>
+                  )
                 ))}
                 <div className="flex flex-col gap-2 pt-4 border-t border-slate-200">
                   {user ? (
