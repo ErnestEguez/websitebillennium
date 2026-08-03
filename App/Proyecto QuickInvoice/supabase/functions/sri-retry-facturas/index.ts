@@ -5,6 +5,14 @@
 // al agotarse sin autorizar, avisa por correo (SMTP de la empresa
 // Billennium System, RUC 0907388268001) sin importar de qué
 // empresa cliente sea la factura.
+//
+// 2026-08-03: se agregó el caso RECHAZADO (rechazo firme del SRI, no
+// solo "sigue pendiente"). Antes solo se barrían PENDIENTE/ENVIADO,
+// así que una factura rechazada de una vez nunca entraba a este
+// barrido y NUNCA disparaba la alerta — se detectó porque una
+// rechazada real no avisó. Un rechazo firme no se arregla reintentando
+// solo (el motivo no cambia), así que se alerta de inmediato, sin
+// esperar los MAX_INTENTOS que sí aplican al caso pendiente/enviado.
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
@@ -17,7 +25,7 @@ const corsHeaders = {
 
 const MAX_INTENTOS = 8;
 const RUC_ALERTA = "0907388268001"; // Billennium System — cuyo SMTP se reutiliza para la alerta
-const CORREO_ALERTA = "billenniumsystem@gmail.com";
+const CORREO_ALERTA = "e_eguez@hotmail.com";
 
 serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -28,7 +36,7 @@ serve(async (req) => {
         { db: { schema: "facturacion" } }
     );
 
-    const resumen = { revisadas: 0, autorizadas: 0, siguen_pendientes: 0, alertas_enviadas: 0, errores: [] as string[] };
+    const resumen = { revisadas: 0, autorizadas: 0, siguen_pendientes: 0, rechazadas_alertadas: 0, alertas_enviadas: 0, errores: [] as string[] };
 
     try {
         const quinceMinAtras = new Date(Date.now() - 15 * 60 * 1000).toISOString();
@@ -81,11 +89,45 @@ serve(async (req) => {
                         empresaNombre: (comp.empresas as any)?.razon_social || (comp.empresas as any)?.nombre || "Empresa desconocida",
                         empresaRuc: (comp.empresas as any)?.ruc || "",
                         motivo: signerData?.error || signerData?.message || comp.observaciones_sri || "Sin detalle disponible",
+                        contexto: "reintentos_agotados",
                     });
                     if (enviado) {
                         await supabase.from("comprobantes").update({ alerta_enviada: true }).eq("id", comp.id);
                         resumen.alertas_enviadas++;
                     }
+                }
+            } catch (e: any) {
+                resumen.errores.push(`${comp.secuencial}: ${e.message}`);
+            }
+        }
+
+        // 3. Rechazos firmes del SRI (estado_sri = RECHAZADO) — no entran al
+        //    barrido de arriba (no tiene sentido reintentar solo, el SRI no
+        //    va a cambiar de opinión sin que alguien corrija algo), así que
+        //    se alertan de inmediato la primera vez que se detectan.
+        const { data: rechazadas, error: errRechazadas } = await supabase
+            .from("comprobantes")
+            .select("id, secuencial, empresa_id, observaciones_sri, empresas(nombre, razon_social, ruc)")
+            .eq("tipo_comprobante", "FACTURA")
+            .eq("estado_sri", "RECHAZADO")
+            .neq("estado_sistema", "ANULADA")
+            .eq("alerta_enviada", false);
+
+        if (errRechazadas) throw errRechazadas;
+
+        for (const comp of rechazadas ?? []) {
+            try {
+                const enviado = await enviarAlerta(supabase, {
+                    secuencial: comp.secuencial,
+                    empresaNombre: (comp.empresas as any)?.razon_social || (comp.empresas as any)?.nombre || "Empresa desconocida",
+                    empresaRuc: (comp.empresas as any)?.ruc || "",
+                    motivo: comp.observaciones_sri || "Sin detalle disponible",
+                    contexto: "rechazado",
+                });
+                if (enviado) {
+                    await supabase.from("comprobantes").update({ alerta_enviada: true }).eq("id", comp.id);
+                    resumen.rechazadas_alertadas++;
+                    resumen.alertas_enviadas++;
                 }
             } catch (e: any) {
                 resumen.errores.push(`${comp.secuencial}: ${e.message}`);
@@ -105,7 +147,7 @@ serve(async (req) => {
 
 async function enviarAlerta(
     supabase: ReturnType<typeof createClient>,
-    info: { secuencial: string; empresaNombre: string; empresaRuc: string; motivo: string }
+    info: { secuencial: string; empresaNombre: string; empresaRuc: string; motivo: string; contexto: "reintentos_agotados" | "rechazado" }
 ): Promise<boolean> {
     try {
         const { data: empresaAlerta } = await supabase
@@ -133,13 +175,21 @@ async function enviarAlerta(
             tls: { rejectUnauthorized: false },
         });
 
+        const esRechazo = info.contexto === "rechazado";
+        const asunto = esRechazo
+            ? `⚠️ Factura RECHAZADA por el SRI — ${info.empresaNombre}`
+            : `⚠️ Factura NO autorizada tras ${MAX_INTENTOS} intentos — ${info.empresaNombre}`;
+        const parrafoIntro = esRechazo
+            ? "El SRI rechazó esta factura directamente (no quedó pendiente, no se reintenta automáticamente):"
+            : `Después de ${MAX_INTENTOS} intentos automáticos, esta factura no logró autorizarse:`;
+
         await transporter.sendMail({
             from: `Alertas QuickInvoice <${mailUser}>`,
             to: CORREO_ALERTA,
-            subject: `⚠️ Factura NO autorizada tras ${MAX_INTENTOS} intentos — ${info.empresaNombre}`,
+            subject: asunto,
             html: `
                 <h2>Factura sin autorizar por el SRI</h2>
-                <p>Después de ${MAX_INTENTOS} intentos automáticos, esta factura no logró autorizarse:</p>
+                <p>${parrafoIntro}</p>
                 <ul>
                     <li><b>Empresa:</b> ${info.empresaNombre} (RUC ${info.empresaRuc})</li>
                     <li><b>Factura:</b> ${info.secuencial}</li>
