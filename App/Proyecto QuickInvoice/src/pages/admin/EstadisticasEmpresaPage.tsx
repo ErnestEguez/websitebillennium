@@ -43,33 +43,21 @@ export function EstadisticasEmpresaPage() {
             const desde = new Date(Date.UTC(anio, mes - 1, 1)).toISOString()
             const hasta = new Date(Date.UTC(mes === 12 ? anio + 1 : anio, mes === 12 ? 0 : mes, 1)).toISOString()
 
-            const [consumoRes, comprobantesRes] = await Promise.all([
-                supabase.from('consumo_ia')
-                    .select('origen')
-                    .eq('empresa_id', empresaId)
-                    .eq('exitoso', true)
-                    .gte('created_at', desde)
-                    .lt('created_at', hasta),
-                supabase.from('comprobantes')
-                    .select('total')
-                    .eq('empresa_id', empresaId)
-                    .eq('estado_sri', 'AUTORIZADO')
-                    .gte('created_at', desde)
-                    .lt('created_at', hasta),
-            ])
+            // RPC (SECURITY DEFINER) en vez de queries directas: comprobantes
+            // tiene RLS scoped a "mi empresa", sin excepción para
+            // admin_plataforma — un superadmin viendo otra empresa obtenía 0
+            // filas silenciosamente. Ver 20260804_fn_estadisticas_empresa.sql.
+            const { data, error } = await supabase.rpc('fn_estadisticas_empresa', {
+                p_empresa_id: empresaId,
+                p_desde: desde,
+                p_hasta: hasta,
+            })
+            if (error) throw error
 
-            if (consumoRes.error) throw consumoRes.error
-            if (comprobantesRes.error) throw comprobantesRes.error
-
-            const porOrigen: Record<string, number> = {}
-            for (const r of consumoRes.data ?? []) {
-                porOrigen[r.origen] = (porOrigen[r.origen] ?? 0) + 1
-            }
+            const porOrigen = (data?.consumo_ia ?? {}) as Record<string, number>
             setConsumoIA(Object.entries(porOrigen).map(([origen, total]) => ({ origen, total })))
-
-            const facturas = comprobantesRes.data ?? []
-            setFacturasEmitidas(facturas.length)
-            setTotalFacturado(facturas.reduce((s, f: any) => s + (Number(f.total) || 0), 0))
+            setFacturasEmitidas(data?.facturas_emitidas ?? 0)
+            setTotalFacturado(Number(data?.total_facturado ?? 0))
         } catch (e: any) {
             setError(e.message)
         } finally {
