@@ -169,6 +169,89 @@ class AdminSubscriptionCreate(BaseModel):
 class ChangePasswordRequest(BaseModel):
     new_password: str
 
+# ============== CALCULADORA MODELS ==============
+
+class ModuloCalculadora(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    nombre: str
+    precio: float
+    orden: int
+    activo: bool = True
+
+class ModuloCalculadoraCreate(BaseModel):
+    nombre: str
+    precio: float
+    orden: int = 0
+
+class ModuloCalculadoraUpdate(BaseModel):
+    nombre: Optional[str] = None
+    precio: Optional[float] = None
+    orden: Optional[int] = None
+    activo: Optional[bool] = None
+
+class TramoCalculadora(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    parametro: str
+    orden: int
+    desde: int
+    hasta: Optional[int] = None
+    recargo: float
+    es_contactar: bool = False
+
+class TramoCalculadoraUpdate(BaseModel):
+    desde: Optional[int] = None
+    hasta: Optional[int] = None
+    recargo: Optional[float] = None
+
+class ConfigCalculadora(BaseModel):
+    recargo_usuario_pct: float
+    dtos_multiempresa: List[float]
+
+class CalculadoraConfigResponse(BaseModel):
+    modulos: List[ModuloCalculadora]
+    tramos: List[TramoCalculadora]
+    recargo_usuario_pct: float
+    dtos_multiempresa: List[float]
+
+class EmpresaCotizacionIn(BaseModel):
+    nombre: str
+    modulos: List[str] = []
+    usuarios: int = 1
+    clientes: int = 0
+    articulos: int = 0
+    facturas: int = 0
+    compras: int = 0
+    empleados: int = 0
+
+class CotizacionCreate(BaseModel):
+    cliente_nombre: str
+    telefono: Optional[str] = None
+    email: Optional[EmailStr] = None
+    observaciones: Optional[str] = None
+    empresas: List[EmpresaCotizacionIn]
+
+class Cotizacion(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    cliente_nombre: str
+    telefono: Optional[str] = None
+    email: Optional[str] = None
+    observaciones: Optional[str] = None
+    empresas: List[dict]
+    subtotal: float
+    total: float
+    estado: str
+    monto_mensual_acordado: Optional[float] = None
+    acordado_por: Optional[str] = None
+    acordado_en: Optional[datetime] = None
+    created_at: datetime
+
+class CotizacionUpdate(BaseModel):
+    estado: Optional[str] = None
+    monto_mensual_acordado: Optional[float] = None
+
 # ============== PRODUCTS DATA ==============
 
 PRODUCTS = [
@@ -830,6 +913,194 @@ def admin_create_subscription(sub_data: AdminSubscriptionCreate, admin: dict = D
 
     supabase.table("subscriptions").insert(new_sub).execute()
     return {"message": "Producto agregado correctamente"}
+
+# ============== CALCULADORA ROUTES ==============
+# Precio de la suscripción mensual de QuickInvoice/módulos, calculado a
+# partir de tablas editables (calculadora_modulos, calculadora_tramos,
+# calculadora_config) en vez del array hardcodeado que tenía el HTML
+# standalone. El total que arma esta calculadora es SIEMPRE precio de
+# lista — el monto que realmente se cobra cada mes lo fija un admin a
+# mano en /admin/cotizaciones/{id} después de negociar (ver Cotizacion).
+
+def _parse_cotizacion(c: dict) -> Cotizacion:
+    return Cotizacion(
+        id=c["id"],
+        cliente_nombre=c["cliente_nombre"],
+        telefono=c.get("telefono"),
+        email=c.get("email"),
+        observaciones=c.get("observaciones"),
+        empresas=c["empresas"],
+        subtotal=c["subtotal"],
+        total=c["total"],
+        estado=c["estado"],
+        monto_mensual_acordado=c.get("monto_mensual_acordado"),
+        acordado_por=c.get("acordado_por"),
+        acordado_en=datetime.fromisoformat(c["acordado_en"]) if c.get("acordado_en") and isinstance(c["acordado_en"], str) else c.get("acordado_en"),
+        created_at=datetime.fromisoformat(c["created_at"]) if isinstance(c["created_at"], str) else c["created_at"],
+    )
+
+def _tramo_recargo(tramos: List[dict], parametro: str, cantidad: int) -> tuple[float, bool]:
+    """Recorre los tramos de un parámetro y devuelve (recargo, es_contactar) del tramo donde cae `cantidad`."""
+    aplicables = sorted([t for t in tramos if t["parametro"] == parametro], key=lambda t: t["orden"])
+    for t in aplicables:
+        si_pasa_desde = cantidad >= t["desde"]
+        si_pasa_hasta = t["hasta"] is None or cantidad <= t["hasta"]
+        if si_pasa_desde and si_pasa_hasta:
+            return float(t["recargo"]), bool(t["es_contactar"])
+    return 0.0, False
+
+def _calcular_empresa(emp: EmpresaCotizacionIn, modulos: List[dict], tramos: List[dict], recargo_usuario_pct: float) -> dict:
+    precios = {m["id"]: float(m["precio"]) for m in modulos}
+    base_modulos = sum(precios.get(mid, 0.0) for mid in emp.modulos)
+    usuarios = max(1, emp.usuarios)
+    con_usuarios = base_modulos * (1 + recargo_usuario_pct * (usuarios - 1))
+
+    recargos_tamano = []
+    contacta = False
+    for parametro, cantidad in [
+        ("clientes", emp.clientes), ("articulos", emp.articulos), ("facturas", emp.facturas),
+        ("compras", emp.compras), ("empleados", emp.empleados),
+    ]:
+        recargo, es_contactar = _tramo_recargo(tramos, parametro, cantidad)
+        if es_contactar:
+            contacta = True
+        recargos_tamano.append({"parametro": parametro, "cantidad": cantidad, "recargo": recargo, "es_contactar": es_contactar})
+
+    total_recargo_tamano = sum(r["recargo"] for r in recargos_tamano)
+    subtotal_empresa = con_usuarios + total_recargo_tamano
+
+    return {
+        "nombre": emp.nombre, "modulos": emp.modulos, "usuarios": usuarios,
+        "base_modulos": base_modulos, "con_usuarios": con_usuarios,
+        "recargos_tamano": recargos_tamano, "contacta_ventas": contacta,
+        "subtotal": subtotal_empresa,
+    }
+
+def _calcular_cotizacion(empresas_in: List[EmpresaCotizacionIn]) -> dict:
+    modulos = supabase.table("calculadora_modulos").select("*").eq("activo", True).execute().data or []
+    tramos = supabase.table("calculadora_tramos").select("*").execute().data or []
+    config_row = supabase.table("calculadora_config").select("*").eq("id", 1).execute().data
+    recargo_usuario_pct = float(config_row[0]["recargo_usuario_pct"]) if config_row else 0.20
+    dtos_multiempresa = [float(x) for x in config_row[0]["dtos_multiempresa"]] if config_row else [0, 0.15, 0.20, 0.25]
+
+    empresas_calc = []
+    subtotal = 0.0
+    total = 0.0
+    for i, emp in enumerate(empresas_in):
+        calc = _calcular_empresa(emp, modulos, tramos, recargo_usuario_pct)
+        dto = dtos_multiempresa[min(i, len(dtos_multiempresa) - 1)] if i > 0 else 0.0
+        calc["dto_multiempresa_pct"] = dto
+        calc["total_empresa"] = calc["subtotal"] * (1 - dto)
+        subtotal += calc["subtotal"]
+        total += calc["total_empresa"]
+        empresas_calc.append(calc)
+
+    return {"empresas": empresas_calc, "subtotal": round(subtotal, 2), "total": round(total, 2)}
+
+@api_router.get("/calculadora/config", response_model=CalculadoraConfigResponse)
+def get_calculadora_config():
+    modulos = supabase.table("calculadora_modulos").select("*").eq("activo", True).order("orden").execute().data or []
+    tramos = supabase.table("calculadora_tramos").select("*").order("parametro").order("orden").execute().data or []
+    config_row = supabase.table("calculadora_config").select("*").eq("id", 1).execute().data
+    recargo_usuario_pct = float(config_row[0]["recargo_usuario_pct"]) if config_row else 0.20
+    dtos_multiempresa = [float(x) for x in config_row[0]["dtos_multiempresa"]] if config_row else [0, 0.15, 0.20, 0.25]
+    return CalculadoraConfigResponse(
+        modulos=[ModuloCalculadora(**m) for m in modulos],
+        tramos=[TramoCalculadora(**t) for t in tramos],
+        recargo_usuario_pct=recargo_usuario_pct,
+        dtos_multiempresa=dtos_multiempresa,
+    )
+
+@api_router.post("/calculadora/cotizacion", response_model=Cotizacion)
+def crear_cotizacion(data: CotizacionCreate):
+    calculo = _calcular_cotizacion(data.empresas)
+    nueva = {
+        "cliente_nombre": data.cliente_nombre,
+        "telefono": data.telefono,
+        "email": data.email,
+        "observaciones": data.observaciones,
+        "empresas": calculo["empresas"],
+        "subtotal": calculo["subtotal"],
+        "total": calculo["total"],
+        "estado": "nueva",
+    }
+    result = supabase.table("cotizaciones").insert(nueva).execute()
+    return _parse_cotizacion(result.data[0])
+
+@api_router.get("/admin/cotizaciones", response_model=List[Cotizacion])
+def listar_cotizaciones(admin: dict = Depends(get_admin_user)):
+    result = supabase.table("cotizaciones").select("*").order("created_at", desc=True).execute()
+    return [_parse_cotizacion(c) for c in result.data]
+
+@api_router.put("/admin/cotizaciones/{cotizacion_id}", response_model=Cotizacion)
+def actualizar_cotizacion(cotizacion_id: str, data: CotizacionUpdate, admin: dict = Depends(get_admin_user)):
+    existing = supabase.table("cotizaciones").select("id").eq("id", cotizacion_id).execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Cotización no encontrada")
+
+    update_fields = {}
+    if data.estado is not None:
+        update_fields["estado"] = data.estado
+    if data.monto_mensual_acordado is not None:
+        update_fields["monto_mensual_acordado"] = data.monto_mensual_acordado
+        update_fields["acordado_por"] = admin["email"]
+        update_fields["acordado_en"] = datetime.now(timezone.utc).isoformat()
+        if data.estado is None:
+            update_fields["estado"] = "cerrado"
+
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="Nada que actualizar")
+
+    result = supabase.table("cotizaciones").update(update_fields).eq("id", cotizacion_id).execute()
+    return _parse_cotizacion(result.data[0])
+
+@api_router.get("/admin/calculadora/modulos", response_model=List[ModuloCalculadora])
+def admin_listar_modulos(admin: dict = Depends(get_admin_user)):
+    result = supabase.table("calculadora_modulos").select("*").order("orden").execute()
+    return [ModuloCalculadora(**m) for m in result.data]
+
+@api_router.post("/admin/calculadora/modulos", response_model=ModuloCalculadora)
+def admin_crear_modulo(data: ModuloCalculadoraCreate, admin: dict = Depends(get_admin_user)):
+    result = supabase.table("calculadora_modulos").insert(data.model_dump()).execute()
+    return ModuloCalculadora(**result.data[0])
+
+@api_router.put("/admin/calculadora/modulos/{modulo_id}", response_model=ModuloCalculadora)
+def admin_actualizar_modulo(modulo_id: str, data: ModuloCalculadoraUpdate, admin: dict = Depends(get_admin_user)):
+    cambios = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not cambios:
+        raise HTTPException(status_code=400, detail="Nada que actualizar")
+    result = supabase.table("calculadora_modulos").update(cambios).eq("id", modulo_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Módulo no encontrado")
+    return ModuloCalculadora(**result.data[0])
+
+@api_router.delete("/admin/calculadora/modulos/{modulo_id}")
+def admin_eliminar_modulo(modulo_id: str, admin: dict = Depends(get_admin_user)):
+    supabase.table("calculadora_modulos").delete().eq("id", modulo_id).execute()
+    return {"message": "Módulo eliminado"}
+
+@api_router.get("/admin/calculadora/tramos", response_model=List[TramoCalculadora])
+def admin_listar_tramos(admin: dict = Depends(get_admin_user)):
+    result = supabase.table("calculadora_tramos").select("*").order("parametro").order("orden").execute()
+    return [TramoCalculadora(**t) for t in result.data]
+
+@api_router.put("/admin/calculadora/tramos/{tramo_id}", response_model=TramoCalculadora)
+def admin_actualizar_tramo(tramo_id: str, data: TramoCalculadoraUpdate, admin: dict = Depends(get_admin_user)):
+    cambios = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not cambios:
+        raise HTTPException(status_code=400, detail="Nada que actualizar")
+    result = supabase.table("calculadora_tramos").update(cambios).eq("id", tramo_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Tramo no encontrado")
+    return TramoCalculadora(**result.data[0])
+
+@api_router.put("/admin/calculadora/config", response_model=ConfigCalculadora)
+def admin_actualizar_config(data: ConfigCalculadora, admin: dict = Depends(get_admin_user)):
+    result = supabase.table("calculadora_config").update({
+        "recargo_usuario_pct": data.recargo_usuario_pct,
+        "dtos_multiempresa": data.dtos_multiempresa,
+    }).eq("id", 1).execute()
+    return ConfigCalculadora(**result.data[0])
 
 # ============== CONTACT ROUTES ==============
 

@@ -19,6 +19,7 @@ const navLinks = [
   { href: '/', label: 'Inicio' },
   { href: '/productos', label: 'Productos' },
   { href: '/planes', label: 'Planes' },
+  { href: '/calculadora', label: 'Cotizador' },
   { href: '/blog', label: 'Blog' },
   { href: '/nosotros', label: 'Nosotros' },
   { href: '/contacto', label: 'Contacto' },
@@ -234,6 +235,7 @@ const Footer = () => {
             <ul className="space-y-2">
               <li><Link to="/nosotros" className="text-slate-400 hover:text-white transition-colors text-sm">Sobre Nosotros</Link></li>
               <li><Link to="/planes" className="text-slate-400 hover:text-white transition-colors text-sm">Planes y Precios</Link></li>
+              <li><Link to="/calculadora" className="text-slate-400 hover:text-white transition-colors text-sm">Arme su plan</Link></li>
               <li><Link to="/contacto" className="text-slate-400 hover:text-white transition-colors text-sm">Contacto</Link></li>
             </ul>
           </div>

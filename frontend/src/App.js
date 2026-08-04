@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Planes from "./pages/Planes";
+import Calculadora from "./pages/Calculadora";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Login from "./pages/Login";
@@ -24,6 +25,8 @@ import AdminUsers from "./pages/admin/Users";
 import AdminMessages from "./pages/admin/Messages";
 import AdminApps from "./pages/admin/Apps";
 import AdminERPModules from "./pages/admin/ERPModules";
+import AdminCotizaciones from "./pages/admin/Cotizaciones";
+import AdminCalculadoraConfig from "./pages/admin/CalculadoraConfig";
 
 // Public Page Wrapper
 const PublicPage = ({ children }) => (
@@ -56,6 +59,7 @@ function App() {
           <Route path="/productos" element={<PublicPage><Products /></PublicPage>} />
           <Route path="/productos/:slug" element={<PublicPage><ProductDetail /></PublicPage>} />
           <Route path="/planes" element={<PublicPage><Planes /></PublicPage>} />
+          <Route path="/calculadora" element={<PublicPage><Calculadora /></PublicPage>} />
           <Route path="/nosotros" element={<PublicPage><About /></PublicPage>} />
           <Route path="/contacto" element={<PublicPage><Contact /></PublicPage>} />
           {/* /blog y /blog/:slug NO se registran aquí a propósito: viven en
@@ -77,6 +81,8 @@ function App() {
           <Route path="/admin/aplicaciones" element={<AdminRoute><AdminApps /></AdminRoute>} />
           <Route path="/admin/suscripciones" element={<AdminRoute><AdminSubscriptions /></AdminRoute>} />
           <Route path="/admin/erp-modulos" element={<AdminRoute><AdminERPModules /></AdminRoute>} />
+          <Route path="/admin/cotizaciones" element={<AdminRoute><AdminCotizaciones /></AdminRoute>} />
+          <Route path="/admin/calculadora" element={<AdminRoute><AdminCalculadoraConfig /></AdminRoute>} />
           <Route path="/admin/usuarios" element={<AdminRoute><AdminUsers /></AdminRoute>} />
           <Route path="/admin/mensajes" element={<AdminRoute><AdminMessages /></AdminRoute>} />
 

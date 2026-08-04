@@ -12,7 +12,9 @@ import {
   Home,
   ChevronRight,
   AppWindow,
-  Layers
+  Layers,
+  FileText,
+  Sliders
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
@@ -24,6 +26,8 @@ const sidebarLinks = [
   { href: '/admin/aplicaciones', label: 'Aplicaciones', icon: AppWindow },
   { href: '/admin/suscripciones', label: 'Suscripciones', icon: CreditCard },
   { href: '/admin/erp-modulos', label: 'Módulos ERP', icon: Layers },
+  { href: '/admin/cotizaciones', label: 'Cotizaciones', icon: FileText },
+  { href: '/admin/calculadora', label: 'Calculadora', icon: Sliders },
   { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
   { href: '/admin/mensajes', label: 'Mensajes', icon: MessageSquare },
 ];
