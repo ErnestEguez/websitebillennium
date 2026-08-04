@@ -614,8 +614,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             {openGroups.includes('ajustes') && isSidebarOpen && (
                                 <div className="mt-0.5 ml-2 border-l-2 border-slate-100 pl-1 space-y-0.5">
                                     <SidebarItem to="/configuracion"      icon={Settings}  label="Configuración"       active={location.pathname === '/configuracion'} sub sentinelId="nav-configuracion" disabled={!p.perm_configuracion} />
+                                    <SidebarItem to="/retenciones/codigos" icon={BookOpen}  label="Códigos Ret. SRI"    active={location.pathname === '/retenciones/codigos'} sub disabled={!p.perm_codigos_retencion} />
                                     {isAdmin && <SidebarItem to="/ajustes/permisos" icon={UserCog} label="Permisos de usuario" active={location.pathname === '/ajustes/permisos'} sub />}
                                     {esOficina && <SidebarItem to="/ajustes/auditoria" icon={ShieldCheck} label="Auditoría" active={location.pathname === '/ajustes/auditoria'} sub />}
+                                    {(isAdmin || profile?.rol === 'admin_plataforma' || permisos?.perm_eliminar_compra) && <SidebarItem to="/ajustes/eliminar-compra" icon={Trash2} label="Eliminar compra" active={location.pathname === '/ajustes/eliminar-compra'} sub />}
                                     {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub disabled={!p.perm_vendedores} />}
                                     {esOficina && <SidebarItem to="/importar-articulos" icon={Upload} label="Importar Artículos" active={location.pathname === '/importar-articulos'} sub disabled={!p.perm_importar_articulos} />}
                                     {esOficina && <SidebarItem to="/importar-clientes"  icon={Users}  label="Clientes (Import/Export)" active={location.pathname === '/importar-clientes'} sub disabled={!p.perm_importar_clientes} />}
