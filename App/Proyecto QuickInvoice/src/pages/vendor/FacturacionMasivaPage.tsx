@@ -221,6 +221,7 @@ export function FacturacionMasivaPage() {
                                 {[
                                     ['Clientes seleccionados', resumen.clientesSeleccionados],
                                     ['Clientes facturados', resumen.clientesFacturados],
+                                    ['— pendientes de autorización SRI', resumen.clientesPendientesAutorizacion],
                                     ['Facturas con error', resumen.clientesConError],
                                     ['Subtotal sin IVA', fmt(resumen.subtotalSinIva)],
                                     ['IVA 15%', fmt(resumen.totalIva15)],
@@ -235,6 +236,14 @@ export function FacturacionMasivaPage() {
                             </tbody>
                         </table>
                     </div>
+
+                    {resumen.clientesPendientesAutorizacion > 0 && (
+                        <div className="card p-4 bg-amber-50 border border-amber-200 text-sm text-amber-800">
+                            {resumen.clientesPendientesAutorizacion} factura(s) quedaron generadas pero aún sin autorización del SRI —
+                            el sistema las reintenta automáticamente cada 15 minutos, no requieren acción manual salvo que sigan
+                            pendientes tras un par de horas.
+                        </div>
+                    )}
 
                     {resumen.clientesConError > 0 && (
                         <div className="card p-4 bg-red-50 border border-red-200 space-y-1">

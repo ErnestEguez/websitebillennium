@@ -32,8 +32,9 @@ export interface ResultadoCliente {
     valor: number
     iva: number
     total: number
-    ok: boolean
-    error?: string
+    ok: boolean          // true = el comprobante se creó (no hubo excepción) — esto es lo que cuenta como "facturado"
+    autorizado: boolean  // true = ya salió AUTORIZADO por el SRI en el momento del corte
+    error?: string        // solo cuando ok=false (falló la creación del comprobante)
     secuencial?: string
     estadoSri?: string
 }
@@ -42,6 +43,7 @@ export interface ResumenLote {
     clientesSeleccionados: number
     clientesFacturados: number
     clientesConError: number
+    clientesPendientesAutorizacion: number  // ok=true pero estado_sri todavía no es AUTORIZADO
     subtotalSinIva: number
     totalIva15: number
     totalIva0: number
@@ -132,6 +134,13 @@ export const facturacionMasivaService = {
                     created_by: opciones.createdBy ?? null,
                 })
 
+                // "Facturado" = el comprobante se creó (secuencial, cartera,
+                // contabilidad ya corrieron dentro de generarFacturaDirecta).
+                // Que el SRI ya lo haya AUTORIZADO en este instante es aparte
+                // — si sigue PENDIENTE, el cron sri-retry-facturas ya lo
+                // reintenta solo cada 15 min. No excluir esto de los totales
+                // del reporte, o el reporte queda en $0 cada vez que el SRI
+                // tarda un poco en responder (que es lo normal).
                 resultados.push({
                     clienteId: fila.cliente.id,
                     clienteNombre: fila.cliente.nombre,
@@ -140,8 +149,8 @@ export const facturacionMasivaService = {
                     valor: subtotal,
                     iva: ivaValor,
                     total,
-                    ok: factura.estado_sri === 'AUTORIZADO',
-                    error: factura.estado_sri !== 'AUTORIZADO' ? `No autorizado (${factura.estado_sri})` : undefined,
+                    ok: true,
+                    autorizado: factura.estado_sri === 'AUTORIZADO',
                     secuencial: factura.secuencial,
                     estadoSri: factura.estado_sri,
                 })
@@ -155,6 +164,7 @@ export const facturacionMasivaService = {
                     iva: ivaValor,
                     total,
                     ok: false,
+                    autorizado: false,
                     error: e.message ?? String(e),
                 })
             }
@@ -162,11 +172,13 @@ export const facturacionMasivaService = {
 
         const exitosos = resultados.filter(r => r.ok)
         const conError = resultados.filter(r => !r.ok)
+        const pendientes = exitosos.filter(r => !r.autorizado)
 
         return {
             clientesSeleccionados: seleccionadas.length,
             clientesFacturados: exitosos.length,
             clientesConError: conError.length,
+            clientesPendientesAutorizacion: pendientes.length,
             subtotalSinIva: exitosos.reduce((s, r) => s + r.valor, 0),
             totalIva15: exitosos.filter(r => filas.find(f => f.cliente.id === r.clienteId)?.tasaIva === 15).reduce((s, r) => s + r.iva, 0),
             totalIva0: exitosos.filter(r => filas.find(f => f.cliente.id === r.clienteId)?.tasaIva === 0).reduce((s, r) => s + r.iva, 0),
