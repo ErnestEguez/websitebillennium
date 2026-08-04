@@ -22,6 +22,20 @@ export interface CodigoRetencion {
 
 type CodigoDefault = Omit<CodigoRetencion, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>
 
+export type CampoComparable = 'porcentaje' | 'descripcion' | 'base_legal' | 'aplica_a'
+
+export interface DiffCodigoRetencion {
+    id: string
+    codigo: string
+    tipo: TipoRetencionCodigo
+    campos: Array<{ campo: CampoComparable; actual: string | number | null; nuevo: string | number | null }>
+}
+
+export interface ComparacionCatalogo {
+    cambios: DiffCodigoRetencion[]          // codigo+tipo existe en ambos lados pero con valores distintos
+    noEnCatalogoVigente: CodigoRetencion[]  // existe en la empresa pero ya no está en CODIGOS_SRI_DEFAULT — no se toca, solo se informa
+}
+
 // ── Catálogo SRI Ecuador — Tabla de retenciones vigente desde 2026-03-01 ──────
 // Fuente: tabla oficial descargada de sri.gob.ec/en/retenciones-en-la-fuente
 // ("Detalle de porcentajes de retención en la fuente de impuesto a la renta"),
@@ -294,5 +308,58 @@ export const codigoRetencionService = {
         // Retorna cuántos quedaron en total para que la UI pueda informar
         const total = await codigoRetencionService.contarCodigos(empresaId)
         return { insertados: total }
+    },
+
+    // Compara el catálogo ya cargado de la empresa contra CODIGOS_SRI_DEFAULT
+    // (matched por codigo+tipo). Solo mira porcentaje/descripcion/base_legal/
+    // aplica_a — nunca cuenta_contable_* (eso lo asigna el usuario a mano y
+    // no debe perderse al actualizar). Los códigos que la empresa tiene pero
+    // que ya no están en la tabla vigente se listan aparte, sin tocarlos.
+    async compararConDefaults(empresaId: string): Promise<ComparacionCatalogo> {
+        const existentes = await codigoRetencionService.listar(empresaId)
+        const cambios: DiffCodigoRetencion[] = []
+        const noEnCatalogoVigente: CodigoRetencion[] = []
+
+        for (const actual of existentes) {
+            const def = CODIGOS_SRI_DEFAULT.find(d => d.codigo === actual.codigo && d.tipo === actual.tipo)
+            if (!def) {
+                noEnCatalogoVigente.push(actual)
+                continue
+            }
+            const campos: DiffCodigoRetencion['campos'] = []
+            if (actual.porcentaje !== def.porcentaje)
+                campos.push({ campo: 'porcentaje', actual: actual.porcentaje, nuevo: def.porcentaje })
+            if (actual.descripcion !== def.descripcion)
+                campos.push({ campo: 'descripcion', actual: actual.descripcion, nuevo: def.descripcion })
+            if ((actual.base_legal ?? null) !== (def.base_legal ?? null))
+                campos.push({ campo: 'base_legal', actual: actual.base_legal, nuevo: def.base_legal })
+            if ((actual.aplica_a ?? 'TODOS') !== (def.aplica_a ?? 'TODOS'))
+                campos.push({ campo: 'aplica_a', actual: actual.aplica_a, nuevo: def.aplica_a })
+
+            if (campos.length > 0) {
+                cambios.push({ id: actual.id, codigo: actual.codigo, tipo: actual.tipo, campos })
+            }
+        }
+
+        return { cambios, noEnCatalogoVigente }
+    },
+
+    // Aplica únicamente los campos diferentes detectados por compararConDefaults.
+    // No toca cuenta_contable_id/codigo/nombre ni activo.
+    async actualizarDesdeDefaults(cambios: DiffCodigoRetencion[]): Promise<void> {
+        for (const cambio of cambios) {
+            const def = CODIGOS_SRI_DEFAULT.find(d => d.codigo === cambio.codigo && d.tipo === cambio.tipo)
+            if (!def) continue
+            const { error } = await supabase
+                .from('codigos_retencion')
+                .update({
+                    porcentaje: def.porcentaje,
+                    descripcion: def.descripcion,
+                    base_legal: def.base_legal,
+                    aplica_a: def.aplica_a,
+                })
+                .eq('id', cambio.id)
+            if (error) throw error
+        }
     },
 }

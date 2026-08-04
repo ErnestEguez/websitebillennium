@@ -5,12 +5,13 @@ import {
     type CodigoRetencion,
     type TipoRetencionCodigo,
     type AplicaA,
+    type ComparacionCatalogo,
 } from '../services/codigoRetencionService'
 import { supabaseContabilidad } from '../lib/supabaseContabilidad'
 import type { CuentaLP } from '../services/contableConfigService'
 import {
     Plus, Edit2, Search, X, Save, Loader2, BookOpen,
-    ToggleLeft, ToggleRight, Download, AlertCircle, Scale,
+    ToggleLeft, ToggleRight, Download, AlertCircle, Scale, RefreshCw,
 } from 'lucide-react'
 
 type FiltroTipo = 'TODOS' | 'FUENTE' | 'IVA'
@@ -26,6 +27,20 @@ const APLICA_LABELS: Record<AplicaA, string> = {
     PERSONA_NATURAL:   'P. Natural',
     PERSONA_JURIDICA:  'P. Jurídica',
     ARTESANO:          'Artesano',
+}
+
+const CAMPO_LABELS: Record<string, string> = {
+    porcentaje:  'Tasa %',
+    descripcion: 'Descripción',
+    base_legal:  'Norma legal',
+    aplica_a:    'Aplica a',
+}
+
+function formatearValorCampo(campo: string, valor: string | number | null): string {
+    if (valor === null || valor === '') return '—'
+    if (campo === 'porcentaje') return `${valor}%`
+    if (campo === 'aplica_a') return APLICA_LABELS[valor as AplicaA] ?? String(valor)
+    return String(valor)
 }
 
 type FormState = Omit<CodigoRetencion, 'id' | 'empresa_id' | 'created_at' | 'updated_at'>
@@ -86,6 +101,11 @@ export function CodigosRetencionPage() {
     const [form, setForm]               = useState<FormState>(EMPTY_FORM)
     const [modalError, setModalError]   = useState('')
 
+    const [comparando, setComparando]       = useState(false)
+    const [actualizando, setActualizando]   = useState(false)
+    const [comparacion, setComparacion]     = useState<ComparacionCatalogo | null>(null)
+    const [modalActualizarOpen, setModalActualizarOpen] = useState(false)
+
     useEffect(() => {
         if (empresa?.id) {
             cargarCodigos()
@@ -129,6 +149,41 @@ export function CodigosRetencionPage() {
             setError(e.message)
         } finally {
             setSeeding(false)
+        }
+    }
+
+    async function abrirActualizarCatalogo() {
+        if (!empresa?.id) return
+        setComparando(true)
+        setError('')
+        try {
+            const resultado = await codigoRetencionService.compararConDefaults(empresa.id)
+            setComparacion(resultado)
+            if (resultado.cambios.length === 0) {
+                alert('El catálogo de esta empresa ya está al día con la tabla vigente del SRI.\n\nNo hay porcentajes ni descripciones por actualizar.')
+                setComparando(false)
+                return
+            }
+            setModalActualizarOpen(true)
+        } catch (e: any) {
+            setError(e.message)
+        } finally {
+            setComparando(false)
+        }
+    }
+
+    async function confirmarActualizarCatalogo() {
+        if (!comparacion || comparacion.cambios.length === 0) return
+        setActualizando(true)
+        try {
+            await codigoRetencionService.actualizarDesdeDefaults(comparacion.cambios)
+            setModalActualizarOpen(false)
+            setComparacion(null)
+            await cargarCodigos()
+        } catch (e: any) {
+            setError(e.message)
+        } finally {
+            setActualizando(false)
         }
     }
 
@@ -238,6 +293,14 @@ export function CodigosRetencionPage() {
                         {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                         {codigos.length > 0 ? 'Catálogo ya cargado' : 'Cargar catálogo inicial SRI'}
                     </button>
+                    {codigos.length > 0 && (
+                        <button onClick={abrirActualizarCatalogo} disabled={comparando}
+                            title="Compara los códigos de esta empresa contra la tabla vigente del SRI y actualiza porcentajes/descripciones desactualizados, sin perder las cuentas contables ya asignadas"
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-amber-200 text-amber-700 text-sm font-bold bg-amber-50 hover:bg-amber-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                            {comparando ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                            Actualizar catálogo
+                        </button>
+                    )}
                     <button onClick={abrirNuevo}
                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-700 transition-colors">
                         <Plus className="w-4 h-4" /> Nuevo código
@@ -512,6 +575,71 @@ export function CodigosRetencionPage() {
                                     Guardar
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Actualizar catálogo */}
+            {modalActualizarOpen && comparacion && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+
+                        <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-900">Actualizar catálogo</h2>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    {comparacion.cambios.length} código{comparacion.cambios.length !== 1 ? 's' : ''} con valores desactualizados. Las cuentas contables asignadas no se modifican.
+                                </p>
+                            </div>
+                            <button onClick={() => setModalActualizarOpen(false)} className="p-2 hover:bg-slate-100 rounded-full">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-3 overflow-y-auto">
+                            {comparacion.cambios.map(c => (
+                                <div key={c.id} className="border border-slate-200 rounded-xl p-3">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded border ${TIPO_COLORS[c.tipo]}`}>{c.tipo}</span>
+                                        <span className="font-mono font-black text-slate-800">{c.codigo}</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {c.campos.map(campo => (
+                                            <div key={campo.campo} className="grid grid-cols-[100px_1fr_auto_1fr] items-center gap-2 text-xs">
+                                                <span className="text-slate-400 font-bold uppercase tracking-wider">{CAMPO_LABELS[campo.campo]}</span>
+                                                <span className="text-red-600 bg-red-50 rounded px-1.5 py-0.5 line-through truncate">{formatearValorCampo(campo.campo, campo.actual)}</span>
+                                                <span className="text-slate-300">→</span>
+                                                <span className="text-emerald-700 bg-emerald-50 rounded px-1.5 py-0.5 font-medium truncate">{formatearValorCampo(campo.campo, campo.nuevo)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {comparacion.noEnCatalogoVigente.length > 0 && (
+                                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs">
+                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="font-bold mb-1">
+                                            {comparacion.noEnCatalogoVigente.length} código{comparacion.noEnCatalogoVigente.length !== 1 ? 's' : ''} en esta empresa ya no está{comparacion.noEnCatalogoVigente.length !== 1 ? 'n' : ''} en la tabla vigente del SRI
+                                        </p>
+                                        <p>{comparacion.noEnCatalogoVigente.map(x => x.codigo).join(', ')} — no se modifican automáticamente, revísalos manualmente (Editar / Dar de baja) si corresponde.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-5 pt-4 border-t border-slate-100 flex gap-3 shrink-0">
+                            <button onClick={() => setModalActualizarOpen(false)}
+                                className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">
+                                Cancelar
+                            </button>
+                            <button onClick={confirmarActualizarCatalogo} disabled={actualizando}
+                                className="flex-1 bg-amber-600 text-white rounded-lg px-4 py-2 font-bold hover:bg-amber-700 flex items-center justify-center gap-2 disabled:opacity-50">
+                                {actualizando ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                Aplicar {comparacion.cambios.length} cambio{comparacion.cambios.length !== 1 ? 's' : ''}
+                            </button>
                         </div>
                     </div>
                 </div>
