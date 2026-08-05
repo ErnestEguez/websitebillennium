@@ -13,11 +13,33 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
+import smtplib
+from email.mime.text import MIMEText
 from supabase import create_client, Client
 
 # Load .env file for local development
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env', override=True)
+
+# ============== SMTP (SMTP2GO — mismo remitente que Supabase Auth) ==============
+SMTP_HOST = os.environ.get('SMTP_HOST', 'mail.smtp2go.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
+SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL', 'promociones@billenniumsystem.com')
+SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', 'Billennium System')
+
+def enviar_correo(destinatario: str, asunto: str, cuerpo: str):
+    if not SMTP_USER or not SMTP_PASSWORD:
+        raise RuntimeError('SMTP no configurado (faltan SMTP_USER / SMTP_PASSWORD)')
+    msg = MIMEText(cuerpo, 'plain', 'utf-8')
+    msg['Subject'] = asunto
+    msg['From'] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
+    msg['To'] = destinatario
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.sendmail(SMTP_FROM_EMAIL, [destinatario], msg.as_string())
 
 # ============== SUPABASE CLIENT ==============
 SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://dummy.supabase.co')
@@ -1026,6 +1048,41 @@ def crear_cotizacion(data: CotizacionCreate):
     }
     result = supabase.table("cotizaciones").insert(nueva).execute()
     return _parse_cotizacion(result.data[0])
+
+def _construir_mensaje_cotizacion(c: dict) -> str:
+    linea = '─' * 32
+    msg = f"Cotización QuickInvoice — Billennium System\nCliente: {c['cliente_nombre']}\n{linea}\n\n"
+    for e in c.get('empresas', []):
+        nombres = ', '.join(m for m in e.get('modulos', [])) or 'Sin módulos'
+        msg += f"{e['nombre']}:\n  Módulos: {nombres}\n  Usuarios: {e.get('usuarios', 1)}\n  Subtotal: ${e.get('total_empresa', 0):.2f}"
+        if e.get('dto_multiempresa_pct', 0) > 0:
+            msg += f" ({e['dto_multiempresa_pct']*100:.0f}% dto.)"
+        msg += "\n"
+        if e.get('contacta_ventas'):
+            msg += "  ⚠ Volumen alto — requiere propuesta a medida\n"
+        msg += "\n"
+    if c.get('observaciones'):
+        msg += f"Observaciones:\n{c['observaciones']}\n\n"
+    msg += f"{linea}\nTOTAL MENSUAL ESTIMADO: ${c['total']:.2f}\n(precio de lista, sujeto a confirmación de nuestro equipo)"
+    return msg
+
+class EnviarCopiaEmail(BaseModel):
+    cotizacion_id: str
+    destino: EmailStr
+
+@api_router.post("/calculadora/cotizacion/enviar-email")
+def enviar_copia_cotizacion(data: EnviarCopiaEmail):
+    result = supabase.table("cotizaciones").select("*").eq("id", data.cotizacion_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Cotización no encontrada")
+    c = result.data[0]
+    asunto = f"Cotización QuickInvoice — {c['cliente_nombre']}"
+    cuerpo = _construir_mensaje_cotizacion(c)
+    try:
+        enviar_correo(data.destino, asunto, cuerpo)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"No se pudo enviar el correo: {e}")
+    return {"message": "Correo enviado"}
 
 @api_router.get("/admin/cotizaciones", response_model=List[Cotizacion])
 def listar_cotizaciones(admin: dict = Depends(get_admin_user)):

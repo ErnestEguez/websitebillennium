@@ -81,6 +81,8 @@ export const Calculadora = () => {
 
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
+  const [cotizacionId, setCotizacionId] = useState(null);
+  const [enviandoCorreo, setEnviandoCorreo] = useState(false);
 
   useEffect(() => { fetchConfig(); }, []);
   useEffect(() => { if (empresas.length && activaId === null) setActivaId(empresas[0].id); }, [empresas, activaId]);
@@ -140,7 +142,7 @@ export const Calculadora = () => {
     if (!clienteNombre.trim()) { toast.warning('Ingresa el nombre del cliente'); return; }
     setEnviando(true);
     try {
-      await axios.post(`${API}/calculadora/cotizacion`, {
+      const { data } = await axios.post(`${API}/calculadora/cotizacion`, {
         cliente_nombre: clienteNombre,
         telefono: telefono || null,
         email: email || null,
@@ -156,6 +158,7 @@ export const Calculadora = () => {
           empleados: Math.max(0, parseInt(e.empleados) || 0),
         })),
       });
+      setCotizacionId(data.id);
       setEnviado(true);
       toast.success('¡Cotización enviada! Nuestro equipo te contactará.');
     } catch (error) {
@@ -172,10 +175,18 @@ export const Calculadora = () => {
     window.open(`https://wa.me/593${tel}?text=${encodeURIComponent(construirMensaje())}`, '_blank');
   };
 
-  const enviarCorreo = () => {
+  const enviarCorreo = async () => {
     if (!email.trim()) { toast.warning('Ingresa el email del cliente'); return; }
-    const asunto = `Cotización QuickInvoice — ${clienteNombre || 'Cliente'}`;
-    window.location.href = `mailto:${email}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(construirMensaje())}`;
+    if (!cotizacionId) { toast.error('Falta guardar la cotización primero'); return; }
+    setEnviandoCorreo(true);
+    try {
+      await axios.post(`${API}/calculadora/cotizacion/enviar-email`, { cotizacion_id: cotizacionId, destino: email });
+      toast.success(`Correo enviado a ${email}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'No se pudo enviar el correo');
+    } finally {
+      setEnviandoCorreo(false);
+    }
   };
 
   if (loadingConfig) {
@@ -238,13 +249,10 @@ export const Calculadora = () => {
                 <Button onClick={enviarWhatsApp} disabled={!telefono.trim()} className="bg-[#25D366] hover:bg-[#1ebe5d] gap-2 disabled:opacity-40">
                   <MessageCircle className="h-4 w-4" /> Enviar copia por WhatsApp
                 </Button>
-                <Button onClick={enviarCorreo} disabled={!email.trim()} variant="outline" className="gap-2 disabled:opacity-40">
-                  <Mail className="h-4 w-4" /> Enviar copia por Email
+                <Button onClick={enviarCorreo} disabled={!email.trim() || enviandoCorreo} variant="outline" className="gap-2 disabled:opacity-40">
+                  {enviandoCorreo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} Enviar copia por Email
                 </Button>
               </div>
-              <p className="text-xs text-slate-400">
-                El email abre tu programa de correo (Outlook/Gmail) con el mensaje listo — debes darle "Enviar" ahí. No se envía solo.
-              </p>
               <Button variant="ghost" onClick={() => { setEnviado(false); }}>Hacer otra cotización</Button>
             </CardContent>
           </Card>
