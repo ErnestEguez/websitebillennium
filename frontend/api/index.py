@@ -26,7 +26,13 @@ SMTP_HOST = os.environ.get('SMTP_HOST', 'mail.smtp2go.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USER = os.environ.get('SMTP_USER')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
-SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL', 'promociones@billenniumsystem.com')
+# El remitente debe ser el mismo buzón autenticado (SMTP_USER) — si se manda
+# con un "From" distinto al que SMTP2GO tiene autorizado para esta cuenta,
+# el servidor acepta el mensaje (devuelve 250 OK) pero lo descarta o lo
+# manda a spam en destino en vez de rebotar, así que el error no se nota
+# desde acá. Por defecto usa el mismo SMTP_USER a menos que se fije
+# explícitamente otro remitente ya verificado en SMTP2GO.
+SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL') or SMTP_USER or 'facturacion@billenniumsystem.com'
 SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', 'Billennium System')
 
 def enviar_correo(destinatario: str, asunto: str, cuerpo: str):
