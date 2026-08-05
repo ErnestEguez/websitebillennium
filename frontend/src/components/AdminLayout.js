@@ -85,7 +85,7 @@ export const AdminLayout = ({ children }) => {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-800">
+          <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-800 shrink-0">
             <img src={LOGO_URL} alt="Billennium" className="h-10 w-10 rounded-full" />
             <div>
               <p className="font-semibold text-white">Billennium</p>
@@ -94,7 +94,7 @@ export const AdminLayout = ({ children }) => {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 py-6 px-4 space-y-1">
+          <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
             {sidebarLinks.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.href;
@@ -119,7 +119,7 @@ export const AdminLayout = ({ children }) => {
           </nav>
 
           {/* User Info & Actions */}
-          <div className="p-4 border-t border-slate-800">
+          <div className="p-4 border-t border-slate-800 shrink-0">
             <div className="px-4 py-3 mb-2">
               <p className="text-white font-medium truncate">{user.name}</p>
               <p className="text-slate-400 text-sm truncate">{user.email}</p>

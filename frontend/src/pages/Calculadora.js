@@ -222,15 +222,30 @@ export const Calculadora = () => {
               <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto" />
               <h2 className="text-xl font-bold text-slate-900">¡Listo! Recibimos tu cotización</h2>
               <p className="text-slate-600">Nuestro equipo la revisará y te contactará para confirmar el precio final.</p>
+
+              <div className="max-w-sm mx-auto text-left space-y-3 pt-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500">WhatsApp para enviar copia</label>
+                  <Input placeholder="Ej: 0991234567" value={telefono} onChange={e => setTelefono(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500">Email para enviar copia</label>
+                  <Input type="email" placeholder="correo@cliente.com" value={email} onChange={e => setEmail(e.target.value)} />
+                </div>
+              </div>
+
               <div className="flex flex-wrap justify-center gap-3 pt-2">
-                <Button onClick={enviarWhatsApp} className="bg-[#25D366] hover:bg-[#1ebe5d] gap-2">
+                <Button onClick={enviarWhatsApp} disabled={!telefono.trim()} className="bg-[#25D366] hover:bg-[#1ebe5d] gap-2 disabled:opacity-40">
                   <MessageCircle className="h-4 w-4" /> Enviar copia por WhatsApp
                 </Button>
-                <Button onClick={enviarCorreo} variant="outline" className="gap-2">
+                <Button onClick={enviarCorreo} disabled={!email.trim()} variant="outline" className="gap-2 disabled:opacity-40">
                   <Mail className="h-4 w-4" /> Enviar copia por Email
                 </Button>
-                <Button variant="ghost" onClick={() => { setEnviado(false); }}>Hacer otra cotización</Button>
               </div>
+              <p className="text-xs text-slate-400">
+                El email abre tu programa de correo (Outlook/Gmail) con el mensaje listo — debes darle "Enviar" ahí. No se envía solo.
+              </p>
+              <Button variant="ghost" onClick={() => { setEnviado(false); }}>Hacer otra cotización</Button>
             </CardContent>
           </Card>
         ) : (

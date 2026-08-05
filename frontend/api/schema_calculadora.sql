@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS calculadora_modulos (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Único por nombre: sin esto, correr el INSERT de más abajo dos veces
+-- duplica todos los módulos en vez de dejarlos como estaban (bug real,
+-- corregido — antes el ON CONFLICT no tenía contra qué chocar porque el
+-- único unique era el id, que siempre es nuevo).
+CREATE UNIQUE INDEX IF NOT EXISTS calculadora_modulos_nombre_idx ON calculadora_modulos (nombre);
 
 -- Tramos de recargo por volumen de datos (clientes/artículos/facturas/
 -- compras/empleados). El último tramo de cada parámetro tiene
@@ -37,6 +42,8 @@ CREATE TABLE IF NOT EXISTS calculadora_tramos (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Único por (parametro, orden): mismo motivo que calculadora_modulos_nombre_idx.
+CREATE UNIQUE INDEX IF NOT EXISTS calculadora_tramos_parametro_orden_idx ON calculadora_tramos (parametro, orden);
 
 -- Parámetros globales de la fórmula: recargo % por usuario adicional y
 -- descuento automático por empresa (2da, 3ra, 4ta+ empresa en la misma
@@ -83,7 +90,7 @@ INSERT INTO calculadora_modulos (nombre, precio, orden) VALUES
     ('Talento Humano', 30, 8),
     ('Nóminas',        20, 9),
     ('Tributario',     15, 10)
-ON CONFLICT DO NOTHING;
+ON CONFLICT (nombre) DO NOTHING;
 
 -- Tramos propuestos (punto de partida — ajustables luego desde el panel).
 INSERT INTO calculadora_tramos (parametro, orden, desde, hasta, recargo, es_contactar) VALUES
@@ -116,7 +123,7 @@ INSERT INTO calculadora_tramos (parametro, orden, desde, hasta, recargo, es_cont
     ('empleados', 3,   51,   150, 25, false),
     ('empleados', 4,  151,   400, 50, false),
     ('empleados', 5,  401,  NULL,  0, true)
-ON CONFLICT DO NOTHING;
+ON CONFLICT (parametro, orden) DO NOTHING;
 
 -- ============================================================
 -- Rollback (comentado)
