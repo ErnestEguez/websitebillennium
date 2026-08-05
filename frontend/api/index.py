@@ -1049,11 +1049,28 @@ def crear_cotizacion(data: CotizacionCreate):
     result = supabase.table("cotizaciones").insert(nueva).execute()
     return _parse_cotizacion(result.data[0])
 
+CARTA_COTIZACION_PATH = ROOT_DIR / 'templates' / 'carta_cotizacion.txt'
+
+def _cargar_carta_cotizacion(cliente_nombre: str) -> str:
+    # Archivo editable a mano (sin tocar código) — ver
+    # frontend/api/templates/carta_cotizacion.txt. Único placeholder
+    # disponible: {cliente_nombre} (la calculadora solo guarda un campo
+    # de nombre, no contacto/empresa por separado).
+    try:
+        plantilla = CARTA_COTIZACION_PATH.read_text(encoding='utf-8')
+        return plantilla.format(cliente_nombre=cliente_nombre)
+    except Exception:
+        return f"Estimado(a) {cliente_nombre}:\n\nGracias por su interés en Billennium System."
+
 def _construir_mensaje_cotizacion(c: dict) -> str:
+    # Los módulos guardados en cada empresa son ids (UUID) de
+    # calculadora_modulos, no nombres — hay que resolverlos para que el
+    # correo no muestre UUIDs crudos.
+    modulos_map = {m['id']: m['nombre'] for m in (supabase.table("calculadora_modulos").select("id, nombre").execute().data or [])}
     linea = '─' * 32
-    msg = f"Cotización QuickInvoice — Billennium System\nCliente: {c['cliente_nombre']}\n{linea}\n\n"
+    msg = _cargar_carta_cotizacion(c['cliente_nombre']) + f"\n\n{linea}\n\n"
     for e in c.get('empresas', []):
-        nombres = ', '.join(m for m in e.get('modulos', [])) or 'Sin módulos'
+        nombres = ', '.join(modulos_map.get(m, m) for m in e.get('modulos', [])) or 'Sin módulos'
         msg += f"{e['nombre']}:\n  Módulos: {nombres}\n  Usuarios: {e.get('usuarios', 1)}\n  Subtotal: ${e.get('total_empresa', 0):.2f}"
         if e.get('dto_multiempresa_pct', 0) > 0:
             msg += f" ({e['dto_multiempresa_pct']*100:.0f}% dto.)"
