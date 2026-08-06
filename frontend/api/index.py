@@ -13,46 +13,38 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
-import smtplib
-from email.mime.text import MIMEText
 from supabase import create_client, Client
 
 # Load .env file for local development
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env', override=True)
 
-# ============== SMTP (SMTP2GO — mismo remitente que Supabase Auth) ==============
-SMTP_HOST = os.environ.get('SMTP_HOST', 'mail.smtp2go.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
-SMTP_USER = os.environ.get('SMTP_USER')
-SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
-# El remitente debe ser el mismo buzón autenticado (SMTP_USER) — si se manda
-# con un "From" distinto al que SMTP2GO tiene autorizado para esta cuenta,
-# el servidor acepta el mensaje (devuelve 250 OK) pero lo descarta o lo
-# manda a spam en destino en vez de rebotar, así que el error no se nota
-# desde acá. Por defecto usa el mismo SMTP_USER a menos que se fije
-# explícitamente otro remitente ya verificado en SMTP2GO.
-SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL') or SMTP_USER or 'facturacion@billenniumsystem.com'
-SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME', 'Billennium System')
+# ============== EMAIL (vía Edge Function, no SMTP directo) ==============
+# Vercel bloquea/restringe conexiones SMTP directas por puerto 587 desde
+# funciones Python sin lanzar ningún error visible (smtplib "termina bien"
+# pero el correo nunca llega) — confirmado comparando con sri-signer, que
+# manda por SMTP2GO desde una Supabase Edge Function (Deno) y sí entrega,
+# con las mismas credenciales. En vez de pelear contra esa restricción de
+# red, el envío se delega a portal-send-email (Deno), que sí puede abrir
+# la conexión SMTP real.
+PORTAL_EMAIL_FN_URL = os.environ.get('PORTAL_EMAIL_FN_URL', 'https://ietsocfibsoclienqafq.supabase.co/functions/v1/portal-send-email')
+PORTAL_EMAIL_SECRET = os.environ.get('PORTAL_EMAIL_SECRET')
 # Mismo patrón que config_sri de QuickInvoice (que sí entrega a Hotmail
 # probado): copia siempre al dueño del negocio.
 SMTP_CC = os.environ.get('SMTP_CC', 'e_eguez@hotmail.com')
 
 def enviar_correo(destinatario: str, asunto: str, cuerpo: str, cc: str | None = SMTP_CC):
-    if not SMTP_USER or not SMTP_PASSWORD:
-        raise RuntimeError('SMTP no configurado (faltan SMTP_USER / SMTP_PASSWORD)')
-    msg = MIMEText(cuerpo, 'plain', 'utf-8')
-    msg['Subject'] = asunto
-    msg['From'] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
-    msg['To'] = destinatario
-    destinatarios = [destinatario]
-    if cc:
-        msg['Cc'] = cc
-        destinatarios.append(cc)
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.sendmail(SMTP_FROM_EMAIL, destinatarios, msg.as_string())
+    if not PORTAL_EMAIL_SECRET:
+        raise RuntimeError('Envío de correo no configurado (falta PORTAL_EMAIL_SECRET)')
+    import httpx
+    resp = httpx.post(
+        PORTAL_EMAIL_FN_URL,
+        json={"destinatario": destinatario, "asunto": asunto, "cuerpo": cuerpo, "cc": cc},
+        headers={"x-portal-secret": PORTAL_EMAIL_SECRET},
+        timeout=20,
+    )
+    if resp.status_code >= 400:
+        raise RuntimeError(f"portal-send-email respondió {resp.status_code}: {resp.text}")
 
 # ============== SUPABASE CLIENT ==============
 SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://dummy.supabase.co')
