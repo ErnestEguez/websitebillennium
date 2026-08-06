@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react';
 import axios from 'axios';
-import { FileText, Loader2, RefreshCw, DollarSign, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { FileText, Loader2, RefreshCw, DollarSign, ChevronDown, ChevronUp, AlertTriangle, Link2 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -53,6 +53,11 @@ export const AdminCotizaciones = () => {
   };
 
   const nombreModulo = (id) => modulos.find(m => m.id === id)?.nombre || id;
+
+  const copiarEnlace = (id) => {
+    navigator.clipboard.writeText(`${window.location.origin}/cotizacion/${id}`);
+    toast.success('Enlace copiado — envíalo al cliente por WhatsApp o correo');
+  };
 
   const abrirDialog = (c) => {
     setActual(c);
@@ -148,9 +153,14 @@ export const AdminCotizaciones = () => {
                           <Badge className={ESTADOS[c.estado]?.color || 'bg-slate-100 text-slate-500'}>{ESTADOS[c.estado]?.label || c.estado}</Badge>
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <Button size="sm" onClick={() => abrirDialog(c)} className="bg-blue-600 hover:bg-blue-700 gap-1.5">
-                            <DollarSign className="h-3.5 w-3.5" /> Fijar monto
-                          </Button>
+                          <div className="flex justify-end gap-1.5">
+                            <Button size="sm" variant="outline" onClick={() => copiarEnlace(c.id)} title="Copiar enlace para el cliente">
+                              <Link2 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="sm" onClick={() => abrirDialog(c)} className="bg-blue-600 hover:bg-blue-700 gap-1.5">
+                              <DollarSign className="h-3.5 w-3.5" /> Fijar monto
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                       {expandido === c.id && (

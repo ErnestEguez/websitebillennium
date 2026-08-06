@@ -872,6 +872,15 @@ def crear_cotizacion(data: CotizacionCreate):
     result = supabase.table("cotizaciones").insert(nueva).execute()
     return _parse_cotizacion(result.data[0])
 
+@api_router.get("/calculadora/cotizacion/{cotizacion_id}", response_model=Cotizacion)
+def obtener_cotizacion(cotizacion_id: str):
+    # Público a propósito: es el enlace que se le comparte al cliente para
+    # que vea el monto acordado — el id (UUID) ya cumple el rol de token.
+    result = supabase.table("cotizaciones").select("*").eq("id", cotizacion_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Cotización no encontrada")
+    return _parse_cotizacion(result.data[0])
+
 CARTA_COTIZACION_PATH = ROOT_DIR / 'templates' / 'carta_cotizacion.txt'
 
 def _cargar_carta_cotizacion(cliente_nombre: str) -> str:

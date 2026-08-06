@@ -10,6 +10,7 @@ import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Planes from "./pages/Planes";
 import Calculadora from "./pages/Calculadora";
+import Cotizacion from "./pages/Cotizacion";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Login from "./pages/Login";
@@ -60,6 +61,7 @@ function App() {
           <Route path="/productos/:slug" element={<PublicPage><ProductDetail /></PublicPage>} />
           <Route path="/planes" element={<PublicPage><Planes /></PublicPage>} />
           <Route path="/calculadora" element={<PublicPage><Calculadora /></PublicPage>} />
+          <Route path="/cotizacion/:id" element={<Cotizacion />} />
           <Route path="/nosotros" element={<PublicPage><About /></PublicPage>} />
           <Route path="/contacto" element={<PublicPage><Contact /></PublicPage>} />
           {/* /blog y /blog/:slug NO se registran aquí a propósito: viven en
