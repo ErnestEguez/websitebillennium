@@ -28,6 +28,7 @@ import {
   AccordionTrigger,
 } from '../components/ui/accordion';
 import { useAuth } from '../context/AuthContext';
+import { CotizadorBanner } from '../components/CotizadorBanner';
 import { toast } from 'sonner';
 
 const API = '/api';
@@ -60,22 +61,6 @@ const productExtras = {
       { q: '¿Puedo tener varios locales?', a: 'Sí, con el plan Corporativo puedes gestionar múltiples empresas y locales desde una sola cuenta.' },
     ]
   },
-  sentinel: {
-    image: 'https://images.pexels.com/photos/5324991/pexels-photo-5324991.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
-    problem: 'Los equipos de ventas pierden tiempo con procesos manuales, no tienen visibilidad del inventario actualizado y los pedidos se pierden entre el campo y la oficina.',
-    benefits: [
-      'Vendedores siempre con catálogo actualizado desde el ERP',
-      'Pedidos llegan automáticamente para su procesamiento',
-      'Trabaja sin internet y sincroniza al conectarse',
-      'Dashboard de ventas para medir el desempeño'
-    ],
-    target: 'Empresas con equipos de ventas en campo, distribuidoras, mayoristas y negocios que necesitan toma de pedidos móvil conectada a su sistema.',
-    faqs: [
-      { q: '¿Se integra con mi ERP actual?', a: 'Pedidos Sentinel está diseñado para integrarse con el ERP Billennium-Sentinel. Para otros ERPs podemos evaluar la integración.' },
-      { q: '¿Cada vendedor tiene su propia cuenta?', a: 'Sí, cada vendedor tiene su usuario y puede ver su propio dashboard de ventas y comisiones.' },
-      { q: '¿Puedo gestionar varias empresas?', a: 'Sí, con los planes Profesional y Corporativo puedes gestionar múltiples empresas desde una sola cuenta.' },
-    ]
-  },
   'modulo-importaciones': {
     image: 'https://images.pexels.com/photos/1117210/pexels-photo-1117210.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
     problem: 'El control de importaciones suele hacerse en hojas de cálculo, perdiendo trazabilidad de costos y dificultando el cálculo real del costo de la mercadería.',
@@ -91,52 +76,23 @@ const productExtras = {
       { q: '¿Se integra con el sistema de inventario?', a: 'Sí, al cerrar una importación los productos se integran al inventario con su costo real calculado.' },
     ]
   },
-  lopdp: {
-    image: 'https://images.unsplash.com/photo-1767972464040-8bfee42d7bed?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHw0fHxjeWJlcnNlY3VyaXR5JTIwZGF0YSUyMHByb3RlY3Rpb24lMjBsb2NrfGVufDB8fHx8MTc3MTg1ODY4N3ww&ixlib=rb-4.1.0&q=85',
-    problem: 'La LOPDP exige a las empresas cumplir con obligaciones de protección de datos personales, pero muchas no saben por dónde empezar ni cómo documentar su cumplimiento.',
-    benefits: [
-      'Cumple con la ley sin ser experto en protección de datos',
-      'Documentación legal generada automáticamente',
-      'Portal para que tus clientes ejerzan sus derechos ARCO',
-      'Alertas cuando debes renovar consentimientos'
-    ],
-    target: 'Cualquier empresa que maneje datos personales de clientes, empleados o proveedores y necesite cumplir con la LOPDP ecuatoriana.',
-    faqs: [
-      { q: '¿Qué es la LOPDP?', a: 'La Ley Orgánica de Protección de Datos Personales es la normativa ecuatoriana que regula cómo las empresas deben manejar la información personal de sus clientes y empleados.' },
-      { q: '¿Mi empresa necesita cumplir con la LOPDP?', a: 'Si tu empresa recopila, almacena o procesa datos personales (nombre, cédula, email, etc.) de personas naturales, debes cumplir con la LOPDP.' },
-      { q: '¿Qué son los derechos ARCO?', a: 'Son los derechos de Acceso, Rectificación, Cancelación y Oposición que tienen las personas sobre sus datos personales.' },
-    ]
-  },
   'facturacion-electronica': {
     image: 'https://images.pexels.com/photos/7873568/pexels-photo-7873568.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
-    problem: 'Emitir comprobantes electrónicos puede ser complicado si no tienes un sistema que cumpla con todos los requisitos del SRI.',
+    problem: 'Las PyMEs suelen terminar con varios sistemas sueltos y desconectados: uno para facturar, otro para inventario, un Excel para cartera, otro para contabilidad. Nada habla entre sí, y la información nunca cuadra.',
     benefits: [
-      'Emite facturas, notas de crédito y más en segundos',
-      'Envío automático al SRI sin intervención manual',
-      'Tus clientes reciben sus comprobantes por email',
-      'Reportes listos para tus declaraciones'
+      'Un solo sistema para facturar, controlar inventario, cartera, compras, contabilidad y nómina',
+      'Envío automático de comprobantes al SRI, sin intervención manual',
+      'Asistentes con IA que agilizan el registro de compras y hasta permiten facturar por voz',
+      'Cumplimiento LOPDP integrado, sin sistemas aparte',
+      'Información contable y gerencial siempre al día, sin cuadres manuales'
     ],
-    target: 'Pequeñas y medianas empresas que necesitan facturación electrónica sin la complejidad de un sistema ERP completo.',
+    target: 'PyMEs, almacenes, profesionales y empresas de servicios que quieren dejar de operar con sistemas sueltos y tener todo su negocio en un solo lugar.',
     faqs: [
       { q: '¿Qué comprobantes puedo emitir?', a: 'Facturas, notas de crédito, notas de débito, retenciones, guías de remisión y liquidaciones de compra.' },
       { q: '¿Necesito certificado digital?', a: 'Sí, necesitas un certificado de firma electrónica vigente emitido por una entidad certificada en Ecuador.' },
       { q: '¿Los comprobantes se envían automáticamente al SRI?', a: 'Sí, el sistema firma, envía y autoriza los comprobantes automáticamente con el SRI.' },
-    ]
-  },
-  'dashboard-empresarial': {
-    image: 'https://images.pexels.com/photos/7688336/pexels-photo-7688336.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
-    problem: 'Los dueños de negocio necesitan información actualizada para tomar decisiones, pero extraer datos del ERP suele ser complicado y tardado.',
-    benefits: [
-      'Visualiza tus KPIs principales de un vistazo',
-      'Información actualizada desde tu ERP',
-      'Accede desde cualquier dispositivo',
-      'Identifica tendencias y oportunidades'
-    ],
-    target: 'Gerentes, dueños de negocio y directivos que necesitan información gerencial sin depender del área de sistemas.',
-    faqs: [
-      { q: '¿De dónde toma los datos?', a: 'El dashboard se conecta a tu ERP Billennium-Sentinel y extrae la información automáticamente.' },
-      { q: '¿Puedo personalizar los indicadores?', a: 'Sí, con el plan Profesional puedes configurar los KPIs y reportes según tus necesidades.' },
-      { q: '¿Se actualiza en tiempo real?', a: 'Con el plan Profesional los datos se actualizan en tiempo real. El plan Estándar actualiza diariamente.' },
+      { q: '¿Necesito contratar todos los módulos?', a: 'No, arma tu plan solo con los módulos que tu negocio necesita usando nuestra calculadora — puedes agregar más adelante.' },
+      { q: '¿Cuánto cuesta?', a: 'El precio depende de los módulos que elijas, la cantidad de usuarios y el volumen de tu operación. Usa la calculadora para obtener un estimado en minutos.' },
     ]
   },
   'plataforma-ferias': {
@@ -252,6 +208,13 @@ export const ProductDetail = () => {
                   <a href="#planes">
                     <Button size="lg" className="bg-blue-600 hover:bg-blue-700" data-testid="btn-ver-planes">
                       Ver Planes
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </a>
+                ) : product.id === 'facturacion' ? (
+                  <a href="#planes">
+                    <Button size="lg" className="bg-blue-600 hover:bg-blue-700" data-testid="btn-cotizar">
+                      Cotizar mi plan
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </a>
@@ -455,7 +418,14 @@ export const ProductDetail = () => {
         </section>
       )}
 
-
+      {/* Cotizador — reemplaza la tabla de precios fija para QuickInvoice */}
+      {(!product.plans || product.plans.length === 0) && product.id === 'facturacion' && (
+        <section id="planes" className="py-20 bg-slate-50 scroll-mt-20">
+          <div className="container mx-auto px-4 md:px-8 max-w-4xl">
+            <CotizadorBanner />
+          </div>
+        </section>
+      )}
 
       {/* FAQs */}
       {extras.faqs && extras.faqs.length > 0 && (

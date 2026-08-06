@@ -2,17 +2,11 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   UtensilsCrossed,
-  Smartphone,
   Ship,
-  ShieldCheck,
   FileText,
-  BarChart3,
   ArrowRight,
   Check,
   Ticket,
-  BookOpen,
-  Users,
-  Landmark,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -20,83 +14,22 @@ import { Card, CardContent } from '../components/ui/card';
 const products = [
   {
     id: 'facturacion',
-    name: 'QuickInvoice',
-    tagline: 'Factura hoy. Cumple siempre.',
-    description: 'Facturación electrónica autorizada por el SRI para cualquier negocio: almacenes, profesionales, servicios y más. Con control de inventario, clientes y cartera incluidos.',
+    name: 'ERP QuickInvoice',
+    tagline: 'Todo tu negocio, en un solo sistema.',
+    description: 'ERP completo para PyMEs ecuatorianas: facturación electrónica SRI, inventario, cartera, compras, contabilidad, tesorería, talento humano y cumplimiento LOPDP, todo integrado.',
     icon: FileText,
     image: 'https://images.pexels.com/photos/7873568/pexels-photo-7873568.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
     features: [
-      'Facturas, notas de crédito y retenciones electrónicas SRI',
-      'Control de inventario con Kardex',
-      'Gestión de clientes y cartera CxC',
-      'Múltiples puntos de emisión',
-      'Reportes de ventas y compras',
+      'Facturas, N/C, N/D, guías de remisión y retenciones electrónicas SRI',
+      'Inventario con Kardex, clientes y cartera CxC',
+      'Proveedores, compras y cartera CxP',
+      'Contabilidad NIIF, tesorería y ATS',
+      'Talento Humano, Nóminas y cumplimiento LOPDP',
       'Funciona en computador, tablet y celular',
     ],
     color: 'from-blue-500 to-indigo-500',
     bgColor: 'bg-blue-50',
     iconColor: 'text-blue-600',
-    priceFrom: 15,
-  },
-  {
-    id: 'contabilidad',
-    name: 'LedgerPro',
-    tagline: 'Tu contabilidad al día, siempre.',
-    description: 'Contabilidad completa integrada con el SRI. Genera el ATS automáticamente, declara el IVA con un clic y presenta estados financieros reales a tus socios o clientes.',
-    icon: BookOpen,
-    image: 'https://images.pexels.com/photos/7688336/pexels-photo-7688336.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
-    features: [
-      'Plan de cuentas NIIF para PyMEs',
-      'Asientos contables automáticos desde facturas',
-      'ATS (Anexo Transaccional) automático',
-      'Balance General y Estado de Resultados',
-      'Importación de compras desde el SRI',
-      'Presupuesto y control presupuestario',
-    ],
-    color: 'from-emerald-500 to-teal-500',
-    bgColor: 'bg-emerald-50',
-    iconColor: 'text-emerald-600',
-    priceFrom: 20,
-  },
-  {
-    id: 'vendormanagement',
-    name: 'Vendor Management',
-    tagline: 'Controla a tus proveedores, no al revés.',
-    description: 'Gestión integral de proveedores y cuentas por pagar. Centraliza tus compras, aprueba pagos y nunca más pierdas el control de lo que debes y a quién.',
-    icon: Users,
-    image: 'https://images.pexels.com/photos/3184418/pexels-photo-3184418.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
-    features: [
-      'Catálogo de proveedores calificados',
-      'Cuentas por pagar con vencimientos',
-      'Órdenes de compra y aprobaciones',
-      'Registro de facturas de proveedores',
-      'Reportes de antigüedad de cartera CxP',
-      'Integración con contabilidad',
-    ],
-    color: 'from-amber-500 to-orange-500',
-    bgColor: 'bg-amber-50',
-    iconColor: 'text-amber-600',
-    priceFrom: 20,
-  },
-  {
-    id: 'finance',
-    name: 'Finance Suite',
-    tagline: 'Tu tesorería bajo control total.',
-    description: 'Módulo financiero completo: bancos, cheques, anticipos y conciliaciones. Sabe en tiempo real cuánto tienes, cuánto debes y cuánto te deben.',
-    icon: Landmark,
-    image: 'https://images.pexels.com/photos/50987/money-card-business-credit-card-50987.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
-    features: [
-      'Cuentas bancarias y movimientos',
-      'Gestión de cheques (al día y postfechados)',
-      'Anticipos a proveedores',
-      'Conciliación bancaria',
-      'Comprobantes de egreso',
-      'Reportes de tesorería',
-    ],
-    color: 'from-violet-500 to-purple-500',
-    bgColor: 'bg-violet-50',
-    iconColor: 'text-violet-600',
-    priceFrom: 20,
   },
   {
     id: 'restoflow',
@@ -112,19 +45,6 @@ const products = [
     priceFrom: 30,
   },
   {
-    id: 'pedidos-sentinel',
-    name: 'Pedidos Sentinel',
-    tagline: 'Tu fuerza de ventas siempre conectada',
-    description: 'Aplicación móvil de toma de pedidos enlazada a ERP Billennium. Trabaja offline/online con sincronización automática.',
-    icon: Smartphone,
-    image: 'https://images.pexels.com/photos/5324991/pexels-photo-5324991.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
-    features: ['Multi-empresa', 'Trabajo offline/online', 'Sincronización con ERP', 'Generación de proformas PDF', 'Dashboard de ventas'],
-    color: 'from-blue-500 to-indigo-500',
-    bgColor: 'bg-blue-50',
-    iconColor: 'text-blue-600',
-    priceFrom: 30,
-  },
-  {
     id: 'modulo-importaciones',
     name: 'Módulo de Importaciones',
     tagline: 'Controla tus importaciones de principio a fin',
@@ -136,19 +56,6 @@ const products = [
     bgColor: 'bg-cyan-50',
     iconColor: 'text-cyan-600',
     priceFrom: 35,
-  },
-  {
-    id: 'lopdp',
-    name: 'LOPDP',
-    tagline: 'Cumplimiento de datos sin complicaciones',
-    description: 'Solución para ayudar a las empresas a cumplir la Ley Orgánica de Protección de Datos Personales en Ecuador.',
-    icon: ShieldCheck,
-    image: 'https://images.unsplash.com/photo-1767972464040-8bfee42d7bed?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHw0fHxjeWJlcnNlY3VyaXR5JTIwZGF0YSUyMHByb3RlY3Rpb24lMjBsb2NrfGVufDB8fHx8MTc3MTg1ODY4N3ww&ixlib=rb-4.1.0&q=85',
-    features: ['Inventario de datos personales', 'Gestión de consentimientos', 'Portal de derechos ARCO', 'Alertas de cumplimiento', 'Documentación legal'],
-    color: 'from-green-500 to-emerald-500',
-    bgColor: 'bg-green-50',
-    iconColor: 'text-green-600',
-    priceFrom: 79,
   },
   {
     id: 'plataforma-ferias',
@@ -261,9 +168,17 @@ export const Products = () => {
                                 <ArrowRight className="ml-2 h-4 w-4" />
                               </Button>
                             </Link>
-                            <span className="text-slate-500">
-                              Desde <span className="text-2xl font-bold text-slate-900">${product.priceFrom}</span>/mes
-                            </span>
+                            {product.priceFrom ? (
+                              <span className="text-slate-500">
+                                Desde <span className="text-2xl font-bold text-slate-900">${product.priceFrom}</span>/mes
+                              </span>
+                            ) : product.id === 'facturacion' ? (
+                              <Link to="/calculadora" className="text-blue-600 font-medium hover:underline">
+                                Cotizar mi plan →
+                              </Link>
+                            ) : (
+                              <span className="text-slate-500">Cotización personalizada</span>
+                            )}
                           </div>
                         </div>
                       </div>

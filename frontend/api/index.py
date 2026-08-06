@@ -330,45 +330,6 @@ PRODUCTS = [
         ]
     },
     {
-        "id": "sentinel",
-        "name": "Pedidos Sentinel",
-        "slug": "pedidos-sentinel",
-        "description": "Aplicación de toma de pedidos enlazada a ERP Billennium para equipos de ventas",
-        "icon": "Smartphone",
-        "features": [
-            "Multi-empresa",
-            "Sincronización con ERP",
-            "Trabajo offline/online",
-            "Generación de proformas PDF",
-            "Dashboard de ventas",
-            "Control de cartera"
-        ],
-        "plans": [
-            {
-                "name": "Básico",
-                "price_before": 60,
-                "price_now": 30,
-                "billing": "mensual",
-                "features": ["1 vendedor", "1 empresa", "Pedidos y proformas", "Catálogo actualizado diario", "Envío por email/WhatsApp", "Trabajo offline/online", "Sincronización automática con ERP", "Soporte básico"]
-            },
-            {
-                "name": "Profesional",
-                "price_before": 120,
-                "price_now": 60,
-                "billing": "mensual",
-                "popular": True,
-                "features": ["Hasta 5 vendedores", "Hasta 3 empresas", "Todo lo del Plan Básico", "Cartera (cobranza en ruta)", "Bancos y formas de pago", "Administración de documentos", "Autorización proforma→pedido", "Soporte profesional", "Reportes en PDF/Excel"]
-            },
-            {
-                "name": "Corporativo",
-                "price_before": 250,
-                "price_now": 125,
-                "billing": "mensual",
-                "features": ["Hasta 20 vendedores", "Hasta 10 empresas", "Todo lo del Plan Profesional", "Dashboard avanzado de ventas y costos", "Por vendedor, empresa y periodo", "Configuración avanzada de parámetros", "Soporte prioritario"]
-            }
-        ]
-    },
-    {
         "id": "importaciones",
         "name": "Módulo de Importaciones",
         "slug": "modulo-importaciones",
@@ -401,80 +362,28 @@ PRODUCTS = [
         ]
     },
     {
-        "id": "lopdp",
-        "name": "LOPDP",
-        "slug": "lopdp",
-        "description": "Solución para cumplir la Ley Orgánica de Protección de Datos Personales en Ecuador",
-        "icon": "ShieldCheck",
-        "features": [
-            "Inventario de datos personales",
-            "Gestión de consentimientos",
-            "Registro de tratamientos",
-            "Portal de derechos ARCO",
-            "Alertas de cumplimiento",
-            "Documentación legal automatizada"
-        ],
-        "plans": [
-            {
-                "name": "PYME",
-                "price_before": 60,
-                "price_now": 79,
-                "billing": "mensual",
-                "features": ["Hasta 500 registros", "1 usuario administrador", "Inventario de datos", "Gestión de consentimientos básica", "Portal ARCO", "Documentación legal básica"]
-            },
-            {
-                "name": "Profesional",
-                "price_before": 120,
-                "price_now": 150,
-                "billing": "mensual",
-                "popular": True,
-                "features": ["Registros ilimitados", "Hasta 5 usuarios", "Todo lo del Plan PYME", "Registro de tratamientos completo", "Alertas de cumplimiento", "Reportes de auditoría", "Soporte prioritario"]
-            }
-        ]
-    },
-    {
         "id": "facturacion",
-        "name": "QuickInvoice",
+        "name": "ERP QuickInvoice",
         "slug": "facturacion-electronica",
-        "description": "Facturación electrónica SRI para almacenes, profesionales y cualquier negocio. Con inventario, clientes y cartera incluidos.",
+        "description": "ERP completo para PyMEs ecuatorianas: facturación electrónica SRI, inventario, cartera, compras, contabilidad, tesorería, talento humano y cumplimiento LOPDP, todo integrado en un solo sistema.",
         "icon": "FileText",
         "features": [
-            "Facturas, N/C, N/D y retenciones electrónicas SRI",
+            "Facturas, N/C, N/D, guías de remisión y liquidaciones de compra electrónicas SRI",
+            "Facturación masiva recurrente (clientes con cargo mensual fijo)",
             "Control de inventario con Kardex",
             "Gestión de clientes y cartera CxC",
-            "Múltiples puntos de emisión",
-            "Reportes de ventas y compras",
+            "Proveedores, compras (inventario y servicios) y cartera CxP",
+            "Retenciones en la fuente e IVA con catálogo SRI actualizado",
+            "Contabilidad: plan de cuentas NIIF, asientos automáticos, balances y ATS",
+            "Tesorería: cuentas bancarias, cheques, anticipos y conciliación",
+            "Talento Humano y Nóminas: roles de pago, décimos, liquidaciones",
+            "Cumplimiento LOPDP integrado",
+            "Asistentes con IA: OCR de facturas de compra, voz para facturar, análisis de hojas de vida",
+            "Dashboard gerencial con indicadores en tiempo real",
+            "Multiempresa y múltiples puntos de emisión",
             "Funciona en computador, tablet y celular"
         ],
-        "plans": [
-            {
-                "name": "Independiente",
-                "price_before": 18,
-                "price_now": 10,
-                "price_annual": 110,
-                "billing": "mensual",
-                "target": "Profesionales y freelancers",
-                "features": ["Hasta 50 documentos/mes", "1 usuario", "Facturas y notas de crédito", "Envío automático al SRI", "Soporte por email", "1 mes gratis al pagar anual"]
-            },
-            {
-                "name": "Empresarial",
-                "price_before": 35,
-                "price_now": 20,
-                "price_annual": 220,
-                "billing": "mensual",
-                "popular": True,
-                "target": "Almacenes y PyMEs",
-                "features": ["Documentos ilimitados", "Hasta 3 usuarios", "Todos los tipos de comprobantes", "Control de inventario y Kardex", "Cartera CxC", "Retenciones automáticas", "Reportes para declaraciones", "Soporte prioritario", "1 mes gratis al pagar anual"]
-            },
-            {
-                "name": "Corporativo",
-                "price_before": 65,
-                "price_now": 40,
-                "price_annual": 440,
-                "billing": "mensual",
-                "features": ["Documentos ilimitados", "Usuarios ilimitados", "Todo lo del Plan Empresarial", "Múltiples empresas", "API de integración", "Soporte dedicado", "1 mes gratis al pagar anual"]
-            }
-        ]
+        "plans": []
     },
     {
         "id": "plataforma-ferias",
@@ -494,105 +403,6 @@ PRODUCTS = [
         ],
         "external_link": "https://proyecto-ferias2026.vercel.app/",
         "plans": []
-    },
-    {
-        "id": "contabilidad",
-        "name": "Ledger Pro Contabilidad",
-        "slug": "contabilidad",
-        "description": "Sistema contable completo con plan de cuentas NIIF PYMES, asientos, balances e integración SRI.",
-        "icon": "BookOpen",
-        "features": [
-            "Plan de cuentas NIIF para PYMES",
-            "Comprobantes contables",
-            "Balance general y estado de resultados",
-            "Integración con QuickInvoice",
-            "Importación de comprobantes SRI",
-            "Presupuesto vs Real"
-        ],
-        "plans": [
-            {
-                "name": "Contador",
-                "price_before": 35,
-                "price_now": 20,
-                "price_annual": 220,
-                "billing": "mensual",
-                "popular": True,
-                "features": ["1 empresa", "3 usuarios", "Plan de cuentas NIIF", "Comprobantes y balances", "ATS automático", "Importación SRI", "Integración QuickInvoice", "Soporte prioritario", "1 mes gratis al pagar anual"]
-            },
-            {
-                "name": "Multi-empresa",
-                "price_before": 75,
-                "price_now": 45,
-                "price_annual": 495,
-                "billing": "mensual",
-                "features": ["Hasta 5 empresas", "Usuarios ilimitados", "Todo lo del Plan Contador", "Presupuesto vs Real", "Cierre contable anual", "Reportes avanzados", "1 mes gratis al pagar anual"]
-            }
-        ]
-    },
-    {
-        "id": "vendormanagement",
-        "name": "Gestión de Compras",
-        "slug": "vendormanagement",
-        "description": "Módulo completo de proveedores, compras de inventario y servicios, cuentas por pagar y órdenes de compra.",
-        "icon": "ShoppingCart",
-        "features": [
-            "Maestro de proveedores con datos SRI",
-            "Compras de inventario con kardex",
-            "Compras de servicios",
-            "Retenciones en la fuente e IVA",
-            "Cuentas por pagar (CxP)",
-            "Órdenes de compra"
-        ],
-        "plans": [
-            {
-                "name": "Básico",
-                "price_before": 35,
-                "price_now": 20,
-                "billing": "mensual",
-                "features": ["1 empresa", "2 usuarios", "Proveedores y compras", "CxP básico", "Soporte básico"]
-            },
-            {
-                "name": "Profesional",
-                "price_before": 70,
-                "price_now": 45,
-                "billing": "mensual",
-                "popular": True,
-                "features": ["Hasta 3 empresas", "5 usuarios", "Todo lo del Plan Básico", "Retenciones electrónicas", "Órdenes de compra", "Soporte prioritario"]
-            },
-            {
-                "name": "Empresarial",
-                "price_before": 130,
-                "price_now": 80,
-                "billing": "mensual",
-                "features": ["Multiempresa", "Usuarios ilimitados", "Todo lo del Plan Profesional", "Integración SRI", "Reportes avanzados"]
-            }
-        ]
-    },
-    {
-        "id": "finance",
-        "name": "Finance Suite",
-        "slug": "finance-suite",
-        "description": "Módulo bancario y de pagos. Cuentas bancarias, egresos a proveedores, cheques, anticipos, movimientos y conciliación bancaria.",
-        "icon": "Landmark",
-        "features": [
-            "Gestión de cuentas bancarias",
-            "Comprobantes de egreso a proveedores",
-            "Control de cheques y post-fechados",
-            "Anticipos a proveedores",
-            "Movimientos bancarios",
-            "Conciliación bancaria"
-        ],
-        "plans": [
-            {
-                "name": "Empresarial",
-                "price_before": 35,
-                "price_now": 20,
-                "price_annual": 220,
-                "billing": "mensual",
-                "popular": True,
-                "features": ["1 empresa", "3 usuarios", "Cuentas bancarias ilimitadas", "Egresos y comprobantes de pago", "Cheques al día y post-fechados", "Anticipos a proveedores", "Conciliación bancaria", "Exportación a Excel", "1 mes gratis al pagar anual"]
-            }
-        ]
     }
 ]
 

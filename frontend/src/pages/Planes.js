@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useAuth } from '../context/AuthContext';
+import { CotizadorBanner } from '../components/CotizadorBanner';
 import { toast } from 'sonner';
 
 const API = '/api';
@@ -191,15 +192,21 @@ export const Planes = () => {
 
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
                   {(!product.plans || product.plans.length === 0) ? (
-                    <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 shadow-sm mt-4">
-                      <h3 className="text-xl font-semibold text-slate-900 mb-3">Plan Personalizado</h3>
-                      <p className="text-slate-600 max-w-lg mx-auto mb-8">
-                        Este producto o servicio requiere una cotización a medida según las necesidades específicas de tu negocio.
-                      </p>
-                      <Link to="/contacto">
-                        <Button className="bg-blue-600 hover:bg-blue-700">Contáctanos para más información</Button>
-                      </Link>
-                    </div>
+                    product.id === 'facturacion' ? (
+                      <div className="col-span-full mt-4">
+                        <CotizadorBanner />
+                      </div>
+                    ) : (
+                      <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 shadow-sm mt-4">
+                        <h3 className="text-xl font-semibold text-slate-900 mb-3">Plan Personalizado</h3>
+                        <p className="text-slate-600 max-w-lg mx-auto mb-8">
+                          Este producto o servicio requiere una cotización a medida según las necesidades específicas de tu negocio.
+                        </p>
+                        <Link to="/contacto">
+                          <Button className="bg-blue-600 hover:bg-blue-700">Contáctanos para más información</Button>
+                        </Link>
+                      </div>
+                    )
                   ) : (
                     product.plans.map((plan, i) => (
                       <motion.div
