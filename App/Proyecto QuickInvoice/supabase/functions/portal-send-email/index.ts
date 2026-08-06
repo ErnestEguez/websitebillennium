@@ -1,11 +1,10 @@
-// Envía correos del Portal (cotizaciones de la calculadora) vía SMTP2GO,
-// usando el mismo transporte (Deno + nodemailer) que ya usa sri-signer
-// para las facturas — comprobado que SÍ entrega. El backend del Portal
-// corre en Python sobre Vercel, donde las conexiones SMTP directas por
-// puerto 587 quedan bloqueadas/restringidas sin lanzar ningún error
-// visible (el envío "parece" exitoso pero nunca llega). En vez de pelear
-// contra esa restricción, el Portal llama a este Edge Function por HTTPS
-// (nunca bloqueado) y este sí abre la conexión SMTP real.
+// Envía correos del Portal (cotizaciones de la calculadora) vía la API de
+// Resend (HTTPS, no SMTP) — mismo servicio y misma RESEND_API_KEY que ya
+// usa factura-electronica/index.ts. Se cambió de SMTP2GO/nodemailer a
+// esto porque el correo se marcaba como "enviado" sin ningún error pero
+// nunca llegaba a destino (ni siquiera pudimos ver el log de SMTP2GO —
+// la cuenta la administra un revendedor/hosting, sin panel propio). La
+// API de Resend da error explícito si algo falla, nada de fallos mudos.
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders = {
@@ -34,36 +33,51 @@ serve(async (req) => {
             });
         }
 
-        const mailHost = Deno.env.get("PORTAL_SMTP_HOST") || "mail.smtp2go.com";
-        const mailPort = Number(Deno.env.get("PORTAL_SMTP_PORT") || "587");
-        const mailUser = Deno.env.get("PORTAL_SMTP_USER");
-        const mailPass = Deno.env.get("PORTAL_SMTP_PASSWORD");
-
-        if (!mailUser || !mailPass) {
-            return new Response(JSON.stringify({ error: "SMTP no configurado (faltan secrets PORTAL_SMTP_USER / PORTAL_SMTP_PASSWORD)" }), {
+        const resendApiKey = Deno.env.get("RESEND_API_KEY");
+        if (!resendApiKey) {
+            return new Response(JSON.stringify({ error: "RESEND_API_KEY no configurado" }), {
                 status: 500,
                 headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
         }
 
-        const nodemailer = (await import("npm:nodemailer@6.9.13")).default;
-        const transporter = nodemailer.createTransport({
-            host: mailHost,
-            port: mailPort,
-            secure: false,
-            auth: { user: mailUser, pass: mailPass },
-            tls: { rejectUnauthorized: false },
+        const resendFrom = Deno.env.get("PORTAL_RESEND_FROM") || "Billennium System <onboarding@resend.dev>";
+        // white-space: pre-line no es confiable en todos los webmail
+        // (Outlook/Hotmail suele limpiar ese CSS y el texto queda pegado
+        // en un solo párrafo) — se convierten los saltos de línea a <br>
+        // reales, que sí respeta cualquier cliente de correo.
+        const escapado = cuerpo
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+        const cuerpoHtml = `<div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.5;">${escapado.replace(/\n/g, "<br>")}</div>`;
+
+        const resendRes = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${resendApiKey}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                from: resendFrom,
+                to: destinatario,
+                cc: cc || undefined,
+                subject: asunto,
+                html: cuerpoHtml,
+                text: cuerpo,
+            }),
         });
 
-        await transporter.sendMail({
-            from: `Billennium System <${mailUser}>`,
-            to: destinatario,
-            cc: cc || undefined,
-            subject: asunto,
-            text: cuerpo,
-        });
+        const resendResult = await resendRes.json();
+        if (!resendRes.ok) {
+            console.error("[portal-send-email] Resend error:", JSON.stringify(resendResult));
+            return new Response(JSON.stringify({ error: resendResult }), {
+                status: 502,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
 
-        return new Response(JSON.stringify({ ok: true }), {
+        return new Response(JSON.stringify({ ok: true, id: resendResult.id }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     } catch (e) {
