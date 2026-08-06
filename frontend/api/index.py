@@ -36,10 +36,13 @@ SMTP_CC = os.environ.get('SMTP_CC', 'e_eguez@hotmail.com')
 def enviar_correo(destinatario: str, asunto: str, cuerpo: str, cc: str | None = SMTP_CC):
     if not PORTAL_EMAIL_SECRET:
         raise RuntimeError('Envío de correo no configurado (falta PORTAL_EMAIL_SECRET)')
+    # Si el destinatario y la copia son el mismo correo, no se manda como
+    # cc duplicado (algunos proveedores lo tratan como sospechoso/lo filtran).
+    cc_final = cc if (cc and cc.lower() != destinatario.lower()) else None
     import httpx
     resp = httpx.post(
         PORTAL_EMAIL_FN_URL,
-        json={"destinatario": destinatario, "asunto": asunto, "cuerpo": cuerpo, "cc": cc},
+        json={"destinatario": destinatario, "asunto": asunto, "cuerpo": cuerpo, "cc": cc_final},
         headers={"x-portal-secret": PORTAL_EMAIL_SECRET},
         timeout=20,
     )
