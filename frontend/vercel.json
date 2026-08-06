@@ -1,5 +1,4 @@
 {
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- .",
   "headers": [
     {
       "source": "/api/(.*)",
