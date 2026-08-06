@@ -460,11 +460,17 @@ async function generarRidePdfNC(nc: any, comprobanteOrigen: any): Promise<Uint8A
   };
   drawHdr(y); y += TH;
 
+  const DESC_LH = 3.2;
   detalles.forEach((d: any, i: number) => {
-    if (y+TR > PH) { doc.addPage(); y=10; drawHdr(y); y += TH; }
-    if (i%2 !== 0) { sf1(); doc.rect(ML, y, CW, TR, 'F'); }
-    sd4(); doc.rect(ML, y, CW, TR);
-    sd2(); COLS.forEach((_,j) => { if (j>0) doc.line(colXs[j], y, colXs[j], y+TR); });
+    const descText = (d.nombre_producto||(d.productos&&d.productos.nombre)||'').toUpperCase();
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    const descLines = doc.splitTextToSize(descText, COLS[3].w-2);
+    const rowH = Math.max(TR, descLines.length*DESC_LH + 2.3);
+
+    if (y+rowH > PH) { doc.addPage(); y=10; drawHdr(y); y += TH; }
+    if (i%2 !== 0) { sf1(); doc.rect(ML, y, CW, rowH, 'F'); }
+    sd4(); doc.rect(ML, y, CW, rowH);
+    sd2(); COLS.forEach((_,j) => { if (j>0) doc.line(colXs[j], y, colXs[j], y+rowH); });
     const ivaRate = Number(d.iva_porcentaje??0);
     const dcto    = Number(d.descuento??0);
     const dctoV   = r2x(Number(d.precio_unitario??0)*Number(d.cantidad??0)*dcto/100);
@@ -472,19 +478,24 @@ async function generarRidePdfNC(nc: any, comprobanteOrigen: any): Promise<Uint8A
       d.productos?.codigo||(d.producto_id||'').substring(0,8)||'-',
       d.codigo_auxiliar||'',
       Number(d.cantidad).toFixed(2),
-      (d.nombre_producto||(d.productos&&d.productos.nombre)||'').toUpperCase(),
+      descText,
       ivaRate>0?`${ivaRate}%`:'NO',
       dcto.toFixed(2), dctoV.toFixed(2), f4(d.precio_unitario), f2(d.subtotal),
     ];
     doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(0,0,0);
     COLS.forEach((c,j) => {
-      let txt = String(vals[j]);
-      if (j===3) { txt = doc.splitTextToSize(txt, c.w-2)[0]||txt; }
-      else { while (doc.getTextWidth(txt)>c.w-2 && txt.length>1) txt=txt.slice(0,-1); }
       const tx = c.align==='right'?colXs[j]+c.w-1:c.align==='center'?colXs[j]+c.w/2:colXs[j]+1;
-      doc.text(txt, tx, y+TR*0.65, { align: c.align });
+      if (j===3) {
+        descLines.forEach((line: string, k: number) => {
+          doc.text(line, tx, y+3.5+k*DESC_LH, { align: c.align });
+        });
+        return;
+      }
+      let txt = String(vals[j]);
+      while (doc.getTextWidth(txt)>c.w-2 && txt.length>1) txt=txt.slice(0,-1);
+      doc.text(txt, tx, y+3.5, { align: c.align });
     });
-    y += TR;
+    y += rowH;
   });
 
   // ── INFO ADICIONAL (55%) | TOTALES NC (45%) ──────────────────────────

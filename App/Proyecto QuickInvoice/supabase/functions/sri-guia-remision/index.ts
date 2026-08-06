@@ -325,22 +325,29 @@ async function generarRideGR(guia: any): Promise<Uint8Array> {
     });
     y += TH;
 
+    const DESC_LH_GR = 3.2;
     for (const d of detalles) {
-        if (y + TR > 270) {
+        doc.setFontSize(7); doc.setFont("helvetica", "normal");
+        const descLines = doc.splitTextToSize((d.descripcion || "").toUpperCase(), 96);
+        const rowH = Math.max(TR, descLines.length*DESC_LH_GR + 2.3);
+
+        if (y + rowH > 270) {
             doc.addPage();
             y = 10;
         }
-        sd2(); doc.rect(ML, y, CW, TR);
+        sd2(); doc.rect(ML, y, CW, rowH);
         COLS.forEach((c, i) => {
-            if (i > 0) doc.line(colXs[i], y, colXs[i], y+TR);
+            if (i > 0) doc.line(colXs[i], y, colXs[i], y+rowH);
         });
         doc.setFontSize(7); doc.setFont("helvetica", "normal"); doc.setTextColor(0,0,0);
-        doc.text((d.codigo || "").toString().slice(0,20),       colXs[0]+1, y+3.8, { align: "left"  });
-        doc.text(doc.splitTextToSize((d.descripcion || "").toUpperCase(), 96)[0] || "", colXs[1]+1, y+3.8, { align: "left"  });
+        doc.text((d.codigo || "").toString().slice(0,20), colXs[0]+1, y+3.8, { align: "left" });
+        descLines.forEach((line: string, k: number) => {
+            doc.text(line, colXs[1]+1, y+3.8+k*DESC_LH_GR, { align: "left" });
+        });
         doc.text(Number(d.cantidad).toFixed(2),          colXs[2]+c_w(COLS,2)-1, y+3.8, { align: "right" });
         doc.text(Number(d.precio_unitario).toFixed(4),   colXs[3]+c_w(COLS,3)-1, y+3.8, { align: "right" });
         doc.text(f2(Number(d.total)),                    colXs[4]+c_w(COLS,4)-1, y+3.8, { align: "right" });
-        y += TR;
+        y += rowH;
     }
 
     // ── TOTAL ──
