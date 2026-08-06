@@ -17,6 +17,7 @@ export default function generarXmlGR(guia: any): string {
     // Solo & y < — escapar comillas aquí rompe la verificación de firma XAdES
     // (C14N no reintroduce &quot; en contenido de texto al canonicalizar).
     const esc = (s: string) => String(s || "")
+        .replace(/[\r\n]+/g, " ").replace(/\s{2,}/g, " ").trim()
         .replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
     const fmtDate = (d: string | null | undefined): string => {

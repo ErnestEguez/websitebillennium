@@ -15,6 +15,14 @@ import { format } from "https://esm.sh/date-fns@3.6.0";
 // firma en sí estén perfectamente correctos.
 function escapeXml(value: unknown): string {
   return String(value ?? "")
+    // El SRI valida varios campos de texto (descripcion, razonSocial, etc.)
+    // contra patrones tipo [^\n]* — un salto de línea (pegado desde Word,
+    // un textarea, etc.) rompe la estructura del XML y el comprobante
+    // queda "Aún no autorizado" con REC:35. Se colapsan saltos de línea
+    // y espacios repetidos a un solo espacio antes de escapar.
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;");
 }

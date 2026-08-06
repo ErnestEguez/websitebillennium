@@ -33,6 +33,9 @@ function toBase64(bytes: Uint8Array | ArrayBuffer): string {
 // escapamos al firmar, la huella no coincide y rechaza como "firma inválida".
 function escapeXml(value: unknown): string {
   return String(value ?? "")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;");
 }
