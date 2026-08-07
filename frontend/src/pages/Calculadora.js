@@ -180,8 +180,9 @@ export const Calculadora = () => {
     if (!cotizacionId) { toast.error('Falta guardar la cotización primero'); return; }
     setEnviandoCorreo(true);
     try {
-      await axios.post(`${API}/calculadora/cotizacion/enviar-email`, { cotizacion_id: cotizacionId, destino: email });
-      toast.success(`Correo enviado a ${email}`);
+      const { data } = await axios.post(`${API}/calculadora/cotizacion/enviar-email`, { cotizacion_id: cotizacionId, destino: email });
+      console.log('[cotizacion email_id]', data.email_id);
+      toast.success(`Correo enviado a ${email} (id: ${data.email_id || 'sin id'})`);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'No se pudo enviar el correo');
     } finally {

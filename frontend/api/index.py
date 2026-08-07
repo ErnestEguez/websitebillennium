@@ -33,7 +33,7 @@ PORTAL_EMAIL_SECRET = os.environ.get('PORTAL_EMAIL_SECRET')
 # probado): copia siempre al dueño del negocio.
 SMTP_CC = os.environ.get('SMTP_CC', 'e_eguez@hotmail.com')
 
-def enviar_correo(destinatario: str, asunto: str, cuerpo: str, cc: str | None = SMTP_CC):
+def enviar_correo(destinatario: str, asunto: str, cuerpo: str, cc: str | None = SMTP_CC) -> str | None:
     if not PORTAL_EMAIL_SECRET:
         raise RuntimeError('Envío de correo no configurado (falta PORTAL_EMAIL_SECRET)')
     # Si el destinatario y la copia son el mismo correo, no se manda como
@@ -48,6 +48,10 @@ def enviar_correo(destinatario: str, asunto: str, cuerpo: str, cc: str | None = 
     )
     if resp.status_code >= 400:
         raise RuntimeError(f"portal-send-email respondió {resp.status_code}: {resp.text}")
+    try:
+        return resp.json().get('id')
+    except Exception:
+        return None
 
 # ============== SUPABASE CLIENT ==============
 SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://dummy.supabase.co')
@@ -923,10 +927,10 @@ def enviar_copia_cotizacion(data: EnviarCopiaEmail):
     asunto = f"Cotización QuickInvoice — {c['cliente_nombre']}"
     cuerpo = _construir_mensaje_cotizacion(c)
     try:
-        enviar_correo(data.destino, asunto, cuerpo)
+        email_id = enviar_correo(data.destino, asunto, cuerpo)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"No se pudo enviar el correo: {e}")
-    return {"message": "Correo enviado"}
+    return {"message": "Correo enviado", "email_id": email_id}
 
 @api_router.get("/admin/cotizaciones", response_model=List[Cotizacion])
 def listar_cotizaciones(admin: dict = Depends(get_admin_user)):

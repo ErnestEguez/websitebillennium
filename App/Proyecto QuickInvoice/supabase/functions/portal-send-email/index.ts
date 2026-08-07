@@ -25,6 +25,22 @@ serve(async (req) => {
             });
         }
 
+        // Diagnóstico: ?status=<id-de-resend> consulta el estado real de un
+        // envío ya hecho, sin mandar nada nuevo.
+        const url = new URL(req.url);
+        const statusId = url.searchParams.get("status");
+        if (statusId) {
+            const resendApiKey = Deno.env.get("RESEND_API_KEY");
+            const r = await fetch(`https://api.resend.com/emails/${statusId}`, {
+                headers: { Authorization: `Bearer ${resendApiKey}` },
+            });
+            const body = await r.json();
+            return new Response(JSON.stringify(body, null, 2), {
+                status: r.status,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+        }
+
         const { destinatario, asunto, cuerpo, cc } = await req.json();
         if (!destinatario || !asunto || !cuerpo) {
             return new Response(JSON.stringify({ error: "Faltan destinatario/asunto/cuerpo" }), {
