@@ -15,7 +15,7 @@ export const CotizadorBanner = () => (
     </div>
     <h3 className="text-2xl md:text-3xl font-bold text-white mb-3">Arma tu plan a tu medida</h3>
     <p className="text-slate-300 max-w-xl mx-auto mb-6">
-      ERP QuickInvoice se adapta al tamaño real de tu negocio. Elige los módulos que necesitas,
+      Corina ERP se adapta al tamaño real de tu negocio. Elige los módulos que necesitas,
       indícanos cuántos usuarios y el volumen de tu operación, y arma tu propio plan.
     </p>
     <ul className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 mb-8 text-sm text-slate-300">

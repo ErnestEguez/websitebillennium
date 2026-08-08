@@ -26,7 +26,7 @@ const HERO_IMAGE = "https://images.pexels.com/photos/3184418/pexels-photo-318441
 const products = [
   {
     id: 'facturacion',
-    name: 'QuickInvoice',
+    name: 'Corina ERP',
     description: 'Facturación electrónica SRI para almacenes, profesionales y cualquier negocio. Inventario, clientes y reportes incluidos.',
     icon: FileText,
     color: 'from-blue-500 to-indigo-500',
@@ -160,7 +160,7 @@ export const Home = () => {
                 </span>
               </h1>
               <p className="text-lg text-slate-300 mb-4 max-w-xl">
-                QuickInvoice + LedgerPro: la solución completa para almacenes, profesionales y contadores. Facturación electrónica SRI, contabilidad e inventario integrados en la nube.
+                Corina ERP + LedgerPro: la solución completa para almacenes, profesionales y contadores. Facturación electrónica SRI, contabilidad e inventario integrados en la nube.
               </p>
               <p className="text-sm text-blue-300 mb-8 font-medium">
                 ✓ Sin instalaciones &nbsp;·&nbsp; ✓ Desde $15/mes &nbsp;·&nbsp; ✓ 30 días gratis

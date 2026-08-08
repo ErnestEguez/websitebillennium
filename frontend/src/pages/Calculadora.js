@@ -126,7 +126,7 @@ export const Calculadora = () => {
 
   const construirMensaje = () => {
     if (!resumen) return '';
-    let msg = `Cotización QuickInvoice — Billennium System\nCliente: ${clienteNombre || '(sin nombre)'}\n${'─'.repeat(32)}\n\n`;
+    let msg = `Cotización Corina ERP — Billennium System\nCliente: ${clienteNombre || '(sin nombre)'}\n${'─'.repeat(32)}\n\n`;
     resumen.detalle.forEach(d => {
       const nombresModulos = config.modulos.filter(m => empresas.find(e => e.nombre === d.nombre)?.mods[m.id]).map(m => m.nombre).join(', ') || 'Sin módulos';
       msg += `${d.nombre}:\n  Módulos: ${nombresModulos}\n  Usuarios: ${d.usuarios}\n  Subtotal: $${d.totalEmpresa.toFixed(2)}${d.dto > 0 ? ` (${(d.dto * 100).toFixed(0)}% dto.)` : ''}\n`;

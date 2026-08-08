@@ -38,7 +38,7 @@ El ATS incluye tres secciones principales:
 Con **LedgerPro** de Billennium System, el ATS se genera automáticamente:
 
 1. Importa tus comprobantes de compra desde el portal del SRI
-2. Si usas QuickInvoice, tus ventas se sincronizan automáticamente
+2. Si usas Corina ERP, tus ventas se sincronizan automáticamente
 3. Haz clic en **"Generar ATS"** y descarga el XML listo para subir al DIMM del SRI
 
 **Sin digitar. Sin errores manuales. Sin estrés de fin de mes.**
@@ -92,9 +92,9 @@ El **SRI** exige que todos los contribuyentes emitan comprobantes electrónicos:
 
 La firma electrónica (.p12) la emite el Banco Central del Ecuador o el Security Data. Cuesta alrededor de $30 y tiene vigencia de 2 años.
 
-## Cómo empezar con QuickInvoice
+## Cómo empezar con Corina ERP
 
-Con **QuickInvoice** de Billennium System:
+Con **Corina ERP** de Billennium System:
 - Subes tu firma electrónica (.p12) una sola vez
 - Configuras tu empresa con tu RUC
 - Empiezas a facturar en minutos
@@ -124,7 +124,7 @@ Esto puede consumir 2-3 días de trabajo por cliente al mes.
 
 ## Cómo la nube cambia el juego
 
-Con **LedgerPro** conectado a **QuickInvoice**:
+Con **LedgerPro** conectado a **Corina ERP**:
 
 1. **Las ventas se sincronizan automáticamente** — no hay que digitar
 2. **Las compras se importan desde el portal SRI** con un clic
@@ -133,7 +133,7 @@ Con **LedgerPro** conectado a **QuickInvoice**:
 
 ## La propuesta para contadores de Billennium
 
-Si al menos 3 de tus clientes facturan con **QuickInvoice**, tú usas **LedgerPro gratis**.
+Si al menos 3 de tus clientes facturan con **Corina ERP**, tú usas **LedgerPro gratis**.
 
 Esto significa:
 - $0/mes para ti mientras mantengas esa base de clientes
@@ -146,22 +146,22 @@ Esto significa:
   },
   {
     id: 'que-es-quickinvoice-billennium-system',
-    title: 'QuickInvoice: el sistema de facturación electrónica que ordena tu negocio',
-    excerpt: 'QuickInvoice, desarrollado por Billennium System, es un sistema de facturación electrónica y gestión empresarial que ayuda a negocios y profesionales a facturar con más orden, menos errores y mayor control.',
+    title: 'Corina ERP: el sistema de facturación electrónica que ordena tu negocio',
+    excerpt: 'Corina ERP, desarrollado por Billennium System, es un sistema de facturación electrónica y gestión empresarial que ayuda a negocios y profesionales a facturar con más orden, menos errores y mayor control.',
     date: '2026-07-28',
     readTime: '6 min',
     category: 'Software Empresarial',
     color: 'bg-amber-100 text-amber-700',
     content: `
-Llevar la facturación y la información de un negocio en hojas de cálculo, correos sueltos y documentos dispersos tiene un costo silencioso: errores, tiempo perdido y falta de control. **QuickInvoice**, el sistema de facturación electrónica y gestión empresarial desarrollado por **Billennium System**, nace precisamente para resolver eso: ayudar a negocios y profesionales a emitir comprobantes, organizar sus operaciones y tener una visión clara de su información, sin procesos manuales que frenen el crecimiento.
+Llevar la facturación y la información de un negocio en hojas de cálculo, correos sueltos y documentos dispersos tiene un costo silencioso: errores, tiempo perdido y falta de control. **Corina ERP**, el sistema de facturación electrónica y gestión empresarial desarrollado por **Billennium System**, nace precisamente para resolver eso: ayudar a negocios y profesionales a emitir comprobantes, organizar sus operaciones y tener una visión clara de su información, sin procesos manuales que frenen el crecimiento.
 
-## Qué es QuickInvoice y cómo ayuda a tu negocio
+## Qué es Corina ERP y cómo ayuda a tu negocio
 
-QuickInvoice es una plataforma pensada para simplificar los procesos que normalmente consumen más tiempo dentro de una empresa: la emisión de comprobantes electrónicos, la organización de clientes y documentos, y el seguimiento de la operación diaria. En lugar de depender de herramientas separadas que no se comunican entre sí, QuickInvoice centraliza ese trabajo en un solo lugar, ayudando a que el negocio gane en eficiencia y control.
+Corina ERP es una plataforma pensada para simplificar los procesos que normalmente consumen más tiempo dentro de una empresa: la emisión de comprobantes electrónicos, la organización de clientes y documentos, y el seguimiento de la operación diaria. En lugar de depender de herramientas separadas que no se comunican entre sí, Corina ERP centraliza ese trabajo en un solo lugar, ayudando a que el negocio gane en eficiencia y control.
 
 ## Una solución para distintos tipos de negocio
 
-QuickInvoice no fue diseñado para una sola industria. Su enfoque es adaptarse a la forma de trabajar de cada cliente, en lugar de obligarlo a cambiar su operación para encajar en el sistema. Por eso es una opción válida para:
+Corina ERP no fue diseñado para una sola industria. Su enfoque es adaptarse a la forma de trabajar de cada cliente, en lugar de obligarlo a cambiar su operación para encajar en el sistema. Por eso es una opción válida para:
 
 - Profesionales independientes
 - Pequeñas y medianas empresas
@@ -170,7 +170,7 @@ QuickInvoice no fue diseñado para una sola industria. Su enfoque es adaptarse a
 - Empresas comerciales
 - Cualquier empresa que necesite más orden en su facturación y seguimiento
 
-## Qué problema resuelve QuickInvoice
+## Qué problema resuelve Corina ERP
 
 Muchas empresas todavía gestionan parte de su información en hojas de cálculo, correos electrónicos y documentos aislados. Esa forma de trabajar suele traer consecuencias concretas:
 
@@ -180,9 +180,9 @@ Muchas empresas todavía gestionan parte de su información en hojas de cálculo
 - Dificultad para revisar reportes con claridad
 - Riesgos de incumplimiento tributario o administrativo
 
-QuickInvoice busca centralizar ese trabajo en una sola plataforma, para que el día a día del negocio tenga más orden y menos fricción.
+Corina ERP busca centralizar ese trabajo en una sola plataforma, para que el día a día del negocio tenga más orden y menos fricción.
 
-## Principales beneficios de QuickInvoice
+## Principales beneficios de Corina ERP
 
 ### 1. Emisión de facturas más rápida
 El sistema permite generar comprobantes electrónicos de forma más ágil, reduciendo pasos manuales y haciendo el proceso más simple para quien lo usa.
@@ -194,14 +194,14 @@ Al tener los datos organizados dentro de una sola plataforma, la empresa puede c
 Cuando un proceso se automatiza correctamente, se reducen los errores en números, datos de clientes, valores, impuestos o secuencias.
 
 ### 4. Acceso desde la nube
-Al ser una solución desarrollada por Billennium System, QuickInvoice puede operar como sistema en la nube, lo que facilita trabajar desde distintos lugares y dispositivos, según la configuración del negocio.
+Al ser una solución desarrollada por Billennium System, Corina ERP puede operar como sistema en la nube, lo que facilita trabajar desde distintos lugares y dispositivos, según la configuración del negocio.
 
 ### 5. Escalabilidad
 Un negocio puede empezar usando funciones básicas y, con el tiempo, crecer hacia una operación más completa, incorporando nuevos módulos o integraciones según lo que necesite.
 
-## Para quién es útil QuickInvoice
+## Para quién es útil Corina ERP
 
-QuickInvoice puede ser una buena opción si tu negocio necesita:
+Corina ERP puede ser una buena opción si tu negocio necesita:
 
 - Facturar de forma más ordenada
 - Reducir el trabajo manual
@@ -211,15 +211,15 @@ QuickInvoice puede ser una buena opción si tu negocio necesita:
 
 También es una alternativa útil para profesionales que buscan un sistema más serio y confiable para manejar su operación diaria.
 
-## Por qué importa que Billennium System esté detrás de QuickInvoice
+## Por qué importa que Billennium System esté detrás de Corina ERP
 
-No solo importa el software, también importa quién lo respalda. QuickInvoice forma parte de una visión más amplia de **Billennium System** enfocada en soluciones tecnológicas para empresas. Eso le da al producto una base más sólida para seguir evolucionando, ofrecer soporte real y continuar sumando funcionalidades con el tiempo.
+No solo importa el software, también importa quién lo respalda. Corina ERP forma parte de una visión más amplia de **Billennium System** enfocada en soluciones tecnológicas para empresas. Eso le da al producto una base más sólida para seguir evolucionando, ofrecer soporte real y continuar sumando funcionalidades con el tiempo.
 
 ## Conclusión
 
-QuickInvoice es más que una herramienta para emitir facturas: es una plataforma pensada para ayudar a negocios y profesionales a trabajar con más orden, menos errores y mejor control. Si buscas una solución que unifique procesos y te permita operar con mayor eficiencia, QuickInvoice, de Billennium System, puede ser la alternativa que tu negocio necesita.
+Corina ERP es más que una herramienta para emitir facturas: es una plataforma pensada para ayudar a negocios y profesionales a trabajar con más orden, menos errores y mejor control. Si buscas una solución que unifique procesos y te permita operar con mayor eficiencia, Corina ERP, de Billennium System, puede ser la alternativa que tu negocio necesita.
 
-**¿Quieres conocer cómo QuickInvoice puede adaptarse a la operación de tu negocio?** [Contáctanos y descubre cómo empezar](/contacto).
+**¿Quieres conocer cómo Corina ERP puede adaptarse a la operación de tu negocio?** [Contáctanos y descubre cómo empezar](/contacto).
     `
   }
 ];

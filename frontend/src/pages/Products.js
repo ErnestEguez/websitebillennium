@@ -14,7 +14,7 @@ import { Card, CardContent } from '../components/ui/card';
 const products = [
   {
     id: 'facturacion',
-    name: 'ERP QuickInvoice',
+    name: 'Corina ERP',
     tagline: 'Todo tu negocio, en un solo sistema.',
     description: 'ERP completo para PyMEs ecuatorianas: facturación electrónica SRI, inventario, cartera, compras, contabilidad, tesorería, talento humano y cumplimiento LOPDP, todo integrado.',
     icon: FileText,
