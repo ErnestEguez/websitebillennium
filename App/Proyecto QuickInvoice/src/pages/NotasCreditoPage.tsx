@@ -11,6 +11,7 @@ import {
     FileMinus, Plus, Search,
     CheckCircle2, XCircle, Clock, Send,
     Download, Printer, RefreshCw, AlertCircle, Loader2, FileText,
+    Ban, X,
 } from 'lucide-react'
 
 const estadoColors: Record<string, string> = {
@@ -32,7 +33,7 @@ const tipoNcLabel: Record<string, string> = {
 }
 
 export function NotasCreditoPage() {
-    const { empresa } = useAuth()
+    const { empresa, profile } = useAuth()
     const navigate = useNavigate()
     const [notas, setNotas] = useState<NotaCredito[]>([])
     const [loading, setLoading] = useState(true)
@@ -40,6 +41,13 @@ export function NotasCreditoPage() {
     const [reintentando, setReintentando] = useState<string | null>(null)
     const [imprimiendo, setImprimiendo] = useState<string | null>(null)
     const [msgMap, setMsgMap] = useState<Record<string, string>>({})   // ncId → msg reintentar
+
+    // ── Anulación ──────────────────────────────────────────
+    const [ncAnular, setNcAnular] = useState<NotaCredito | null>(null)
+    const [impacto, setImpacto] = useState<{ pagos: { id: string; valor: number; facturaSecuencial: string | null }[]; totalARevertir: number } | null>(null)
+    const [motivoAnulacion, setMotivoAnulacion] = useState('')
+    const [cargandoImpacto, setCargandoImpacto] = useState(false)
+    const [anulando, setAnulando] = useState(false)
 
     useEffect(() => {
         if (empresa?.id) loadData()
@@ -181,6 +189,32 @@ ${logoHtml}
         }
     }
 
+    // ── Anular NC ─────────────────────────────────────────
+    async function abrirAnular(nc: NotaCredito) {
+        setNcAnular(nc)
+        setMotivoAnulacion('')
+        setImpacto(null)
+        setCargandoImpacto(true)
+        try { setImpacto(await ncService.getImpactoAnulacion(nc.id)) }
+        catch (e: any) { alert('Error al calcular el impacto: ' + e.message) }
+        finally { setCargandoImpacto(false) }
+    }
+
+    async function confirmarAnular() {
+        if (!ncAnular || !profile?.id) return
+        if (!motivoAnulacion.trim()) { alert('El motivo es obligatorio'); return }
+        setAnulando(true)
+        try {
+            await ncService.anularNC(ncAnular.id, motivoAnulacion.trim(), profile.id)
+            setNcAnular(null)
+            await loadData()
+        } catch (e: any) {
+            alert('Error al anular: ' + e.message)
+        } finally {
+            setAnulando(false)
+        }
+    }
+
     const filtradas = notas.filter(n =>
         n.secuencial.includes(search) ||
         (n.clientes?.nombre || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -309,9 +343,24 @@ ${logoHtml}
                                                     {estadoIcons[nc.estado_sri]}
                                                     {nc.estado_sri}
                                                 </span>
+                                                {nc.estado_sistema === 'ANULADA' && (
+                                                    <span className="block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
+                                                        ANULADA
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex justify-center items-center gap-1 flex-wrap">
+                                                    {/* Anular — solo si está autorizada y activa */}
+                                                    {nc.estado_sri === 'AUTORIZADO' && nc.estado_sistema !== 'ANULADA' && (
+                                                        <button
+                                                            onClick={() => abrirAnular(nc)}
+                                                            title="Anular esta N/C"
+                                                            className="p-1.5 bg-red-50 hover:bg-red-100 rounded-lg text-red-600 transition-colors"
+                                                        >
+                                                            <Ban className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                     {/* Reintentar: visible si no está autorizada */}
                                                     {nc.estado_sri !== 'AUTORIZADO' && (
                                                         <button
@@ -385,6 +434,72 @@ ${logoHtml}
                     </div>
                 )}
             </div>
+
+            {/* ── Modal Anular NC ─────────────────────────── */}
+            {ncAnular && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-start">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                    <Ban className="w-5 h-5 text-red-500" /> Anular Nota de Crédito
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-0.5">N/C {ncAnular.secuencial} — {ncAnular.clientes?.nombre}</p>
+                            </div>
+                            <button onClick={() => setNcAnular(null)} className="p-2 hover:bg-slate-100 rounded-full">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {cargandoImpacto ? (
+                                <div className="py-6 text-center text-slate-400 text-sm">
+                                    <Loader2 className="w-4 h-4 animate-spin inline mr-2" />Calculando impacto...
+                                </div>
+                            ) : impacto && impacto.pagos.length > 0 ? (
+                                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                                    <p className="text-sm text-amber-800 flex items-start gap-2">
+                                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                                        Esta N/C aplicó <strong>{formatCurrency(impacto.totalARevertir)}</strong> a {impacto.pagos.length === 1 ? 'la siguiente factura' : 'las siguientes facturas'}. Al anular, se revertirá ese saldo (la factura volverá a quedar pendiente por ese valor).
+                                    </p>
+                                    <ul className="text-xs text-amber-900 space-y-0.5">
+                                        {impacto.pagos.map(p => (
+                                            <li key={p.id} className="flex justify-between font-mono">
+                                                <span>{p.facturaSecuencial ?? '—'}</span>
+                                                <span>{formatCurrency(p.valor)}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
+                                    Esta N/C no tiene saldo aplicado a ninguna factura — no hay nada que revertir, solo se marcará como anulada.
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Motivo de anulación *</label>
+                                <textarea
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-red-400 outline-none text-sm resize-none h-20"
+                                    value={motivoAnulacion}
+                                    onChange={e => setMotivoAnulacion(e.target.value)}
+                                    placeholder="Ej: NC digitada por error"
+                                    autoFocus
+                                />
+                            </div>
+                            <p className="text-[11px] text-slate-400">Una N/C anulada no se puede reactivar.</p>
+                            <div className="flex gap-3 pt-1">
+                                <button onClick={() => setNcAnular(null)} disabled={anulando}
+                                    className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 disabled:opacity-50">
+                                    Cancelar
+                                </button>
+                                <button onClick={confirmarAnular} disabled={anulando || cargandoImpacto || !motivoAnulacion.trim()}
+                                    className="flex-1 bg-red-600 text-white rounded-xl px-4 py-2 font-bold hover:bg-red-700 flex items-center justify-center gap-2 disabled:opacity-50">
+                                    {anulando ? <><Loader2 className="w-4 h-4 animate-spin" /> Anulando...</> : <><Ban className="w-4 h-4" /> Confirmar Anulación</>}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

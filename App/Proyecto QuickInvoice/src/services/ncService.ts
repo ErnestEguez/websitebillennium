@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
 import { puntoEmisionService } from './puntoEmisionService'
 import { auditService } from './auditoria/auditService'
+import { carteraCxcService } from './carteraCxcService'
 
 // ─── Interfaces ───────────────────────────────────────────
 
@@ -21,6 +22,10 @@ export interface NotaCredito {
     total: number
     saldo_nc: number
     estado_sri: 'PENDIENTE' | 'ENVIADO' | 'AUTORIZADO' | 'RECHAZADO'
+    estado_sistema: 'ACTIVA' | 'ANULADA'
+    fecha_anulacion?: string | null
+    motivo_anulacion?: string | null
+    usuario_anulacion?: string | null
     autorizacion_numero: string | null
     observaciones_sri: string | null
     xml_firmado: string | null
@@ -454,5 +459,76 @@ export const ncService = {
         link.click()
         document.body.removeChild(link)
         setTimeout(() => window.URL.revokeObjectURL(url), 5000)
+    },
+
+    /**
+     * Vista previa de lo que se revertirá al anular una NC: los pagos de
+     * cartera_cxc_pagos que esta NC generó (metodo_pago='nota_credito'),
+     * con la factura afectada y el valor de cada uno. Se usa para el
+     * diálogo de confirmación antes de anular.
+     */
+    async getImpactoAnulacion(ncId: string): Promise<{
+        pagos: { id: string; valor: number; facturaSecuencial: string | null }[]
+        totalARevertir: number
+    }> {
+        const { data, error } = await supabase
+            .from('cartera_cxc_pagos')
+            .select('id, valor, cartera_cxc(comprobantes(secuencial))')
+            .eq('nota_credito_id', ncId)
+            .eq('estado', 'activo')
+        if (error) throw error
+
+        const pagos = (data ?? []).map((p: any) => ({
+            id: p.id,
+            valor: Number(p.valor),
+            facturaSecuencial: p.cartera_cxc?.comprobantes?.secuencial ?? null,
+        }))
+        return { pagos, totalARevertir: r2(pagos.reduce((s, p) => s + p.valor, 0)) }
+    },
+
+    /**
+     * Anula una NC propia (emitida a un cliente). Revierte cada pago de
+     * cartera que esta NC haya generado — reutiliza carteraCxcService
+     * .reversarPago(), que ya recalcula el saldo de la factura afectada
+     * (trigger fn_actualizar_saldo_cxc) y reversa el asiento contable
+     * vinculado si existe. No borra nada, solo cambia estados.
+     */
+    async anularNC(ncId: string, motivo: string, usuarioId: string): Promise<void> {
+        const { data: nc, error: ncErr } = await supabase
+            .from('notas_credito')
+            .select('id, empresa_id, secuencial, estado_sistema')
+            .eq('id', ncId)
+            .single()
+        if (ncErr) throw ncErr
+        if (nc.estado_sistema === 'ANULADA') throw new Error('Esta N/C ya está anulada.')
+
+        const { pagos } = await this.getImpactoAnulacion(ncId)
+        for (const p of pagos) {
+            await carteraCxcService.reversarPago(p.id, `Anulación NC ${nc.secuencial}: ${motivo}`)
+        }
+
+        const { error: updErr } = await supabase
+            .from('notas_credito')
+            .update({
+                estado_sistema:    'ANULADA',
+                fecha_anulacion:   new Date().toISOString(),
+                motivo_anulacion:  motivo,
+                usuario_anulacion: usuarioId,
+                saldo_nc:          0,
+            })
+            .eq('id', ncId)
+        if (updErr) throw updErr
+
+        auditService.logEvent({
+            empresaId: nc.empresa_id,
+            modulo: 'facturacion',
+            accion: 'anular',
+            entidad: 'nota_credito',
+            entidadId: ncId,
+            numeroDocumento: nc.secuencial,
+            resumen: `Anulación de nota de crédito No. ${nc.secuencial}`,
+            detalle: { motivo, pagos_revertidos: pagos.length },
+            nivel: 'sensible',
+        })
     },
 }
