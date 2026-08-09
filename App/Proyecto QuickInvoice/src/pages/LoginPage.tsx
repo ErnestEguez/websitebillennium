@@ -124,7 +124,7 @@ export function LoginPage() {
                 </form>
 
                 <p className="mt-8 text-center text-[10px] text-slate-300">
-                    © 2026 QuickInvoice — Sistema de Facturación Electrónica
+                    © 2026 Corina ERP — Sistema de Facturación Electrónica
                 </p>
             </div>
         </div>

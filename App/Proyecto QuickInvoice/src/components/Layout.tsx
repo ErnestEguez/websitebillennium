@@ -247,7 +247,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         </div>
                         {isSidebarOpen && (
                             <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent">
-                                QuickInvoice
+                                Corina ERP
                             </span>
                         )}
                     </div>
