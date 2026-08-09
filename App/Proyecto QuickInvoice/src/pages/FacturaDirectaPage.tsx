@@ -7,6 +7,7 @@ import { useReactToPrint } from 'react-to-print'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { facturacionService } from '../services/facturacionService'
+import { carteraCxcService, type CarteraCxc } from '../services/carteraCxcService'
 import {
     facturaDirectaService,
     calcularLinea,
@@ -92,6 +93,8 @@ export function FacturaDirectaPage() {
     const [newClient, setNewClient] = useState({ identificacion: '', nombre: '', email: '', direccion: '', telefono: '' })
     const [isSearchingSRI, setIsSearchingSRI] = useState(false)
     const [isSavingClient, setIsSavingClient] = useState(false)
+    // Alerta de cartera pendiente (vencida / por vencer) del cliente seleccionado
+    const [alertaDeuda, setAlertaDeuda] = useState<{ vencida: CarteraCxc[]; porVencer: CarteraCxc[] } | null>(null)
 
     // Estado: vendedores
     const [vendedores, setVendedores] = useState<Vendedor[]>([])
@@ -312,6 +315,27 @@ export function FacturaDirectaPage() {
         coincideComodin(c.nombre ?? '', searchCliente) ||
         c.identificacion?.includes(searchCliente)
     )
+
+    // Al elegir cliente del buscador: seleccionarlo y revisar si tiene cartera
+    // vencida o por vencer (próximos 30 días) para alertar antes de facturar.
+    // Consumidor Final queda excluido (no se le lleva cartera individual).
+    const handleSeleccionarCliente = async (c: any) => {
+        setSelectedCliente(c)
+        setSearchCliente('')
+        setClienteCollapsed(true)
+        if (!empresa?.id || c.identificacion === '9999999999999') return
+        try {
+            const cartera = await carteraCxcService.getCarteraActivaPorCliente(empresa.id, c.id)
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+            const limite = new Date(hoy); limite.setDate(limite.getDate() + 30)
+            const vencida = cartera.filter(x => x.fecha_vencimiento && new Date(x.fecha_vencimiento) < hoy)
+            const porVencer = cartera.filter(x => x.fecha_vencimiento
+                && new Date(x.fecha_vencimiento) >= hoy && new Date(x.fecha_vencimiento) <= limite)
+            setAlertaDeuda(vencida.length || porVencer.length ? { vencida, porVencer } : null)
+        } catch (e) {
+            console.error('Error consultando cartera CxC del cliente:', e)
+        }
+    }
 
     const lookupSRI = async () => {
         const id = newClient.identificacion.trim()
@@ -821,7 +845,7 @@ export function FacturaDirectaPage() {
                                                 {filteredClientes.map(c => (
                                                     <button key={c.id}
                                                         className="w-full px-4 py-3 text-left hover:bg-slate-50 flex justify-between items-center border-b border-slate-50 last:border-0 text-sm"
-                                                        onClick={() => { setSelectedCliente(c); setSearchCliente(''); setClienteCollapsed(true) }}>
+                                                        onClick={() => handleSeleccionarCliente(c)}>
                                                         <div>
                                                             <p className="font-bold text-slate-900">{c.nombre}</p>
                                                             <p className="text-xs text-slate-500">{c.identificacion}</p>
@@ -1525,6 +1549,65 @@ export function FacturaDirectaPage() {
                         <p className="text-[10px] text-slate-400 text-center italic">
                             El comprobante POS se imprimió automáticamente. Use "Re-imprimir" si necesita otra copia.
                         </p>
+                    </div>
+                </div>
+            )}
+
+            {/* ── MODAL ALERTA DE CARTERA PENDIENTE ──────── */}
+            {alertaDeuda && (
+                <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 z-[60] overflow-y-auto">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 space-y-5 animate-in zoom-in-95 duration-300">
+                        <div className="text-center space-y-2">
+                            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+                                <svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                                </svg>
+                            </div>
+                            <h2 className="text-xl font-black text-slate-900">Cliente con cartera pendiente</h2>
+                            <p className="text-slate-500 text-sm">
+                                <strong>{selectedCliente?.nombre}</strong> tiene facturas pendientes de cobro.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+                                <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest">Vencida</p>
+                                <p className="text-xl font-black text-red-700">
+                                    {formatCurrency(alertaDeuda.vencida.reduce((s, c) => s + Number(c.saldo), 0))}
+                                </p>
+                            </div>
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+                                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Por vencer (30 días)</p>
+                                <p className="text-xl font-black text-amber-700">
+                                    {formatCurrency(alertaDeuda.porVencer.reduce((s, c) => s + Number(c.saldo), 0))}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="max-h-52 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
+                            {[...alertaDeuda.vencida, ...alertaDeuda.porVencer].map(c => (
+                                <div key={c.id} className="flex items-center justify-between px-4 py-2 text-sm">
+                                    <div>
+                                        <p className="font-bold text-slate-800">Fact. {c.comprobantes?.secuencial || '—'}</p>
+                                        <p className="text-xs text-slate-400">Vence {c.fecha_vencimiento}</p>
+                                    </div>
+                                    <p className={cn('font-bold', c.fecha_vencimiento && new Date(c.fecha_vencimiento) < new Date() ? 'text-red-600' : 'text-amber-600')}>
+                                        {formatCurrency(Number(c.saldo))}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <button onClick={() => { setSelectedCliente(null); setAlertaDeuda(null) }}
+                                className="py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50">
+                                Cancelar
+                            </button>
+                            <button onClick={() => setAlertaDeuda(null)}
+                                className="py-3 bg-primary-600 text-white rounded-2xl font-bold hover:bg-primary-700">
+                                Continuar de todas formas
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
