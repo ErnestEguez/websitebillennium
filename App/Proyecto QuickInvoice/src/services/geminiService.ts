@@ -97,7 +97,9 @@ Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional.
       "categoria_sugerida": "la categoría más apropiada de la lista disponible"
     }
   ]
-}`
+}
+
+IMPORTANTE sobre precio_unitario y subtotal: usa EXACTAMENTE la columna "Precio Unitario"/"P. Unitario" y la columna de total de línea ("Precio Total"/"Subtotal") de la tabla de detalle. Algunas facturas tienen columnas adicionales (ej. "Detalle Adicional", códigos de empaque, factores de conversión) con varios números apilados en una sola celda — NUNCA tomes esos valores como precio_unitario. Si tienes dudas, prioriza que subtotal sea el valor real de la columna de total de línea, ya que cantidad × precio_unitario debe coincidir con subtotal.`
         const raw = await callGemini(
             [{ inline_data: { mime_type: mimeType, data: base64 } }, { text: prompt }],
             empresaId,

@@ -295,6 +295,16 @@ export function NuevaCompraInventarioPage() {
                 const normStr = (s: string) => (s ?? '').toLowerCase().trim()
                 const codNorm = normStr(item.codigo)
 
+                // El "Precio Total" de línea que trae el PDF es más confiable que el
+                // "Precio Unitario" (en facturas con columnas extra, ej. "Detalle
+                // Adicional", la IA a veces confunde esa columna con el precio
+                // unitario). Si el total de línea viene, se deriva el costo unitario
+                // desde ahí (total ÷ cantidad) para que la compra SIEMPRE cuadre
+                // exactamente con el total del documento original.
+                const costoUnitario = (item.subtotal > 0 && item.cantidad > 0)
+                    ? Math.round((item.subtotal / item.cantidad) * 10000) / 10000
+                    : item.precio_unitario
+
                 // 1. Coincidencia exacta por código
                 const byCode = productosCompletos.find(p =>
                     p.codigo && normStr(p.codigo) === codNorm && codNorm.length > 0,
@@ -304,7 +314,7 @@ export function NuevaCompraInventarioPage() {
                     codigo:          item.codigo,
                     nombre:          byCode.nombre,
                     cantidad:        item.cantidad,
-                    costo_unitario:  item.precio_unitario,
+                    costo_unitario:  costoUnitario,
                     iva_porcentaje:  item.iva_porcentaje,
                     status:          'found' as LineaStatus,
                 }
@@ -319,7 +329,7 @@ export function NuevaCompraInventarioPage() {
                     codigo:           item.codigo,
                     nombre:           byDesc.p.nombre,
                     cantidad:         item.cantidad,
-                    costo_unitario:   item.precio_unitario,
+                    costo_unitario:   costoUnitario,
                     iva_porcentaje:   item.iva_porcentaje,
                     status:           'by_description' as LineaStatus,
                     categoria_sugerida: item.categoria_sugerida,
@@ -331,7 +341,7 @@ export function NuevaCompraInventarioPage() {
                     codigo:           item.codigo,
                     nombre:           item.descripcion,
                     cantidad:         item.cantidad,
-                    costo_unitario:   item.precio_unitario,
+                    costo_unitario:   costoUnitario,
                     iva_porcentaje:   item.iva_porcentaje,
                     status:           'new' as LineaStatus,
                     categoria_sugerida: item.categoria_sugerida,
