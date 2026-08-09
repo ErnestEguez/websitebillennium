@@ -11,7 +11,7 @@ import { contableConfigService } from '../../services/contableConfigService'
 import { contabilidadComprasService } from '../../services/contabilidadComprasService'
 import { supabase } from '../../lib/supabase'
 import type { Proveedor } from '../../types/vendors'
-import { TIPO_SUSTENTO_LABELS } from '../../types/vendors'
+import { TIPO_SUSTENTO_LABELS, TIPO_DOCUMENTO_SRI_LABELS, type TipoDocumentoSri } from '../../types/vendors'
 import { RetencionesEditor } from '../../components/vendor/RetencionesEditor'
 import type { RetLine } from '../../components/vendor/RetencionesEditor'
 import { geminiService } from '../../services/geminiService'
@@ -106,6 +106,7 @@ export function NuevaCompraInventarioPage() {
     const [numeroFactura, setNumeroFactura] = useState('')
     const [claveAcceso, setClaveAcceso]     = useState('')
     const [tipoSustento, setTipoSustento]   = useState<'01'|'02'|'03'|'04'|'05'>('04')
+    const [tipoDocumentoSri, setTipoDocumentoSri] = useState<TipoDocumentoSri>('01')
     const [formaPago, setFormaPago]         = useState<'CONTADO'|'CREDITO'>('CREDITO')
     const [fechaVenc, setFechaVenc]         = useState(fechaMasDias(30))
     const [observaciones, setObservaciones] = useState('')
@@ -141,7 +142,7 @@ export function NuevaCompraInventarioPage() {
         'draft_compra_inventario',
         () => ({
             proveedorId, fechaEmision, estab, ptoEmi, secuencial,
-            claveAcceso, tipoSustento, formaPago, fechaVenc, observaciones,
+            claveAcceso, tipoSustento, tipoDocumentoSri, formaPago, fechaVenc, observaciones,
             detalle, usarIvaManual, baseIva0, baseIva5, baseIva15,
             numeroRetencion, retenciones, retSeccion, ocVinculada,
         }),
@@ -153,6 +154,7 @@ export function NuevaCompraInventarioPage() {
             if (d.secuencial)     setSecuencial(d.secuencial)
             if (d.claveAcceso)    setClaveAcceso(d.claveAcceso)
             if (d.tipoSustento)   setTipoSustento(d.tipoSustento)
+            if (d.tipoDocumentoSri) setTipoDocumentoSri(d.tipoDocumentoSri)
             if (d.formaPago)      setFormaPago(d.formaPago)
             if (d.fechaVenc)      setFechaVenc(d.fechaVenc)
             if (d.observaciones)  setObservaciones(d.observaciones)
@@ -168,7 +170,7 @@ export function NuevaCompraInventarioPage() {
         },
         [
             proveedorId, fechaEmision, estab, ptoEmi, secuencial,
-            claveAcceso, tipoSustento, formaPago, fechaVenc, observaciones,
+            claveAcceso, tipoSustento, tipoDocumentoSri, formaPago, fechaVenc, observaciones,
             detalle, usarIvaManual, baseIva0, baseIva5, baseIva15,
             numeroRetencion, retenciones, retSeccion, ocVinculada,
         ],
@@ -625,7 +627,7 @@ export function NuevaCompraInventarioPage() {
                     subtotal: subtotalLineas, valor_iva: ivaCalc, total,
                     forma_pago: formaPago,
                     fecha_vencimiento: formaPago === 'CREDITO' ? fechaVencFinal : undefined,
-                    tipo_sustento: tipoSustento, tipo_regimen_pago: '01',
+                    tipo_sustento: tipoSustento, tipo_documento_sri: tipoDocumentoSri, tipo_regimen_pago: '01',
                     aplica_convenio_ddi: false,
                     estado: 'ACTIVO', origen: 'MANUAL', tipo_compra: 'INVENTARIO',
                     orden_compra_id: ocVinculada || undefined,
@@ -846,7 +848,16 @@ export function NuevaCompraInventarioPage() {
                         onChange={e => setClaveAcceso(e.target.value)} placeholder="49 dígitos SRI" />
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label className="label text-xs">Tipo de documento (SRI)</label>
+                        <select className={inp} value={tipoDocumentoSri}
+                            onChange={e => setTipoDocumentoSri(e.target.value as TipoDocumentoSri)}>
+                            {Object.entries(TIPO_DOCUMENTO_SRI_LABELS).map(([k, v]) => (
+                                <option key={k} value={k}>{k} — {v}</option>
+                            ))}
+                        </select>
+                    </div>
                     <div>
                         <label className="label text-xs">Tipo sustento (ATS)</label>
                         <select className={inp} value={tipoSustento}

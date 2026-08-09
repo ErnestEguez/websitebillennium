@@ -80,6 +80,10 @@ export type OrigenCompra = 'MANUAL' | 'SRI' | 'OC'
 export type FormaPago    = 'CONTADO' | 'CREDITO'
 export type TipoSustento = '01' | '02' | '03' | '04' | '05'
 export type TipoRegimenPago = '01' | '02'
+// SRI Tabla 4 — Tipo de Comprobante
+export type TipoDocumentoSri =
+    '01' | '02' | '03' | '04' | '05' | '06' | '07' | '08' | '09' | '11' | '12' |
+    '15' | '16' | '18' | '19' | '20' | '21' | '22' | '41' | '47' | '48'
 
 export interface Compra {
     id: string
@@ -112,6 +116,7 @@ export interface Compra {
     fecha_anulacion?:   string
     anulado_por?:       string
     tipo_sustento:      TipoSustento
+    tipo_documento_sri?: TipoDocumentoSri
     tipo_regimen_pago:  TipoRegimenPago
     pais_pago_exterior?: string
     aplica_convenio_ddi: boolean
@@ -280,6 +285,31 @@ export const TIPO_SUSTENTO_LABELS: Record<TipoSustento, string> = {
     '03': 'Activo fijo',
     '04': 'Inventario',
     '05': 'No aplica',
+}
+
+// SRI Tabla 4 — Tipo de Comprobante
+export const TIPO_DOCUMENTO_SRI_LABELS: Record<TipoDocumentoSri, string> = {
+    '01': 'Factura',
+    '02': 'Nota o Boleta de Venta',
+    '03': 'Liquidación de Compra de Bienes y Prestación de Servicios',
+    '04': 'Nota de Crédito',
+    '05': 'Nota de Débito',
+    '06': 'Guía de Remisión',
+    '07': 'Comprobante de Retención',
+    '08': 'Tickets o cintas de máquinas registradoras',
+    '09': 'Tiquetes',
+    '11': 'Pasajes de aviación',
+    '12': 'Documentos de inst. financieras (electrónicos)',
+    '15': 'Carta de porte aéreo',
+    '16': 'Documento Aduanero Único (DAU)',
+    '18': 'Documento de inst. del Estado',
+    '19': 'Comprobante de venta emitido en el exterior',
+    '20': 'Certificado de depósito / warrant',
+    '21': 'NFT (Non Fungible Token)',
+    '22': 'Token de activos digitales',
+    '41': 'Comprobante de Venta por reembolso de gastos',
+    '47': 'Nota de Crédito por Reembolso (intermediario)',
+    '48': 'Nota de Débito por Reembolso (intermediario)',
 }
 
 export const TIPO_GASTO_LABELS: Record<TipoGasto, string> = {
