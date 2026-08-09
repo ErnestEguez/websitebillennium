@@ -18,6 +18,7 @@ import { geminiService } from '../../services/geminiService'
 import { useIaFeatureEnabled } from '../../hooks/useIaFeatureEnabled'
 import { productoService } from '../../services/productoService'
 import type { Categoria } from '../../services/productoService'
+import { unidadService, type Unidad } from '../../services/unidadService'
 import type { TipoProveedor } from '../../types/vendors'
 import {
     ArrowLeft, Plus, Trash2, Save, Package, ChevronDown, ChevronUp, CheckSquare,
@@ -27,6 +28,8 @@ import { cn } from '../../lib/utils'
 import { BuscadorProducto, type ProductoResultado } from '../../components/BuscadorProducto'
 
 const inp = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white'
+// Variante compacta para la tabla de detalle de compras (más columnas, letra chica)
+const inpSm = 'w-full border border-slate-300 rounded-lg px-1.5 py-1 text-xs focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white'
 
 const HOY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guayaquil' })
 
@@ -49,6 +52,11 @@ interface LineaDetalle {
     iva_porcentaje?: number
     status?: LineaStatus
     categoria_sugerida?: string
+    // Unidad/Categoría — solo editables cuando status === 'new' (producto no
+    // existe aún en el catálogo). Para productos existentes se muestran de
+    // solo lectura, tomadas del producto real (productosCompletos).
+    unidad_id?: string | null
+    categoria_id?: string | null
 }
 
 // Descuento y subtotal neto de una línea (costo_unitario es el precio bruto de factura).
@@ -80,8 +88,9 @@ export function NuevaCompraInventarioPage() {
 
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
     const [productosSimple, setProductosSimple] = useState<{ id: string; nombre: string }[]>([])
-    const [productosCompletos, setProductosCompletos] = useState<{ id: string; codigo: string | null; nombre: string }[]>([])
+    const [productosCompletos, setProductosCompletos] = useState<{ id: string; codigo: string | null; nombre: string; unidad_id: string | null; categoria_id: string | null }[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
+    const [unidades, setUnidades] = useState<Unidad[]>([])
     const [bodegas, setBodegas]       = useState<Bodega[]>([])
     const [loading, setLoading]       = useState(true)
     const [saving, setSaving]         = useState(false)
@@ -170,13 +179,14 @@ export function NuevaCompraInventarioPage() {
     async function load() {
         try {
             const { data: prodsData } = await supabase
-                .from('productos').select('id, codigo, nombre')
+                .from('productos').select('id, codigo, nombre, unidad_id, categoria_id')
                 .eq('empresa_id', empresa!.id).eq('activo', true).order('nombre')
-            const [provs, ocs, bods, cats, codigos] = await Promise.all([
+            const [provs, ocs, bods, cats, unids, codigos] = await Promise.all([
                 proveedorService.listar(empresa!.id),
                 ocService.listar(empresa!.id),
                 bodegaService.listar(empresa!.id),
                 productoService.getCategorias(empresa!.id),
+                unidadService.getUnidades(empresa!.id),
                 codigoRetencionService.listar(empresa!.id),
             ])
             setOrdenesCompra(ocs.filter(o => o.estado === 'ENVIADA' || o.estado === 'PARCIALMENTE_RECIBIDA'))
@@ -185,6 +195,7 @@ export function NuevaCompraInventarioPage() {
             setProductosCompletos(prodsData ?? [])
             setProductosSimple((prodsData ?? []).map(p => ({ id: p.id, nombre: p.nombre })))
             setCategorias(cats ?? [])
+            setUnidades(unids ?? [])
             setBodegas(bods)
             if (bods.length > 0 && !bodegaId) {
                 const principal = bods.find(b => b.es_principal) ?? bods[0]
@@ -241,8 +252,6 @@ export function NuevaCompraInventarioPage() {
             const ocr = await geminiService.analizarFacturaCompra(
                 base64, mimeType, categorias.map(c => c.nombre), empresa!.id,
             )
-            // TEMPORAL — para diagnosticar precios OCR incorrectos, quitar luego.
-            console.log('[OCR RAW] detalle devuelto por Gemini:', JSON.stringify(ocr.detalle, null, 2))
 
             // ── Llenar cabecera ────────────────────────────────────────────
             if (ocr.fecha_emision) setFechaEmision(ocr.fecha_emision)
@@ -292,6 +301,18 @@ export function NuevaCompraInventarioPage() {
             }
             if (proveedorResueltoId) setProveedorId(proveedorResueltoId)
 
+            // Categoría por nombre sugerido de la IA — o la primera disponible
+            function resolverCategoriaSugerida(sugerida?: string): string | null {
+                if (sugerida && categorias.length > 0) {
+                    const matched = categorias.find(c =>
+                        c.nombre.toLowerCase().includes(sugerida.toLowerCase()) ||
+                        sugerida.toLowerCase().includes(c.nombre.toLowerCase()),
+                    )
+                    if (matched) return matched.id
+                }
+                return categorias[0]?.id ?? null
+            }
+
             // ── Validar detalle contra catálogo ───────────────────────────
             const lineasValidadas: LineaDetalle[] = ocr.detalle.map(item => {
                 const normStr = (s: string) => (s ?? '').toLowerCase().trim()
@@ -319,6 +340,8 @@ export function NuevaCompraInventarioPage() {
                     costo_unitario:  costoUnitario,
                     iva_porcentaje:  item.iva_porcentaje,
                     status:          'found' as LineaStatus,
+                    unidad_id:       byCode.unidad_id,
+                    categoria_id:    byCode.categoria_id,
                 }
 
                 // 2. Coincidencia por similitud de descripción (> 65%)
@@ -335,9 +358,12 @@ export function NuevaCompraInventarioPage() {
                     iva_porcentaje:   item.iva_porcentaje,
                     status:           'by_description' as LineaStatus,
                     categoria_sugerida: item.categoria_sugerida,
+                    unidad_id:        byDesc.p.unidad_id,
+                    categoria_id:     byDesc.p.categoria_id,
                 }
 
-                // 3. Producto nuevo
+                // 3. Producto nuevo — precargar categoría sugerida por la IA y la
+                // unidad "UND" por defecto; ambas quedan editables en la fila.
                 return {
                     producto_id:      '',
                     codigo:           item.codigo,
@@ -347,6 +373,8 @@ export function NuevaCompraInventarioPage() {
                     iva_porcentaje:   item.iva_porcentaje,
                     status:           'new' as LineaStatus,
                     categoria_sugerida: item.categoria_sugerida,
+                    unidad_id:        unidades.find(u => u.codigo === 'UND')?.id ?? unidades[0]?.id ?? null,
+                    categoria_id:     resolverCategoriaSugerida(item.categoria_sugerida),
                 }
             })
 
@@ -497,15 +525,17 @@ export function NuevaCompraInventarioPage() {
                     const d = lineasFinales[i]
                     if (d.status !== 'new' || d.producto_id) continue
 
-                    // Elegir categoría: usar la sugerida por la IA, o la primera disponible
-                    let catId = catsLocal[0]?.id ?? null
-                    if (d.categoria_sugerida && catsLocal.length > 0) {
+                    // Elegir categoría: la que quedó seleccionada en la fila (editable por
+                    // el usuario), o si no hay, la sugerida por la IA, o la primera disponible
+                    let catId = d.categoria_id ?? null
+                    if (!catId && d.categoria_sugerida && catsLocal.length > 0) {
                         const matched = catsLocal.find(c =>
                             c.nombre.toLowerCase().includes(d.categoria_sugerida!.toLowerCase()) ||
                             d.categoria_sugerida!.toLowerCase().includes(c.nombre.toLowerCase()),
                         )
-                        if (matched) catId = matched.id
+                        catId = matched?.id ?? null
                     }
+                    if (!catId) catId = catsLocal[0]?.id ?? null
 
                     if (!catId) continue  // sin categoría no se puede crear
 
@@ -519,6 +549,7 @@ export function NuevaCompraInventarioPage() {
                         descripcion:    d.nombre,
                         precio_venta:   Math.round(costoUnitNeto * 1.3 * 100) / 100,
                         categoria_id:   catId,
+                        unidad_id:      d.unidad_id ?? null,
                         iva_porcentaje: d.iva_porcentaje ?? 15,
                         maneja_stock:   true,
                         costo_promedio: costoUnitNeto,
@@ -871,15 +902,17 @@ export function NuevaCompraInventarioPage() {
                         <div className="overflow-visible">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="text-xs text-slate-500 border-b">
-                                        <th className="w-3 py-2" />
-                                        <th className="text-left py-2 pr-2 w-28 font-semibold">Código</th>
-                                        <th className="text-left py-2 pr-3 font-semibold">Producto</th>
-                                        <th className="text-right py-2 px-3 w-24 font-semibold">Cant.</th>
-                                        <th className="text-right py-2 px-3 w-28 font-semibold">Costo unit.</th>
-                                        <th className="text-right py-2 px-3 w-20 font-semibold">Desc. %</th>
-                                        <th className="text-right py-2 px-3 w-24 font-semibold">Desc. $</th>
-                                        <th className="text-right py-2 px-3 w-28 font-semibold">Subtotal</th>
+                                    <tr className="text-[11px] text-slate-500 border-b">
+                                        <th className="w-3 py-1.5" />
+                                        <th className="text-left py-1.5 pr-2 w-24 font-semibold">Código</th>
+                                        <th className="text-left py-1.5 pr-2 font-semibold">Producto</th>
+                                        <th className="text-left py-1.5 px-2 w-20 font-semibold">Unidad</th>
+                                        <th className="text-left py-1.5 px-2 w-28 font-semibold">Categoría</th>
+                                        <th className="text-right py-1.5 px-2 w-16 font-semibold">Cant.</th>
+                                        <th className="text-right py-1.5 px-2 w-20 font-semibold">Costo</th>
+                                        <th className="text-right py-1.5 px-2 w-16 font-semibold">Dsc. %</th>
+                                        <th className="text-right py-1.5 px-2 w-20 font-semibold">Dsc. $</th>
+                                        <th className="text-right py-1.5 px-2 w-24 font-semibold">Subtotal</th>
                                         <th className="w-8" />
                                     </tr>
                                 </thead>
@@ -906,9 +939,9 @@ export function NuevaCompraInventarioPage() {
                                                 </td>
 
                                                 {/* Código */}
-                                                <td className="py-2 pr-2">
+                                                <td className="py-1.5 pr-2">
                                                     <input
-                                                        className={cn('w-full border border-slate-200 rounded px-2 py-1.5 text-xs font-mono bg-transparent focus:bg-white focus:border-primary-400 outline-none', textColor)}
+                                                        className={cn('w-full border border-slate-200 rounded px-1.5 py-1 text-[11px] font-mono bg-transparent focus:bg-white focus:border-primary-400 outline-none', textColor)}
                                                         value={d.codigo || ''}
                                                         onChange={e => updLinea(i, 'codigo', e.target.value)}
                                                         placeholder="COD"
@@ -916,16 +949,16 @@ export function NuevaCompraInventarioPage() {
                                                 </td>
 
                                                 {/* Producto */}
-                                                <td className="py-2 pr-3 relative" style={{ minWidth: 260 }}>
+                                                <td className="py-1.5 pr-2 relative" style={{ minWidth: 200 }}>
                                                     {isOcr ? (
                                                         <input
-                                                            className={cn('w-full border border-slate-200 rounded px-2 py-1.5 text-sm bg-transparent focus:bg-white focus:border-primary-400 outline-none font-medium', textColor)}
+                                                            className={cn('w-full border border-slate-200 rounded px-1.5 py-1 text-xs bg-transparent focus:bg-white focus:border-primary-400 outline-none font-medium', textColor)}
                                                             value={d.nombre}
                                                             onChange={e => updLinea(i, 'nombre', e.target.value)}
                                                         />
                                                     ) : d.producto_id ? (
                                                         <div className="flex items-center gap-1">
-                                                            <span className="flex-1 text-sm bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 truncate">{d.nombre || d.producto_id}</span>
+                                                            <span className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1 truncate">{d.nombre || d.producto_id}</span>
                                                             <button type="button" onClick={() => updLinea(i, 'producto_id', '')}
                                                                 className="text-slate-400 hover:text-red-500 text-xs px-1">✕</button>
                                                         </div>
@@ -941,10 +974,42 @@ export function NuevaCompraInventarioPage() {
                                                     )}
                                                 </td>
 
+                                                {/* Unidad — editable solo si el producto es nuevo */}
+                                                <td className="py-1.5 px-2">
+                                                    {d.status === 'new' ? (
+                                                        <select className={inpSm}
+                                                            value={d.unidad_id ?? ''}
+                                                            onChange={e => updLinea(i, 'unidad_id', e.target.value || null)}>
+                                                            <option value="">—</option>
+                                                            {unidades.map(u => <option key={u.id} value={u.id}>{u.codigo}</option>)}
+                                                        </select>
+                                                    ) : (
+                                                        <span className="text-[11px] text-slate-500">
+                                                            {unidades.find(u => u.id === d.unidad_id)?.codigo ?? '—'}
+                                                        </span>
+                                                    )}
+                                                </td>
+
+                                                {/* Categoría — editable solo si el producto es nuevo */}
+                                                <td className="py-1.5 px-2">
+                                                    {d.status === 'new' ? (
+                                                        <select className={inpSm}
+                                                            value={d.categoria_id ?? ''}
+                                                            onChange={e => updLinea(i, 'categoria_id', e.target.value || null)}>
+                                                            <option value="">—</option>
+                                                            {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                                                        </select>
+                                                    ) : (
+                                                        <span className="text-[11px] text-slate-500 truncate block max-w-[110px]">
+                                                            {categorias.find(c => c.id === d.categoria_id)?.nombre ?? '—'}
+                                                        </span>
+                                                    )}
+                                                </td>
+
                                                 {/* Cantidad */}
-                                                <td className="py-2 px-3">
+                                                <td className="py-1.5 px-2">
                                                     <input type="text" inputMode="decimal"
-                                                        className={cn(inp, 'text-sm text-right')}
+                                                        className={cn(inpSm, 'text-right')}
                                                         value={numVal(`cant_${i}`, d.cantidad)}
                                                         onFocus={e => e.target.select()}
                                                         onChange={e => numChange(`cant_${i}`, e.target.value, v => updLinea(i, 'cantidad', v))}
@@ -952,9 +1017,9 @@ export function NuevaCompraInventarioPage() {
                                                 </td>
 
                                                 {/* Costo */}
-                                                <td className="py-2 px-3">
+                                                <td className="py-1.5 px-2">
                                                     <input type="text" inputMode="decimal"
-                                                        className={cn(inp, 'text-sm text-right')}
+                                                        className={cn(inpSm, 'text-right')}
                                                         value={numVal(`costo_${i}`, d.costo_unitario)}
                                                         onFocus={e => e.target.select()}
                                                         onChange={e => numChange(`costo_${i}`, e.target.value, v => updLinea(i, 'costo_unitario', v))}
@@ -962,41 +1027,41 @@ export function NuevaCompraInventarioPage() {
                                                 </td>
 
                                                 {/* Descuento % — deshabilitado si ya hay descuento directo en $ */}
-                                                <td className="py-2 px-3">
+                                                <td className="py-1.5 px-2">
                                                     <input type="text" inputMode="decimal"
                                                         disabled={(d.descuento_valor ?? 0) > 0}
                                                         title={(d.descuento_valor ?? 0) > 0 ? 'Ya hay un descuento directo en $ para esta línea' : undefined}
-                                                        className={cn(inp, 'text-sm text-right', (d.descuento_valor ?? 0) > 0 && 'opacity-40 pointer-events-none')}
+                                                        className={cn(inpSm, 'text-right', (d.descuento_valor ?? 0) > 0 && 'opacity-40 pointer-events-none')}
                                                         value={numVal(`desc_${i}`, d.descuento_porcentaje ?? 0)}
                                                         onChange={e => numChange(`desc_${i}`, e.target.value, v => updLinea(i, 'descuento_porcentaje', Math.min(v, 100)))}
                                                         onBlur={() => numBlur(`desc_${i}`, v => updLinea(i, 'descuento_porcentaje', Math.min(v, 100)))} />
                                                 </td>
 
                                                 {/* Descuento directo en $ — deshabilitado si ya hay % */}
-                                                <td className="py-2 px-3">
+                                                <td className="py-1.5 px-2">
                                                     <input type="text" inputMode="decimal"
                                                         disabled={(d.descuento_porcentaje ?? 0) > 0}
                                                         title={(d.descuento_porcentaje ?? 0) > 0 ? 'Ya hay un % de descuento para esta línea' : undefined}
-                                                        className={cn(inp, 'text-sm text-right', (d.descuento_porcentaje ?? 0) > 0 && 'opacity-40 pointer-events-none')}
+                                                        className={cn(inpSm, 'text-right', (d.descuento_porcentaje ?? 0) > 0 && 'opacity-40 pointer-events-none')}
                                                         value={numVal(`descval_${i}`, d.descuento_valor ?? 0)}
                                                         onChange={e => numChange(`descval_${i}`, e.target.value, v => updLinea(i, 'descuento_valor', Math.max(v, 0)))}
                                                         onBlur={() => numBlur(`descval_${i}`, v => updLinea(i, 'descuento_valor', Math.max(v, 0)))} />
                                                 </td>
 
                                                 {/* Subtotal (neto de descuento) */}
-                                                <td className="py-2 px-3 text-right font-mono">
+                                                <td className="py-1.5 px-2 text-right font-mono">
                                                     {((d.descuento_porcentaje ?? 0) > 0 || (d.descuento_valor ?? 0) > 0) && (
-                                                        <div className="text-[10px] text-slate-400 line-through leading-tight">
+                                                        <div className="text-[9px] text-slate-400 line-through leading-tight">
                                                             ${lineaNeta(d).bruto.toFixed(2)}
                                                         </div>
                                                     )}
-                                                    <div className="font-semibold text-slate-800">
+                                                    <div className="text-xs font-semibold text-slate-800">
                                                         ${lineaNeta(d).neto.toFixed(2)}
                                                     </div>
                                                 </td>
 
                                                 {/* Eliminar */}
-                                                <td className="py-2 pl-2">
+                                                <td className="py-1.5 pl-2">
                                                     <button onClick={() => removeLinea(i)}
                                                         className="p-1 hover:bg-red-50 rounded text-slate-300 hover:text-red-500">
                                                         <Trash2 className="w-3.5 h-3.5" />

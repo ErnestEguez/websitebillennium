@@ -10,6 +10,7 @@ export interface Producto {
     precio3?: number | null
     precio4?: number | null
     categoria_id: string
+    unidad_id?: string | null
     linea_id?: string | null
     subcategoria_id?: string | null
     imagen_url: string | null
