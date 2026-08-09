@@ -220,13 +220,10 @@ const Footer = () => {
           <div>
             <h4 className="font-semibold mb-4">Productos</h4>
             <ul className="space-y-2">
+              <li><Link to="/productos/facturacion-electronica" className="text-slate-400 hover:text-white transition-colors text-sm">Corina ERP</Link></li>
               <li><Link to="/productos/restoflow" className="text-slate-400 hover:text-white transition-colors text-sm">RestoFlow</Link></li>
-              <li><Link to="/productos/pedidos-sentinel" className="text-slate-400 hover:text-white transition-colors text-sm">Pedidos Sentinel</Link></li>
-              <li><Link to="/productos/modulo-importaciones" className="text-slate-400 hover:text-white transition-colors text-sm">Importaciones</Link></li>
-              <li><Link to="/productos/lopdp" className="text-slate-400 hover:text-white transition-colors text-sm">LOPDP</Link></li>
-              <li><Link to="/productos/facturacion-electronica" className="text-slate-400 hover:text-white transition-colors text-sm">Facturación Electrónica</Link></li>
-              <li><Link to="/productos/dashboard-empresarial" className="text-slate-400 hover:text-white transition-colors text-sm">Dashboard</Link></li>
-              <li><Link to="/productos/plataforma-ferias" className="text-slate-400 hover:text-white transition-colors text-sm">Plataforma Ferias</Link></li>
+              <li><Link to="/productos/modulo-importaciones" className="text-slate-400 hover:text-white transition-colors text-sm">ImporTrack</Link></li>
+              <li><Link to="/productos/plataforma-ferias" className="text-slate-400 hover:text-white transition-colors text-sm">Ferias</Link></li>
             </ul>
           </div>
 

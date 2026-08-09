@@ -216,7 +216,7 @@ export const Calculadora = () => {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <Badge className="bg-blue-500/20 text-blue-200 border-blue-400/30 mb-4">Cotizador interactivo</Badge>
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-3 flex items-center gap-3">
-              <Calculator className="h-8 w-8 text-blue-300" /> Arme usted mismo su plan
+              <Calculator className="h-8 w-8 text-blue-300" /> Arme usted mismo su plan ERP
             </h1>
             <p className="text-slate-300 text-lg max-w-2xl">
               Seleccione los módulos, usuarios y volumen de operación de su empresa para ver un precio mensual estimado.

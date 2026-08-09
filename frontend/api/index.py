@@ -362,7 +362,7 @@ PRODUCTS = [
     },
     {
         "id": "facturacion",
-        "name": "ERP QuickInvoice",
+        "name": "Corina ERP",
         "slug": "facturacion-electronica",
         "description": "ERP completo para PyMEs ecuatorianas: facturación electrónica SRI, inventario, cartera, compras, contabilidad, tesorería, talento humano y cumplimiento LOPDP, todo integrado en un solo sistema.",
         "icon": "FileText",
@@ -924,7 +924,7 @@ def enviar_copia_cotizacion(data: EnviarCopiaEmail):
     if not result.data:
         raise HTTPException(status_code=404, detail="Cotización no encontrada")
     c = result.data[0]
-    asunto = f"Cotización QuickInvoice — {c['cliente_nombre']}"
+    asunto = f"Cotización Corina ERP — {c['cliente_nombre']}"
     cuerpo = _construir_mensaje_cotizacion(c)
     try:
         email_id = enviar_correo(data.destino, asunto, cuerpo)
