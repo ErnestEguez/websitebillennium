@@ -6,6 +6,7 @@ import { subproductoService, type Subproducto } from '../services/subproductoSer
 import { contableConfigService, type CuentaLP } from '../services/contableConfigService'
 import { lineaService, type Linea } from '../services/lineaService'
 import { subcategoriaService, type Subcategoria } from '../services/subcategoriaService'
+import { unidadService, type Unidad } from '../services/unidadService'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/utils'
@@ -282,6 +283,7 @@ export function ProductsPage() {
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [lineas, setLineas] = useState<Linea[]>([])
     const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([])
+    const [unidades, setUnidades] = useState<Unidad[]>([])
     const [loading, setLoading] = useState(false)  // sin carga inicial
     const [search, setSearch] = useState('')
     const [selectedCategoria, setSelectedCategoria] = useState<string>('')
@@ -313,11 +315,13 @@ export function ProductsPage() {
             contableConfigService.getCuentas((empresa as any)?.ruc),
             lineaService.getLineas(empresa.id).catch(() => [] as Linea[]),
             subcategoriaService.getSubcategorias(empresa.id).catch(() => [] as Subcategoria[]),
-        ]).then(([catData, cuentas, lineasData, subcatsData]) => {
+            unidadService.getUnidades(empresa.id).catch(() => [] as Unidad[]),
+        ]).then(([catData, cuentas, lineasData, subcatsData, unidsData]) => {
             setCategorias(catData)
             setCuentasLP(cuentas)
             setLineas(lineasData)
             setSubcategorias(subcatsData)
+            setUnidades(unidsData)
         }).catch(console.error)
 
         supabase
@@ -419,6 +423,7 @@ export function ProductsPage() {
             precio3:                   editingProduct.precio3                   ?? null,
             precio4:                   editingProduct.precio4                   ?? null,
             categoria_id:              editingProduct.categoria_id              ?? undefined,
+            unidad_id:                 editingProduct.unidad_id                 ?? null,
             linea_id:                  editingProduct.linea_id                  ?? null,
             subcategoria_id:           editingProduct.subcategoria_id           ?? null,
             iva_porcentaje:            editingProduct.iva_porcentaje            ?? 15,
@@ -499,6 +504,7 @@ export function ProductsPage() {
                                 precio_venta: 0,
                                 iva_porcentaje: 15,
                                 categoria_id: categorias[0]?.id,
+                                unidad_id: unidades.find(u => u.codigo === 'UND')?.id ?? unidades[0]?.id ?? null,
                                 maneja_stock: true,
                                 cuenta_ingreso_id: cuentasLP[0]?.id || null,
                                 cuenta_ingreso_codigo: cuentasLP[0]?.codigo || null,
@@ -860,19 +866,34 @@ export function ProductsPage() {
                                 </label>
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Categoría</label>
-                                <select
-                                    required
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary-500"
-                                    value={editingProduct?.categoria_id || ''}
-                                    onChange={(e) => setEditingProduct({ ...editingProduct, categoria_id: e.target.value })}
-                                >
-                                    <option value="" disabled>Seleccionar...</option>
-                                    {categorias.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{cat.nombre}</option>
-                                    ))}
-                                </select>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Categoría</label>
+                                    <select
+                                        required
+                                        className="w-full px-4 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary-500"
+                                        value={editingProduct?.categoria_id || ''}
+                                        onChange={(e) => setEditingProduct({ ...editingProduct, categoria_id: e.target.value })}
+                                    >
+                                        <option value="" disabled>Seleccionar...</option>
+                                        {categorias.map(cat => (
+                                            <option key={cat.id} value={cat.id}>{cat.nombre}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Unidad</label>
+                                    <select
+                                        className="w-full px-4 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary-500"
+                                        value={editingProduct?.unidad_id || ''}
+                                        onChange={(e) => setEditingProduct({ ...editingProduct, unidad_id: e.target.value || null })}
+                                    >
+                                        <option value="">— Sin unidad —</option>
+                                        {unidades.map(u => (
+                                            <option key={u.id} value={u.id}>{u.codigo} — {u.nombre}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
                             {/* Línea y SubCategoría */}

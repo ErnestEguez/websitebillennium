@@ -28,6 +28,7 @@ import {
     PowerOff,
     Printer,
     AlignLeft,
+    Ruler,
     FolderTree,
     Download,
     Copy,
@@ -37,6 +38,7 @@ import { ContabilidadConfigTab } from '../components/ContabilidadConfigTab'
 import { TalentoNominasConfigTab } from '../components/TalentoNominasConfigTab'
 import { categoriaService, type Categoria } from '../services/categoriaService'
 import { lineaService, type Linea } from '../services/lineaService'
+import { unidadService, type Unidad } from '../services/unidadService'
 import { subcategoriaService, type Subcategoria } from '../services/subcategoriaService'
 import { bodegaService } from '../services/bodegaService'
 import { puntoEmisionService } from '../services/puntoEmisionService'
@@ -109,7 +111,7 @@ function PrepPinturaCodeField({
 
 export function ConfigurationPage() {
     const { empresa, profile } = useAuth()
-    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'lineas' | 'subcategorias' | 'bodegas' | 'puntos_emision' | 'plataforma' | 'contabilidad' | 'talento_nominas'>('empresa')
+    const [activeTab, setActiveTab] = useState<'empresa' | 'staff' | 'mesas' | 'categorias' | 'lineas' | 'subcategorias' | 'unidades' | 'bodegas' | 'puntos_emision' | 'plataforma' | 'contabilidad' | 'talento_nominas'>('empresa')
     const [platformSubTab, setPlatformSubTab]   = useState<'empresas' | 'personal'>('empresas')
     const [mensajePlataforma, setMensajePlataforma] = useState('')
     const [savingMsg, setSavingMsg]               = useState(false)
@@ -146,6 +148,9 @@ export function ConfigurationPage() {
     const [lineas, setLineas] = useState<Linea[]>([])
     const [isLineaModalOpen, setIsLineaModalOpen] = useState(false)
     const [editingLinea, setEditingLinea] = useState<Partial<Linea> | null>(null)
+    const [unidades, setUnidades] = useState<Unidad[]>([])
+    const [isUnidadModalOpen, setIsUnidadModalOpen] = useState(false)
+    const [editingUnidad, setEditingUnidad] = useState<Partial<Unidad> | null>(null)
 
     // SubCategorías State
     const [subcategorias, setSubcategorias] = useState<Subcategoria[]>([])
@@ -341,6 +346,15 @@ export function ConfigurationPage() {
                 } catch (e) {
                     console.error('Error cargando subcategorías:', e)
                     setSubcategorias([])
+                }
+
+                // ── Cargar unidades ──
+                try {
+                    const unidadesData = await unidadService.getUnidades(empresa!.id, true)
+                    setUnidades(unidadesData)
+                } catch (e) {
+                    console.error('Error cargando unidades:', e)
+                    setUnidades([])
                 }
 
                 // ── Cargar bodegas ──
@@ -923,6 +937,44 @@ export function ConfigurationPage() {
         }
     }
 
+    async function handleSaveUnidad() {
+        try {
+            setSaving(true)
+            if (!editingUnidad?.codigo?.trim() || !editingUnidad?.nombre?.trim()) {
+                alert('Código y nombre son obligatorios')
+                return
+            }
+            if (editingUnidad.id) {
+                const { id, empresa_id, created_at, activo, ...updates } = editingUnidad as any
+                await unidadService.updateUnidad(editingUnidad.id, updates)
+            } else {
+                await unidadService.createUnidad({
+                    codigo: editingUnidad.codigo.trim().toUpperCase(),
+                    nombre: editingUnidad.nombre,
+                    empresa_id: empresa!.id,
+                })
+            }
+            setIsUnidadModalOpen(false)
+            setEditingUnidad(null)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al guardar unidad: ${error.message}`)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    // No elimina físicamente: solo marca activo=false (igual que categorías/líneas)
+    async function handleBajaUnidad(id: string, nombre: string) {
+        if (!confirm(`¿Dar de baja la unidad "${nombre}"? No se eliminará, quedará inactiva.`)) return
+        try {
+            await unidadService.darBajaUnidad(id)
+            loadData()
+        } catch (error: any) {
+            alert(`Error al dar de baja: ${error.message}`)
+        }
+    }
+
     async function handleSaveSubcategoria() {
         try {
             setSaving(true)
@@ -1060,6 +1112,16 @@ export function ConfigurationPage() {
                     >
                         <AlignLeft className="w-4 h-4" />
                         Líneas
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('unidades')}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all",
+                            activeTab === 'unidades' ? "bg-white text-cyan-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                        )}
+                    >
+                        <Ruler className="w-4 h-4" />
+                        Unidades
                     </button>
                     <button
                         onClick={() => setActiveTab('subcategorias')}
@@ -1766,6 +1828,94 @@ export function ConfigurationPage() {
                                             className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Cancelar</button>
                                         <button onClick={handleSaveLinea} disabled={saving}
                                             className="flex-1 bg-teal-600 text-white rounded-xl px-4 py-2 font-bold hover:bg-teal-700 flex items-center justify-center gap-2 disabled:opacity-50">
+                                            <Save className="w-4 h-4" />{saving ? 'Guardando...' : 'Guardar'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ) : activeTab === 'unidades' ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-900">Unidades de Medida</h2>
+                            <p className="text-sm text-slate-500">Catálogo de unidades para artículos (UND, CJ, KG, etc.)</p>
+                        </div>
+                        <button
+                            onClick={() => { setEditingUnidad({ codigo: '', nombre: '' }); setIsUnidadModalOpen(true) }}
+                            className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" /> Nueva Unidad
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {unidades.map(u => (
+                            <div key={u.id} className={cn(
+                                "card p-6 group relative hover:shadow-lg transition-all border-l-4",
+                                u.activo === false ? "border-l-slate-300 opacity-60" : "border-l-cyan-500"
+                            )}>
+                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button title="Editar" onClick={() => { setEditingUnidad(u); setIsUnidadModalOpen(true) }}
+                                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-cyan-600">
+                                        <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    {u.activo !== false && (
+                                        <button title="Dar de baja (inactivar)" onClick={() => handleBajaUnidad(u.id, u.nombre)}
+                                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="space-y-2 pt-1">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <h3 className="font-bold text-slate-900 text-base uppercase tracking-tight leading-tight">{u.codigo}</h3>
+                                        {u.activo === false && (
+                                            <span className="shrink-0 text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full uppercase">Inactiva</span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1">{u.nombre}</p>
+                                </div>
+                            </div>
+                        ))}
+                        {unidades.length === 0 && (
+                            <div className="col-span-full py-16 text-center">
+                                <Ruler className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                                <p className="text-slate-400 font-medium">No hay unidades registradas.</p>
+                                <p className="text-slate-300 text-sm mt-1">Crea la primera unidad con el botón de arriba.</p>
+                            </div>
+                        )}
+                    </div>
+                    {/* Modal Unidad */}
+                    {isUnidadModalOpen && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                                    <h2 className="text-lg font-bold text-slate-900">{editingUnidad?.id ? 'Editar Unidad' : 'Nueva Unidad'}</h2>
+                                    <button onClick={() => { setIsUnidadModalOpen(false); setEditingUnidad(null) }} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-5 h-5" /></button>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Código *</label>
+                                        <input type="text" maxLength={10} placeholder="Ej: CJ"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-cyan-500 font-mono uppercase"
+                                            value={editingUnidad?.codigo || ''}
+                                            onChange={e => setEditingUnidad(p => ({ ...p, codigo: e.target.value.toUpperCase() }))}
+                                            autoFocus />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Nombre *</label>
+                                        <input type="text" placeholder="Ej: Caja"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-cyan-500"
+                                            value={editingUnidad?.nombre || ''}
+                                            onChange={e => setEditingUnidad(p => ({ ...p, nombre: e.target.value }))} />
+                                    </div>
+                                    <div className="flex gap-3 pt-2">
+                                        <button onClick={() => { setIsUnidadModalOpen(false); setEditingUnidad(null) }}
+                                            className="flex-1 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50">Cancelar</button>
+                                        <button onClick={handleSaveUnidad} disabled={saving}
+                                            className="flex-1 bg-cyan-600 text-white rounded-xl px-4 py-2 font-bold hover:bg-cyan-700 flex items-center justify-center gap-2 disabled:opacity-50">
                                             <Save className="w-4 h-4" />{saving ? 'Guardando...' : 'Guardar'}
                                         </button>
                                     </div>
