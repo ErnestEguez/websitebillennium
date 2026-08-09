@@ -241,6 +241,8 @@ export function NuevaCompraInventarioPage() {
             const ocr = await geminiService.analizarFacturaCompra(
                 base64, mimeType, categorias.map(c => c.nombre), empresa!.id,
             )
+            // TEMPORAL — para diagnosticar precios OCR incorrectos, quitar luego.
+            console.log('[OCR RAW] detalle devuelto por Gemini:', JSON.stringify(ocr.detalle, null, 2))
 
             // ── Llenar cabecera ────────────────────────────────────────────
             if (ocr.fecha_emision) setFechaEmision(ocr.fecha_emision)
