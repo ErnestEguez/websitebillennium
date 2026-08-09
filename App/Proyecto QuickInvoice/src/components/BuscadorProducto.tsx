@@ -17,6 +17,8 @@ export interface ProductoResultado {
     costo_promedio: number
     stock: number
     maneja_stock: boolean
+    unidad_id?: string | null
+    categoria_id?: string | null
     subproductos?: any[]
 }
 
@@ -41,7 +43,7 @@ export function BuscadorProducto({ empresaId, onSelect, placeholder = 'Código o
         setBuscando(true)
         try {
             const q = '%' + t.replace(/\*/g, '%') + '%'
-            const sel = conSubproductos ? '*, subproductos(*)' : 'id, codigo, nombre, precio_venta, iva_porcentaje, costo_promedio, stock, maneja_stock'
+            const sel = conSubproductos ? '*, subproductos(*)' : 'id, codigo, nombre, precio_venta, iva_porcentaje, costo_promedio, stock, maneja_stock, unidad_id, categoria_id'
             const { data } = await supabase
                 .from('productos')
                 .select(sel)

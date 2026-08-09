@@ -560,6 +560,22 @@ export function NuevaCompraInventarioPage() {
                 }
             }
 
+            // 2. Si el usuario cambió Unidad/Categoría de un producto YA EXISTENTE
+            //    en esta misma compra, reflejarlo en el catálogo (productos).
+            for (const d of lineasFinales) {
+                if (!d.producto_id || d.status === 'new') continue  // 'new' ya se creó con lo elegido
+                const original = productosCompletos.find(p => p.id === d.producto_id)
+                if (!original) continue
+                const cambios: { unidad_id?: string | null; categoria_id?: string } = {}
+                if (d.unidad_id !== undefined && d.unidad_id !== original.unidad_id) cambios.unidad_id = d.unidad_id
+                // categoria_id no es nullable en el catálogo — solo actualizar si eligió una real
+                if (d.categoria_id && d.categoria_id !== original.categoria_id) cambios.categoria_id = d.categoria_id
+                if (Object.keys(cambios).length > 0) {
+                    try { await productoService.updateProducto(d.producto_id, cambios) }
+                    catch (e) { console.error('No se pudo actualizar la clasificación del producto', d.producto_id, e) }
+                }
+            }
+
             const validas = lineasFinales.filter(d => d.producto_id && d.cantidad > 0 && d.costo_unitario > 0)
             if (!validas.length) { alert('Agrega al menos un producto válido'); return }
 
@@ -968,15 +984,15 @@ export function NuevaCompraInventarioPage() {
                                                             placeholder="Buscar (Enter o Buscar)…"
                                                             onSelect={(p: ProductoResultado) => {
                                                                 setDetalle(prev => prev.map((d2, j) => j !== i ? d2
-                                                                    : { ...d2, producto_id: p.id, nombre: p.nombre, codigo: p.codigo ?? '' }))
+                                                                    : { ...d2, producto_id: p.id, nombre: p.nombre, codigo: p.codigo ?? '', unidad_id: p.unidad_id ?? null, categoria_id: p.categoria_id ?? null }))
                                                             }}
                                                         />
                                                     )}
                                                 </td>
 
-                                                {/* Unidad — editable solo si el producto es nuevo */}
+                                                {/* Unidad — editable si hay producto identificado (nuevo o existente) */}
                                                 <td className="py-1.5 px-2">
-                                                    {d.status === 'new' ? (
+                                                    {(d.status === 'new' || d.producto_id) ? (
                                                         <select className={inpSm}
                                                             value={d.unidad_id ?? ''}
                                                             onChange={e => updLinea(i, 'unidad_id', e.target.value || null)}>
@@ -984,15 +1000,13 @@ export function NuevaCompraInventarioPage() {
                                                             {unidades.map(u => <option key={u.id} value={u.id}>{u.codigo}</option>)}
                                                         </select>
                                                     ) : (
-                                                        <span className="text-[11px] text-slate-500">
-                                                            {unidades.find(u => u.id === d.unidad_id)?.codigo ?? '—'}
-                                                        </span>
+                                                        <span className="text-[11px] text-slate-300">—</span>
                                                     )}
                                                 </td>
 
-                                                {/* Categoría — editable solo si el producto es nuevo */}
+                                                {/* Categoría — editable si hay producto identificado (nuevo o existente) */}
                                                 <td className="py-1.5 px-2">
-                                                    {d.status === 'new' ? (
+                                                    {(d.status === 'new' || d.producto_id) ? (
                                                         <select className={inpSm}
                                                             value={d.categoria_id ?? ''}
                                                             onChange={e => updLinea(i, 'categoria_id', e.target.value || null)}>
@@ -1000,9 +1014,7 @@ export function NuevaCompraInventarioPage() {
                                                             {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                                                         </select>
                                                     ) : (
-                                                        <span className="text-[11px] text-slate-500 truncate block max-w-[110px]">
-                                                            {categorias.find(c => c.id === d.categoria_id)?.nombre ?? '—'}
-                                                        </span>
+                                                        <span className="text-[11px] text-slate-300">—</span>
                                                     )}
                                                 </td>
 
