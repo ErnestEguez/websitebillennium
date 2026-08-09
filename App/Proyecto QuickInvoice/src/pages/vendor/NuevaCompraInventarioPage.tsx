@@ -401,8 +401,13 @@ export function NuevaCompraInventarioPage() {
         if (!isNaN(n)) setter(n)
     }
     function numBlur(key: string, setter: (n: number) => void) {
-        setter(parseFloat(rawInputs[key] ?? '') || 0)
-        setRawInputs(prev => { const next = { ...prev }; delete next[key]; return next })
+        // Si el usuario solo enfocó el campo y salió sin escribir nada
+        // (rawInputs[key] nunca se creó), no tocar el valor existente —
+        // antes esto lo reseteaba a 0 y "borraba" lo cargado desde el PDF.
+        if (key in rawInputs) {
+            setter(parseFloat(rawInputs[key]) || 0)
+            setRawInputs(prev => { const next = { ...prev }; delete next[key]; return next })
+        }
     }
 
     function addLinea() {
@@ -929,6 +934,7 @@ export function NuevaCompraInventarioPage() {
                                                     <input type="text" inputMode="decimal"
                                                         className={cn(inp, 'text-sm text-right')}
                                                         value={numVal(`cant_${i}`, d.cantidad)}
+                                                        onFocus={e => e.target.select()}
                                                         onChange={e => numChange(`cant_${i}`, e.target.value, v => updLinea(i, 'cantidad', v))}
                                                         onBlur={() => numBlur(`cant_${i}`, v => updLinea(i, 'cantidad', v))} />
                                                 </td>
@@ -938,6 +944,7 @@ export function NuevaCompraInventarioPage() {
                                                     <input type="text" inputMode="decimal"
                                                         className={cn(inp, 'text-sm text-right')}
                                                         value={numVal(`costo_${i}`, d.costo_unitario)}
+                                                        onFocus={e => e.target.select()}
                                                         onChange={e => numChange(`costo_${i}`, e.target.value, v => updLinea(i, 'costo_unitario', v))}
                                                         onBlur={() => numBlur(`costo_${i}`, v => updLinea(i, 'costo_unitario', v))} />
                                                 </td>
