@@ -74,6 +74,7 @@ const ComprasPage                  = lz(() => import('./pages/vendor/ComprasPage
 const EliminarCompraPage           = lz(() => import('./pages/vendor/EliminarCompraPage'), 'EliminarCompraPage')
 const NuevaCompraInventarioPage    = lz(() => import('./pages/vendor/NuevaCompraInventarioPage'), 'NuevaCompraInventarioPage')
 const NuevaCompraServicioPage      = lz(() => import('./pages/vendor/NuevaCompraServicioPage'), 'NuevaCompraServicioPage')
+const NdProveedoresPage            = lz(() => import('./pages/vendor/NdProveedoresPage'), 'NdProveedoresPage')
 const OrdenesCompraPage            = lz(() => import('./pages/vendor/OrdenesCompraPage'), 'OrdenesCompraPage')
 const NuevaOrdenCompraPage         = lz(() => import('./pages/vendor/NuevaOrdenCompraPage'), 'NuevaOrdenCompraPage')
 const CxPPage                      = lz(() => import('./pages/vendor/CxPPage'), 'CxPPage')
@@ -736,6 +737,7 @@ function App() {
               <Route path="/compras/nueva-servicio" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaCompraServicioPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/notas-credito" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NotasCreditoProveedorPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/notas-credito/nueva" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaNcProveedorPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
+              <Route path="/compras/notas-debito" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NdProveedoresPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/ordenes" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><OrdenesCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/ordenes/nueva" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaOrdenCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />
               <Route path="/compras/ordenes/:id" element={<ProtectedRoute><RoleProtectedRoute allowedRoles={['oficina']}><Layout><NuevaOrdenCompraPage /></Layout></RoleProtectedRoute></ProtectedRoute>} />

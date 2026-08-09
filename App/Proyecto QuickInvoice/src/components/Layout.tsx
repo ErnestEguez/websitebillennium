@@ -21,6 +21,7 @@ import {
     Wallet,
     Search,
     FileMinus,
+    FilePlus2,
     Ban,
     Moon,
     Sun,
@@ -375,6 +376,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     <div className="ml-4 border-l border-slate-100 pl-1 space-y-0.5">
                                         <SidebarItem to="/compras"                icon={FileText}  label="Lista de Compras"     active={location.pathname === '/compras'} sub disabled={!p.perm_compras} />
                                         <SidebarItem to="/compras/notas-credito"  icon={FileMinus} label="Notas de Crédito"     active={location.pathname.startsWith('/compras/notas-credito')} sub disabled={!p.perm_nc_proveedores} />
+                                        <SidebarItem to="/compras/notas-debito"   icon={FilePlus2} label="Notas de Débito"      active={location.pathname.startsWith('/compras/notas-debito')} sub disabled={!p.perm_nc_proveedores} />
                                         <SidebarItem to="/compras/nueva-servicio" icon={FileText}  label="Compras de Servicios" active={location.pathname === '/compras/nueva-servicio'} sub disabled={!p.perm_compras} />
                                         <SidebarItem to="/retenciones"            icon={UserCheck} label="Retenciones"          active={location.pathname === '/retenciones'} sub disabled={!p.perm_compras} />
                                         <SidebarItem to="/liquidaciones"          icon={Receipt}   label="Liquidaciones Compra"  active={location.pathname.startsWith('/liquidaciones')} sub disabled={!p.perm_compras} />
