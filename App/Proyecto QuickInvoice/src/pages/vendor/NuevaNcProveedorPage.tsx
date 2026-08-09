@@ -8,6 +8,8 @@ import type { CompraConDetalle } from '../../types/vendors'
 import { supabase } from '../../lib/supabase'
 import { BuscadorCuentaContable } from '../../components/BuscadorCuentaContable'
 import { HelpButton } from '../../components/help/HelpButton'
+import { ScanFacturaButton, type FacturaEscaneada } from '../../components/ScanFacturaButton'
+import { useIaFeatureEnabled } from '../../hooks/useIaFeatureEnabled'
 import { formatCurrency, cn } from '../../lib/utils'
 import {
     Search, ChevronRight, ChevronLeft, AlertCircle,
@@ -41,6 +43,7 @@ interface CxpAlterno {
 export function NuevaNcProveedorPage() {
     const { empresa, profile } = useAuth()
     const navigate = useNavigate()
+    const { enabled: ocrIaHabilitado } = useIaFeatureEnabled('compras')
 
     // ── Step 1: buscar compra origen
     const [step, setStep] = useState<Step>(1)
@@ -202,6 +205,21 @@ export function NuevaNcProveedorPage() {
 
     const saldoOrigen = compra?.cxp?.saldo_pendiente ?? 0
     const necesitaOtraFactura = total > saldoOrigen + 0.001
+
+    // Aplica los datos leídos del PDF/foto de la N/C física del proveedor.
+    // El proveedor y la factura origen ya están fijados por el Paso 1 — acá
+    // solo se completan los datos propios del documento de N/C.
+    function handleScanAplicar(data: FacturaEscaneada) {
+        if (data.estab && data.pto_emi && data.secuencial) {
+            setNumeroNc(`${data.estab}-${data.pto_emi}-${data.secuencial}`)
+        }
+        if (data.fecha_emision) setFechaNc(data.fecha_emision)
+        if (data.clave_acceso) setAutorizacionNc(data.clave_acceso)
+        if (tipo === 'NC_VALOR') {
+            setBaseIva0(data.base_cero ?? 0)
+            setBaseIva15(data.base_iva ?? 0)
+        }
+    }
 
     function validarStep2(): boolean {
         if (!fechaNc) { setErrStep('Ingresa la fecha de la N/C.'); return false }
@@ -422,6 +440,12 @@ export function NuevaNcProveedorPage() {
                     </div>
 
                     <div className="card p-6 space-y-5">
+                        {ocrIaHabilitado && (
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Datos de la N/C</p>
+                                <ScanFacturaButton onAplicar={handleScanAplicar} empresaId={empresa!.id} />
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Tipo de N/C *</label>
