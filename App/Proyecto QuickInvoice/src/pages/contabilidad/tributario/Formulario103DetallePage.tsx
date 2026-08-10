@@ -285,7 +285,7 @@ export function Formulario103DetallePage() {
         <div className="space-y-5 max-w-4xl">
             {/* Header */}
             <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => navigate('/tributario/103')}
+                <button onClick={() => navigate('/conta/tributario/103')}
                     className="text-slate-400 hover:text-slate-700 p-1">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
