@@ -223,7 +223,12 @@ export const CODIGOS_SRI_DEFAULT: CodigoDefault[] = [
       cuenta_contable_id: null, cuenta_contable_codigo: null, cuenta_contable_nombre: null },
 
     // ── Retención del IVA — impuestoSRI=2 ─────────────────────────────────────
-    { tipo: 'IVA', codigo: '725', porcentaje: 30, activo: true, aplica_a: 'TODOS',
+    // Código real confirmado por autorización SRI en producción el 2026-08-10
+    // (comprobante ConHierro/PINO ARISTATA: con codigoRetencion=725 el SRI
+    // rechazó "no existe o no está vigente"; con codigoRetencion=1 autorizó).
+    // Los demás códigos IVA de esta tabla (726-730) NO están verificados así
+    // — no tocarlos sin la misma prueba.
+    { tipo: 'IVA', codigo: '1', porcentaje: 30, activo: true, aplica_a: 'TODOS',
       base_legal: 'Art. 63 LIVA / Res. NAC-DGERCGC15-00000284',
       descripcion: 'Retención IVA 30% — compra de bienes (agentes de retención sector privado)',
       cuenta_contable_id: null, cuenta_contable_codigo: null, cuenta_contable_nombre: null },

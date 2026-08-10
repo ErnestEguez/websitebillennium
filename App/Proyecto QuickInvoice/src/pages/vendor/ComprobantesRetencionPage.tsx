@@ -386,8 +386,9 @@ export function ComprobantesRetencionPage() {
 
                         return (
                             <div key={idx} className="card overflow-hidden">
-                                {/* Cabecera con botones siempre visibles */}
-                                <div className="flex items-center">
+                                {/* Cabecera con botones siempre visibles — flex-wrap para que en
+                                    pantallas angostas los botones bajen de línea en vez de cortarse */}
+                                <div className="flex items-center flex-wrap">
                                     {/* Área clickable de info */}
                                     <div
                                         onClick={() => setExpandido(abierto ? null : clave)}

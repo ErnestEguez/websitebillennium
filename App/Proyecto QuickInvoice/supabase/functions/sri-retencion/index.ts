@@ -471,6 +471,7 @@ serve(async (req) => {
         let sustentoNumero = "";
         let sustentoFecha  = "";
         let codDocSustento = "01";
+        let bodegaId: string | null = null;
 
         if (esLC) {
             const { data: lc, error: lcErr } = await supabase
@@ -484,19 +485,29 @@ serve(async (req) => {
             sustentoNumero = `${l.establecimiento}-${l.punto_emision}-${l.secuencial}`;
             sustentoFecha  = l.fecha_emision;
             codDocSustento = "03";
+            // liquidaciones_compra no tiene bodega_id -- se resuelve por el
+            // punto de emisión "Principal" de la empresa (mismo fallback que
+            // ya usan Factura/NC cuando no hay bodega asociada).
         } else {
             const { data: compra, error: compraErr } = await supabase
                 .from("ingresos_stock")
-                .select("numero_factura, fecha_emision")
+                .select("numero_factura, fecha_emision, bodega_id")
                 .eq("id", compra_id)
                 .single();
 
             if (compraErr || !compra) throw new Error("Compra no encontrada");
             sustentoNumero = (compra as any).numero_factura || "";
             sustentoFecha  = (compra as any).fecha_emision;
+            bodegaId       = (compra as any).bodega_id ?? null;
         }
 
         // ── 5. Determine estab / pto / secuencial ─────────────
+        // Misma lógica que Factura/NOTA_CREDITO: punto de emisión de la
+        // bodega de la compra (o el "Principal" si no hay uno asociado a esa
+        // bodega), con secuencial atómico por tipo de comprobante. Si la
+        // empresa todavía no tiene puntos de emisión configurados, cae al
+        // legado (config_sri.estab/pto_emision + MAX manual) para no romper
+        // empresas no migradas.
         let estab       = ((configSri.estab        || "001") + "").padStart(3, "0");
         let pto         = ((configSri.pto_emision  || "001") + "").padStart(3, "0");
         let secuencial9 = "000000001";
@@ -512,25 +523,57 @@ serve(async (req) => {
                 secuencial9 = numRet.replace(/\D/g, "").padStart(9, "0").slice(-9);
             }
         } else {
-            // Auto-generate: find max secuencial ONLY for this estab/pto
-            const prefix = `${estab}-${pto}-`;
-            const { data: existing } = await supabase
-                .from("retenciones_compras")
-                .select("numero_retencion")
-                .eq("empresa_id", empresa_id)
-                .like("numero_retencion", `${prefix}%`)
-                .not("numero_retencion", "is", null);
+            let puntoEmision: { id: string; establecimiento: string; punto_emision: string } | null = null;
 
-            let maxSeq = 0;
-            (existing ?? []).forEach((r: any) => {
-                const m = (r.numero_retencion || "").match(/^\d{3}-\d{3}-(\d{9})$/);
-                if (m) {
-                    const seq = parseInt(m[1], 10);
-                    if (seq > maxSeq) maxSeq = seq;
-                }
-            });
-            secuencial9 = (maxSeq + 1).toString().padStart(9, "0");
-            numRet      = `${prefix}${secuencial9}`;
+            if (bodegaId) {
+                const { data: peBodega } = await supabase
+                    .from("puntos_emision")
+                    .select("id, establecimiento, punto_emision")
+                    .eq("empresa_id", empresa_id)
+                    .eq("bodega_id", bodegaId)
+                    .eq("activo", true)
+                    .maybeSingle();
+                if (peBodega) puntoEmision = peBodega as any;
+            }
+            if (!puntoEmision) {
+                const { data: pePrincipal } = await supabase
+                    .from("puntos_emision")
+                    .select("id, establecimiento, punto_emision")
+                    .eq("empresa_id", empresa_id)
+                    .eq("es_principal", true)
+                    .eq("activo", true)
+                    .maybeSingle();
+                if (pePrincipal) puntoEmision = pePrincipal as any;
+            }
+
+            if (puntoEmision) {
+                estab = puntoEmision.establecimiento.padStart(3, "0");
+                pto   = puntoEmision.punto_emision.padStart(3, "0");
+                const { data: nextSec, error: nextSecErr } = await supabase
+                    .rpc("qi_next_secuencial_punto", { p_punto_emision_id: puntoEmision.id, p_tipo_comprobante: "RETENCION" });
+                if (nextSecErr) throw nextSecErr;
+                secuencial9 = String(nextSec as number).padStart(9, "0");
+            } else {
+                // Legado: empresa sin puntos de emisión configurados aún
+                const prefix = `${estab}-${pto}-`;
+                const { data: existing } = await supabase
+                    .from("retenciones_compras")
+                    .select("numero_retencion")
+                    .eq("empresa_id", empresa_id)
+                    .like("numero_retencion", `${prefix}%`)
+                    .not("numero_retencion", "is", null);
+
+                let maxSeq = 0;
+                (existing ?? []).forEach((r: any) => {
+                    const m = (r.numero_retencion || "").match(/^\d{3}-\d{3}-(\d{9})$/);
+                    if (m) {
+                        const seq = parseInt(m[1], 10);
+                        if (seq > maxSeq) maxSeq = seq;
+                    }
+                });
+                secuencial9 = (maxSeq + 1).toString().padStart(9, "0");
+            }
+            numRet = `${estab}-${pto}-${secuencial9}`;
         }
 
         // ── 6. Build ambient and clave de acceso ──────────────

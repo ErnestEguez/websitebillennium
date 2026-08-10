@@ -2188,6 +2188,7 @@ export function ConfigurationPage() {
                                         <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider">Bodega</th>
                                         <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Sec. Factura</th>
                                         <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Sec. Nota Crédito</th>
+                                        <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Sec. Retención</th>
                                         <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Principal</th>
                                         <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Estado</th>
                                         <th className="py-3 px-4 text-center text-xs font-bold uppercase tracking-wider">Acciones</th>
@@ -2220,6 +2221,9 @@ export function ConfigurationPage() {
                                             </td>
                                             <td className="py-3 px-4 text-center font-mono text-slate-600">
                                                 {pe.secuenciales?.NOTA_CREDITO ?? 0}
+                                            </td>
+                                            <td className="py-3 px-4 text-center font-mono text-slate-600">
+                                                {pe.secuenciales?.RETENCION ?? 0}
                                             </td>
                                             <td className="py-3 px-4 text-center">
                                                 {pe.es_principal ? (
@@ -3502,6 +3506,41 @@ export function ConfigurationPage() {
                                             </button>
                                         </div>
                                         <p className="text-xs text-slate-400 mt-1">Próxima NC = este número + 1.</p>
+                                    </div>
+
+                                    {/* Retención */}
+                                    <div>
+                                        <label className="label">Secuencial actual (Retención)</label>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-mono text-lg font-bold text-slate-700">
+                                                {editingPuntoEmision.secuenciales?.RETENCION ?? 0}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    const actual = editingPuntoEmision.secuenciales?.RETENCION ?? 0
+                                                    const nuevo = window.prompt(
+                                                        `Secuencial de Retención actual: ${actual}\n\nIngresa el ÚLTIMO número de retención emitido (la próxima será ese número + 1).`,
+                                                        String(actual)
+                                                    )
+                                                    if (nuevo === null) return
+                                                    const n = parseInt(nuevo, 10)
+                                                    if (isNaN(n) || n < 0) { alert('Número inválido'); return }
+                                                    if (!window.confirm(`¿Confirmas cambiar el secuencial de Retención a ${n}?\nLa próxima retención será la #${n + 1}.`)) return
+                                                    const { error } = await supabase
+                                                        .from('puntos_emision')
+                                                        .update({ secuenciales: { ...editingPuntoEmision.secuenciales, RETENCION: n }, updated_at: new Date().toISOString() })
+                                                        .eq('id', editingPuntoEmision.id!)
+                                                    if (error) { alert('Error: ' + error.message); return }
+                                                    setEditingPuntoEmision((prev: any) => ({ ...prev, secuenciales: { ...(prev?.secuenciales || {}), RETENCION: n } }))
+                                                    alert(`✓ Secuencial de Retención actualizado a ${n}. Próxima retención: #${n + 1}`)
+                                                }}
+                                                className="px-4 py-3 text-sm font-semibold border border-amber-300 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 transition-colors whitespace-nowrap"
+                                            >
+                                                Cambiar secuencial
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-1">Próxima retención = este número + 1.</p>
                                     </div>
 
                                     <div className={cn(

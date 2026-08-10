@@ -68,6 +68,23 @@ export const puntoEmisionService = {
         return this.getPrincipal(empresaId)
     },
 
+    // Punto de emisión asociado a una bodega (ej. para retenciones, que deben
+    // salir del establecimiento donde se hizo la compra, no de "el dispositivo").
+    // Si ninguno está configurado para esa bodega, cae al "Principal".
+    async resolverPorBodega(empresaId: string, bodegaId: string | null | undefined): Promise<PuntoEmision | null> {
+        if (bodegaId) {
+            const { data } = await supabase
+                .from('puntos_emision')
+                .select('*')
+                .eq('empresa_id', empresaId)
+                .eq('bodega_id', bodegaId)
+                .eq('activo', true)
+                .maybeSingle()
+            if (data) return data as PuntoEmision
+        }
+        return this.getPrincipal(empresaId)
+    },
+
     async crear(puntoEmision: Omit<PuntoEmision, 'id' | 'created_at' | 'updated_at' | 'secuenciales'>): Promise<PuntoEmision> {
         const { data, error } = await supabase
             .from('puntos_emision')
