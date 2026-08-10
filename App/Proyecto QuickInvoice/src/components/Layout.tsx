@@ -533,6 +533,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/conta/tributario/nc-proveedores"  icon={FileMinus} label="N/C Proveedores" active={location.pathname === '/conta/tributario/nc-proveedores'} sub />
                             <SidebarItem to="/conta/tributario/ats"         icon={FileText}     label="ATS"           active={location.pathname === '/conta/tributario/ats'} sub />
                             <SidebarItem to="/conta/tributario/104"         icon={BarChart3}    label="Form. 104 IVA" active={location.pathname === '/conta/tributario/104'} sub />
+                            <SidebarItem to="/conta/tributario/103"         icon={BarChart3}    label="Form. 103 Ret. Fuente" active={location.pathname === '/conta/tributario/103'} sub />
                         </ModuleSection>}
 
                         {/* ── MÓDULO 5: Talento Humano ────────────────────── */}

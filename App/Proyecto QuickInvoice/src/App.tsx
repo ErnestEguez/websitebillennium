@@ -113,8 +113,10 @@ const ConsultaNcNdPage             = lz(() => import('./pages/contabilidad/tribu
 const ConsultaNcProveedoresPage    = lz(() => import('./pages/contabilidad/tributario/ConsultaNcProveedoresPage'), 'ConsultaNcProveedoresPage')
 const AtsPage                      = lz(() => import('./pages/contabilidad/tributario/AtsPage'), 'AtsPage')
 const Formulario104Page            = lz(() => import('./pages/contabilidad/tributario/Formulario104Page'), 'Formulario104Page')
+const Formulario103Page            = lz(() => import('./pages/contabilidad/tributario/Formulario103Page'), 'Formulario103Page')
 const ContaConfig                  = lz(() => import('./pages/contabilidad/ConfiguracionPage'), 'ConfiguracionPage')
 const Formulario104DetallePage     = lz(() => import('./pages/contabilidad/tributario/Formulario104DetallePage'), 'Formulario104DetallePage')
+const Formulario103DetallePage     = lz(() => import('./pages/contabilidad/tributario/Formulario103DetallePage'), 'Formulario103DetallePage')
 
 // ── Módulo Talento Humano ─────────────────────────────────────────────────────
 const EmpleadosPage                = lz(() => import('./pages/talento/EmpleadosPage'), 'EmpleadosPage')
@@ -810,6 +812,8 @@ function App() {
                           <Route path="tributario/ats"                 element={<AtsPage />} />
                           <Route path="tributario/104"                 element={<Formulario104Page />} />
                           <Route path="tributario/104/:id"             element={<Formulario104DetallePage />} />
+                          <Route path="tributario/103"                 element={<Formulario103Page />} />
+                          <Route path="tributario/103/:id"             element={<Formulario103DetallePage />} />
                           <Route path="configuracion"                  element={<ContaConfig />} />
                           <Route path="*"                              element={<Navigate to="/conta/dashboard" replace />} />
                         </Routes>
@@ -919,6 +923,8 @@ function App() {
               <Route path="/tributario/ats"             element={<Navigate to="/conta/tributario/ats" replace />} />
               <Route path="/tributario/104"             element={<Navigate to="/conta/tributario/104" replace />} />
               <Route path="/tributario/104/:id"         element={<Navigate to="/conta/tributario/104" replace />} />
+              <Route path="/tributario/103"             element={<Navigate to="/conta/tributario/103" replace />} />
+              <Route path="/tributario/103/:id"         element={<Navigate to="/conta/tributario/103" replace />} />
               <Route path="/reportes/balance-comprobacion"  element={<Navigate to="/conta/reportes/balance-comprobacion" replace />} />
               <Route path="/reportes/balance-general"       element={<Navigate to="/conta/reportes/balance-general" replace />} />
               <Route path="/reportes/estado-resultados"     element={<Navigate to="/conta/reportes/estado-resultados" replace />} />
