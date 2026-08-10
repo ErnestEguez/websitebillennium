@@ -124,6 +124,7 @@ export function NdProveedoresPage() {
                 empresaId: empresa.id,
                 proveedorId,
                 compraId: compraSeleccionada?.id ?? null,
+                facturaReferencia: compraSeleccionada ? undefined : (searchFactura.trim() || undefined),
                 numeroNd: numeroNd.trim(),
                 fechaEmision,
                 numeroAutorizacion: numeroAutorizacion || undefined,
@@ -247,7 +248,7 @@ export function NdProveedoresPage() {
 
                         <div>
                             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                                Factura relacionada (opcional)
+                                Factura del proveedor a la que aplica
                             </label>
                             {compraSeleccionada ? (
                                 <div className="flex items-center justify-between p-3 bg-primary-50 border border-primary-200 rounded-lg">
@@ -265,7 +266,7 @@ export function NdProveedoresPage() {
                                 <div className="relative">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                     <input className={cn(inp, 'pl-10')} value={searchFactura} onChange={e => setSearchFactura(e.target.value)}
-                                        placeholder="Buscar factura del proveedor por número..." />
+                                        placeholder="N° de factura del proveedor..." />
                                     {buscandoFactura && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />}
                                     {resultadosFactura.length > 0 && (
                                         <div className="absolute z-10 w-full mt-1 border border-slate-200 rounded-lg overflow-hidden divide-y divide-slate-100 bg-white shadow-lg max-h-56 overflow-y-auto">
@@ -284,7 +285,7 @@ export function NdProveedoresPage() {
                                 </div>
                             )}
                             <p className="text-[11px] text-slate-400 mt-1">
-                                Si la dejas vacía, la N/D solo queda registrada sin aumentar ninguna Cuenta por Pagar.
+                                Si la factura ya está en el sistema, aparece en la lista al escribir su número — selecciónala para vincularla directo. Si no aparece (factura no digitada aún), la N/D igual se registra como deuda nueva usando lo que escribas aquí como referencia.
                             </p>
                         </div>
 

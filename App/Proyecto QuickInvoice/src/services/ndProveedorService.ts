@@ -44,6 +44,7 @@ export const ndProveedorService = {
         empresaId: string
         proveedorId: string
         compraId: string | null
+        facturaReferencia?: string   // N° de factura del proveedor cuando NO hay compra vinculada en el sistema
         numeroNd: string
         fechaEmision: string
         numeroAutorizacion?: string
@@ -53,53 +54,59 @@ export const ndProveedorService = {
         concepto?: string
         usuarioId: string
     }): Promise<NDProveedor> {
+        // La N/D SIEMPRE incrementa una deuda con el proveedor: si hay compra
+        // vinculada y ya tiene CxP, se le suma; si no tiene CxP (contado) o no
+        // hay compra vinculada en el sistema, se crea una CxP nueva.
         let cxpId: string | null = null
 
-        if (params.compraId) {
-            const { data: cxpExistente, error: cxpBuscarErr } = await supabase
+        const cxpExistente = params.compraId
+            ? (await supabase
                 .from('cuentas_por_pagar')
                 .select('id, monto_original, saldo_pendiente')
                 .eq('compra_id', params.compraId)
                 .maybeSingle()
-            if (cxpBuscarErr) throw cxpBuscarErr
+              ).data
+            : null
 
-            if (cxpExistente) {
-                const { error: updErr } = await supabase
-                    .from('cuentas_por_pagar')
-                    .update({
-                        monto_original:  Number(cxpExistente.monto_original) + params.total,
-                        saldo_pendiente: Number(cxpExistente.saldo_pendiente) + params.total,
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('id', cxpExistente.id)
-                if (updErr) throw updErr
-                cxpId = cxpExistente.id
-            } else {
-                const [{ data: prov }] = await Promise.all([
-                    supabase.from('proveedores').select('dias_credito').eq('id', params.proveedorId).maybeSingle(),
-                ])
-                const dias = prov?.dias_credito ?? 30
-                const fVenc = new Date(params.fechaEmision + 'T12:00:00')
-                fVenc.setDate(fVenc.getDate() + dias)
+        if (cxpExistente) {
+            const { error: updErr } = await supabase
+                .from('cuentas_por_pagar')
+                .update({
+                    monto_original:  Number(cxpExistente.monto_original) + params.total,
+                    saldo_pendiente: Number(cxpExistente.saldo_pendiente) + params.total,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', cxpExistente.id)
+            if (updErr) throw updErr
+            cxpId = cxpExistente.id
+        } else {
+            const { data: prov } = await supabase
+                .from('proveedores').select('dias_credito').eq('id', params.proveedorId).maybeSingle()
+            const dias = prov?.dias_credito ?? 30
+            const fVenc = new Date(params.fechaEmision + 'T12:00:00')
+            fVenc.setDate(fVenc.getDate() + dias)
 
-                const { data: nuevaCxp, error: cxpCrearErr } = await supabase
-                    .from('cuentas_por_pagar')
-                    .insert({
-                        empresa_id:        params.empresaId,
-                        proveedor_id:      params.proveedorId,
-                        compra_id:         params.compraId,
-                        fecha_emision:     params.fechaEmision,
-                        fecha_vencimiento: fVenc.toISOString().split('T')[0],
-                        monto_original:    params.total,
-                        saldo_pendiente:   params.total,
-                        estado:            'PENDIENTE',
-                        observaciones:     `Generada por N/D ${params.numeroNd} sobre compra pagada de contado`,
-                    })
-                    .select('id')
-                    .single()
-                if (cxpCrearErr) throw cxpCrearErr
-                cxpId = nuevaCxp.id
-            }
+            const observaciones = params.compraId
+                ? `Generada por N/D ${params.numeroNd} sobre compra pagada de contado`
+                : `Generada por N/D ${params.numeroNd}${params.facturaReferencia ? ` — Factura proveedor: ${params.facturaReferencia}` : ' (sin factura relacionada en el sistema)'}`
+
+            const { data: nuevaCxp, error: cxpCrearErr } = await supabase
+                .from('cuentas_por_pagar')
+                .insert({
+                    empresa_id:        params.empresaId,
+                    proveedor_id:      params.proveedorId,
+                    compra_id:         params.compraId,
+                    fecha_emision:     params.fechaEmision,
+                    fecha_vencimiento: fVenc.toISOString().split('T')[0],
+                    monto_original:    params.total,
+                    saldo_pendiente:   params.total,
+                    estado:            'PENDIENTE',
+                    observaciones,
+                })
+                .select('id')
+                .single()
+            if (cxpCrearErr) throw cxpCrearErr
+            cxpId = nuevaCxp.id
         }
 
         const { data: nd, error: ndErr } = await supabase

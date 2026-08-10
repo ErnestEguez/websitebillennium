@@ -68,6 +68,7 @@ const PRINT_CSS = `
         font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px;
     }
     .badge-fact { background: #fee2e2; color: #b91c1c; }
+    .badge-nd   { background: #ffedd5; color: #c2410c; }
     .badge-pago { background: #dcfce7; color: #15803d; }
     .badge-ret  { background: #dbeafe; color: #1d4ed8; }
     .saldo-box {
@@ -109,7 +110,7 @@ const fmtFLong = (s?: string | null) =>
 
 interface MovProveedor {
     fecha:       string
-    tipo:        'FACTURA' | 'PAGO' | 'RETENCION'
+    tipo:        'FACTURA' | 'PAGO' | 'RETENCION' | 'ND'
     descripcion: string
     factura?:    string
     cargo:       number
@@ -152,7 +153,7 @@ export function EstadoCuentaProveedorPage() {
             const prov = proveedores.find(p => p.id === provId)
             setProveedor(prov ?? null)
 
-            const [comprasRes, pagosRes, retencionesRes] = await Promise.allSettled([
+            const [comprasRes, pagosRes, retencionesRes, ndRes] = await Promise.allSettled([
                 supabase
                     .from('ingresos_stock')
                     .select('id, numero_factura, fecha_emision, fecha_ingreso, total, estado, forma_pago')
@@ -178,11 +179,21 @@ export function EstadoCuentaProveedorPage() {
                     .lte('fecha_emision', hasta)
                     .eq('estado', 'ACTIVO')
                     .order('fecha_emision'),
+                supabase
+                    .from('nd_proveedores')
+                    .select('numero_nd, fecha_emision, total, ingresos_stock(numero_factura)')
+                    .eq('empresa_id', empresa.id)
+                    .eq('proveedor_id', provId)
+                    .gte('fecha_emision', desde)
+                    .lte('fecha_emision', hasta)
+                    .eq('estado', 'ACTIVA')
+                    .order('fecha_emision'),
             ])
 
             const compras     = comprasRes.status     === 'fulfilled' ? (comprasRes.value.data     ?? []) : []
             const pagos       = pagosRes.status       === 'fulfilled' ? (pagosRes.value.data       ?? []) : []
             const retenciones = retencionesRes.status === 'fulfilled' ? (retencionesRes.value.data ?? []) : []
+            const nds         = ndRes.status          === 'fulfilled' ? (ndRes.value.data           ?? []) : []
 
             // Número de factura asociado a cada pago (vía CxP → compra)
             const cxpIds = [...new Set(pagos.map(p => p.cxp_id).filter(Boolean) as string[])]
@@ -201,6 +212,7 @@ export function EstadoCuentaProveedorPage() {
                 ...compras.map(c     => ({ fecha: c.fecha_emision ?? c.fecha_ingreso, item: c, tipo: 'FACTURA'   as const })),
                 ...pagos.map(p       => ({ fecha: p.fecha_pago,                       item: p, tipo: 'PAGO'      as const })),
                 ...retenciones.map(r => ({ fecha: r.fecha_emision,                    item: r, tipo: 'RETENCION' as const })),
+                ...nds.map(n         => ({ fecha: n.fecha_emision,                    item: n, tipo: 'ND'        as const })),
             ].sort((a, b) => a.fecha.localeCompare(b.fecha))
 
             let saldo = 0
@@ -221,6 +233,9 @@ export function EstadoCuentaProveedorPage() {
                 } else if (tipo === 'PAGO') {
                     saldo -= item.monto
                     movs.push({ fecha, tipo, descripcion: `Pago ${item.forma_pago}${item.numero_referencia ? ' #' + item.numero_referencia : ''}`, factura: item.cxp_id ? facturaPorCxp.get(item.cxp_id) : undefined, cargo: 0, abono: item.monto, saldo })
+                } else if (tipo === 'ND') {
+                    saldo += item.total
+                    movs.push({ fecha, tipo, descripcion: `Nota de Débito ${item.numero_nd}`, factura: (item as any).ingresos_stock?.numero_factura ?? undefined, cargo: item.total, abono: 0, saldo })
                 } else {
                     saldo -= item.valor
                     movs.push({ fecha, tipo, descripcion: `Retención ${item.tipo} cód. ${item.codigo_retencion}`, cargo: 0, abono: item.valor, saldo })
@@ -387,9 +402,10 @@ export function EstadoCuentaProveedorPage() {
                                         <td className="px-4 py-2.5">
                                             <span className={cn('inline-block text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide',
                                                 m.tipo === 'FACTURA'   ? 'bg-red-100 text-red-700'    :
+                                                m.tipo === 'ND'        ? 'bg-orange-100 text-orange-700' :
                                                 m.tipo === 'PAGO'      ? 'bg-green-100 text-green-700' :
                                                                           'bg-blue-100 text-blue-700')}>
-                                                {m.tipo === 'FACTURA' ? 'Factura' : m.tipo === 'PAGO' ? 'Pago' : 'Retención'}
+                                                {m.tipo === 'FACTURA' ? 'Factura' : m.tipo === 'ND' ? 'N/D' : m.tipo === 'PAGO' ? 'Pago' : 'Retención'}
                                             </span>
                                         </td>
                                         <td className="px-4 py-2.5 text-slate-700">{m.descripcion}</td>
@@ -534,8 +550,9 @@ export function EstadoCuentaProveedorPage() {
                                     <td>
                                         <span className={cn('badge',
                                             m.tipo === 'FACTURA'   ? 'badge-fact' :
+                                            m.tipo === 'ND'        ? 'badge-nd'   :
                                             m.tipo === 'PAGO'      ? 'badge-pago' : 'badge-ret')}>
-                                            {m.tipo === 'FACTURA' ? 'Factura' : m.tipo === 'PAGO' ? 'Pago' : 'Ret.'}
+                                            {m.tipo === 'FACTURA' ? 'Factura' : m.tipo === 'ND' ? 'N/D' : m.tipo === 'PAGO' ? 'Pago' : 'Ret.'}
                                         </span>
                                     </td>
                                     <td>{m.descripcion}</td>
