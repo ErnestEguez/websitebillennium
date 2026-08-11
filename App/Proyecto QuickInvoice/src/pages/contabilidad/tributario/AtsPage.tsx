@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
     FileDown, Loader2, AlertCircle, CheckCircle, X,
     FileText, ShoppingCart, Receipt, ChevronDown, ChevronUp, Info, Ban,
+    FileMinus, FilePlus,
 } from 'lucide-react'
 import { supabase as supabaseConta } from '../../../lib/supabaseContabilidad'
 import { supabase } from '../../../lib/supabase'
@@ -263,6 +264,150 @@ ${anulados.map(a => {
 </iva>`
 }
 
+// ── Tabla reutilizable de compras/liquidaciones/N-C/N-D (una por pestaña) ──
+
+function TablaComprasATS({ titulo, rows, sym, cargando, EmptyIcon, emptyMsg }: {
+    titulo: string
+    rows: SriComp[]
+    sym: string
+    cargando: boolean
+    EmptyIcon: React.ElementType
+    emptyMsg: React.ReactNode
+}) {
+    const [expandido, setExpandido] = useState<string | null>(null)
+
+    const tot = {
+        base0:  rows.reduce((s, c) => s + c.base_cero, 0),
+        baseGr: rows.reduce((s, c) => s + c.base_iva,  0),
+        iva:    rows.reduce((s, c) => s + c.iva,        0),
+        total:  rows.reduce((s, c) => s + c.total,      0),
+    }
+
+    return (
+        <div className="card overflow-hidden">
+            <div className="bg-slate-700 px-5 py-3 text-white font-bold text-sm">{titulo}</div>
+            {cargando ? (
+                <div className="py-10 text-center text-slate-400">
+                    <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Cargando...
+                </div>
+            ) : rows.length === 0 ? (
+                <div className="py-10 text-center text-slate-400">
+                    <EmptyIcon className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    {emptyMsg}
+                </div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-slate-50 border-b text-xs text-slate-500 uppercase tracking-wide">
+                                <th className="py-2 px-2 w-8" />
+                                <th className="py-2 px-3 text-left">Tipo</th>
+                                <th className="py-2 px-3 text-left">Proveedor</th>
+                                <th className="py-2 px-3 text-left">Número</th>
+                                <th className="py-2 px-3 text-left">Fecha</th>
+                                <th className="py-2 px-3 text-right">Base 0%</th>
+                                <th className="py-2 px-3 text-right">Base Grav.</th>
+                                <th className="py-2 px-3 text-right">IVA</th>
+                                <th className="py-2 px-3 text-right">Total</th>
+                                <th className="py-2 px-3 text-center">ATS TP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map(c => {
+                                const isExp = expandido === c.id
+                                const { estab, ptoEmi, sec } = parseNumero(c.numero)
+                                return (
+                                    <>
+                                        <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                            <td className="py-2 px-2">
+                                                <button onClick={() => setExpandido(isExp ? null : c.id)}
+                                                    className="text-slate-400 hover:text-slate-600">
+                                                    {isExp ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                </button>
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium',
+                                                    c.tipo === 'factura' ? 'bg-blue-100 text-blue-700' :
+                                                    c.tipo === 'liquidacion_compra' ? 'bg-indigo-100 text-indigo-700' :
+                                                    c.tipo === 'nota_credito' ? 'bg-amber-100 text-amber-700' :
+                                                    'bg-orange-100 text-orange-700')}>
+                                                    {c.tipo === 'factura' ? 'Factura' :
+                                                     c.tipo === 'liquidacion_compra' ? 'Liquid.' :
+                                                     c.tipo === 'nota_credito' ? 'N/C' : 'N/D'}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                <div className="font-medium text-slate-700 text-xs">{c.proveedor_nombre}</div>
+                                                <div className="text-slate-400 text-xs font-mono">{c.proveedor_ruc}</div>
+                                            </td>
+                                            <td className="py-2 px-3 font-mono text-xs text-slate-600">{c.numero}</td>
+                                            <td className="py-2 px-3 text-xs text-slate-500">{c.fecha_emision}</td>
+                                            <td className="py-2 px-3 text-right text-xs">{c.base_cero > 0 ? formatMoneda(c.base_cero, sym) : '—'}</td>
+                                            <td className="py-2 px-3 text-right text-xs">{c.base_iva > 0 ? formatMoneda(c.base_iva, sym) : '—'}</td>
+                                            <td className="py-2 px-3 text-right text-xs">{c.iva > 0 ? formatMoneda(c.iva, sym) : '—'}</td>
+                                            <td className="py-2 px-3 text-right font-semibold text-xs">{formatMoneda(c.total, sym)}</td>
+                                            <td className="py-2 px-3 text-center">
+                                                <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                                    {tipoCompSRI(c.tipo)}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {isExp && (
+                                            <tr key={`${c.id}-det`} className="bg-slate-50 border-b border-slate-100">
+                                                <td colSpan={10} className="px-8 py-3">
+                                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Detalle ATS generado</p>
+                                                    <div className="grid grid-cols-3 gap-2 text-xs font-mono text-slate-600">
+                                                        <div><span className="text-slate-400">Estab:</span> {estab}</div>
+                                                        <div><span className="text-slate-400">Pto Emisión:</span> {ptoEmi}</div>
+                                                        <div><span className="text-slate-400">Secuencial:</span> {sec}</div>
+                                                        <div><span className="text-slate-400">tpIdProv:</span> {c.tpIdProvOverride ?? tipoIdProvCompra(c.proveedor_ruc)}</div>
+                                                        <div><span className="text-slate-400">tipoComp:</span> {tipoCompSRI(c.tipo)}</div>
+                                                        <div><span className="text-slate-400">codSustento:</span> {c.codSustentoOverride ?? '01'}</div>
+                                                        <div><span className="text-slate-400">baseImponible:</span> {f2(c.base_cero)}</div>
+                                                        <div><span className="text-slate-400">baseImpGrav:</span> {f2(c.base_iva)}</div>
+                                                        <div><span className="text-slate-400">montoIva:</span> {f2(c.iva)}</div>
+                                                        {c.codigo_retencion && (
+                                                            <>
+                                                                <div><span className="text-slate-400">codRetAir:</span> {c.codigo_retencion}</div>
+                                                                <div><span className="text-slate-400">porcentajeAir:</span> {c.porcentaje_ret}%</div>
+                                                                <div><span className="text-slate-400">valRetAir:</span> {f2(c.valor_retenido ?? 0)}</div>
+                                                            </>
+                                                        )}
+                                                        {c.docModificado && (
+                                                            <div className="col-span-3">
+                                                                <span className="text-slate-400">docModificado:</span>{' '}
+                                                                {c.docModificado.tipo} {c.docModificado.estab}-{c.docModificado.ptoEmi}-{c.docModificado.sec}
+                                                            </div>
+                                                        )}
+                                                        <div className="col-span-3">
+                                                            <span className="text-slate-400">autorizacion:</span>{' '}
+                                                            <span className="break-all">{c.clave_acceso ?? '(sin clave de acceso)'}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </>
+                                )
+                            })}
+                        </tbody>
+                        <tfoot>
+                            <tr className="bg-slate-50 border-t-2 font-semibold text-sm">
+                                <td colSpan={5} className="py-2.5 px-3 text-right text-xs text-slate-500 uppercase">Totales</td>
+                                <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(tot.base0, sym)}</td>
+                                <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(tot.baseGr, sym)}</td>
+                                <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(tot.iva, sym)}</td>
+                                <td className="py-2.5 px-3 text-right">{formatMoneda(tot.total, sym)}</td>
+                                <td />
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            )}
+        </div>
+    )
+}
+
 // ── Componente ─────────────────────────────────────────────────────────────
 
 export function AtsPage() {
@@ -290,8 +435,7 @@ export function AtsPage() {
     const [ok, setOk]                   = useState('')
 
     const [excluirVentas, setExcluirVentas] = useState(false)
-    const [tabVista, setTabVista] = useState<'compras' | 'ventas' | 'retenciones' | 'anulados'>('compras')
-    const [expandido, setExpandido] = useState<string | null>(null)
+    const [tabVista, setTabVista] = useState<'compras' | 'nc' | 'nd' | 'ventas' | 'retenciones' | 'anulados'>('compras')
 
     const sym = empresaActiva?.moneda?.simbolo ?? '$'
 
@@ -590,6 +734,11 @@ export function AtsPage() {
         valor: retenciones.reduce((s, r) => s + (r.valor_retenido ?? 0), 0),
     }
 
+    // Compras se divide en 3 pestañas: facturas/liquidaciones, N/C proveedores, N/D proveedores
+    const comprasFacturas = compras.filter(c => c.tipo === 'factura' || c.tipo === 'liquidacion_compra')
+    const comprasNC = compras.filter(c => c.tipo === 'nota_credito')
+    const comprasND = compras.filter(c => c.tipo === 'nota_debito')
+
     // ── Render ─────────────────────────────────────────────────────────────
 
     return (
@@ -698,7 +847,9 @@ export function AtsPage() {
             <div>
                 <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm w-fit mb-4">
                     {([
-                        ['compras',     `Compras (${compras.length})`,                                         ShoppingCart],
+                        ['compras',     `Compras (${comprasFacturas.length})`,                                  ShoppingCart],
+                        ['nc',          `N/C Proveedores (${comprasNC.length})`,                                 FileMinus],
+                        ['nd',          `N/D Proveedores (${comprasND.length})`,                                 FilePlus],
                         ['ventas',      `Ventas (${ventasAts.reduce((s, v) => s + v.cantidad, 0)})`,           Receipt],
                         ['retenciones', `Retenciones (${retenciones.length})`,                                 FileText],
                         ['anulados',    `Anulados (${anuladosSeleccionados.size}/${anulados.length})`,          Ban],
@@ -711,133 +862,40 @@ export function AtsPage() {
                     ))}
                 </div>
 
-                {/* ── Tabla COMPRAS ── */}
+                {/* ── Tabla COMPRAS (facturas + Liquidaciones de Compra) ── */}
                 {tabVista === 'compras' && (
-                    <div className="card overflow-hidden">
-                        <div className="bg-slate-700 px-5 py-3 text-white font-bold text-sm">
-                            Compras del período — {mesNombre(mes)} {año}
-                        </div>
-                        {cargando ? (
-                            <div className="py-10 text-center text-slate-400">
-                                <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Cargando...
-                            </div>
-                        ) : compras.length === 0 ? (
-                            <div className="py-10 text-center text-slate-400">
-                                <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                                Sin comprobantes de compra para este período.
-                                <br />
-                                <span className="text-xs">Importa el CSV del SRI en Integración SRI.</span>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="bg-slate-50 border-b text-xs text-slate-500 uppercase tracking-wide">
-                                            <th className="py-2 px-2 w-8" />
-                                            <th className="py-2 px-3 text-left">Tipo</th>
-                                            <th className="py-2 px-3 text-left">Proveedor</th>
-                                            <th className="py-2 px-3 text-left">Número</th>
-                                            <th className="py-2 px-3 text-left">Fecha</th>
-                                            <th className="py-2 px-3 text-right">Base 0%</th>
-                                            <th className="py-2 px-3 text-right">Base Grav.</th>
-                                            <th className="py-2 px-3 text-right">IVA</th>
-                                            <th className="py-2 px-3 text-right">Total</th>
-                                            <th className="py-2 px-3 text-center">ATS TP</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {compras.map(c => {
-                                            const isExp = expandido === c.id
-                                            const { estab, ptoEmi, sec } = parseNumero(c.numero)
-                                            return (
-                                                <>
-                                                    <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                                        <td className="py-2 px-2">
-                                                            <button onClick={() => setExpandido(isExp ? null : c.id)}
-                                                                className="text-slate-400 hover:text-slate-600">
-                                                                {isExp ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                                            </button>
-                                                        </td>
-                                                        <td className="py-2 px-3">
-                                                            <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium',
-                                                                c.tipo === 'factura' ? 'bg-blue-100 text-blue-700' :
-                                                                c.tipo === 'liquidacion_compra' ? 'bg-indigo-100 text-indigo-700' :
-                                                                c.tipo === 'nota_credito' ? 'bg-amber-100 text-amber-700' :
-                                                                'bg-orange-100 text-orange-700')}>
-                                                                {c.tipo === 'factura' ? 'Factura' :
-                                                                 c.tipo === 'liquidacion_compra' ? 'Liquid.' :
-                                                                 c.tipo === 'nota_credito' ? 'N/C' : 'N/D'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-2 px-3">
-                                                            <div className="font-medium text-slate-700 text-xs">{c.proveedor_nombre}</div>
-                                                            <div className="text-slate-400 text-xs font-mono">{c.proveedor_ruc}</div>
-                                                        </td>
-                                                        <td className="py-2 px-3 font-mono text-xs text-slate-600">{c.numero}</td>
-                                                        <td className="py-2 px-3 text-xs text-slate-500">{c.fecha_emision}</td>
-                                                        <td className="py-2 px-3 text-right text-xs">{c.base_cero > 0 ? formatMoneda(c.base_cero, sym) : '—'}</td>
-                                                        <td className="py-2 px-3 text-right text-xs">{c.base_iva > 0 ? formatMoneda(c.base_iva, sym) : '—'}</td>
-                                                        <td className="py-2 px-3 text-right text-xs">{c.iva > 0 ? formatMoneda(c.iva, sym) : '—'}</td>
-                                                        <td className="py-2 px-3 text-right font-semibold text-xs">{formatMoneda(c.total, sym)}</td>
-                                                        <td className="py-2 px-3 text-center">
-                                                            <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                                                                {tipoCompSRI(c.tipo)}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                    {isExp && (
-                                                        <tr key={`${c.id}-det`} className="bg-slate-50 border-b border-slate-100">
-                                                            <td colSpan={10} className="px-8 py-3">
-                                                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Detalle ATS generado</p>
-                                                                <div className="grid grid-cols-3 gap-2 text-xs font-mono text-slate-600">
-                                                                    <div><span className="text-slate-400">Estab:</span> {estab}</div>
-                                                                    <div><span className="text-slate-400">Pto Emisión:</span> {ptoEmi}</div>
-                                                                    <div><span className="text-slate-400">Secuencial:</span> {sec}</div>
-                                                                    <div><span className="text-slate-400">tpIdProv:</span> {c.tpIdProvOverride ?? tipoIdProvCompra(c.proveedor_ruc)}</div>
-                                                                    <div><span className="text-slate-400">tipoComp:</span> {tipoCompSRI(c.tipo)}</div>
-                                                                    <div><span className="text-slate-400">codSustento:</span> {c.codSustentoOverride ?? '01'}</div>
-                                                                    <div><span className="text-slate-400">baseImponible:</span> {f2(c.base_cero)}</div>
-                                                                    <div><span className="text-slate-400">baseImpGrav:</span> {f2(c.base_iva)}</div>
-                                                                    <div><span className="text-slate-400">montoIva:</span> {f2(c.iva)}</div>
-                                                                    {c.codigo_retencion && (
-                                                                        <>
-                                                                            <div><span className="text-slate-400">codRetAir:</span> {c.codigo_retencion}</div>
-                                                                            <div><span className="text-slate-400">porcentajeAir:</span> {c.porcentaje_ret}%</div>
-                                                                            <div><span className="text-slate-400">valRetAir:</span> {f2(c.valor_retenido ?? 0)}</div>
-                                                                        </>
-                                                                    )}
-                                                                    {c.docModificado && (
-                                                                        <div className="col-span-3">
-                                                                            <span className="text-slate-400">docModificado:</span>{' '}
-                                                                            {c.docModificado.tipo} {c.docModificado.estab}-{c.docModificado.ptoEmi}-{c.docModificado.sec}
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="col-span-3">
-                                                                        <span className="text-slate-400">autorizacion:</span>{' '}
-                                                                        <span className="break-all">{c.clave_acceso ?? '(sin clave de acceso)'}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </>
-                                            )
-                                        })}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr className="bg-slate-50 border-t-2 font-semibold text-sm">
-                                            <td colSpan={5} className="py-2.5 px-3 text-right text-xs text-slate-500 uppercase">Totales</td>
-                                            <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totCompras.base0, sym)}</td>
-                                            <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totCompras.baseGr, sym)}</td>
-                                            <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totCompras.iva, sym)}</td>
-                                            <td className="py-2.5 px-3 text-right">{formatMoneda(totCompras.total, sym)}</td>
-                                            <td />
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        )}
-                    </div>
+                    <TablaComprasATS
+                        titulo={`Compras del período — ${mesNombre(mes)} ${año}`}
+                        rows={comprasFacturas}
+                        sym={sym}
+                        cargando={cargando}
+                        EmptyIcon={ShoppingCart}
+                        emptyMsg={<>Sin facturas ni liquidaciones de compra para este período.<br /><span className="text-xs">Importa el CSV del SRI en Integración SRI.</span></>}
+                    />
+                )}
+
+                {/* ── Tabla N/C DE PROVEEDORES ── */}
+                {tabVista === 'nc' && (
+                    <TablaComprasATS
+                        titulo={`N/C de Proveedores — ${mesNombre(mes)} ${año}`}
+                        rows={comprasNC}
+                        sym={sym}
+                        cargando={cargando}
+                        EmptyIcon={FileMinus}
+                        emptyMsg="Sin notas de crédito de proveedores para este período."
+                    />
+                )}
+
+                {/* ── Tabla N/D DE PROVEEDORES ── */}
+                {tabVista === 'nd' && (
+                    <TablaComprasATS
+                        titulo={`N/D de Proveedores — ${mesNombre(mes)} ${año}`}
+                        rows={comprasND}
+                        sym={sym}
+                        cargando={cargando}
+                        EmptyIcon={FilePlus}
+                        emptyMsg="Sin notas de débito de proveedores para este período."
+                    />
                 )}
 
                 {/* ── Tabla VENTAS ── */}
