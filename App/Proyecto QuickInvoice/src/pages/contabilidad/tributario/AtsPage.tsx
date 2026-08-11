@@ -12,9 +12,17 @@ import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
+interface DocModificado {
+    tipo: string   // tipoComprobante del documento que la N/C o N/D modifica (normalmente '01')
+    estab: string
+    ptoEmi: string
+    sec: string
+    autorizacion: string
+}
+
 interface SriComp {
     id: string
-    tipo: 'factura' | 'retencion' | 'nota_credito' | 'nota_debito'
+    tipo: 'factura' | 'retencion' | 'nota_credito' | 'nota_debito' | 'liquidacion_compra'
     proveedor_ruc: string
     proveedor_nombre: string
     numero: string
@@ -27,6 +35,12 @@ interface SriComp {
     codigo_retencion: string | null
     porcentaje_ret: number | null
     valor_retenido: number | null
+    // Solo Liquidación de Compra: tpIdProv real (CEDULA/PASAPORTE) — el beneficiario
+    // no necesariamente tiene RUC, así que no se puede inferir solo por longitud.
+    tpIdProvOverride?: string
+    codSustentoOverride?: string
+    // Solo N/C y N/D de proveedores: documento que modifican (obligatorio en ATS para tipoComprobante 04/05)
+    docModificado?: DocModificado
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -59,6 +73,7 @@ function parseNumero(num: string) {
     return { estab: '001', ptoEmi: '001', sec: String(parseInt(num.replace(/\D/g, ''), 10) || 0) }
 }
 
+// tpIdCliente (VENTAS) — catálogo SRI: 04 RUC, 05 Cédula, 06 Pasaporte, 07 Consumidor final
 function tipoIdProv(ruc: string): string {
     const r = ruc.replace(/\D/g, '')
     if (r === '9999999999999' || r === '9999999999') return '07'  // consumidor final
@@ -67,13 +82,23 @@ function tipoIdProv(ruc: string): string {
     return '06'                         // Pasaporte u otro
 }
 
+// tpIdProv (COMPRAS) — catálogo SRI distinto al de ventas: 01 RUC, 02 Cédula, 03 Pasaporte.
+// Confirmado contra ATS real: proveedor con cédula (10 dígitos) declarado como '02', no '05'.
+function tipoIdProvCompra(ruc: string): string {
+    const r = ruc.replace(/\D/g, '')
+    if (r.length === 13) return '01'   // RUC
+    if (r.length === 10) return '02'   // Cédula
+    return '03'                         // Pasaporte u otro
+}
+
 function tipoCompSRI(tipo: SriComp['tipo']): string {
     switch (tipo) {
-        case 'factura':      return '01'
-        case 'nota_credito': return '04'
-        case 'nota_debito':  return '05'
-        case 'retencion':    return '07'
-        default:             return '01'
+        case 'factura':             return '01'
+        case 'liquidacion_compra':  return '03'
+        case 'nota_credito':        return '04'
+        case 'nota_debito':         return '05'
+        case 'retencion':           return '07'
+        default:                    return '01'
     }
 }
 
@@ -103,11 +128,20 @@ function generarXmlAts(params: {
 
     const xmlCompras = compras.map(c => {
         const { estab, ptoEmi, sec } = parseNumero(c.numero)
-        const tpId         = tipoIdProv(c.proveedor_ruc)
+        const tpId         = c.tpIdProvOverride ?? tipoIdProvCompra(c.proveedor_ruc)
         const tipoComp     = tipoCompSRI(c.tipo)
+        const codSustento  = c.codSustentoOverride ?? '01'
         const autorizacion = c.clave_acceso ?? '0000000000000000000000000000000000000000000000000'
         const fechaReg     = fmtDate(c.fecha_emision)
         const fechaEmi     = fmtDate(c.fecha_emision)
+
+        // N/C y N/D deben declarar el documento que modifican (ATS lo exige para tipoComprobante 04/05)
+        const docModBlock = c.docModificado ? `
+      <docModificado>${c.docModificado.tipo}</docModificado>
+      <estabModificado>${c.docModificado.estab}</estabModificado>
+      <ptoEmiModificado>${c.docModificado.ptoEmi}</ptoEmiModificado>
+      <secModificado>${c.docModificado.sec.padStart(9, '0')}</secModificado>
+      <autModificado>${c.docModificado.autorizacion}</autModificado>` : ''
 
         const hasRet = !!(c.codigo_retencion && (c.valor_retenido ?? 0) > 0)
 
@@ -128,7 +162,7 @@ function generarXmlAts(params: {
             : ''
 
         return `    <detalleCompras>
-      <codSustento>01</codSustento>
+      <codSustento>${codSustento}</codSustento>
       <tpIdProv>${tpId}</tpIdProv>
       <idProv>${c.proveedor_ruc}</idProv>
       <tipoComprobante>${tipoComp}</tipoComprobante>
@@ -153,7 +187,7 @@ function generarXmlAts(params: {
       <valRetServ100>0.00</valRetServ100>
       <valorRetencionNc>0.00</valorRetencionNc>
       <totbasesImpReemb>0.00</totbasesImpReemb>${airBlock}
-      <pagoExterior><pagoLocExt>01</pagoLocExt><paisEfecPago>NA</paisEfecPago><aplicConvDobTrib>NA</aplicConvDobTrib><pagExtSujRetNorLeg>NA</pagExtSujRetNorLeg></pagoExterior>${formasPagoBlock}
+      <pagoExterior><pagoLocExt>01</pagoLocExt><paisEfecPago>NA</paisEfecPago><aplicConvDobTrib>NA</aplicConvDobTrib><pagExtSujRetNorLeg>NA</pagExtSujRetNorLeg></pagoExterior>${formasPagoBlock}${docModBlock}
     </detalleCompras>`
     }).join('\n')
 
@@ -287,7 +321,107 @@ export function AtsPage() {
             }))
         }
 
-        // Fuente 3: Facturación directa — ventas (agrupadas por cliente para ATS)
+        // Fuente 3: Facturación directa — Liquidaciones de Compra (emitidas por nosotros, tipoComprobante 03)
+        let facLiquidaciones: SriComp[] = []
+        if (empresa?.id) {
+            const { data } = await supabase
+                .from('liquidaciones_compra')
+                .select('id, establecimiento, punto_emision, secuencial, clave_acceso, fecha_emision, base_iva_0, base_iva_15, valor_iva, total, beneficiario_tipo_id, beneficiario_identificacion, beneficiario_nombre')
+                .eq('empresa_id', empresa.id)
+                .eq('estado_sri', 'AUTORIZADO')
+                .gte('fecha_emision', desde).lte('fecha_emision', hasta)
+                .order('fecha_emision')
+            facLiquidaciones = (data ?? []).map((r: any) => ({
+                id: r.id,
+                tipo: 'liquidacion_compra' as const,
+                proveedor_ruc: r.beneficiario_identificacion ?? '',
+                proveedor_nombre: r.beneficiario_nombre ?? '',
+                numero: `${r.establecimiento}-${r.punto_emision}-${r.secuencial}`,
+                clave_acceso: r.clave_acceso,
+                fecha_emision: r.fecha_emision,
+                base_cero: r.base_iva_0 ?? 0,
+                base_iva: r.base_iva_15 ?? 0,
+                iva: r.valor_iva ?? 0,
+                total: r.total ?? 0,
+                codigo_retencion: null,
+                porcentaje_ret: null,
+                valor_retenido: null,
+                tpIdProvOverride: r.beneficiario_tipo_id === 'PASAPORTE' ? '03' : '02',
+                codSustentoOverride: '03',
+            }))
+        }
+
+        // Fuente 4: N/C de proveedores registradas en QuickInvoice (tipoComprobante 04 — requiere doc que modifican)
+        let facNcProveedores: SriComp[] = []
+        if (empresa?.id) {
+            const { data } = await supabase
+                .from('notas_credito_proveedores')
+                .select('id, numero_nc, autorizacion_nc, fecha_nc, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, proveedor:proveedores(ruc, nombre_empresa), compra:ingresos_stock(numero_factura, clave_acceso)')
+                .eq('empresa_id', empresa.id)
+                .eq('estado', 'ACTIVA')
+                .gte('fecha_nc', desde).lte('fecha_nc', hasta)
+                .order('fecha_nc')
+            facNcProveedores = (data ?? []).map((r: any) => {
+                const orig = r.compra ? parseNumero(r.compra.numero_factura ?? '') : null
+                return {
+                    id: r.id,
+                    tipo: 'nota_credito' as const,
+                    proveedor_ruc: r.proveedor?.ruc ?? '',
+                    proveedor_nombre: r.proveedor?.nombre_empresa ?? '',
+                    numero: r.numero_nc ?? '',
+                    clave_acceso: r.autorizacion_nc,
+                    fecha_emision: r.fecha_nc,
+                    base_cero: r.base_iva_0 ?? 0,
+                    base_iva: (r.base_iva_5 ?? 0) + (r.base_iva_15 ?? 0),
+                    iva: r.valor_iva ?? 0,
+                    total: r.total ?? 0,
+                    codigo_retencion: null,
+                    porcentaje_ret: null,
+                    valor_retenido: null,
+                    docModificado: (orig && r.compra?.clave_acceso) ? {
+                        tipo: '01', estab: orig.estab, ptoEmi: orig.ptoEmi, sec: orig.sec,
+                        autorizacion: r.compra.clave_acceso,
+                    } : undefined,
+                }
+            })
+        }
+
+        // Fuente 5: N/D de proveedores registradas en QuickInvoice (tipoComprobante 05 — requiere doc que modifican)
+        let facNdProveedores: SriComp[] = []
+        if (empresa?.id) {
+            const { data } = await supabase
+                .from('nd_proveedores')
+                .select('id, numero_nd, numero_autorizacion, fecha_emision, base_imponible, iva, total, proveedor:proveedores(ruc, nombre_empresa), compra:ingresos_stock(numero_factura, clave_acceso)')
+                .eq('empresa_id', empresa.id)
+                .eq('estado', 'ACTIVA')
+                .gte('fecha_emision', desde).lte('fecha_emision', hasta)
+                .order('fecha_emision')
+            facNdProveedores = (data ?? []).map((r: any) => {
+                const orig = r.compra ? parseNumero(r.compra.numero_factura ?? '') : null
+                return {
+                    id: r.id,
+                    tipo: 'nota_debito' as const,
+                    proveedor_ruc: r.proveedor?.ruc ?? '',
+                    proveedor_nombre: r.proveedor?.nombre_empresa ?? '',
+                    numero: r.numero_nd ?? '',
+                    clave_acceso: r.numero_autorizacion,
+                    fecha_emision: r.fecha_emision,
+                    base_cero: 0,
+                    base_iva: r.base_imponible ?? 0,
+                    iva: r.iva ?? 0,
+                    total: r.total ?? 0,
+                    codigo_retencion: null,
+                    porcentaje_ret: null,
+                    valor_retenido: null,
+                    docModificado: (orig && r.compra?.clave_acceso) ? {
+                        tipo: '01', estab: orig.estab, ptoEmi: orig.ptoEmi, sec: orig.sec,
+                        autorizacion: r.compra.clave_acceso,
+                    } : undefined,
+                }
+            })
+        }
+
+        // Fuente 6: Facturación directa — ventas (agrupadas por cliente para ATS)
         let ventasAgrupadas: VentaAts[] = []
         if (empresa?.id) {
             const { data } = await supabase
@@ -317,10 +451,16 @@ export function AtsPage() {
             ventasAgrupadas = Object.values(porCliente)
         }
 
-        // Merge compras: SRI + facturación, deduplicar por numero+ruc
+        // Merge compras: SRI (CSV) + facturación directa (facturas, liquidaciones, N/C, N/D), deduplicar por numero+ruc
         const sriKeys = new Set(sriCompras.map(c => `${c.numero}|${c.proveedor_ruc}`))
-        const facNuevas = facCompras.filter(c => !sriKeys.has(`${c.numero}|${c.proveedor_ruc}`))
-        const todasCompras = [...sriCompras, ...facNuevas]
+        const noDup = (c: SriComp) => !sriKeys.has(`${c.numero}|${c.proveedor_ruc}`)
+        const todasCompras = [
+            ...sriCompras,
+            ...facCompras.filter(noDup),
+            ...facLiquidaciones.filter(noDup),
+            ...facNcProveedores.filter(noDup),
+            ...facNdProveedores.filter(noDup),
+        ]
 
         setCompras(todasCompras)
         setRetenciones(sriRetenciones)
@@ -540,9 +680,12 @@ export function AtsPage() {
                                                         <td className="py-2 px-3">
                                                             <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium',
                                                                 c.tipo === 'factura' ? 'bg-blue-100 text-blue-700' :
+                                                                c.tipo === 'liquidacion_compra' ? 'bg-indigo-100 text-indigo-700' :
                                                                 c.tipo === 'nota_credito' ? 'bg-amber-100 text-amber-700' :
                                                                 'bg-orange-100 text-orange-700')}>
-                                                                {c.tipo === 'factura' ? 'Factura' : c.tipo === 'nota_credito' ? 'N/C' : 'N/D'}
+                                                                {c.tipo === 'factura' ? 'Factura' :
+                                                                 c.tipo === 'liquidacion_compra' ? 'Liquid.' :
+                                                                 c.tipo === 'nota_credito' ? 'N/C' : 'N/D'}
                                                             </span>
                                                         </td>
                                                         <td className="py-2 px-3">
@@ -569,9 +712,9 @@ export function AtsPage() {
                                                                     <div><span className="text-slate-400">Estab:</span> {estab}</div>
                                                                     <div><span className="text-slate-400">Pto Emisión:</span> {ptoEmi}</div>
                                                                     <div><span className="text-slate-400">Secuencial:</span> {sec}</div>
-                                                                    <div><span className="text-slate-400">tpIdProv:</span> {tipoIdProv(c.proveedor_ruc)}</div>
+                                                                    <div><span className="text-slate-400">tpIdProv:</span> {c.tpIdProvOverride ?? tipoIdProvCompra(c.proveedor_ruc)}</div>
                                                                     <div><span className="text-slate-400">tipoComp:</span> {tipoCompSRI(c.tipo)}</div>
-                                                                    <div><span className="text-slate-400">codSustento:</span> 01</div>
+                                                                    <div><span className="text-slate-400">codSustento:</span> {c.codSustentoOverride ?? '01'}</div>
                                                                     <div><span className="text-slate-400">baseImponible:</span> {f2(c.base_cero)}</div>
                                                                     <div><span className="text-slate-400">baseImpGrav:</span> {f2(c.base_iva)}</div>
                                                                     <div><span className="text-slate-400">montoIva:</span> {f2(c.iva)}</div>
@@ -581,6 +724,12 @@ export function AtsPage() {
                                                                             <div><span className="text-slate-400">porcentajeAir:</span> {c.porcentaje_ret}%</div>
                                                                             <div><span className="text-slate-400">valRetAir:</span> {f2(c.valor_retenido ?? 0)}</div>
                                                                         </>
+                                                                    )}
+                                                                    {c.docModificado && (
+                                                                        <div className="col-span-3">
+                                                                            <span className="text-slate-400">docModificado:</span>{' '}
+                                                                            {c.docModificado.tipo} {c.docModificado.estab}-{c.docModificado.ptoEmi}-{c.docModificado.sec}
+                                                                        </div>
                                                                     )}
                                                                     <div className="col-span-3">
                                                                         <span className="text-slate-400">autorizacion:</span>{' '}
@@ -737,9 +886,14 @@ export function AtsPage() {
                 <div>
                     <strong>ATS v1.31 — Información importante:</strong>
                     <ul className="mt-1 space-y-0.5 list-disc ml-4">
-                        <li><strong>Compras:</strong> se combinan las ingresadas en QuickInvoice + las importadas desde CSV del SRI (sin duplicar).</li>
-                        <li><strong>Ventas:</strong> se toman automáticamente de las facturas emitidas en QuickInvoice, agrupadas por cliente.</li>
-                        <li>El <code>codSustento</code> se declara como <strong>01</strong> por defecto.</li>
+                        <li><strong>Compras:</strong> se combinan facturas + Liquidaciones de Compra + N/C y N/D de proveedores registradas en QuickInvoice, más lo importado desde CSV del SRI (sin duplicar).</li>
+                        <li><strong>Liquidaciones de Compra:</strong> solo se incluyen las de estado <strong>AUTORIZADO</strong>. <code>tpIdProv</code> se declara 02 (cédula) o 03 (pasaporte) según el beneficiario — catálogo de compras, distinto al de ventas.</li>
+                        <li><strong>N/C y N/D de proveedores:</strong> solo estado <strong>ACTIVA</strong> (las anuladas no se declaran). Incluyen el documento que modifican (<code>docModificado</code>) cuando la compra original está vinculada en el sistema.</li>
+                        <li><strong>Ventas:</strong> se toman automáticamente de las facturas emitidas en QuickInvoice, agrupadas por cliente — sin cambios.</li>
+                        <li>El <code>codSustento</code> se declara <strong>03</strong> para Liquidaciones y <strong>01</strong> por defecto para el resto.</li>
+                        <li className="text-amber-700">
+                            <strong>Pendiente de confirmar:</strong> el bloque <code>&lt;anulados&gt;</code> (documentos propios — facturas, liquidaciones, N/C — emitidos y luego anulados) todavía no está implementado. Avísame si tienes un XML de muestra con ese bloque para agregarlo.
+                        </li>
                         <li>Verifica que el RUC y razón social de la empresa estén correctos en Configuración antes de declarar.</li>
                     </ul>
                 </div>
