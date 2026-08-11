@@ -52,6 +52,15 @@ const SECCIONES_READONLY = new Set(['liquidacion']) // se recalculan solos
 function f2(n: number) { return n.toFixed(2) }
 
 // ── Generador XML (cliente) ────────────────────────────────────────────────
+//
+// Este archivo NO es un formato de importación oficial del SRI (no existe
+// una especificación pública verificada para eso). Es una hoja de
+// referencia con los valores por casillero — incluida su descripción —
+// para transcribir a mano en DIMM Formularios o en SRI en Línea.
+
+function escXml(s: string) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+}
 
 function generarXml(
     decl: Declaracion,
@@ -59,27 +68,20 @@ function generarXml(
     empresa: { ruc?: string; razon_social?: string; nombre: string }
 ): string {
     const campos = casilleros.map(c =>
-        `    <casillero numero="${c.casillero}">${f2(c.valor_final)}</casillero>`
+        `    <casillero numero="${c.casillero}" descripcion="${escXml(c.descripcion)}">${f2(c.valor_final)}</casillero>`
     ).join('\n')
 
     const mesStr = String(decl.mes).padStart(2, '0')
 
-    // Estructura supuesta — ajustar al XSD real del SRI cuando esté disponible
     return `<?xml version="1.0" encoding="UTF-8"?>
-<declaracion version="${decl.version_form}">
-  <informante>
-    <tipoId>R</tipoId>
-    <id>${empresa.ruc ?? ''}</id>
-    <razonSocial>${(empresa.razon_social ?? empresa.nombre).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</razonSocial>
-  </informante>
-  <periodo>
-    <anio>${decl.año}</anio>
-    <mes>${mesStr}</mes>
-  </periodo>
-  <formIva>
+<!-- Hoja de referencia para transcripción manual en DIMM Formularios (SRI). NO es un archivo de importación oficial del SRI. -->
+<referenciaFormulario104>
+  <contribuyente ruc="${empresa.ruc ?? ''}" razonSocial="${escXml(empresa.razon_social ?? empresa.nombre)}"/>
+  <periodo anio="${decl.año}" mes="${mesStr}"/>
+  <casilleros>
 ${campos}
-  </formIva>
-</declaracion>`
+  </casilleros>
+</referenciaFormulario104>`
 }
 
 // ── Componente ─────────────────────────────────────────────────────────────
@@ -286,7 +288,7 @@ export function Formulario104DetallePage() {
         <div className="space-y-5 max-w-4xl">
             {/* Header */}
             <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={() => navigate('/tributario/104')}
+                <button onClick={() => navigate('/conta/tributario/104')}
                     className="text-slate-400 hover:text-slate-700 p-1">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
@@ -339,8 +341,9 @@ export function Formulario104DetallePage() {
                     Recalcular
                 </button>
                 <button onClick={descargarXml} disabled={casilleros.length === 0}
-                    className="btn border border-slate-200 text-slate-700 hover:bg-slate-50 gap-2">
-                    <FileDown className="w-4 h-4" /> Descargar XML
+                    className="btn border border-slate-200 text-slate-700 hover:bg-slate-50 gap-2"
+                    title="Hoja de referencia por casillero para transcribir en DIMM Formularios — no es un archivo de importación oficial del SRI">
+                    <FileDown className="w-4 h-4" /> Descargar XML (referencia DIMM)
                 </button>
                 <div className="flex-1" />
                 {decl.estado === 'borrador' && (
@@ -482,6 +485,16 @@ export function Formulario104DetallePage() {
                     </div>
                 </div>
             )}
+
+            {/* Nota XML */}
+            <div className="card p-4 bg-slate-50 border-slate-200 text-xs text-slate-500 flex gap-3">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                    <strong>Sobre el XML:</strong> es una hoja de referencia con el valor de cada casillero (con su
+                    descripción) para transcribir a mano en DIMM Formularios o SRI en Línea. No es un archivo de
+                    importación oficial del SRI — no existe hoy una especificación pública verificada para eso.
+                </div>
+            </div>
         </div>
     )
 }

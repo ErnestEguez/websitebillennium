@@ -97,7 +97,7 @@ export function Formulario104Page() {
 
         if (er) { setError(er.message); setCreando(false); return }
         setCreando(false)
-        navigate(`/tributario/104/${data.id}`)
+        navigate(`/conta/tributario/104/${data.id}`)
     }
 
     // Meses que ya tienen declaración
@@ -217,7 +217,7 @@ export function Formulario104Page() {
                                         <td className="py-3 px-4 text-center">
                                             <div className="flex items-center justify-center gap-1">
                                                 <button
-                                                    onClick={() => navigate(`/tributario/104/${d.id}`)}
+                                                    onClick={() => navigate(`/conta/tributario/104/${d.id}`)}
                                                     className="btn text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 gap-1 py-1 px-3"
                                                 >
                                                     <Eye className="w-3.5 h-3.5" /> Ver
