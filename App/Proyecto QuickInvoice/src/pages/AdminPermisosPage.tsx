@@ -57,6 +57,7 @@ const MODULOS = [
             { field: 'perm_importar_articulos',  label: 'Importar Artículos' },
             { field: 'perm_importar_clientes',   label: 'Clientes (Import/Export)' },
             { field: 'perm_migracion_cartera',   label: 'Migración Cartera' },
+            { field: 'perm_migracion_cxp',       label: 'Migración Deuda Proveedores' },
             { field: 'perm_eliminar_compra',     label: 'Eliminar Compra' },
         ],
     },
@@ -199,6 +200,7 @@ export function AdminPermisosPage() {
                     perm_vendedores:            r.perm_vendedores            ?? def.perm_vendedores,
                     perm_importar_clientes:     r.perm_importar_clientes     ?? def.perm_importar_clientes,
                     perm_migracion_cartera:     r.perm_migracion_cartera     ?? def.perm_migracion_cartera,
+                    perm_migracion_cxp:         r.perm_migracion_cxp         ?? def.perm_migracion_cxp,
                     perm_eliminar_compra:       r.perm_eliminar_compra       ?? def.perm_eliminar_compra,
                 }
             })

@@ -625,6 +625,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     {esOficina && <SidebarItem to="/importar-articulos" icon={Upload} label="Importar Artículos" active={location.pathname === '/importar-articulos'} sub disabled={!p.perm_importar_articulos} />}
                                     {esOficina && <SidebarItem to="/importar-clientes"  icon={Users}  label="Clientes (Import/Export)" active={location.pathname === '/importar-clientes'} sub disabled={!p.perm_importar_clientes} />}
                                     {esOficina && <SidebarItem to="/migrar-cartera"     icon={Wallet} label="Migración Cartera"         active={location.pathname === '/migrar-cartera'} sub disabled={!p.perm_migracion_cartera} />}
+                                    {esOficina && <SidebarItem to="/migrar-cxp"         icon={Truck}  label="Migración Deuda Proveedores" active={location.pathname === '/migrar-cxp'} sub disabled={!p.perm_migracion_cxp} />}
                                     <button
                                         onClick={toggleDarkSidebar}
                                         className="flex items-center gap-3 w-full pl-8 pr-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition-colors"

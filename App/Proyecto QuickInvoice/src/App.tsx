@@ -59,6 +59,7 @@ const AdminReparacionStockPage     = lz(() => import('./pages/admin/AdminReparac
 const EstadisticasEmpresaPage      = lz(() => import('./pages/admin/EstadisticasEmpresaPage'), 'EstadisticasEmpresaPage')
 const ImportarClientesPage         = lz(() => import('./pages/ImportarClientesPage'), 'ImportarClientesPage')
 const MigrarCarteraPage            = lz(() => import('./pages/MigrarCarteraPage'), 'MigrarCarteraPage')
+const MigrarCxPPage                = lz(() => import('./pages/MigrarCxPPage'), 'MigrarCxPPage')
 const ImportarArticulosPage        = lz(() => import('./pages/ImportarArticulosPage'), 'ImportarArticulosPage')
 const InvoicePrint                 = lz(() => import('./pages/InvoicePrint'), 'InvoicePrint')
 const TicketPrint                  = lz(() => import('./pages/TicketPrint'), 'TicketPrint')
@@ -487,6 +488,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <MigrarCarteraPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/migrar-cxp" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <MigrarCxPPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

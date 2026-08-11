@@ -209,6 +209,8 @@ export interface CuentaPorPagar {
     saldo_pendiente: number
     estado: EstadoCxP
     observaciones?: string
+    numero_documento_externo?: string | null
+    origen?: 'COMPRA' | 'LIQUIDACION' | 'MIGRACION'
     created_at?: string
     updated_at?: string
     // Joins
