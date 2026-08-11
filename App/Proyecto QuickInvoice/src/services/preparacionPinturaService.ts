@@ -152,19 +152,33 @@ export const preparacionPinturaService = {
         }
     },
 
+    // El WHERE estado='PENDIENTE' + verificación de fila afectada evita que dos
+    // cajas que facturen/proformen la misma preparación casi al mismo tiempo se
+    // pisen el vínculo en silencio — la segunda recibe un error explícito en vez
+    // de sobreescribir lo que ya guardó la primera.
     async vincularComprobante(id: string, comprobanteId: string): Promise<void> {
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('preparaciones_pintura')
             .update({ comprobante_id: comprobanteId, estado: 'FACTURADA' })
             .eq('id', id)
+            .eq('estado', 'PENDIENTE')
+            .select('id')
         if (error) throw error
+        if (!data || data.length === 0) {
+            throw new Error('Esta preparación ya fue facturada o proformada desde otra caja. Revisa la lista de preparaciones antes de continuar.')
+        }
     },
 
     async vincularProforma(id: string, proformaId: string): Promise<void> {
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('preparaciones_pintura')
             .update({ proforma_id: proformaId, estado: 'PROFORMADA' })
             .eq('id', id)
+            .eq('estado', 'PENDIENTE')
+            .select('id')
         if (error) throw error
+        if (!data || data.length === 0) {
+            throw new Error('Esta preparación ya fue facturada o proformada desde otra caja. Revisa la lista de preparaciones antes de continuar.')
+        }
     },
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { useFormDraft } from '../hooks/useFormDraft'
 import { preparacionPinturaService } from '../services/preparacionPinturaService'
 import { useAuth } from '../contexts/AuthContext'
@@ -23,7 +23,7 @@ import {
     FileText, FilePlus, Search, Plus, Trash2, X, Save, Loader2,
     User, Briefcase, Package, ChevronDown, ChevronUp, ArrowLeft,
     CheckCircle2, RefreshCw, Ban, CreditCard, Eye,
-    FileCheck, AlertCircle, Printer,
+    FileCheck, AlertCircle, Printer, PaintBucket,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -283,8 +283,9 @@ const ESTADO_LABEL: Record<EstadoProforma, string> = {
 
 export function ProformaPage() {
     const [searchParams] = useSearchParams()
+    const navigate = useNavigate()
     const prepId = searchParams.get('prep_id')
-    const { empresa, cajaSesion } = useAuth()
+    const { empresa, cajaSesion, permisos } = useAuth()
 
     // Vista: 'lista' | 'form'
     const [vista, setVista] = useState<'lista' | 'form'>('lista')
@@ -1151,6 +1152,13 @@ export function ProformaPage() {
                                             className="text-violet-600 hover:text-violet-700 flex items-center gap-1 text-sm font-bold">
                                             <Plus className="w-4 h-4" /> Agregar línea
                                         </button>
+                                        {permisos.perm_preparaciones_pintura && (
+                                            <button onClick={() => navigate('/preparaciones-pintura/nueva?origen=proforma')}
+                                                className="text-amber-600 hover:text-amber-700 p-1.5 -m-1.5 rounded-lg hover:bg-amber-50 transition-colors"
+                                                title="Preparar Pintura">
+                                                <PaintBucket className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

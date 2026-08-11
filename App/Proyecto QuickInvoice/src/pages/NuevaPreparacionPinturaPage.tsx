@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useFormDraft } from '../hooks/useFormDraft'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -53,6 +53,12 @@ const INSUMO_VACIO = (tipo: TipoInsumo = 'BASE'): InsumoRow => ({
 export function NuevaPreparacionPinturaPage() {
     const { empresa, profile } = useAuth() as any
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+
+    // Si se entra desde Nueva Factura o desde Proforma (botón "Preparar Pintura"),
+    // Cancelar y el flujo de guardado deben regresar ahí — no al listado general.
+    const origen = searchParams.get('origen') as 'factura' | 'proforma' | null
+    const urlOrigen = origen === 'factura' ? '/nueva-factura' : origen === 'proforma' ? '/proformas' : '/preparaciones-pintura'
 
     // Estado de la preparación
     const [insumos, setInsumos] = useState<InsumoRow[]>([INSUMO_VACIO('BASE'), INSUMO_VACIO('MEZCLA')])
@@ -280,20 +286,22 @@ export function NuevaPreparacionPinturaPage() {
                             onClick={() => navigate(`/nueva-factura?prep_id=${saved.id}`)}
                             className="px-5 py-2.5 bg-primary-600 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 transition-colors"
                         >
-                            Facturar ahora
+                            {origen === 'factura' ? 'Volver a la Factura' : 'Facturar ahora'}
                         </button>
                         <button
                             onClick={() => navigate(`/proformas?prep_id=${saved.id}`)}
                             className="px-5 py-2.5 bg-violet-600 text-white rounded-xl font-semibold text-sm hover:bg-violet-700 transition-colors"
                         >
-                            Proformar
+                            {origen === 'proforma' ? 'Volver a la Proforma' : 'Proformar'}
                         </button>
-                        <button
-                            onClick={() => navigate('/preparaciones-pintura')}
-                            className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-200 transition-colors"
-                        >
-                            Ver preparaciones
-                        </button>
+                        {!origen && (
+                            <button
+                                onClick={() => navigate('/preparaciones-pintura')}
+                                className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-200 transition-colors"
+                            >
+                                Ver preparaciones
+                            </button>
+                        )}
                         <button
                             onClick={() => {
                                 clearDraft()
@@ -318,7 +326,7 @@ export function NuevaPreparacionPinturaPage() {
         <div className="max-w-4xl mx-auto space-y-6">
             {/* Encabezado */}
             <div className="flex items-center gap-4">
-                <button onClick={() => navigate('/preparaciones-pintura')} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <button onClick={() => navigate(urlOrigen)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                     <ArrowLeft className="w-5 h-5 text-slate-500" />
                 </button>
                 <div>
@@ -326,7 +334,11 @@ export function NuevaPreparacionPinturaPage() {
                         <FlaskConical className="w-6 h-6 text-primary-600" />
                         Nueva Preparación de Pintura
                     </h1>
-                    <p className="text-sm text-slate-500 mt-0.5">Mezcla de colores — mini-producción</p>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                        Mezcla de colores — mini-producción
+                        {origen === 'factura' && ' · agregando a la factura en curso'}
+                        {origen === 'proforma' && ' · agregando a la proforma en curso'}
+                    </p>
                 </div>
             </div>
 
@@ -622,7 +634,7 @@ export function NuevaPreparacionPinturaPage() {
             {/* ── Acciones ─────────────────────────────────────────────── */}
             <div className="flex flex-wrap gap-3 justify-end pb-8">
                 <button
-                    onClick={() => navigate('/preparaciones-pintura')}
+                    onClick={() => navigate(urlOrigen)}
                     className="px-5 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition-colors"
                 >
                     Cancelar
@@ -634,20 +646,24 @@ export function NuevaPreparacionPinturaPage() {
                 >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Solo Guardar'}
                 </button>
-                <button
-                    onClick={() => guardar('proformar')}
-                    disabled={saving || !productoRef}
-                    className="px-5 py-3 rounded-xl bg-violet-600 text-white font-semibold text-sm hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar y Proformar'}
-                </button>
-                <button
-                    onClick={() => guardar('facturar')}
-                    disabled={saving || !productoRef}
-                    className="px-5 py-3 rounded-xl bg-primary-600 text-white font-semibold text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Guardar y Facturar'}
-                </button>
+                {origen !== 'factura' && (
+                    <button
+                        onClick={() => guardar('proformar')}
+                        disabled={saving || !productoRef}
+                        className="px-5 py-3 rounded-xl bg-violet-600 text-white font-semibold text-sm hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : origen === 'proforma' ? 'Guardar y Volver a la Proforma' : 'Guardar y Proformar'}
+                    </button>
+                )}
+                {origen !== 'proforma' && (
+                    <button
+                        onClick={() => guardar('facturar')}
+                        disabled={saving || !productoRef}
+                        className="px-5 py-3 rounded-xl bg-primary-600 text-white font-semibold text-sm hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : origen === 'factura' ? 'Guardar y Volver a la Factura' : 'Guardar y Facturar'}
+                    </button>
+                )}
             </div>
         </div>
     )

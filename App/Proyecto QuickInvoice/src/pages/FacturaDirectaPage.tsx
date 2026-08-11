@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { HelpButton } from '../components/help/HelpButton'
 import { preparacionPinturaService } from '../services/preparacionPinturaService'
 import { useFormDraft } from '../hooks/useFormDraft'
@@ -25,7 +25,7 @@ import {
     Search, UserPlus, Plus, Trash2, X, Save,
     CheckCircle2, Loader2, FilePlus, FileText, CreditCard,
     Package, Printer, User, Briefcase, ChevronDown, ChevronUp,
-    Layers, RotateCw,
+    Layers, RotateCw, PaintBucket,
 } from 'lucide-react'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { bodegaService } from '../services/bodegaService'
@@ -79,8 +79,9 @@ const DETALLE_VACIO: DetalleFacturaDirecta = {
 
 export function FacturaDirectaPage() {
     const [searchParams] = useSearchParams()
+    const navigate = useNavigate()
     const prepId = searchParams.get('prep_id')
-    const { empresa, cajaSesion, profile } = useAuth()
+    const { empresa, cajaSesion, profile, permisos } = useAuth()
     const { enabled: vozIaHabilitada } = useIaFeatureEnabled('voz')
     const { isOnline } = useNetworkStatus()
     const [offlineSaved, setOfflineSaved] = useState(false)
@@ -996,6 +997,13 @@ export function FacturaDirectaPage() {
                                     className="text-primary-600 hover:text-primary-700 flex items-center gap-1 text-sm font-bold">
                                     <Plus className="w-4 h-4" /> Agregar línea
                                 </button>
+                                {permisos.perm_preparaciones_pintura && (
+                                    <button onClick={() => navigate('/preparaciones-pintura/nueva?origen=factura')}
+                                        className="text-violet-600 hover:text-violet-700 p-1.5 -m-1.5 rounded-lg hover:bg-violet-50 transition-colors"
+                                        title="Preparar Pintura">
+                                        <PaintBucket className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
 
