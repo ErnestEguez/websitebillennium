@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { HelpButton } from '../components/help/HelpButton'
 import { sriService } from '../services/sriService'
@@ -28,10 +29,37 @@ import {
     Trash2,
     WifiOff,
     AlertTriangle,
+    MoreVertical,
 } from 'lucide-react'
 import { format } from 'date-fns'
 
 import { useAuth } from '../contexts/AuthContext'
+
+// Menú de acciones por fila — se renderiza en un portal a document.body para que
+// nunca quede recortado por el overflow-hidden de la tarjeta que envuelve la
+// tabla, sin importar la resolución de pantalla ni el scroll horizontal.
+function ComprobanteAccionesMenu({ triggerRect, onClose, children }: {
+    triggerRect: DOMRect
+    onClose: () => void
+    children: React.ReactNode
+}) {
+    const MENU_W = 248
+    const left = Math.min(Math.max(8, triggerRect.right - MENU_W), window.innerWidth - MENU_W - 8)
+    const top  = Math.min(triggerRect.bottom + 4, window.innerHeight - 8)
+
+    return createPortal(
+        <>
+            <div className="fixed inset-0 z-[9995]" onClick={onClose} />
+            <div
+                className="fixed z-[9996] bg-white rounded-xl border border-slate-200 shadow-xl py-1.5"
+                style={{ left, top, width: MENU_W, maxHeight: '70vh', overflowY: 'auto' }}
+            >
+                {children}
+            </div>
+        </>,
+        document.body
+    )
+}
 
 export function InvoicingPage() {
     const { empresa, profile } = useAuth()
@@ -41,6 +69,8 @@ export function InvoicingPage() {
     const [anulando, setAnulando] = useState<string | null>(null)
     const [eliminando, setEliminando] = useState<string | null>(null)
     const [resendingEmail, setResendingEmail] = useState<string | null>(null)
+    const [menuAbierto, setMenuAbierto] = useState<string | null>(null)
+    const [menuRect, setMenuRect] = useState<DOMRect | null>(null)
     const [search, setSearch] = useState('')
     const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
     const [sriConfig, setSriConfig] = useState<Partial<SriConfig>>({})
@@ -461,111 +491,126 @@ export function InvoicingPage() {
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {doc.estado_sri !== 'AUTORIZADO' && (
+                                        <button
+                                            onClick={(e) => {
+                                                const rect = e.currentTarget.getBoundingClientRect()
+                                                if (menuAbierto === doc.id) { setMenuAbierto(null) }
+                                                else { setMenuRect(rect); setMenuAbierto(doc.id) }
+                                            }}
+                                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 text-xs font-semibold transition-colors"
+                                        >
+                                            <MoreVertical className="w-4 h-4" /> Opciones
+                                        </button>
+
+                                        {menuAbierto === doc.id && menuRect && (
+                                            <ComprobanteAccionesMenu triggerRect={menuRect} onClose={() => setMenuAbierto(null)}>
+                                                {doc.estado_sri !== 'AUTORIZADO' && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            setMenuAbierto(null);
+                                                            setLoading(true);
+                                                            try {
+                                                                const { data, error } = await (supabase as any).functions.invoke('sri-signer', {
+                                                                    body: { comprobante_id: doc.id }
+                                                                });
+                                                                if (error) throw error;
+                                                                if (data?.authorized) {
+                                                                    alert('¡Factura AUTORIZADA correctamente!\nNúmero: ' + (data.autorizacion_numero || ''));
+                                                                } else if (data?.estado_sri === 'ENVIADO') {
+                                                                    alert('SRI en procesamiento. Reintente en 2 minutos.');
+                                                                } else if (data?.success === false) {
+                                                                    alert('Error SRI: ' + (data.error || data.message || 'Sin detalle'));
+                                                                } else {
+                                                                    alert('Aún no autorizado: ' + (data?.message || 'Sin mensaje'));
+                                                                }
+                                                            } catch (e: any) {
+                                                                alert('Error de conexión: ' + e.message);
+                                                            } finally {
+                                                                setLoading(false);
+                                                                loadData();
+                                                            }
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-orange-700 hover:bg-orange-50 transition-colors"
+                                                    >
+                                                        <RotateCw className="w-4 h-4 shrink-0" /> Reintentar / Consultar SRI
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={async () => {
-                                                        setLoading(true);
+                                                        setMenuAbierto(null);
                                                         try {
-                                                            const { data, error } = await (supabase as any).functions.invoke('sri-signer', {
-                                                                body: { comprobante_id: doc.id }
-                                                            });
-                                                            if (error) throw error;
-                                                            if (data?.authorized) {
-                                                                alert('¡Factura AUTORIZADA correctamente!\nNúmero: ' + (data.autorizacion_numero || ''));
-                                                            } else if (data?.estado_sri === 'ENVIADO') {
-                                                                alert('SRI en procesamiento. Reintente en 2 minutos.');
-                                                            } else if (data?.success === false) {
-                                                                alert('Error SRI: ' + (data.error || data.message || 'Sin detalle'));
-                                                            } else {
-                                                                alert('Aún no autorizado: ' + (data?.message || 'Sin mensaje'));
-                                                            }
-                                                        } catch (e: any) {
-                                                            alert('Error de conexión: ' + e.message);
-                                                        } finally {
-                                                            setLoading(false);
+                                                            await navigator.clipboard.writeText(doc.clave_acceso || '');
+                                                            const newState = await sriService.consultarEstadoComprobante(doc.id);
                                                             loadData();
+
+                                                            // Abrir portal directamente (como pidió el usuario)
+                                                            window.open('https://srienlinea.sri.gob.ec/comprobantes-electronicos-internet/publico/consultas/consultaComprobanteLibre.jsf', '_blank');
+
+                                                            alert(`Clave de acceso copiada al portapapeles.\nEstado actualizado: ${newState}`);
+                                                        } catch (e: any) {
+                                                            alert('Error: ' + e.message);
                                                         }
                                                     }}
-                                                    title="Reintentar / Consultar SRI"
-                                                    className="p-2 hover:bg-orange-50 rounded-lg text-orange-600 transition-colors"
+                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-primary-700 hover:bg-primary-50 transition-colors"
                                                 >
-                                                    <RotateCw className="w-4 h-4" />
+                                                    <Search className="w-4 h-4 shrink-0" /> Portal SRI / Copiar clave
                                                 </button>
-                                            )}
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        await navigator.clipboard.writeText(doc.clave_acceso || '');
-                                                        const newState = await sriService.consultarEstadoComprobante(doc.id);
-                                                        loadData();
-
-                                                        // Abrir portal directamente (como pidió el usuario)
-                                                        window.open('https://srienlinea.sri.gob.ec/comprobantes-electronicos-internet/publico/consultas/consultaComprobanteLibre.jsf', '_blank');
-
-                                                        alert(`Clave de acceso copiada al portapapeles.\nEstado actualizado: ${newState}`);
-                                                    } catch (e: any) {
-                                                        alert('Error: ' + e.message);
-                                                    }
-                                                }}
-                                                title="Ir a Portal SRI Oficial / Copiar Clave"
-                                                className="p-2 hover:bg-primary-50 rounded-lg text-primary-600 transition-colors"
-                                            >
-                                                <Search className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => sriService.descargarXml(doc.id, doc.secuencial)}
-                                                title="Descargar XML"
-                                                className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors"
-                                            >
-                                                <Key className="w-4 h-4" />
-                                            </button>
-                                            {doc.estado_sri === 'AUTORIZADO' && (
                                                 <button
-                                                    onClick={() => handleResendEmail(doc)}
-                                                    disabled={resendingEmail === doc.id}
-                                                    title="Reenviar correo al cliente"
-                                                    className="p-2 hover:bg-blue-50 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
+                                                    onClick={() => { setMenuAbierto(null); sriService.descargarXml(doc.id, doc.secuencial) }}
+                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-slate-700 hover:bg-slate-50 transition-colors"
                                                 >
-                                                    {resendingEmail === doc.id
-                                                        ? <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                                                        : <Mail className="w-4 h-4" />
-                                                    }
+                                                    <Key className="w-4 h-4 shrink-0" /> Descargar XML
                                                 </button>
-                                            )}
-                                            <Link to={`/comprobante/${doc.id}/print`} title="Ver RIDE PDF" className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors">
-                                                <FileText className="w-4 h-4" />
-                                            </Link>
-                                            <Link to={`/comprobante/${doc.id}/ticket?auto=true`} title="Imprimir Ticket" className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-primary-600 transition-colors">
-                                                <Printer className="w-4 h-4" />
-                                            </Link>
-                                            {doc.estado_sistema !== 'ANULADA' && (
-                                                <button
-                                                    onClick={() => handleAnular(doc)}
-                                                    disabled={anulando === doc.id}
-                                                    title="Anular factura"
-                                                    className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600 transition-colors"
-                                                >
-                                                    {anulando === doc.id
-                                                        ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                                                        : <Ban className="w-4 h-4" />
-                                                    }
-                                                </button>
-                                            )}
-                                            {doc.estado_sri !== 'AUTORIZADO' && (
-                                                <button
-                                                    onClick={() => handleEliminar(doc)}
-                                                    disabled={eliminando === doc.id}
-                                                    title="Eliminar (solo si no está autorizada)"
-                                                    className="p-2 hover:bg-red-100 rounded-lg text-red-400 hover:text-red-700 transition-colors"
-                                                >
-                                                    {eliminando === doc.id
-                                                        ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                                                        : <Trash2 className="w-4 h-4" />
-                                                    }
-                                                </button>
-                                            )}
-                                        </div>
+                                                {doc.estado_sri === 'AUTORIZADO' && (
+                                                    <button
+                                                        onClick={() => { setMenuAbierto(null); handleResendEmail(doc) }}
+                                                        disabled={resendingEmail === doc.id}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-blue-700 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {resendingEmail === doc.id
+                                                            ? <div className="w-4 h-4 shrink-0 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                                            : <Mail className="w-4 h-4 shrink-0" />
+                                                        }
+                                                        Reenviar correo al cliente
+                                                    </button>
+                                                )}
+                                                <Link to={`/comprobante/${doc.id}/print`} onClick={() => setMenuAbierto(null)}
+                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-slate-700 hover:bg-slate-50 transition-colors">
+                                                    <FileText className="w-4 h-4 shrink-0" /> Ver RIDE (PDF)
+                                                </Link>
+                                                <Link to={`/comprobante/${doc.id}/ticket?auto=true`} onClick={() => setMenuAbierto(null)}
+                                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-slate-700 hover:bg-slate-50 transition-colors font-semibold">
+                                                    <Printer className="w-4 h-4 shrink-0" /> Imprimir Ticket
+                                                </Link>
+                                                {doc.estado_sistema !== 'ANULADA' && (
+                                                    <button
+                                                        onClick={() => { setMenuAbierto(null); handleAnular(doc) }}
+                                                        disabled={anulando === doc.id}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {anulando === doc.id
+                                                            ? <div className="w-4 h-4 shrink-0 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                                                            : <Ban className="w-4 h-4 shrink-0" />
+                                                        }
+                                                        Anular factura
+                                                    </button>
+                                                )}
+                                                {doc.estado_sri !== 'AUTORIZADO' && (
+                                                    <button
+                                                        onClick={() => { setMenuAbierto(null); handleEliminar(doc) }}
+                                                        disabled={eliminando === doc.id}
+                                                        title="Solo si no está autorizada"
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {eliminando === doc.id
+                                                            ? <div className="w-4 h-4 shrink-0 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                                                            : <Trash2 className="w-4 h-4 shrink-0" />
+                                                        }
+                                                        Eliminar
+                                                    </button>
+                                                )}
+                                            </ComprobanteAccionesMenu>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
