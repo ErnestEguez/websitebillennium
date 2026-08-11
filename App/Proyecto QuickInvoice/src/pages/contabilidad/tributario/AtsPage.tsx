@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
     FileDown, Loader2, AlertCircle, CheckCircle, X,
-    FileText, ShoppingCart, Receipt, ChevronDown, ChevronUp, Info,
+    FileText, ShoppingCart, Receipt, ChevronDown, ChevronUp, Info, Ban,
 } from 'lucide-react'
 import { supabase as supabaseConta } from '../../../lib/supabaseContabilidad'
 import { supabase } from '../../../lib/supabase'
@@ -102,6 +102,18 @@ function tipoCompSRI(tipo: SriComp['tipo']): string {
     }
 }
 
+// Documento propio (emitido por nosotros) anulado — candidato para <anulados>.
+// El contador decide caso por caso cuáles reportar (checklist vacío por defecto).
+interface AnuladoCandidato {
+    id: string
+    origen: 'nota_credito' | 'liquidacion_compra'
+    tipoComprobante: string   // '04' N/C propia, '03' Liquidación de Compra
+    descripcion: string
+    numero: string            // "est-pto-sec"
+    autorizacion: string
+    fecha: string
+}
+
 // ── Generador XML ATS v1.31 ────────────────────────────────────────────────
 
 interface VentaAts {
@@ -121,8 +133,9 @@ function generarXmlAts(params: {
     mes: number
     compras: SriComp[]
     ventas: VentaAts[]
+    anulados: AnuladoCandidato[]
 }): string {
-    const { ruc, razonSocial, año, mes, compras, ventas } = params
+    const { ruc, razonSocial, año, mes, compras, ventas, anulados } = params
 
     const mesStr = String(mes).padStart(2, '0')
 
@@ -232,7 +245,21 @@ ${ventas.map(v => {
       <ventasEstab>${f2(ventas.reduce((s, v) => s + v.base_cero + v.base_iva + v.iva, 0))}</ventasEstab>
       <ivaComp>${f2(ventas.reduce((s, v) => s + v.iva, 0))}</ivaComp>
     </ventaEst>
-  </ventasEstablecimiento>
+  </ventasEstablecimiento>${anulados.length > 0 ? `
+  <anulados>
+${anulados.map(a => {
+    const { estab, ptoEmi, sec } = parseNumero(a.numero)
+    const secPad = sec.padStart(9, '0')
+    return `    <detalleAnulados>
+      <tipoComprobante>${a.tipoComprobante}</tipoComprobante>
+      <establecimiento>${estab}</establecimiento>
+      <puntoEmision>${ptoEmi}</puntoEmision>
+      <secuencialInicio>${secPad}</secuencialInicio>
+      <secuencialFin>${secPad}</secuencialFin>
+      <autorizacion>${a.autorizacion}</autorizacion>
+    </detalleAnulados>`
+}).join('\n')}
+  </anulados>` : ''}
 </iva>`
 }
 
@@ -255,12 +282,15 @@ export function AtsPage() {
     const [compras, setCompras]         = useState<SriComp[]>([])
     const [retenciones, setRetenciones] = useState<SriComp[]>([])
     const [ventasAts, setVentasAts]     = useState<VentaAts[]>([])
+    const [anulados, setAnulados]       = useState<AnuladoCandidato[]>([])
+    // Checklist vacío por defecto — el contador decide caso por caso cuáles reportar.
+    const [anuladosSeleccionados, setAnuladosSeleccionados] = useState<Set<string>>(new Set())
     const [cargando, setCargando]       = useState(false)
     const [error, setError]             = useState('')
     const [ok, setOk]                   = useState('')
 
     const [excluirVentas, setExcluirVentas] = useState(false)
-    const [tabVista, setTabVista] = useState<'compras' | 'ventas' | 'retenciones'>('compras')
+    const [tabVista, setTabVista] = useState<'compras' | 'ventas' | 'retenciones' | 'anulados'>('compras')
     const [expandido, setExpandido] = useState<string | null>(null)
 
     const sym = empresaActiva?.moneda?.simbolo ?? '$'
@@ -421,7 +451,45 @@ export function AtsPage() {
             })
         }
 
-        // Fuente 6: Facturación directa — ventas (agrupadas por cliente para ATS)
+        // Fuente 6: Documentos propios anulados (candidatos para el checklist de <anulados>)
+        // Solo lo que YA está confirmado como anulado en el sistema: N/C propias y
+        // Liquidaciones de Compra (ambas las emitimos nosotros, llevan numeración SRI
+        // propia). Facturas de venta anuladas no están implementadas todavía.
+        let candidatosAnulados: AnuladoCandidato[] = []
+        if (empresa?.id) {
+            const [{ data: ncAnuladas }, { data: liqAnuladas }] = await Promise.all([
+                supabase.from('notas_credito')
+                    .select('id, secuencial, clave_acceso, fecha_anulacion')
+                    .eq('empresa_id', empresa.id).eq('estado_sistema', 'ANULADA')
+                    .gte('fecha_anulacion', desde).lte('fecha_anulacion', hasta + 'T23:59:59'),
+                supabase.from('liquidaciones_compra')
+                    .select('id, establecimiento, punto_emision, secuencial, clave_acceso, fecha_emision')
+                    .eq('empresa_id', empresa.id).eq('estado_sri', 'ANULADO')
+                    .gte('fecha_emision', desde).lte('fecha_emision', hasta),
+            ])
+            candidatosAnulados = [
+                ...(ncAnuladas ?? []).map((r: any): AnuladoCandidato => ({
+                    id: `nc-${r.id}`,
+                    origen: 'nota_credito',
+                    tipoComprobante: '04',
+                    descripcion: `N/C propia ${r.secuencial}`,
+                    numero: r.secuencial ?? '',
+                    autorizacion: r.clave_acceso ?? '',
+                    fecha: r.fecha_anulacion ?? '',
+                })),
+                ...(liqAnuladas ?? []).map((r: any): AnuladoCandidato => ({
+                    id: `liq-${r.id}`,
+                    origen: 'liquidacion_compra',
+                    tipoComprobante: '03',
+                    descripcion: `Liquidación de Compra ${r.establecimiento}-${r.punto_emision}-${r.secuencial}`,
+                    numero: `${r.establecimiento}-${r.punto_emision}-${r.secuencial}`,
+                    autorizacion: r.clave_acceso ?? '',
+                    fecha: r.fecha_emision ?? '',
+                })),
+            ]
+        }
+
+        // Fuente 7: Facturación directa — ventas (agrupadas por cliente para ATS)
         let ventasAgrupadas: VentaAts[] = []
         if (empresa?.id) {
             const { data } = await supabase
@@ -465,7 +533,17 @@ export function AtsPage() {
         setCompras(todasCompras)
         setRetenciones(sriRetenciones)
         setVentasAts(ventasAgrupadas)
+        setAnulados(candidatosAnulados)
+        setAnuladosSeleccionados(new Set())  // checklist vacío en cada recarga de período
         setCargando(false)
+    }
+
+    function toggleAnulado(id: string) {
+        setAnuladosSeleccionados(prev => {
+            const next = new Set(prev)
+            next.has(id) ? next.delete(id) : next.add(id)
+            return next
+        })
     }
 
     function descargarXml() {
@@ -478,6 +556,7 @@ export function AtsPage() {
         const razon = empresaActiva?.razon_social ?? empresaActiva?.nombre ?? empresa?.nombre ?? ''
 
         const ventasParaXml = excluirVentas ? [] : ventasAts
+        const anuladosParaXml = anulados.filter(a => anuladosSeleccionados.has(a.id))
 
         const xml = generarXmlAts({
             ruc: rucDeclarante,
@@ -486,6 +565,7 @@ export function AtsPage() {
             mes,
             compras,
             ventas: ventasParaXml,
+            anulados: anuladosParaXml,
         })
 
         const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' })
@@ -495,7 +575,7 @@ export function AtsPage() {
         a.download = `ATS_${rucDeclarante}_${año}${String(mes).padStart(2, '0')}.xml`
         a.click()
         URL.revokeObjectURL(url)
-        setOk(`ATS generado: ${compras.length} compra(s)${excluirVentas ? ' (ventas excluidas)' : `, ${ventasAts.reduce((s, v) => s + v.cantidad, 0)} venta(s)`}`)
+        setOk(`ATS generado: ${compras.length} compra(s)${excluirVentas ? ' (ventas excluidas)' : `, ${ventasAts.reduce((s, v) => s + v.cantidad, 0)} venta(s)`}${anuladosParaXml.length > 0 ? `, ${anuladosParaXml.length} anulado(s)` : ''}`)
     }
 
     // ── Totales ────────────────────────────────────────────────────────────
@@ -621,6 +701,7 @@ export function AtsPage() {
                         ['compras',     `Compras (${compras.length})`,                                         ShoppingCart],
                         ['ventas',      `Ventas (${ventasAts.reduce((s, v) => s + v.cantidad, 0)})`,           Receipt],
                         ['retenciones', `Retenciones (${retenciones.length})`,                                 FileText],
+                        ['anulados',    `Anulados (${anuladosSeleccionados.size}/${anulados.length})`,          Ban],
                     ] as const).map(([id, label, Icon]) => (
                         <button key={id} type="button" onClick={() => setTabVista(id)}
                             className={cn('flex items-center gap-2 px-5 py-2.5 border-l border-slate-200 first:border-l-0',
@@ -878,6 +959,65 @@ export function AtsPage() {
                         )}
                     </div>
                 )}
+
+                {/* ── Tabla ANULADOS (checklist) ── */}
+                {tabVista === 'anulados' && (
+                    <div className="card overflow-hidden">
+                        <div className="bg-slate-700 px-5 py-3 text-white font-bold text-sm">
+                            Documentos propios anulados — {mesNombre(mes)} {año}
+                        </div>
+                        <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 text-xs text-amber-700">
+                            Marca solo los que quieras reportar en <code>&lt;anulados&gt;</code>. Ninguno viene
+                            seleccionado por defecto — decide caso por caso antes de generar el XML.
+                        </div>
+                        {cargando ? (
+                            <div className="py-10 text-center text-slate-400">
+                                <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Cargando...
+                            </div>
+                        ) : anulados.length === 0 ? (
+                            <div className="py-10 text-center text-slate-400">
+                                <Ban className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                Sin N/C propias o Liquidaciones de Compra anuladas para este período.
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-slate-50 border-b text-xs text-slate-500 uppercase tracking-wide">
+                                            <th className="py-2 px-3 w-10" />
+                                            <th className="py-2 px-3 text-left">Documento</th>
+                                            <th className="py-2 px-3 text-left">Fecha</th>
+                                            <th className="py-2 px-3 text-center">ATS TP</th>
+                                            <th className="py-2 px-3 text-left">Autorización</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {anulados.map(a => (
+                                            <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                                <td className="py-2 px-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={anuladosSeleccionados.has(a.id)}
+                                                        onChange={() => toggleAnulado(a.id)}
+                                                        className="w-4 h-4 rounded border-slate-300 text-primary-600"
+                                                    />
+                                                </td>
+                                                <td className="py-2 px-3 text-xs font-medium text-slate-700">{a.descripcion}</td>
+                                                <td className="py-2 px-3 text-xs text-slate-500">{a.fecha}</td>
+                                                <td className="py-2 px-3 text-center">
+                                                    <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                                        {a.tipoComprobante}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2 px-3 font-mono text-xs text-slate-500 break-all">{a.autorizacion || '(sin autorización)'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Nota informativa */}
@@ -891,9 +1031,7 @@ export function AtsPage() {
                         <li><strong>N/C y N/D de proveedores:</strong> solo estado <strong>ACTIVA</strong> (las anuladas no se declaran). Incluyen el documento que modifican (<code>docModificado</code>) cuando la compra original está vinculada en el sistema.</li>
                         <li><strong>Ventas:</strong> se toman automáticamente de las facturas emitidas en QuickInvoice, agrupadas por cliente — sin cambios.</li>
                         <li>El <code>codSustento</code> se declara <strong>03</strong> para Liquidaciones y <strong>01</strong> por defecto para el resto.</li>
-                        <li className="text-amber-700">
-                            <strong>Pendiente de confirmar:</strong> el bloque <code>&lt;anulados&gt;</code> (documentos propios — facturas, liquidaciones, N/C — emitidos y luego anulados) todavía no está implementado. Avísame si tienes un XML de muestra con ese bloque para agregarlo.
-                        </li>
+                        <li><strong>Anulados:</strong> pestaña con checklist (vacío por defecto) de N/C propias y Liquidaciones de Compra marcadas como anuladas en el período — tú decides cuáles entran al <code>&lt;anulados&gt;</code> del XML. Facturas de venta anuladas todavía no están disponibles porque esa función no existe aún en el sistema.</li>
                         <li>Verifica que el RUC y razón social de la empresa estén correctos en Configuración antes de declarar.</li>
                     </ul>
                 </div>
