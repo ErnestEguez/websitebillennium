@@ -7,6 +7,7 @@ import {
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
+import { HelpButton } from '../../../components/help/HelpButton'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -300,6 +301,7 @@ export function Formulario103DetallePage() {
                         {empresaActiva?.razon_social ?? empresaActiva?.nombre} — RUC: {empresaActiva?.ruc ?? '—'}
                     </p>
                 </div>
+                <HelpButton pageKey="formulario-103" />
                 {/* Resumen rápido */}
                 {totalRetenido > 0 && (
                     <div className="card px-4 py-2 bg-purple-50 border-purple-200 text-center">

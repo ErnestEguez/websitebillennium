@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { HelpButton } from '../components/help/HelpButton'
 import { useFormDraft } from '../hooks/useFormDraft'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -329,7 +330,7 @@ export function NuevaPreparacionPinturaPage() {
                 <button onClick={() => navigate(urlOrigen)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                     <ArrowLeft className="w-5 h-5 text-slate-500" />
                 </button>
-                <div>
+                <div className="flex-1">
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <FlaskConical className="w-6 h-6 text-primary-600" />
                         Nueva Preparación de Pintura
@@ -340,6 +341,7 @@ export function NuevaPreparacionPinturaPage() {
                         {origen === 'proforma' && ' · agregando a la proforma en curso'}
                     </p>
                 </div>
+                <HelpButton pageKey="preparaciones-pintura" />
             </div>
 
             {/* Alerta si no hay código configurado */}

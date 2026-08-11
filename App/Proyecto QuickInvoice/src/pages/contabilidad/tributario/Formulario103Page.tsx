@@ -7,6 +7,7 @@ import {
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
+import { HelpButton } from '../../../components/help/HelpButton'
 
 interface Declaracion103 {
     id:               string
@@ -140,6 +141,7 @@ export function Formulario103Page() {
                             <option key={y} value={y}>{y}</option>
                         )}
                     </select>
+                    <HelpButton pageKey="formulario-103" />
                 </div>
             </div>
 

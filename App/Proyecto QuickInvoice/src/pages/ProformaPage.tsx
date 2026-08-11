@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { HelpButton } from '../components/help/HelpButton'
 import { useFormDraft } from '../hooks/useFormDraft'
 import { preparacionPinturaService } from '../services/preparacionPinturaService'
 import { useAuth } from '../contexts/AuthContext'
@@ -712,6 +713,9 @@ export function ProformaPage() {
                         Proformas
                     </h1>
                     <p className="text-slate-500 text-sm">Cotizaciones y presupuestos para clientes</p>
+                </div>
+                <div className="flex items-center gap-2 self-start">
+                    <HelpButton pageKey="proformas" />
                 </div>
 
                 {/* Toggle Factura / Proforma */}

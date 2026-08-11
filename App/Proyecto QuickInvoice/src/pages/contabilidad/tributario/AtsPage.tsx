@@ -5,6 +5,7 @@ import {
     FileText, ShoppingCart, Receipt, ChevronDown, ChevronUp, Info, Ban,
     FileMinus, FilePlus,
 } from 'lucide-react'
+import { HelpButton } from '../../../components/help/HelpButton'
 import { supabase as supabaseConta } from '../../../lib/supabaseContabilidad'
 import { supabase } from '../../../lib/supabase'
 import { useAuth as useContaAuth } from '../../../contexts/contabilidad/ContabilidadContext'
@@ -751,6 +752,7 @@ export function AtsPage() {
                         Genera el XML para declaración mensual ante el SRI (versión 1.31)
                     </p>
                 </div>
+                <HelpButton pageKey="ats" />
             </div>
 
             {/* Alertas */}

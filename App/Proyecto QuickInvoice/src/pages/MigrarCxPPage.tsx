@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { formatCurrency } from '../lib/utils'
+import { HelpButton } from '../components/help/HelpButton'
 
 /* ── Tipos ──────────────────────────────────────────────────────────────── */
 
@@ -380,12 +381,15 @@ export function MigrarCxPPage() {
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             {/* Header */}
-            <div className="flex items-center gap-3">
-                <Truck className="w-7 h-7 text-primary-600" />
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Migración de Deuda a Proveedores</h1>
-                    <p className="text-sm text-slate-500 mt-0.5">Importa cuentas por pagar pendientes desde un sistema externo</p>
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <Truck className="w-7 h-7 text-primary-600" />
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-800">Migración de Deuda a Proveedores</h1>
+                        <p className="text-sm text-slate-500 mt-0.5">Importa cuentas por pagar pendientes desde un sistema externo</p>
+                    </div>
                 </div>
+                <HelpButton pageKey="migrar-cxp" />
             </div>
 
             {/* Banner: migración SQL pendiente */}

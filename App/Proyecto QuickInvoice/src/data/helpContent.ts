@@ -25,6 +25,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                     'Usa "Consumidor Final" (clic en el botón rápido) para ventas sin datos del comprador.',
                     'Puedes facturar a crédito solo a clientes con identificación registrada.',
                 ],
+                alerta: 'Si el cliente tiene cartera vencida o por vencer, aparece un aviso automático al seleccionarlo, antes de continuar con la factura.',
             },
             {
                 titulo: '2. Agregar productos',
@@ -32,6 +33,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                 tips: [
                     'Puedes agregar múltiples artículos antes de emitir.',
                     'Los artículos se descuentan del inventario automáticamente al emitir.',
+                    'El botón del bote de pintura (junto a "Agregar línea") abre el formulario de Preparación de Pinturas sin perder la factura en curso — al guardar, regresas aquí con la línea ya agregada. Puedes repetirlo varias veces para varias preparaciones.',
                 ],
             },
             {
@@ -91,6 +93,9 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             {
                 titulo: '1. Selecciona la factura de compra origen',
                 texto: 'Busca por número de factura del proveedor. Toda N/C debe referenciar la compra a la que corresponde.',
+                tips: [
+                    'Una vez elegida la factura, puedes usar "Escanear factura" para subir el PDF o foto de la N/C física del proveedor — la IA completa número, fecha y valores automáticamente.',
+                ],
             },
             {
                 titulo: '2. Elige el tipo de N/C',
@@ -109,8 +114,37 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                 texto: 'Usa el botón "Ver N/C Registradas" para buscar y revisar notas de crédito ya ingresadas sin perder lo que estás digitando en el formulario actual.',
             },
             {
+                titulo: 'Anular una N/C',
+                texto: 'Desde el listado de N/C registradas, usa el botón "Anular" e ingresa el motivo. La anulación revierte el saldo que esa N/C haya aplicado a la cuenta por pagar de la factura origen — el saldo pendiente vuelve a quedar como antes de aplicarla.',
+                alerta: 'La anulación no se puede deshacer. Verifica el motivo antes de confirmar.',
+            },
+            {
                 titulo: 'Salir sin guardar',
                 texto: 'Si te equivocaste al elegir la factura o el tipo, usa "Finalizar Sin Grabar" para volver al listado sin registrar nada.',
+            },
+        ],
+    },
+
+    // ─── NOTAS DE DÉBITO DE PROVEEDORES ─────────────────────────────────────
+    'nd-proveedores': {
+        titulo: 'Notas de Débito de Proveedores',
+        subtitulo: 'Registra cargos adicionales que el proveedor te factura sobre una compra',
+        secciones: [
+            {
+                titulo: '¿Qué es una N/D de proveedor?',
+                texto: 'Una Nota de Débito es el documento que el proveedor te entrega para cobrarte un valor adicional sobre una compra ya realizada — intereses por mora, fletes no incluidos, ajustes de precio, etc. Aumenta lo que le debes al proveedor.',
+            },
+            {
+                titulo: 'Registrar una N/D',
+                texto: 'Selecciona el proveedor, ingresa el número de la N/D, fecha de emisión y número de autorización SRI del documento. Ingresa la base imponible y el IVA (el sistema calcula el total). Si la N/D corresponde a una factura de compra específica, búscala y selecciónala — queda vinculada a esa cuenta por pagar.',
+                tips: [
+                    'Usa "Escanear factura" para subir el PDF o foto de la N/D física del proveedor — la IA completa los datos automáticamente.',
+                    'Vincular la factura relacionada es opcional, pero recomendado para trazabilidad y para el ATS.',
+                ],
+            },
+            {
+                titulo: 'Historial',
+                texto: 'La pestaña "Historial" muestra todas las N/D registradas para la empresa, con su estado (ACTIVA o ANULADA).',
             },
         ],
     },
@@ -279,6 +313,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                 tips: [
                     'Las proformas no descuentan del inventario.',
                     'Puedes crear varias proformas para un mismo cliente.',
+                    'El botón del bote de pintura (junto a "Agregar línea") abre Preparación de Pinturas y regresa a esta proforma al guardar, igual que en Factura Directa.',
                 ],
             },
             {
@@ -459,19 +494,26 @@ export const AYUDA: Record<string, PaginaAyuda> = {
 
     // ─── PREPARACIONES DE PINTURA ───────────────────────────────────────────
     'preparaciones-pintura': {
-        titulo: 'Preparaciones de Pintura',
-        subtitulo: 'Control de preparados y fórmulas de color',
+        titulo: 'Preparación de Pinturas',
+        subtitulo: 'Mezcla de colores dentro de la misma factura o proforma',
         secciones: [
             {
-                titulo: 'Nueva preparación',
-                texto: 'Registra una preparación con: número de orden o factura asociada, color/fórmula, base utilizada, cantidad de insumos por componente y el cliente para el que se prepara. El sistema registra el consumo de insumos en el inventario.',
+                titulo: 'Cómo entrar (desde Factura o Proforma)',
+                texto: 'La forma normal de usar este módulo es desde el botón del bote de pintura, junto a "Agregar línea" en Nueva Factura o en Proforma. Te lleva directo al formulario de preparación — sin pasar por ningún listado — y al guardar regresas automáticamente a la factura o proforma de donde saliste, con la línea ya agregada.',
+                tips: [
+                    'Puedes repetir el botón varias veces para agregar varias preparaciones a la misma factura.',
+                    'Nada de lo que ya tenías escrito en la factura se pierde al ir y volver.',
+                ],
             },
             {
-                titulo: 'Historial de preparaciones',
-                texto: 'El listado muestra todas las preparaciones registradas con sus fórmulas. Sirve para repetir colores anteriores de un cliente. Filtra por fecha, cliente o color para encontrar preparaciones históricas.',
+                titulo: 'Insumos y producto final',
+                texto: 'Agrega cada insumo (Base o Mezcla) buscándolo en el catálogo, con su cantidad. El sistema calcula el costo total de producción. Describe el producto final (aparece tal cual en la factura), la presentación y la cantidad producida, y el precio de venta con IVA.',
+            },
+            {
+                titulo: 'Guardar',
+                texto: 'Si entraste desde una factura, el botón principal dice "Guardar y Volver a la Factura"; si entraste desde una proforma, "Guardar y Volver a la Proforma". "Solo Guardar" deja la preparación lista sin comprometerla a ninguna, para decidir después. "Cancelar" regresa a la factura/proforma sin guardar nada.',
                 tips: [
-                    'Puedes reutilizar una preparación anterior como base para una nueva.',
-                    'El historial permite garantizar la consistencia de color entre preparaciones.',
+                    'Al guardar, se registra automáticamente la salida de los insumos usados en el Kardex.',
                 ],
             },
         ],
@@ -521,14 +563,18 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
             {
                 titulo: 'Cabecera de la compra',
-                texto: 'Selecciona el proveedor del catálogo. Ingresa: número de factura del proveedor, fecha de emisión de la factura (no la fecha de hoy, sino la del documento físico), número de autorización SRI del documento y la fecha de vencimiento del pago si es a crédito.',
+                texto: 'Selecciona el proveedor del catálogo. Ingresa: número de factura del proveedor, fecha de emisión de la factura (no la fecha de hoy, sino la del documento físico), número de autorización SRI del documento y la fecha de vencimiento del pago si es a crédito. El campo "Tipo de documento (SRI)" identifica si es factura, liquidación de compra u otro documento según la tabla 4 del SRI — normalmente queda en Factura.',
+                tips: [
+                    'Usa "Escanear factura" para subir el PDF o una foto de la factura del proveedor — la IA lee proveedor, número, fecha, autorización y líneas, y llena el formulario automáticamente. Revisa siempre lo que trae antes de guardar.',
+                ],
             },
             {
                 titulo: 'Detalle de productos',
-                texto: 'Agrega cada artículo comprado: selecciona del catálogo de productos, ingresa cantidad y precio unitario de costo (sin IVA). El sistema calcula el subtotal, el IVA y el total. Si el artículo no está en el catálogo, puedes crearlo desde la misma pantalla.',
+                texto: 'Agrega cada artículo comprado: selecciona del catálogo de productos, ingresa cantidad y precio unitario de costo (sin IVA). El sistema calcula el subtotal, el IVA y el total. Si el artículo no está en el catálogo, puedes crearlo desde la misma pantalla, indicando su Unidad y Categoría — estos dos campos solo son editables cuando el artículo es nuevo.',
                 tips: [
                     'El precio de costo ingresado actualiza el costo promedio del artículo en inventario.',
                     'Revisa bien las cantidades — un error aquí desajusta el stock.',
+                    'Al hacer clic en Cantidad o Costo, el valor existente se selecciona completo — puedes escribir directo encima sin tener que borrarlo primero.',
                 ],
             },
             {
@@ -695,7 +741,10 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
             {
                 titulo: 'Registrar la compra',
-                texto: 'Selecciona el proveedor. Ingresa número de factura, fecha de emisión y número de autorización SRI. En el detalle, describe el servicio adquirido, el valor y el IVA. Indica si aplica retención — el sistema generará el comprobante de retención automáticamente.',
+                texto: 'Selecciona el proveedor. Ingresa número de factura, fecha de emisión y número de autorización SRI. El campo "Tipo de documento (SRI)" identifica el tipo de comprobante según la tabla 4 del SRI. En el detalle, describe el servicio adquirido, el valor y el IVA. Indica si aplica retención — el sistema generará el comprobante de retención automáticamente.',
+                tips: [
+                    'Usa "Escanear factura" para subir el PDF o una foto de la factura del proveedor — la IA extrae los datos y llena el formulario automáticamente (misma herramienta que en Compras de Inventario).',
+                ],
             },
             {
                 titulo: 'Cuenta contable del gasto',
@@ -1475,6 +1524,125 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                     'La LC autorizada puede verse y descargarse desde la lista de Liquidaciones de Compra.',
                     'El RIDE de la LC es el documento oficial para sustentar el gasto.',
                 ],
+            },
+        ],
+    },
+
+    // ─── ATS — ANEXO TRANSACCIONAL SIMPLIFICADO ─────────────────────────────
+    'ats': {
+        titulo: 'ATS — Anexo Transaccional Simplificado',
+        subtitulo: 'Genera el XML mensual de compras, ventas y retenciones para el SRI',
+        secciones: [
+            {
+                titulo: '¿Qué es el ATS?',
+                texto: 'El Anexo Transaccional Simplificado es la declaración mensual que resume todas las compras, ventas, retenciones y comprobantes anulados de la empresa, exigida por el SRI. Esta pantalla arma el XML automáticamente a partir de lo registrado en el sistema — revisa cada pestaña antes de generar y descargar.',
+            },
+            {
+                titulo: 'Pestaña Compras',
+                texto: 'Muestra facturas de compra y Liquidaciones de Compra del período. Se combinan las registradas en QuickInvoice con lo importado desde el CSV del SRI (sin duplicar). Cada fila muestra el código de tipo de comprobante que va al XML (01 Factura, 03 Liquidación de Compra).',
+            },
+            {
+                titulo: 'Pestañas N/C y N/D Proveedores',
+                texto: 'Notas de crédito y de débito de proveedores registradas en el período, separadas del resto de compras para que sean fáciles de revisar antes de declarar. Solo se incluyen las que están en estado ACTIVA — las anuladas no se declaran.',
+            },
+            {
+                titulo: 'Pestaña Ventas',
+                texto: 'Facturas de venta emitidas en QuickInvoice, agrupadas por cliente. Se puede excluir del XML con la casilla "Excluir ventas del ATS" si vas a declararlas por otro medio.',
+            },
+            {
+                titulo: 'Pestaña Retenciones',
+                texto: 'Retenciones recibidas de tus clientes en el período (importadas desde el CSV del SRI en Integración SRI).',
+            },
+            {
+                titulo: 'Pestaña Anulados',
+                texto: 'Checklist de documentos propios (N/C propias y Liquidaciones de Compra) marcados como anulados en el sistema. Ningún casillero viene marcado por defecto — decide caso por caso cuáles quieres incluir en el bloque de anulados del XML antes de generar.',
+                alerta: 'Solo marca en esta pestaña los documentos que realmente quieras declarar como anulados ante el SRI. Nada se incluye automáticamente.',
+            },
+            {
+                titulo: 'Generar y descargar',
+                texto: 'El botón "Generar y descargar ATS XML" arma el archivo con todo lo visible en las pestañas (respetando lo que hayas excluido o marcado). Verifica el RUC y razón social de la empresa en Configuración antes de declarar.',
+            },
+        ],
+    },
+
+    // ─── FORMULARIO 103 — RETENCIÓN EN LA FUENTE ────────────────────────────
+    'formulario-103': {
+        titulo: 'Formulario 103 — Retención en la Fuente',
+        subtitulo: 'Declaración mensual de retenciones de Impuesto a la Renta ante el SRI',
+        secciones: [
+            {
+                titulo: '¿Qué cubre este formulario?',
+                texto: 'El 103 declara únicamente la retención en la fuente de Impuesto a la Renta (IR) sobre pagos a proveedores locales. No incluye la retención de IVA que efectúas en compras — esa va en el Formulario 104 (casillero 605). Tampoco cubre pagos al exterior, dividendos ni banano.',
+            },
+            {
+                titulo: 'Crear una declaración',
+                texto: 'Elige el año y haz clic sobre el mes que quieras declarar. El sistema crea la declaración en estado Borrador con los 40 casilleros del formulario, todos en cero hasta que la recalcules.',
+            },
+            {
+                titulo: 'Recalcular',
+                texto: 'Dentro de la declaración, haz clic en "Recalcular" para que el sistema sume las retenciones de Impuesto a la Renta registradas en Compras durante ese mes y las distribuya en el casillero correcto según el código de retención de cada comprobante.',
+                alerta: 'Si acabas de crear la declaración y todo está en cero, es porque falta darle clic a "Recalcular" — no es automático.',
+            },
+            {
+                titulo: 'Ajustes manuales',
+                texto: 'Haz clic en el lápiz de cualquier casillero para ingresar un ajuste. El valor final mostrado es siempre calculado + ajuste. Los ajustes no se pierden si vuelves a recalcular.',
+            },
+            {
+                titulo: 'Descargar XML',
+                texto: 'El XML descargado es una hoja de referencia con el valor de cada casillero (incluida su descripción) para transcribir a mano en DIMM Formularios o SRI en Línea — no es un archivo de importación oficial del SRI.',
+            },
+        ],
+    },
+
+    // ─── FORMULARIO 104 — IVA ────────────────────────────────────────────────
+    'formulario-104': {
+        titulo: 'Formulario 104 — IVA',
+        subtitulo: 'Declaración mensual de IVA ante el SRI',
+        secciones: [
+            {
+                titulo: '¿Cómo se arma esta declaración?',
+                texto: 'Ventas y compras se calculan en vivo desde lo registrado en QuickInvoice (facturas, Liquidaciones de Compra, N/C y N/D de proveedores). Las retenciones de IVA que tus clientes te hicieron en ventas (casillero 601) vienen del CSV importado en Integración SRI.',
+            },
+            {
+                titulo: 'Crear y recalcular',
+                texto: 'Elige el mes a declarar (se crea en Borrador) y haz clic en "Recalcular" para traer los valores. Igual que en el 103, recalcular no es automático — hazlo cada vez que quieras actualizar los montos.',
+            },
+            {
+                titulo: 'Ajustes manuales',
+                texto: 'El lápiz de cada casillero permite un ajuste manual. El valor final = calculado + ajuste, y el ajuste se conserva aunque vuelvas a recalcular. Las secciones de Liquidación (IVA a pagar / crédito siguiente período) se recalculan solas.',
+            },
+            {
+                titulo: 'Descargar XML',
+                texto: 'Igual que en el 103: es una hoja de referencia con el valor y la descripción de cada casillero para transcribir en DIMM Formularios o SRI en Línea, no un archivo de importación oficial.',
+            },
+        ],
+    },
+
+    // ─── MIGRACIÓN DE DEUDA DE PROVEEDORES ──────────────────────────────────
+    'migrar-cxp': {
+        titulo: 'Migración de Deuda de Proveedores',
+        subtitulo: 'Carga masiva de cuentas por pagar pendientes desde un sistema anterior',
+        secciones: [
+            {
+                titulo: '¿Para qué sirve?',
+                texto: 'Permite cargar de una vez las deudas con proveedores que ya existían en tu sistema anterior, sin tener que registrar cada factura una por una en Compras.',
+            },
+            {
+                titulo: 'Formato del archivo',
+                texto: 'Descarga la plantilla CSV desde esta misma pantalla. Columnas: ruc_proveedor, nombre_proveedor (respaldo si el RUC no existe aún), numero_documento, fecha_emision, fecha_vencimiento, monto_original y saldo_pendiente. Puedes elegir el separador (punto y coma o coma) y los decimales aceptan coma o punto.',
+                tips: [
+                    'Si el RUC no existe como proveedor todavía, el sistema lo consulta automáticamente en el SRI y lo crea con la razón social encontrada.',
+                    'Si el SRI no responde, se usa el "nombre_proveedor" del CSV como respaldo — si faltan ambos, esa fila queda en error.',
+                ],
+            },
+            {
+                titulo: 'Antes de importar',
+                texto: 'Revisa las sumas de control que muestra la pantalla (total de monto_original y de saldo_pendiente) y compáralas contra la suma de tu Excel de origen antes de darle Importar.',
+                alerta: 'Las filas con saldo_pendiente en 0 se omiten automáticamente (se asume que ya están pagadas).',
+            },
+            {
+                titulo: 'Resultado',
+                texto: 'Al terminar, la pantalla muestra cuántos registros se importaron, cuántos proveedores nuevos se crearon, cuántos se omitieron y cuántos tuvieron error, con el detalle fila por fila.',
             },
         ],
     },
