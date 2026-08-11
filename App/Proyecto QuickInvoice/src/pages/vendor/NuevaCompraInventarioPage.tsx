@@ -415,6 +415,9 @@ export function NuevaCompraInventarioPage() {
     const b5  = usarIvaManual ? baseIva5  : 0
     const b15 = usarIvaManual ? baseIva15 : subtotalLineas
     const ivaCalc = Math.round((b5 * 0.05 + b15 * 0.15) * 100) / 100
+    // Desglose solo para mostrar en pantalla (ayuda a cuadrar contra la factura del proveedor) — no altera ivaCalc/total.
+    const iva5  = Math.round(b5  * 0.05 * 100) / 100
+    const iva15 = Math.round(b15 * 0.15 * 100) / 100
     const total   = subtotalLineas + ivaCalc
     const totalRet = retenciones.reduce((s, r) => s + r.valor, 0)
 
@@ -1169,10 +1172,21 @@ export function NuevaCompraInventarioPage() {
                         </div>
 
                         {/* Totales */}
-                        <div className="flex justify-between items-center border-t pt-3">
+                        <div className="flex justify-between items-start border-t pt-3">
                             <div className="space-y-0.5 text-sm text-slate-500">
-                                <p>Subtotal: <span className="font-mono text-slate-700">${subtotalLineas.toFixed(2)}</span></p>
-                                <p>IVA: <span className="font-mono text-slate-700">${ivaCalc.toFixed(2)}</span></p>
+                                {usarIvaManual ? (
+                                    <>
+                                        <p>Base 0%: <span className="font-mono text-slate-700">${b0.toFixed(2)}</span></p>
+                                        <p>Base 5%: <span className="font-mono text-slate-700">${b5.toFixed(2)}</span> &nbsp;IVA 5%: <span className="font-mono text-slate-700">${iva5.toFixed(2)}</span></p>
+                                        <p>Base 15%: <span className="font-mono text-slate-700">${b15.toFixed(2)}</span> &nbsp;IVA 15%: <span className="font-mono text-slate-700">${iva15.toFixed(2)}</span></p>
+                                        <p className="pt-1 mt-1 border-t border-slate-100">Subtotal: <span className="font-mono text-slate-700">${subtotalLineas.toFixed(2)}</span> &nbsp;IVA total: <span className="font-mono text-slate-700">${ivaCalc.toFixed(2)}</span></p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p>Subtotal: <span className="font-mono text-slate-700">${subtotalLineas.toFixed(2)}</span></p>
+                                        <p>IVA 15%: <span className="font-mono text-slate-700">${ivaCalc.toFixed(2)}</span></p>
+                                    </>
+                                )}
                                 {totalRet > 0 && <p>Total retenciones: <span className="font-mono text-amber-700">-${totalRet.toFixed(2)}</span></p>}
                                 {formaPago === 'CREDITO' && totalRet > 0 && (
                                     <p className="font-semibold text-slate-600">CxP a crédito: <span className="font-mono">${Math.max(total - totalRet, 0).toFixed(2)}</span></p>
