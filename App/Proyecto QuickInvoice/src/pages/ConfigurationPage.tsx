@@ -33,7 +33,9 @@ import {
     Download,
     Copy,
     CheckCheck,
+    TrendingUp,
 } from 'lucide-react'
+import { DEFAULT_CONFIG_RENTABILIDAD, type ConfigRentabilidad } from '../services/facturaDirectaService'
 import { ContabilidadConfigTab } from '../components/ContabilidadConfigTab'
 import { TalentoNominasConfigTab } from '../components/TalentoNominasConfigTab'
 import { categoriaService, type Categoria } from '../services/categoriaService'
@@ -551,6 +553,7 @@ export function ConfigurationPage() {
                     fecha_inicio_retencion: companyData.es_agente_retencion
                         ? (companyData.fecha_inicio_retencion || null)
                         : null,
+                    config_rentabilidad: companyData.config_rentabilidad ?? DEFAULT_CONFIG_RENTABILIDAD,
                 })
                 .eq('id', empresa!.id)
             if (error) throw error
@@ -1443,6 +1446,94 @@ export function ConfigurationPage() {
                                         </p>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Rentabilidad de ventas */}
+                            <div className="border-t border-slate-100 pt-6 space-y-4">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                    Rentabilidad de Ventas (Semáforo de Márgenes)
+                                </h3>
+
+                                {(() => {
+                                    const configRent: ConfigRentabilidad = companyData.config_rentabilidad ?? DEFAULT_CONFIG_RENTABILIDAD
+                                    const umbrales = configRent.umbrales ?? DEFAULT_CONFIG_RENTABILIDAD.umbrales
+                                    const updateConfigRentabilidad = (patch: Partial<ConfigRentabilidad>) => {
+                                        setCompanyData({ ...companyData, config_rentabilidad: { ...configRent, ...patch } })
+                                    }
+                                    const updateUmbralMinPct = (idx: number, minPct: number) => {
+                                        const nuevos = umbrales.map((u: any, i: number) => i === idx ? { ...u, minPct } : u)
+                                        updateConfigRentabilidad({ umbrales: nuevos })
+                                    }
+
+                                    return (
+                                        <>
+                                            {/* Toggle activar */}
+                                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                                                <div>
+                                                    <p className="font-semibold text-slate-800 text-sm">¿Mostrar semáforo de rentabilidad?</p>
+                                                    <p className="text-xs text-slate-500 mt-0.5">Compara el costo promedio del producto contra el precio de venta al facturar</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => updateConfigRentabilidad({ activo: !configRent.activo })}
+                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${configRent.activo ? 'bg-primary-600' : 'bg-slate-200'}`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${configRent.activo ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                </button>
+                                            </div>
+
+                                            {configRent.activo && (
+                                                <div className="space-y-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                                                    {/* Toggle mostrar tasa */}
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="font-medium text-slate-700 text-sm">Mostrar el % de margen (además del color)</p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => updateConfigRentabilidad({ mostrarTasa: !configRent.mostrarTasa })}
+                                                            className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${configRent.mostrarTasa ? 'bg-primary-600' : 'bg-slate-200'}`}
+                                                        >
+                                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${configRent.mostrarTasa ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Tabla de umbrales editable */}
+                                                    <div className="space-y-1.5">
+                                                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Umbrales de margen (editable)</p>
+                                                        <div className="bg-white rounded-lg border border-slate-200 divide-y divide-slate-100">
+                                                            {umbrales.map((u: any, idx: number) => {
+                                                                const esUltimo = idx === umbrales.length - 1
+                                                                return (
+                                                                    <div key={idx} className="flex items-center justify-between gap-3 px-3 py-2">
+                                                                        <span className="text-sm flex items-center gap-2">
+                                                                            <span>{u.emoji}</span>
+                                                                            <span className="text-slate-700">{u.label}</span>
+                                                                        </span>
+                                                                        {esUltimo ? (
+                                                                            <span className="text-xs text-slate-400">Menor a 0%</span>
+                                                                        ) : (
+                                                                            <div className="flex items-center gap-1">
+                                                                                <span className="text-xs text-slate-400">Desde</span>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    step="0.1"
+                                                                                    className="w-20 px-2 py-1 rounded-lg border border-slate-200 text-sm text-right bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                                                    value={u.minPct}
+                                                                                    onChange={e => updateUmbralMinPct(idx, parseFloat(e.target.value) || 0)}
+                                                                                />
+                                                                                <span className="text-xs text-slate-400">%</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )
+                                })()}
                             </div>
 
                             <div className="pt-2">

@@ -12,9 +12,14 @@ import {
     facturaDirectaService,
     calcularLinea,
     calcularTotalesFactura,
+    calcularMargenLinea,
+    costoLinea,
+    getSemaforoRentabilidad,
+    DEFAULT_CONFIG_RENTABILIDAD,
     type DetalleFacturaDirecta,
     type PagoFactura,
-    type RetencionFactura
+    type RetencionFactura,
+    type ConfigRentabilidad,
 } from '../services/facturaDirectaService'
 import { RetencionesEditor } from '../components/vendor/RetencionesEditor'
 import type { RetLine } from '../components/vendor/RetencionesEditor'
@@ -430,6 +435,7 @@ export function FacturaDirectaPage() {
             iva_porcentaje: prod.iva_porcentaje ?? 15,
             subproducto_id: null,
             factor_conversion: 1,
+            costo_promedio: prod.costo_promedio ?? 0,
         } : d))
         setSearchProducto(prev => ({ ...prev, [idx]: prod.nombre }))
         setProductDropdown(null)
@@ -453,6 +459,12 @@ export function FacturaDirectaPage() {
 
     // ─── TOTALES ──────────────────────────────────────────
     const totales = calcularTotalesFactura(detalles)
+    const configRentabilidad: ConfigRentabilidad = (empresa as any)?.config_rentabilidad ?? DEFAULT_CONFIG_RENTABILIDAD
+    const costoTotalFactura = detalles.reduce((sum, d) => sum + costoLinea(d), 0)
+    const margenFacturaPct = totales.subtotal > 0 ? ((totales.subtotal - costoTotalFactura) / totales.subtotal) * 100 : null
+    const semaforoFactura = configRentabilidad.activo && margenFacturaPct !== null
+        ? getSemaforoRentabilidad(margenFacturaPct, configRentabilidad.umbrales)
+        : null
     const totalRetenciones = retenciones.reduce((sum, r) => sum + (Number(r.valor) || 0), 0)
     // La retención rebaja lo que hay que cubrir con efectivo/tarjeta/crédito/etc.
     const totalPagado = pagos.reduce((sum, p) => sum + (Number(p.valor) || 0), 0) + totalRetenciones
@@ -1012,6 +1024,8 @@ export function FacturaDirectaPage() {
                         <div className="space-y-3">
                             {detalles.map((det, idx) => {
                                 const linea = det.cantidad > 0 && det.precio_unitario > 0 ? calcularLinea(det) : null
+                                const margenLinea = configRentabilidad.activo && linea ? calcularMargenLinea(det) : null
+                                const semaforoLinea = margenLinea ? getSemaforoRentabilidad(margenLinea.margenPct, configRentabilidad.umbrales) : null
                                 const filtProd = productDropdown === idx ? searchResults : []
 
                                 return (
@@ -1183,10 +1197,19 @@ export function FacturaDirectaPage() {
                                             </div>
 
                                             {/* Total línea */}
-                                            <div className="col-span-6 md:col-span-2 flex items-center justify-end">
+                                            <div className="col-span-6 md:col-span-2 flex flex-col items-end justify-center gap-0.5">
                                                 <span className="text-sm font-bold text-primary-700">
                                                     {linea ? formatCurrency(linea.total) : '—'}
                                                 </span>
+                                                {semaforoLinea && (
+                                                    <span
+                                                        className="text-[10px] font-bold whitespace-nowrap"
+                                                        title={semaforoLinea.label}
+                                                    >
+                                                        {semaforoLinea.emoji}
+                                                        {configRentabilidad.mostrarTasa && ` ${margenLinea!.margenPct.toFixed(1)}%`}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1428,6 +1451,15 @@ export function FacturaDirectaPage() {
                                 <span className="font-black text-slate-900 text-base">TOTAL</span>
                                 <span className="font-black text-primary-600 text-2xl">{formatCurrency(totales.total)}</span>
                             </div>
+                            {semaforoFactura && (
+                                <div className="flex justify-between items-center bg-slate-50 rounded-lg px-3 py-2">
+                                    <span className="text-slate-500 text-xs font-bold">Rentabilidad de la factura</span>
+                                    <span className="font-bold text-xs" title={semaforoFactura.label}>
+                                        {semaforoFactura.emoji} {semaforoFactura.label}
+                                        {configRentabilidad.mostrarTasa && margenFacturaPct !== null && ` (${margenFacturaPct.toFixed(1)}%)`}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="border-t border-slate-100 pt-3 space-y-2 text-sm">

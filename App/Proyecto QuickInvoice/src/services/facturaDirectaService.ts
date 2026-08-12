@@ -16,6 +16,9 @@ export interface DetalleFacturaDirecta {
     // Subproductos: si se seleccionó una presentación, almacenar su id y factor
     subproducto_id?: string | null
     factor_conversion?: number  // fracción del producto maestro por unidad vendida
+    // Solo para el semáforo de rentabilidad en pantalla — NO se persiste en
+    // comprobante_detalles (esa tabla no tiene columna de costo).
+    costo_promedio?: number
 }
 
 export interface PagoFactura {
@@ -63,6 +66,61 @@ export function calcularLinea(detalle: DetalleFacturaDirecta) {
     const iva_valor = subtotal_neto * (detalle.iva_porcentaje / 100)
     const total = subtotal_neto + iva_valor
     return { subtotal_bruto, descuento_valor, subtotal_neto, iva_valor, total }
+}
+
+// ── Semáforo de rentabilidad (configurable por empresa, columna empresas.config_rentabilidad) ──
+
+export interface UmbralRentabilidad {
+    minPct: number
+    label: string
+    color: 'green' | 'yellow' | 'orange' | 'red' | 'black'
+    emoji: string
+}
+
+export interface ConfigRentabilidad {
+    activo: boolean
+    mostrarTasa: boolean
+    umbrales: UmbralRentabilidad[]
+}
+
+export const DEFAULT_CONFIG_RENTABILIDAD: ConfigRentabilidad = {
+    activo: false,
+    mostrarTasa: true,
+    umbrales: [
+        { minPct: 45,    label: 'Saludable',               color: 'green',  emoji: '🟢' },
+        { minPct: 35,    label: 'Margen bajo',              color: 'yellow', emoji: '🟡' },
+        { minPct: 20,    label: 'Margen crítico',           color: 'orange', emoji: '🟠' },
+        { minPct: 0,     label: 'Riesgo / posible pérdida', color: 'red',    emoji: '🔴' },
+        { minPct: -9999, label: 'Venta con pérdida real',   color: 'black',  emoji: '⛔' },
+    ],
+}
+
+// Costo estimado de una línea: costo_promedio del producto maestro, ajustado
+// por el factor de conversión si la línea usa una presentación/subproducto
+// (ej. "caja de 12" → factor 12 → costo por caja = costo_promedio × 12).
+export function costoLinea(detalle: DetalleFacturaDirecta): number {
+    const costoUnit = (detalle.costo_promedio ?? 0) * (detalle.factor_conversion || 1)
+    return costoUnit * detalle.cantidad
+}
+
+// Margen de una línea sobre su subtotal neto (post-descuento, sin IVA) — la
+// base comparable contra el costo. Devuelve null si no hay costo/venta con
+// que calcular (evita mostrar un semáforo engañoso en líneas vacías).
+export function calcularMargenLinea(detalle: DetalleFacturaDirecta): { margenValor: number; margenPct: number } | null {
+    const { subtotal_neto } = calcularLinea(detalle)
+    if (subtotal_neto <= 0) return null
+    const costo = costoLinea(detalle)
+    const margenValor = subtotal_neto - costo
+    const margenPct = Math.round((margenValor / subtotal_neto) * 1000) / 10
+    return { margenValor, margenPct }
+}
+
+// Umbrales ordenados de mayor a menor minPct: el margen cae en el primero
+// cuyo minPct sea <= al margen. El último umbral (minPct muy negativo) actúa
+// como "todo lo demás" para pérdidas.
+export function getSemaforoRentabilidad(margenPct: number, umbrales: UmbralRentabilidad[]): UmbralRentabilidad {
+    const ordenados = [...umbrales].sort((a, b) => b.minPct - a.minPct)
+    return ordenados.find(u => margenPct >= u.minPct) ?? ordenados[ordenados.length - 1]
 }
 
 // Calcula los totales de toda la factura
