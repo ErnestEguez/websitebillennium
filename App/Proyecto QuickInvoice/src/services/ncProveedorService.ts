@@ -164,6 +164,8 @@ export const ncProveedorService = {
         // 0. Validar N/C duplicada (mismo número + proveedor, ya registrada y ACTIVA).
         // Una N/C ANULADA no bloquea — permite corregir un error de digitación.
         if (input.numeroNc?.trim()) {
+            // .limit(1) en vez de .maybeSingle(): con 2+ duplicados preexistentes
+            // maybeSingle() falla (data=null) y el chequeo se desactiva solo.
             const { data: dup } = await supabase
                 .from('notas_credito_proveedores')
                 .select('id')
@@ -171,8 +173,8 @@ export const ncProveedorService = {
                 .eq('proveedor_id', input.proveedorId)
                 .eq('numero_nc', input.numeroNc.trim())
                 .eq('estado', 'ACTIVA')
-                .maybeSingle()
-            if (dup) throw new Error(`Ya existe una N/C activa con el número "${input.numeroNc.trim()}" para este proveedor.`)
+                .limit(1)
+            if (dup && dup.length > 0) throw new Error(`Ya existe una N/C activa con el número "${input.numeroNc.trim()}" para este proveedor.`)
         }
 
         // 1. Validar cantidades devueltas (solo DEVOLUCION_MERCADERIA)

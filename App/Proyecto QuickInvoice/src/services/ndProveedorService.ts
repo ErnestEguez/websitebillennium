@@ -56,6 +56,8 @@ export const ndProveedorService = {
     }): Promise<NDProveedor> {
         // Validar N/D duplicada (mismo número + proveedor, ya registrada y ACTIVA)
         // ANTES de tocar cualquier CxP — una N/D ANULADA no bloquea.
+        // .limit(1) en vez de .maybeSingle(): con 2+ duplicados preexistentes
+        // maybeSingle() falla (data=null) y el chequeo se desactiva solo.
         const { data: dup } = await supabase
             .from('nd_proveedores')
             .select('id')
@@ -63,8 +65,8 @@ export const ndProveedorService = {
             .eq('proveedor_id', params.proveedorId)
             .eq('numero_nd', params.numeroNd)
             .eq('estado', 'ACTIVA')
-            .maybeSingle()
-        if (dup) throw new Error(`Ya existe una N/D activa con el número "${params.numeroNd}" para este proveedor.`)
+            .limit(1)
+        if (dup && dup.length > 0) throw new Error(`Ya existe una N/D activa con el número "${params.numeroNd}" para este proveedor.`)
 
         // La N/D SIEMPRE incrementa una deuda con el proveedor: si hay compra
         // vinculada y ya tiene CxP, se le suma; si no tiene CxP (contado) o no

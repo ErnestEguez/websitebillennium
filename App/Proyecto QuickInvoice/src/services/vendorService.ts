@@ -136,6 +136,11 @@ export const compraService = {
     // registrado y ACTIVO (un documento ANULADO no bloquea — permite corregir un
     // error de digitación y volver a ingresar el número correcto).
     async verificarDuplicado(empresaId: string, claveAcceso?: string, numeroFactura?: string, proveedorId?: string): Promise<boolean> {
+        // .limit(1) en vez de .maybeSingle(): si ya hay 2+ filas duplicadas
+        // preexistentes (datos de antes de este control), maybeSingle() falla
+        // con error "multiple rows" y data queda null — el chequeo reportaba
+        // "no hay duplicado" y dejaba colar más. Con .limit(1) siempre funciona
+        // sin importar cuantas coincidencias existentes haya.
         if (claveAcceso) {
             const { data } = await supabase
                 .from('ingresos_stock')
@@ -143,8 +148,8 @@ export const compraService = {
                 .eq('empresa_id', empresaId)
                 .eq('clave_acceso', claveAcceso)
                 .eq('estado', 'ACTIVO')
-                .maybeSingle()
-            if (data) return true
+                .limit(1)
+            if (data && data.length > 0) return true
         }
         if (numeroFactura && proveedorId) {
             const { data } = await supabase
@@ -154,8 +159,8 @@ export const compraService = {
                 .eq('numero_factura', numeroFactura)
                 .eq('proveedor_id', proveedorId)
                 .eq('estado', 'ACTIVO')
-                .maybeSingle()
-            if (data) return true
+                .limit(1)
+            if (data && data.length > 0) return true
         }
         return false
     },
