@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { ScanLine, Upload, Camera, X, Loader2, CheckCircle2, AlertCircle, FileText } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { mensajeErrorFuncion } from '../lib/functionsError'
 
 export interface FacturaEscaneada {
     estab:         string
@@ -79,7 +80,8 @@ export function ScanFacturaButton({ onAplicar, empresaId }: Props) {
             const { data, error: fnErr } = await supabase.functions.invoke('scan-invoice', {
                 body: { content: preview, mimeType, empresa_id: empresaId },
             })
-            if (fnErr || data?.error) throw new Error(fnErr?.message ?? data?.error)
+            if (fnErr) throw new Error(await mensajeErrorFuncion(fnErr))
+            if (data?.error) throw new Error(data.error)
             setResultado(data as FacturaEscaneada)
         } catch (e: any) {
             setError(e.message ?? 'Error al analizar el documento')

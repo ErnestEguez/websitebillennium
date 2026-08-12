@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { mensajeErrorFuncion } from '../lib/functionsError'
 
 interface GeminiPart {
     text?: string
@@ -47,7 +48,7 @@ async function callGemini(parts: GeminiPart[], empresaId: string, origen: Origen
     const { data, error } = await supabase.functions.invoke('gemini-client-proxy', {
         body: { parts, maxTokens, empresa_id: empresaId, origen },
     })
-    if (error) throw new Error(error.message ?? 'Error al llamar a Gemini')
+    if (error) throw new Error(await mensajeErrorFuncion(error, 'Error al llamar a Gemini'))
     if (data?.error) throw new Error(data.error)
     return data?.text ?? ''
 }
