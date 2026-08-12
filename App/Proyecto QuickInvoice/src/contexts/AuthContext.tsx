@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, onSessionExpired } from '../lib/supabase'
 import { offlineDb } from '../lib/offlineDb'
 import type { User } from '@supabase/supabase-js'
 import { EmpresaSelectorScreen } from '../components/EmpresaSelectorScreen'
 import type { EmpresaOption } from '../components/EmpresaSelectorScreen'
 import { sesionUnicaService } from '../services/sesionUnicaService'
 import { SesionDesplazadaModal } from '../components/SesionDesplazadaModal'
+import { SesionExpiradaModal } from '../components/SesionExpiradaModal'
 
 export type { EmpresaOption }
 
@@ -193,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // ── Sesión única activa por usuario ─────────────────────────
     // (feature flag por empresa — sin flag activo, todo esto es no-op)
     const [sesionDesplazada, setSesionDesplazada] = useState(false)
+    const [sesionExpirada, setSesionExpirada]     = useState(false)
     const sesionUnicaEnabledRef = React.useRef(false)
     const sessionJustSignedIn   = React.useRef(false)
     const userIdRef    = React.useRef<string | null>(null)
@@ -220,6 +222,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const onVisible = () => { if (document.visibilityState === 'visible') chequearSesionSiCorresponde() }
         document.addEventListener('visibilitychange', onVisible)
         return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
+    }, [])
+
+    // Aviso de JWT vencido — ver lib/supabase.ts (notificarSesionExpirada).
+    // Solo user-facing: no toca el refresh de token para nada.
+    useEffect(() => {
+        return onSessionExpired(() => { if (isMounted.current) setSesionExpirada(true) })
     }, [])
 
     useEffect(() => {
@@ -650,6 +658,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.href = '/login'
     }
 
+    const confirmarSesionExpirada = async () => {
+        setSesionExpirada(false)
+        await supabase.auth.signOut().catch(() => {})
+        Object.keys(localStorage).forEach(k => {
+            if (!k.startsWith('sb-')) localStorage.removeItem(k)
+        })
+        sessionStorage.clear()
+        window.location.href = '/login'
+    }
+
     // ── Renders especiales ──────────────────────────────────────
 
     if (loading) {
@@ -718,6 +736,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } as any}>
             {children}
             <SesionDesplazadaModal open={sesionDesplazada} onConfirm={confirmarSesionDesplazada} />
+            <SesionExpiradaModal open={sesionExpirada} onConfirm={confirmarSesionExpirada} />
         </AuthContext.Provider>
     )
 }
