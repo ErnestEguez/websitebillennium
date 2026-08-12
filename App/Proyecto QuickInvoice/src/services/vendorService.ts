@@ -132,6 +132,9 @@ export const compraService = {
         } as CompraConDetalle
     },
 
+    // Duplicado = mismo número de factura+proveedor, O misma clave de acceso, ya
+    // registrado y ACTIVO (un documento ANULADO no bloquea — permite corregir un
+    // error de digitación y volver a ingresar el número correcto).
     async verificarDuplicado(empresaId: string, claveAcceso?: string, numeroFactura?: string, proveedorId?: string): Promise<boolean> {
         if (claveAcceso) {
             const { data } = await supabase
@@ -139,8 +142,9 @@ export const compraService = {
                 .select('id')
                 .eq('empresa_id', empresaId)
                 .eq('clave_acceso', claveAcceso)
+                .eq('estado', 'ACTIVO')
                 .maybeSingle()
-            return !!data
+            if (data) return true
         }
         if (numeroFactura && proveedorId) {
             const { data } = await supabase
@@ -149,8 +153,9 @@ export const compraService = {
                 .eq('empresa_id', empresaId)
                 .eq('numero_factura', numeroFactura)
                 .eq('proveedor_id', proveedorId)
+                .eq('estado', 'ACTIVO')
                 .maybeSingle()
-            return !!data
+            if (data) return true
         }
         return false
     },

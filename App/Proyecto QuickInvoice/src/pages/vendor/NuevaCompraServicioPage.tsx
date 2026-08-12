@@ -212,6 +212,14 @@ export function NuevaCompraServicioPage() {
         if (!validas.length) { alert('Agrega al menos un servicio con descripción y precio'); return }
         if (formaPago === 'CREDITO' && !fechaVenc) { alert('Ingresa la fecha de vencimiento'); return }
 
+        if (numeroFactura || claveAcceso) {
+            const duplicado = await compraService.verificarDuplicado(empresa!.id, claveAcceso || undefined, numeroFactura || undefined, proveedorId)
+            if (duplicado) {
+                alert(`Ya existe una compra registrada con este número de factura para este proveedor (${numeroFactura || 'clave de acceso'}). Verifica en el listado de Compras — si es un error de digitación, corrígelo antes de guardar.`)
+                return
+            }
+        }
+
         const retsValidas = retenciones.filter(r => r.codigo && r.valor > 0)
         if (retsValidas.length > 0) {
             const totalRetConfirm = retsValidas.reduce((s, r) => s + r.valor, 0)
