@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { bodegaService } from '../services/bodegaService'
+import { ACCEPT_CSV_EXCEL, esArchivoExcel, leerFilasExcel } from '../lib/excelRows'
 import {
     Upload, CheckCircle, AlertCircle, Loader2, FileText, X, AlertTriangle, Wrench,
 } from 'lucide-react'
@@ -114,35 +115,52 @@ function splitCsvLine(line: string, delimiter: string): string[] {
     return fields
 }
 
+// Mapea una fila ya partida en celdas (venga de CSV o de una hoja de Excel)
+// a un CsvRow — el punto de convergencia de ambos orígenes.
+function mapRowToCsvRow(parts: string[]): CsvRow | null {
+    if (parts.length < 4) return null
+
+    const codigo   = (parts[0] ?? '').trim()
+    const nombre   = (parts[1] ?? '').trim()
+    const precio   = parseNumber(parts[2] ?? '')
+    const categoria = (parts[3] ?? '').trim()
+    const costoRaw = parts[4] ?? ''
+    const stockRaw = parts[5] ?? ''
+    const costo    = parseNumber(costoRaw)   // col 5 (opcional)
+    let   stock    = parseNumber(stockRaw)   // col 6 (opcional)
+    const iva_porcentaje = parseIvaPorcentaje(parts[6] ?? '')   // col 7 (opcional, 0/5/15)
+
+    if (!codigo && !nombre && !categoria) return null
+    if (stock < 0) stock = 0
+
+    return {
+        codigo, nombre, precio_venta: precio, categoria, costo, stock, iva_porcentaje,
+        costoAmbiguo: isAmbiguousNumber(costoRaw),
+        stockAmbiguo: isAmbiguousNumber(stockRaw),
+    }
+}
+
 function parseCsvRows(text: string, delimiter: FieldDelimiter): CsvRow[] {
     const lines = text.split(/\r?\n/)
     const rows: CsvRow[] = []
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim()
         if (!line) continue
-        const parts = splitCsvLine(line, delimiter)
-        if (parts.length < 4) continue
-
-        const codigo   = (parts[0] ?? '').trim()
-        const nombre   = (parts[1] ?? '').trim()
-        const precio   = parseNumber(parts[2] ?? '')
-        const categoria = (parts[3] ?? '').trim()
-        const costoRaw = parts[4] ?? ''
-        const stockRaw = parts[5] ?? ''
-        const costo    = parseNumber(costoRaw)   // col 5 (opcional)
-        let   stock    = parseNumber(stockRaw)   // col 6 (opcional)
-        const iva_porcentaje = parseIvaPorcentaje(parts[6] ?? '')   // col 7 (opcional, 0/5/15)
-
-        if (!codigo && !nombre && !categoria) continue
-        if (stock < 0) stock = 0
-
-        rows.push({
-            codigo, nombre, precio_venta: precio, categoria, costo, stock, iva_porcentaje,
-            costoAmbiguo: isAmbiguousNumber(costoRaw),
-            stockAmbiguo: isAmbiguousNumber(stockRaw),
-        })
+        const row = mapRowToCsvRow(splitCsvLine(line, delimiter))
+        if (row) rows.push(row)
     }
     return rows
+}
+
+// Mismo mapeo que parseCsvRows, pero para filas que ya vienen partidas en
+// celdas (hoja de Excel leída con XLSX) — sin pasar por texto ni delimiter.
+function mapExcelRows(rows: string[][]): CsvRow[] {
+    const out: CsvRow[] = []
+    for (let i = 1; i < rows.length; i++) {
+        const row = mapRowToCsvRow(rows[i] ?? [])
+        if (row) out.push(row)
+    }
+    return out
 }
 
 function deduplicateRows(rows: CsvRow[]): { unique: CsvRow[]; duplicateCodes: string[] } {
@@ -175,6 +193,7 @@ export function ImportarArticulosPage() {
     const fileRef = useRef<HTMLInputElement>(null)
     const [fileName, setFileName]     = useState('')
     const [rawText, setRawText]       = useState('')
+    const [excelRows, setExcelRows]   = useState<string[][] | null>(null)
     const [delimiter, setDelimiter]   = useState<FieldDelimiter>(';')
     const [mode, setMode]             = useState<'importar' | 'corregir'>('importar')
     const [allRows, setAllRows]       = useState<CsvRow[]>([])
@@ -211,6 +230,16 @@ export function ImportarArticulosPage() {
         const file = e.target.files?.[0]
         if (!file) return
         setParseError(''); setSummary(null); setCorrectionSummary(null); setFileName(file.name)
+
+        if (esArchivoExcel(file)) {
+            setRawText(''); setExcelRows(null)
+            leerFilasExcel(file)
+                .then(rows => setExcelRows(rows))
+                .catch(() => setParseError('Error al leer el archivo Excel.'))
+            return
+        }
+
+        setExcelRows(null)
         const reader = new FileReader()
         reader.onload = (ev) => {
             const text = ev.target?.result as string
@@ -220,8 +249,18 @@ export function ImportarArticulosPage() {
         reader.readAsText(file, 'UTF-8')
     }, [])
 
-    // Reparsea si cambia el archivo o el separador de campo elegido
+    // Reparsea si cambia el archivo (CSV o Excel) o el separador de campo elegido
     useEffect(() => {
+        if (excelRows) {
+            try {
+                const parsed = mapExcelRows(excelRows)
+                if (parsed.length === 0) { setParseError('No se encontraron filas válidas en el Excel.'); setAllRows([]); setDuplicates([]); return }
+                setParseError('')
+                const { unique, duplicateCodes } = deduplicateRows(parsed)
+                setAllRows(unique); setDuplicates(duplicateCodes)
+            } catch { setParseError('Error al leer el archivo Excel.'); setAllRows([]); setDuplicates([]) }
+            return
+        }
         if (!rawText) return
         try {
             const parsed = parseCsvRows(rawText, delimiter)
@@ -230,10 +269,10 @@ export function ImportarArticulosPage() {
             const { unique, duplicateCodes } = deduplicateRows(parsed)
             setAllRows(unique); setDuplicates(duplicateCodes)
         } catch { setParseError('Error al leer el archivo CSV.'); setAllRows([]); setDuplicates([]) }
-    }, [rawText, delimiter])
+    }, [rawText, delimiter, excelRows])
 
     const handleClear = useCallback(() => {
-        setFileName(''); setRawText(''); setAllRows([]); setDuplicates([]); setParseError('')
+        setFileName(''); setRawText(''); setExcelRows(null); setAllRows([]); setDuplicates([]); setParseError('')
         setSummary(null); setCorrectionSummary(null); setProgress({ current: 0, total: 0 })
         if (fileRef.current) fileRef.current.value = ''
     }, [])
@@ -599,10 +638,10 @@ export function ImportarArticulosPage() {
                 {!fileName ? (
                     <div className="flex flex-col items-center gap-3">
                         <Upload className="w-12 h-12 text-slate-400" />
-                        <p className="text-slate-600 font-medium">Arrastra o selecciona un archivo CSV</p>
+                        <p className="text-slate-600 font-medium">Selecciona un archivo CSV o Excel (.xlsx)</p>
                         <label className="mt-2 px-5 py-2.5 bg-primary-600 text-white rounded-lg font-semibold cursor-pointer hover:bg-primary-700 transition-colors text-sm">
                             Seleccionar archivo
-                            <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden" onChange={handleFile} />
+                            <input ref={fileRef} type="file" accept={ACCEPT_CSV_EXCEL} className="hidden" onChange={handleFile} />
                         </label>
                     </div>
                 ) : (

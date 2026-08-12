@@ -10,6 +10,7 @@ import {
 import { cn } from '../lib/utils'
 import { formatCurrency } from '../lib/utils'
 import { HelpButton } from '../components/help/HelpButton'
+import { ACCEPT_CSV_EXCEL, esArchivoExcel, leerFilasExcel } from '../lib/excelRows'
 
 /* ── Tipos ──────────────────────────────────────────────────────────────── */
 
@@ -114,33 +115,50 @@ function splitCsvLine(line: string, delimiter: string): string[] {
     return fields
 }
 
+// Mapea una fila ya partida en celdas (venga de CSV o de una hoja de Excel)
+// a un CsvRow — el punto de convergencia de ambos orígenes.
+function mapRowToCsvRow(p: string[]): CsvRow | null {
+    const ruc_proveedor    = (p[0] ?? '').trim()
+    const nombre_proveedor = (p[1] ?? '').trim()
+    const numero_documento = (p[2] ?? '').trim()
+    const fecha_emision    = (p[3] ?? '').trim()
+    const fecha_vencimiento = (p[4] ?? '').trim()
+    const montoOriginalRaw = p[5] ?? ''
+    const saldoRaw          = p[6] ?? ''
+    const monto_original   = parseNumero(montoOriginalRaw) ?? 0
+    const saldo_pendiente  = parseNumero(saldoRaw) ?? 0
+    const observaciones    = (p[7] ?? '').trim()
+
+    if (!ruc_proveedor || !numero_documento) return null
+    return {
+        ruc_proveedor, nombre_proveedor, numero_documento, fecha_emision, fecha_vencimiento,
+        monto_original, saldo_pendiente, observaciones,
+        montoOriginalAmbiguo: isAmbiguousNumber(montoOriginalRaw),
+        saldoAmbiguo: isAmbiguousNumber(saldoRaw),
+    }
+}
+
 function parseCsv(text: string, delimiter: FieldDelimiter): CsvRow[] {
     const lines = text.split(/\r?\n/)
     const rows: CsvRow[] = []
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim()
         if (!line) continue
-        const p = splitCsvLine(line, delimiter)
-        const ruc_proveedor    = (p[0] ?? '').trim()
-        const nombre_proveedor = (p[1] ?? '').trim()
-        const numero_documento = (p[2] ?? '').trim()
-        const fecha_emision    = (p[3] ?? '').trim()
-        const fecha_vencimiento = (p[4] ?? '').trim()
-        const montoOriginalRaw = p[5] ?? ''
-        const saldoRaw          = p[6] ?? ''
-        const monto_original   = parseNumero(montoOriginalRaw) ?? 0
-        const saldo_pendiente  = parseNumero(saldoRaw) ?? 0
-        const observaciones    = (p[7] ?? '').trim()
-
-        if (!ruc_proveedor || !numero_documento) continue
-        rows.push({
-            ruc_proveedor, nombre_proveedor, numero_documento, fecha_emision, fecha_vencimiento,
-            monto_original, saldo_pendiente, observaciones,
-            montoOriginalAmbiguo: isAmbiguousNumber(montoOriginalRaw),
-            saldoAmbiguo: isAmbiguousNumber(saldoRaw),
-        })
+        const row = mapRowToCsvRow(splitCsvLine(line, delimiter))
+        if (row) rows.push(row)
     }
     return rows
+}
+
+// Mismo mapeo que parseCsv, pero para filas que ya vienen partidas en
+// celdas (hoja de Excel leída con XLSX) — sin pasar por texto ni delimiter.
+function mapExcelRows(rows: string[][]): CsvRow[] {
+    const out: CsvRow[] = []
+    for (let i = 1; i < rows.length; i++) {
+        const row = mapRowToCsvRow(rows[i] ?? [])
+        if (row) out.push(row)
+    }
+    return out
 }
 
 /* ── Componente ─────────────────────────────────────────────────────────── */
@@ -151,6 +169,7 @@ export function MigrarCxPPage() {
 
     const [file, setFile] = useState<File | null>(null)
     const [rawText, setRawText] = useState('')
+    const [excelRows, setExcelRows] = useState<string[][] | null>(null)
     const [delimiter, setDelimiter] = useState<FieldDelimiter>(';')
     const [rows, setRows] = useState<CsvRow[]>([])
     const [parseError, setParseError] = useState('')
@@ -185,6 +204,15 @@ export function MigrarCxPPage() {
         setSummary(null)
         setParseError('')
 
+        if (esArchivoExcel(f)) {
+            setRawText(''); setExcelRows(null)
+            leerFilasExcel(f)
+                .then(rows => setExcelRows(rows))
+                .catch(() => setParseError('Error al leer el archivo Excel.'))
+            return
+        }
+
+        setExcelRows(null)
         const reader = new FileReader()
         reader.onload = ev => {
             const text = ev.target?.result as string
@@ -194,10 +222,22 @@ export function MigrarCxPPage() {
         reader.readAsText(f, 'UTF-8')
     }
 
-    // Reparsea si cambia el archivo o el separador de campo elegido — así el
-    // usuario puede cambiar de ; a , (o viceversa) sin tener que reseleccionar
-    // el archivo si al inicio no detecta filas válidas.
+    // Reparsea si cambia el archivo (CSV o Excel) o el separador de campo
+    // elegido — así el usuario puede cambiar de ; a , (o viceversa) sin tener
+    // que reseleccionar el archivo si al inicio no detecta filas válidas.
     useEffect(() => {
+        if (excelRows) {
+            try {
+                const parsed = mapExcelRows(excelRows)
+                if (parsed.length === 0) { setParseError('No se encontraron filas válidas en el Excel.'); setRows([]); return }
+                setParseError('')
+                setRows(parsed)
+            } catch {
+                setParseError('Error al leer el archivo Excel.')
+                setRows([])
+            }
+            return
+        }
         if (!rawText) return
         try {
             const parsed = parseCsv(rawText, delimiter)
@@ -212,7 +252,7 @@ export function MigrarCxPPage() {
             setParseError('Error al leer el archivo CSV.')
             setRows([])
         }
-    }, [rawText, delimiter])
+    }, [rawText, delimiter, excelRows])
 
     /* ── Resolver proveedor por RUC — buscar, o consultar SRI y crear ──── */
     async function resolverProveedor(row: CsvRow): Promise<{ id: string; nombre: string; creado: boolean } | { error: string }> {
@@ -499,12 +539,12 @@ export function MigrarCxPPage() {
                     {file ? (
                         <p className="text-sm font-semibold text-primary-700">{file.name}</p>
                     ) : (
-                        <p className="text-sm text-slate-500">Haga clic para seleccionar el archivo CSV</p>
+                        <p className="text-sm text-slate-500">Haga clic para seleccionar el archivo CSV o Excel</p>
                     )}
                     <p className="text-xs text-slate-400 mt-1">
-                        Solo archivos .csv — separador seleccionado arriba: {delimiter === ';' ? 'punto y coma ( ; )' : 'coma ( , )'}
+                        CSV (separador seleccionado arriba: {delimiter === ';' ? 'punto y coma ( ; )' : 'coma ( , )'}) o Excel (.xlsx)
                     </p>
-                    <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
+                    <input ref={fileRef} type="file" accept={ACCEPT_CSV_EXCEL} className="hidden" onChange={handleFileChange} />
                 </div>
 
                 {parseError && (

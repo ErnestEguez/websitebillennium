@@ -7,6 +7,7 @@ import {
     FileText, X, AlertTriangle, Users,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { ACCEPT_CSV_EXCEL, esArchivoExcel, leerFilasExcel } from '../lib/excelRows'
 
 /* ── Tipos ──────────────────────────────────────────────────────────────── */
 
@@ -73,25 +74,42 @@ function decodeCsvBuffer(buffer: ArrayBuffer): string {
     }
 }
 
+// Mapea una fila ya partida en celdas (venga de CSV o de una hoja de Excel)
+// a un CsvRow — el punto de convergencia de ambos orígenes.
+function mapRowToCsvRow(p: string[]): CsvRow | null {
+    const identificacion = (p[0] ?? '').trim()
+    const nombre         = (p[1] ?? '').trim()
+    if (!identificacion || !nombre) return null
+    return {
+        identificacion,
+        nombre,
+        email:    (p[2] ?? '').trim(),
+        telefono: (p[3] ?? '').trim(),
+        direccion:(p[4] ?? '').trim(),
+    }
+}
+
 function parseCsvClientes(text: string): CsvRow[] {
     const lines = text.split(/\r?\n/)
     const rows: CsvRow[] = []
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim()
         if (!line) continue
-        const p = splitCsvLine(line, ';')
-        const identificacion = (p[0] ?? '').trim()
-        const nombre         = (p[1] ?? '').trim()
-        if (!identificacion || !nombre) continue
-        rows.push({
-            identificacion,
-            nombre,
-            email:    (p[2] ?? '').trim(),
-            telefono: (p[3] ?? '').trim(),
-            direccion:(p[4] ?? '').trim(),
-        })
+        const row = mapRowToCsvRow(splitCsvLine(line, ';'))
+        if (row) rows.push(row)
     }
     return rows
+}
+
+// Mismo mapeo que parseCsvClientes, pero para filas que ya vienen partidas
+// en celdas (hoja de Excel leída con XLSX) — sin pasar por texto/encoding.
+function mapExcelRowsClientes(rows: string[][]): CsvRow[] {
+    const out: CsvRow[] = []
+    for (let i = 1; i < rows.length; i++) {
+        const row = mapRowToCsvRow(rows[i] ?? [])
+        if (row) out.push(row)
+    }
+    return out
 }
 
 /* ── Componente ─────────────────────────────────────────────────────────── */
@@ -149,6 +167,18 @@ export function ImportarClientesPage() {
         const file = e.target.files?.[0]
         if (!file) return
         setParseError(''); setSummary(null); setFileName(file.name)
+
+        if (esArchivoExcel(file)) {
+            leerFilasExcel(file)
+                .then(rows => {
+                    const parsed = mapExcelRowsClientes(rows)
+                    if (!parsed.length) { setParseError('No se encontraron filas válidas en el Excel.'); setAllRows([]); return }
+                    setAllRows(parsed)
+                })
+                .catch(() => { setParseError('Error al leer el archivo Excel.'); setAllRows([]) })
+            return
+        }
+
         const reader = new FileReader()
         reader.onload = (ev) => {
             try {
@@ -258,7 +288,7 @@ export function ImportarClientesPage() {
                     <Users className="w-6 h-6 text-primary-600" /> Clientes
                 </h1>
                 <p className="text-sm text-slate-500 mt-1">
-                    Exporta tu lista de clientes a Excel o importa clientes desde un archivo CSV.
+                    Exporta tu lista de clientes a Excel o importa clientes desde un archivo CSV o Excel.
                     Empresa: <span className="font-medium">{empresa?.nombre || 'N/A'}</span>
                 </p>
             </div>
@@ -311,10 +341,10 @@ export function ImportarClientesPage() {
                 {!fileName ? (
                     <div className="flex flex-col items-center gap-3">
                         <Upload className="w-12 h-12 text-slate-400" />
-                        <p className="text-slate-600 font-medium">Arrastra o selecciona un archivo CSV</p>
+                        <p className="text-slate-600 font-medium">Selecciona un archivo CSV o Excel (.xlsx)</p>
                         <label className="mt-2 px-5 py-2.5 bg-primary-600 text-white rounded-lg font-semibold cursor-pointer hover:bg-primary-700 text-sm">
                             Seleccionar archivo
-                            <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden" onChange={handleFile} />
+                            <input ref={fileRef} type="file" accept={ACCEPT_CSV_EXCEL} className="hidden" onChange={handleFile} />
                         </label>
                     </div>
                 ) : (
