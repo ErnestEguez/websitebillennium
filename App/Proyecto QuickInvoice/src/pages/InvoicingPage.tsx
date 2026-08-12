@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { HelpButton } from '../components/help/HelpButton'
@@ -44,15 +44,41 @@ function ComprobanteAccionesMenu({ triggerRect, onClose, children }: {
     children: React.ReactNode
 }) {
     const MENU_W = 248
-    const left = Math.min(Math.max(8, triggerRect.right - MENU_W), window.innerWidth - MENU_W - 8)
-    const top  = Math.min(triggerRect.bottom + 4, window.innerHeight - 8)
+    const menuRef = useRef<HTMLDivElement>(null)
+    // null en el primer render = todavía sin medir (invisible). Antes el menú
+    // siempre abría hacia abajo sin chequear si entraba en el viewport — en
+    // filas cerca del borde inferior (ej. la última fila de la tabla) quedaba
+    // con la parte de abajo fuera de pantalla, e imposible de alcanzar porque
+    // es position:fixed (el scroll de la página no lo mueve).
+    const [pos, setPos] = useState<{ left: number; top: number; maxHeight: number } | null>(null)
+
+    useLayoutEffect(() => {
+        const left = Math.min(Math.max(8, triggerRect.right - MENU_W), window.innerWidth - MENU_W - 8)
+        const menuH = menuRef.current?.offsetHeight ?? 0
+        const espacioAbajo = window.innerHeight - triggerRect.bottom - 8
+        const espacioArriba = triggerRect.top - 8
+        const abrirArriba = menuH > espacioAbajo && espacioArriba > espacioAbajo
+        const top = abrirArriba
+            ? Math.max(8, triggerRect.top - Math.min(menuH, espacioArriba) - 4)
+            : triggerRect.bottom + 4
+        const maxHeight = abrirArriba ? Math.min(menuH, espacioArriba) : Math.min(menuH || espacioAbajo, espacioAbajo)
+        setPos({ left, top, maxHeight })
+    }, [triggerRect])
 
     return createPortal(
         <>
             <div className="fixed inset-0 z-[9995]" onClick={onClose} />
             <div
+                ref={menuRef}
                 className="fixed z-[9996] bg-white rounded-xl border border-slate-200 shadow-xl py-1.5"
-                style={{ left, top, width: MENU_W, maxHeight: '70vh', overflowY: 'auto' }}
+                style={{
+                    left: pos ? pos.left : Math.min(Math.max(8, triggerRect.right - MENU_W), window.innerWidth - MENU_W - 8),
+                    top: pos ? pos.top : triggerRect.bottom + 4,
+                    width: MENU_W,
+                    maxHeight: pos ? pos.maxHeight : '70vh',
+                    overflowY: 'auto',
+                    visibility: pos ? 'visible' : 'hidden',
+                }}
             >
                 {children}
             </div>
