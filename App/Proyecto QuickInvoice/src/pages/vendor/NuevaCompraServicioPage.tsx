@@ -165,7 +165,7 @@ export function NuevaCompraServicioPage() {
         }))
     }, [subtotalLineas, ivaCalc])
 
-    function handleScanAplicar(data: FacturaEscaneada) {
+    async function handleScanAplicar(data: FacturaEscaneada) {
         setEstab(data.estab ?? '')
         setPtoEmi(data.pto_emi ?? '')
         setSecuencial(data.secuencial ?? '')
@@ -175,8 +175,22 @@ export function NuevaCompraServicioPage() {
         setBaseIva0(data.base_cero ?? 0)
         setBaseIva15(data.base_iva ?? 0)
         setValorIvaManual(data.iva ?? 0)
+
         const prov = proveedores.find(p => p.ruc === data.ruc_proveedor)
-        if (prov) setProveedorId(prov.id)
+        if (prov) {
+            setProveedorId(prov.id)
+        } else if (data.ruc_proveedor && empresa?.id) {
+            // El RUC leído del PDF no existe todavía en esta empresa — antes
+            // se dejaba el campo vacío y la compra se guardaba sin proveedor.
+            const resuelto = await proveedorService.resolverPorRuc(empresa.id, data.ruc_proveedor, data.razon_social)
+            if ('error' in resuelto) {
+                alert(`No se pudo crear el proveedor automáticamente (RUC ${data.ruc_proveedor}): ${resuelto.error}. Selecciónalo o créalo manualmente antes de guardar.`)
+            } else {
+                if (resuelto.creado) setProveedores(await proveedorService.listar(empresa.id))
+                setProveedorId(resuelto.id)
+            }
+        }
+
         if (data.items?.length > 0) {
             setDetalle(data.items.map((item: any, idx: number) => ({
                 descripcion:     item.descripcion ?? '',

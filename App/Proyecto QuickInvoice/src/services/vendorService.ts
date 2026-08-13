@@ -9,7 +9,7 @@ import type {
     Proveedor, Compra, CompraConDetalle,
     DetalleInventario, DetalleServicio,
     RetencionCompra, CuentaPorPagar, PagoProveedor,
-    OrdenCompra, DetalleOrdenCompra,
+    OrdenCompra, DetalleOrdenCompra, TipoProveedor,
 } from '../types/vendors'
 
 const COMPRA_SELECT = `
@@ -87,6 +87,58 @@ export const proveedorService = {
             .update({ estado: 'INACTIVO', updated_at: new Date().toISOString() })
             .eq('id', id)
         if (error) throw error
+    },
+
+    // Busca un proveedor por RUC en la empresa; si no existe, lo crea
+    // automáticamente (consultando el SRI por la razón social si hay
+    // conexión). Mismo patrón que ya usaba MigrarCxPPage para la migración
+    // de deuda — se reutiliza acá para el escaneo de facturas con IA
+    // (ScanFacturaButton) en Compras Inventario/Servicios, N/C y N/D: antes
+    // esas pantallas dejaban el proveedor sin seleccionar cuando el RUC
+    // escaneado no existía todavía, y la compra se guardaba sin proveedor.
+    async resolverPorRuc(
+        empresaId: string,
+        ruc: string,
+        nombreSugerido?: string | null,
+    ): Promise<{ id: string; nombre: string; creado: boolean } | { error: string }> {
+        const { data: existente } = await supabase
+            .from('proveedores')
+            .select('id, nombre_empresa')
+            .eq('empresa_id', empresaId)
+            .eq('ruc', ruc)
+            .maybeSingle()
+        if (existente) return { id: existente.id, nombre: (existente as any).nombre_empresa, creado: false }
+
+        let nombreSri: string | undefined
+        try {
+            const { data } = await supabase.functions.invoke('sri-lookup', { body: { identificacion: ruc } })
+            nombreSri = data?.razonSocial || data?.nombreCompleto
+        } catch { /* sin conexión al SRI — seguimos con el nombre sugerido si vino */ }
+
+        const nombreFinal = nombreSri || nombreSugerido
+        if (!nombreFinal) return { error: `RUC "${ruc}" no encontrado en el SRI ni en el sistema` }
+
+        const tercerDigito = parseInt(ruc[2] ?? '9', 10)
+        const tipoProveedor: TipoProveedor = tercerDigito <= 5 ? 'PERSONA_NATURAL' : 'SOCIEDAD'
+
+        try {
+            const nuevo = await proveedorService.crear({
+                empresa_id:             empresaId,
+                ruc,
+                nombre_empresa:         nombreFinal,
+                tipo_identificacion:    'RUC',
+                tipo_proveedor:         tipoProveedor,
+                estado:                 'ACTIVO',
+                condicion_pago:         'CREDITO',
+                pais:                   'Ecuador',
+                contribuyente_especial: false,
+                agente_retencion:       false,
+                tipo_regimen:           'GENERAL',
+            } as any)
+            return { id: nuevo.id, nombre: nuevo.nombre_empresa, creado: true }
+        } catch (e: any) {
+            return { error: `No se pudo crear el proveedor: ${e.message}` }
+        }
     },
 }
 

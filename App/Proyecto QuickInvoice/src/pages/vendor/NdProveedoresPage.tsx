@@ -89,7 +89,7 @@ export function NdProveedoresPage() {
     }
 
     // ── Escanear N/D física ───────────────────────────────
-    function handleScanAplicar(data: FacturaEscaneada) {
+    async function handleScanAplicar(data: FacturaEscaneada) {
         if (data.estab && data.pto_emi && data.secuencial) {
             setNumeroNd(`${data.estab}-${data.pto_emi}-${data.secuencial}`)
         }
@@ -99,7 +99,22 @@ export function NdProveedoresPage() {
         setIva(data.iva ?? 0)
         if (data.ruc_proveedor) {
             const prov = proveedores.find(p => p.ruc === data.ruc_proveedor)
-            if (prov) setProveedorId(prov.id)
+            if (prov) {
+                setProveedorId(prov.id)
+            } else if (empresa?.id) {
+                // RUC leído del PDF sin proveedor todavía en esta empresa —
+                // antes se quedaba sin seleccionar.
+                const resuelto = await proveedorService.resolverPorRuc(empresa.id, data.ruc_proveedor, data.razon_social)
+                if ('error' in resuelto) {
+                    setError(`No se pudo crear el proveedor automáticamente (RUC ${data.ruc_proveedor}): ${resuelto.error}. Selecciónalo o créalo manualmente.`)
+                } else {
+                    if (resuelto.creado) {
+                        const p = await proveedorService.listar(empresa.id)
+                        setProveedores(p.filter(x => x.estado === 'ACTIVO'))
+                    }
+                    setProveedorId(resuelto.id)
+                }
+            }
         }
     }
 
