@@ -260,6 +260,34 @@ export const facturaDirectaService = {
 
             const esColisionSecuencial = errorFactura.code === '23505'
             if (!esColisionSecuencial || intento === MAX_INTENTOS_SECUENCIAL) throw errorFactura
+
+            // Resincronizar antes del siguiente intento: el contador (RPC o
+            // fallback) puede haber quedado atrás de lo que YA existe en
+            // comprobantes para esta serie — ej. si el punto de emisión se
+            // creó con el contador en 0 pero la serie ya tenía facturas de
+            // antes (por el fallback viejo, o por otro punto de emisión
+            // duplicado con la misma serie). Sin esto, cada reintento
+            // choca de nuevo con el mismo hueco y nunca avanza.
+            const seriePrefixRetry = `${est.padStart(3, '0')}-${pto.padStart(3, '0')}-`
+            const { data: maxExistente } = await supabase
+                .from('comprobantes')
+                .select('secuencial')
+                .eq('empresa_id', empresa_id)
+                .like('secuencial', `${seriePrefixRetry}%`)
+                .order('secuencial', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+            const maxNum = maxExistente?.secuencial
+                ? parseInt(maxExistente.secuencial.split('-').pop() || '0', 10)
+                : 0
+            if (puntoEmision && maxNum >= nextSec) {
+                const { data: peActual } = await supabase
+                    .from('puntos_emision').select('secuenciales').eq('id', puntoEmision.id).single()
+                await supabase
+                    .from('puntos_emision')
+                    .update({ secuenciales: { ...((peActual?.secuenciales as any) || {}), FACTURA: maxNum } })
+                    .eq('id', puntoEmision.id)
+            }
         }
 
         auditService.logEvent({
