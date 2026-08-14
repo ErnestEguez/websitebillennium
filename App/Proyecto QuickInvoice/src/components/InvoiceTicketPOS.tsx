@@ -170,6 +170,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                 <p>FECHA AUT.: {factura.fecha_autorizacion ? format(new Date(factura.fecha_autorizacion), 'dd/MM/yyyy HH:mm') : 'PENDIENTE'}</p>
                 <p>AMBIENTE: {factura.ambiente || 'PRUEBAS'}</p>
                 <p>EMISIÓN: NORMAL</p>
+                <p className="mt-1">Proveedor de Facturación: Billennium System RUC 0907388268001</p>
                 {avisoLopdp && (
                     <p className="mt-3 pt-2 border-t border-dashed border-black leading-snug">
                         {avisoLopdp}

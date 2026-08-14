@@ -341,6 +341,10 @@ export function InvoicePrint() {
                                             <span>{factura.observacion}</span>
                                         </div>
                                     )}
+                                    <div>
+                                        <span className="font-bold">Proveedor de Facturación: </span>
+                                        <span>Billennium System RUC 0907388268001</span>
+                                    </div>
                                 </div>
 
                                 {avisoLopdp && (
