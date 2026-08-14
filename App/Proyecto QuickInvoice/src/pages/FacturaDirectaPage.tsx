@@ -481,9 +481,14 @@ export function FacturaDirectaPage() {
         }))
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [totales.subtotal, totales.iva])
-    // Vuelto solo aplica si hay pago en efectivo
+    // Vuelto solo aplica si hay pago en efectivo. Se compara el "Efectivo
+    // Recibido" contra la PORCIÓN en efectivo de la factura, no contra el
+    // total completo — si el pago está combinado (ej. $30 tarjeta + $20
+    // efectivo), el cliente puede dar $25 en efectivo y esperar $5 de
+    // vuelto, no comparar $25 contra los $50 totales (que nunca da vuelto).
     const tieneEfectivo = pagos.some(p => p.metodo === 'efectivo')
-    const vuelto = tieneEfectivo ? Math.max(0, montoRecibido - totales.total) : 0
+    const montoEfectivo = pagos.filter(p => p.metodo === 'efectivo').reduce((sum, p) => sum + (Number(p.valor) || 0), 0)
+    const vuelto = tieneEfectivo ? Math.max(0, montoRecibido - montoEfectivo) : 0
 
     const autoCompletarPago = () => {
         if (pagos.length === 1) {
@@ -585,7 +590,9 @@ export function FacturaDirectaPage() {
         const _efectivoSum = pagos.filter(p => p.metodo === 'efectivo').reduce((s, p) => s + Number(p.valor), 0)
         const _tieneEfectivo = pagos.some(p => p.metodo === 'efectivo')
         const _mRecibido = _tieneEfectivo ? (montoRecibido > 0 ? montoRecibido : _efectivoSum) : undefined
-        const _mVuelto = _tieneEfectivo ? Math.max(0, (_mRecibido ?? 0) - totales.total) : undefined
+        // Contra la porción en efectivo (_efectivoSum), no el total de la
+        // factura — igual que el `vuelto` en pantalla (ver arriba).
+        const _mVuelto = _tieneEfectivo ? Math.max(0, (_mRecibido ?? 0) - _efectivoSum) : undefined
 
         try {
             setSaving(true)
@@ -1261,8 +1268,10 @@ export function FacturaDirectaPage() {
                                                 onChange={e => {
                                                     const val = parseFloat(e.target.value) || 0
                                                     updatePago(i, 'valor', val)
-                                                    // Sincronizar "Efectivo Recibido" si supera el total (muestra vuelto en pantalla)
-                                                    if (p.metodo === 'efectivo') {
+                                                    // Sincronizar "Efectivo Recibido" solo cuando el pago es 100% efectivo
+                                                    // (un único método) — si está combinado con otros métodos, no pisar
+                                                    // lo que el cajero ya escribió ahí manualmente.
+                                                    if (p.metodo === 'efectivo' && pagos.length === 1) {
                                                         setMontoRecibido(val > totales.total ? val : 0)
                                                     }
                                                 }} />
