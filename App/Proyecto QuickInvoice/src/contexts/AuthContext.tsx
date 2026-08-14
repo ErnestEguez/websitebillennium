@@ -633,14 +633,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }
 
+    // Limpia localStorage al cerrar sesión, EXCEPTO las claves de Supabase
+    // (sb-) y las preferencias por DISPOSITIVO que deben sobrevivir al
+    // re-login — punto de emisión asignado a esta máquina, última empresa
+    // activa. Antes se borraba todo sin excepción, así que cada vez que la
+    // sesión expiraba (~1h, ver lib/supabase.ts) o el cajero volvía a
+    // entrar, la caja "olvidaba" su punto de emisión y volvía al Principal.
+    function limpiarLocalStorageSesion() {
+        Object.keys(localStorage).forEach(k => {
+            if (k.startsWith('sb-')) return
+            if (k.startsWith('qi_dispositivo_punto_emision_')) return
+            if (k.startsWith('qi_empresa_actual_')) return
+            localStorage.removeItem(k)
+        })
+    }
+
     const signOut = async () => {
         if (sesionUnicaEnabledRef.current) {
             sesionUnicaService.cerrarSesion('logout_manual').catch(() => {}) // fire-and-forget: no bloquea el resto del logout
         }
         supabase.auth.signOut().catch(() => {})
-        Object.keys(localStorage).forEach(k => {
-            if (!k.startsWith('sb-')) localStorage.removeItem(k)
-        })
+        limpiarLocalStorageSesion()
         sessionStorage.clear()
         window.close()
     }
@@ -651,9 +664,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const confirmarSesionDesplazada = async () => {
         setSesionDesplazada(false)
         await supabase.auth.signOut().catch(() => {})
-        Object.keys(localStorage).forEach(k => {
-            if (!k.startsWith('sb-')) localStorage.removeItem(k)
-        })
+        limpiarLocalStorageSesion()
         sessionStorage.clear()
         window.location.href = '/login'
     }
@@ -661,9 +672,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const confirmarSesionExpirada = async () => {
         setSesionExpirada(false)
         await supabase.auth.signOut().catch(() => {})
-        Object.keys(localStorage).forEach(k => {
-            if (!k.startsWith('sb-')) localStorage.removeItem(k)
-        })
+        limpiarLocalStorageSesion()
         sessionStorage.clear()
         window.location.href = '/login'
     }
