@@ -267,20 +267,7 @@ export function NuevaNcPage() {
             `<div class="row"><span>${d.cantidad} ${d.nombre_producto.substring(0, 22)}</span><span>${formatCurrency(d.total_linea)}</span></div>`
         ).join('')
 
-        const w = window.open('', '_blank', 'width=320,height=700')!
-        w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>NC ${ncCreada.secuencial}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{width:72mm;padding:3mm;font-family:monospace;font-size:10px;}
-h1{text-align:center;font-size:12px;margin-bottom:2px;}
-h2{text-align:center;font-size:11px;border:1px solid #000;padding:2px;margin-bottom:4px;}
-.row{display:flex;justify-content:space-between;margin:1px 0;}
-.row span:first-child{flex:1;margin-right:4px;}
-.row span:last-child{white-space:nowrap;}
-.hr{border-top:1px dashed #000;margin:4px 0;}
-.center{text-align:center;}
-.bold{font-weight:bold;}
-</style></head><body>
+        const cuerpoTicket = `
 <h1>${(empresa?.nombre || 'EMPRESA').toUpperCase()}</h1>
 <div class="center" style="font-size:9px">RUC: ${(empresa as any)?.ruc || ''}</div>
 <div class="hr"></div>
@@ -298,7 +285,33 @@ ${lineas}
 <div class="row bold" style="font-size:12px"><span>TOTAL NC:</span><span>${formatCurrency(totalNc)}</span></div>
 <div class="hr"></div>
 <div class="center" style="font-size:8px;word-break:break-all">${ncCreada.autorizacion_numero || ncCreada.estado_sri}</div>
-<div class="center" style="margin-top:3px">${format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+<div class="center" style="margin-top:3px">${format(new Date(), 'dd/MM/yyyy HH:mm')}</div>`
+
+        // Copias automáticas configuradas en Ajustes (Impresión POS) — se
+        // repite el cuerpo del ticket N veces en la misma ventana, separadas
+        // por un corte de página, así un solo w.print() imprime todas de
+        // corrido (igual que el ticket de Factura).
+        const copias = Math.max(1, Number((empresa as any)?.config_sri?.copias_pos_nc) || 1)
+        const cuerpoRepetido = Array.from({ length: copias })
+            .map((_, i) => `<div${i < copias - 1 ? ' class="copia-pb"' : ''}>${cuerpoTicket}</div>`)
+            .join('')
+
+        const w = window.open('', '_blank', 'width=320,height=700')!
+        w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>NC ${ncCreada.secuencial}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{width:72mm;padding:3mm;font-family:monospace;font-size:10px;}
+h1{text-align:center;font-size:12px;margin-bottom:2px;}
+h2{text-align:center;font-size:11px;border:1px solid #000;padding:2px;margin-bottom:4px;}
+.row{display:flex;justify-content:space-between;margin:1px 0;}
+.row span:first-child{flex:1;margin-right:4px;}
+.row span:last-child{white-space:nowrap;}
+.hr{border-top:1px dashed #000;margin:4px 0;}
+.center{text-align:center;}
+.bold{font-weight:bold;}
+.copia-pb{page-break-after:always;}
+</style></head><body>
+${cuerpoRepetido}
 </body></html>`)
         w.document.close()
         w.focus()

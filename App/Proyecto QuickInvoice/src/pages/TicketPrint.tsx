@@ -56,6 +56,11 @@ export function TicketPrint() {
     if (loading) return <div className="p-12 text-center animate-pulse">Generando Ticket...</div>
     if (!factura) return <div className="p-12 text-center text-red-500">No se encontró el comprobante.</div>
 
+    // Copias automáticas configuradas en Ajustes (Impresión POS) — un solo
+    // window.print() imprime todas de corrido, separadas por un corte de
+    // página para que la impresora térmica las corte entre copia y copia.
+    const copias = Math.max(1, Number(factura?.empresas?.config_sri?.copias_pos_factura) || 1)
+
     return (
         <div className="min-h-screen bg-slate-100 pb-12 print:bg-white print:pb-0">
             {/* Toolbar */}
@@ -64,16 +69,20 @@ export function TicketPrint() {
                     <ChevronLeft className="w-4 h-4" /> Volver
                 </button>
                 <button onClick={() => window.print()} className="bg-primary-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg">
-                    <Printer className="w-4 h-4" /> Imprimir
+                    <Printer className="w-4 h-4" /> Imprimir {copias > 1 ? `(${copias} copias)` : ''}
                 </button>
             </div>
 
-            <InvoiceTicketPOS
-                factura={factura}
-                montoRecibido={montoUrl > 0 ? montoUrl : undefined}
-                vuelto={montoUrl > 0 ? vueltoUrl : undefined}
-                avisoLopdp={avisoLopdp}
-            />
+            {Array.from({ length: copias }).map((_, i) => (
+                <div key={i} className={i < copias - 1 ? 'break-after-page' : ''}>
+                    <InvoiceTicketPOS
+                        factura={factura}
+                        montoRecibido={montoUrl > 0 ? montoUrl : undefined}
+                        vuelto={montoUrl > 0 ? vueltoUrl : undefined}
+                        avisoLopdp={avisoLopdp}
+                    />
+                </div>
+            ))}
         </div>
     )
 }

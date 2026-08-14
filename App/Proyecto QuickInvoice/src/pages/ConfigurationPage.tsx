@@ -1382,6 +1382,37 @@ export function ConfigurationPage() {
                                 </div>
                             </div>
 
+                            {/* Impresión POS (Ticket) */}
+                            <div className="border-t border-slate-100 pt-6 space-y-4">
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                    <Printer className="w-4 h-4 text-primary-500" />
+                                    Impresión POS (Ticket)
+                                </h3>
+                                <p className="text-xs text-slate-400">
+                                    Cuántas copias del ticket se imprimen automáticamente al hacer clic en "Imprimir Ticket" — útil para entregar una copia al cliente y quedarse con otra.
+                                </p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Copias — Factura</label>
+                                        <input
+                                            type="number" min={1} max={5}
+                                            className="w-full px-4 py-3 rounded-xl border font-mono"
+                                            value={companyData.config_sri?.copias_pos_factura ?? 1}
+                                            onChange={e => setCompanyData({ ...companyData, config_sri: { ...(companyData.config_sri || {}), copias_pos_factura: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) } })}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Copias — Nota de Crédito</label>
+                                        <input
+                                            type="number" min={1} max={5}
+                                            className="w-full px-4 py-3 rounded-xl border font-mono"
+                                            value={companyData.config_sri?.copias_pos_nc ?? 1}
+                                            onChange={e => setCompanyData({ ...companyData, config_sri: { ...(companyData.config_sri || {}), copias_pos_nc: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) } })}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Configuración Tributaria */}
                             <div className="border-t border-slate-100 pt-6 space-y-4">
                                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
