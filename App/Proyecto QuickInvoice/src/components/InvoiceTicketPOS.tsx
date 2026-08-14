@@ -22,6 +22,31 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
     const config = { ...IMPRESION_POS_DEFAULTS, ...(configOverride ?? factura.empresas?.config_sri?.impresion_pos ?? {}) }
     const anchoContenido = config.ancho_papel_mm - config.margen_horizontal_mm * 2
 
+    // Ítems de la venta — comprobante_detalles (factura directa) o
+    // pedidos.pedido_detalles (flujo de mesas/pedidos), lo que venga.
+    const items: any[] = factura.pedidos?.pedido_detalles || factura.comprobante_detalles || []
+
+    // Desglose de bases e IVA por tasa — siempre se muestran las 3 tasas
+    // (0/5/15), aunque estén en $0, igual que el RIDE.
+    const baseRate: Record<string, number> = { '0': 0, '5': 0, '15': 0 }
+    const ivaRate: Record<string, number> = { '5': 0, '15': 0 }
+    let totalDescuento = 0
+    items.forEach((det: any) => {
+        const rate = String(det.productos?.iva_porcentaje ?? det.iva_porcentaje ?? 0)
+        const base = Number(det.subtotal || 0)
+        if (rate in baseRate) baseRate[rate] += base
+        else baseRate[rate] = (baseRate[rate] || 0) + base
+        if (rate === '5' || rate === '15') {
+            const iva = Number(det.iva_valor ?? (base * Number(rate) / 100))
+            ivaRate[rate] += iva
+        }
+        totalDescuento += Number(det.descuento || 0)
+    })
+    const totalIva = ivaRate['5'] + ivaRate['15']
+
+    const emailEmpresa = factura.empresas?.email
+    const ciudadEmpresa = factura.empresas?.ciudad || 'Guayaquil'
+
     return (
         <div
             ref={ref}
@@ -32,8 +57,9 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                 @page { size: ${config.ancho_papel_mm}mm auto; margin: 0; }
                 @media print { .${zoomClass} { zoom: ${config.escala_pct}%; } }
             ` }} />
-            {/* Header Logos */}
-            <div className="flex justify-center mb-4">
+
+            {/* ── Logo ── */}
+            <div className="flex justify-center mb-2">
                 {factura.empresas?.logo_url ? (
                     <img src={factura.empresas.logo_url} className="w-[64mm] h-auto object-contain" alt="Business" />
                 ) : (
@@ -43,87 +69,108 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                 )}
             </div>
 
-            <div className="text-center space-y-1 mb-4">
+            {/* ── Empresa ── */}
+            <div className="text-center space-y-1 mb-3">
                 <h1 className="text-xs font-bold uppercase">{factura.empresas?.nombre}</h1>
-                <p>{factura.empresas?.direccion || 'Ecuador'}</p>
                 <p>RUC: {factura.empresas?.ruc}</p>
+                {factura.empresas?.direccion && <p>{factura.empresas.direccion}</p>}
+                <p>{emailEmpresa ? `${emailEmpresa} - ` : ''}{ciudadEmpresa} - Ecuador</p>
                 <div className="border-t border-b border-dashed border-black py-1 my-2">
                     <p className="font-bold uppercase">Factura Electronica</p>
-                    <p className="font-bold">№ {factura.secuencial}</p>
+                    <p className="font-bold">No. {factura.secuencial}</p>
                 </div>
             </div>
 
-            <div className="space-y-1 mb-4">
-                <p><span className="font-bold">CLIENTE:</span> {factura.clientes?.nombre}</p>
-                <p><span className="font-bold">RUC/CI.:</span> {factura.clientes?.identificacion}</p>
-                <p><span className="font-bold">FECHA:</span> {format(new Date(factura.created_at || new Date()), 'dd/MM/yyyy HH:mm')}</p>
+            {/* ── Bloque SRI: QR, clave, autorización, ambiente, fecha ── */}
+            <div className="text-center space-y-1 mb-3 text-[8px]">
+                <div className="flex flex-col items-center mb-1">
+                    <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${factura.clave_acceso}`}
+                        alt="QR SRI"
+                        className="w-16 h-16"
+                    />
+                </div>
+                <p className="font-bold">CLAVE DE ACCESO:</p>
+                <p className="break-all font-mono leading-none">{factura.clave_acceso}</p>
+                <p className="font-bold mt-1">AUTORIZACIÓN:</p>
+                <p className="break-all font-mono leading-none">{factura.autorizacion_numero || factura.clave_acceso}</p>
+                <p>AMBIENTE: {factura.ambiente || 'PRUEBAS'}</p>
+                <p>FECHA AUT.: {factura.fecha_autorizacion ? format(new Date(factura.fecha_autorizacion), 'dd/MM/yyyy HH:mm') : 'PENDIENTE'}</p>
+                <p>EMISIÓN: NORMAL</p>
             </div>
 
+            {/* ── Datos de la factura (cliente) ── */}
+            <div className="space-y-1 mb-3 border-t border-dashed border-black pt-2">
+                <p><span className="font-bold">EMISIÓN:</span> {format(new Date(factura.created_at || new Date()), 'dd/MM/yyyy HH:mm')}</p>
+                <p><span className="font-bold">CÉDULA/RUC:</span> {factura.clientes?.identificacion}</p>
+                <p><span className="font-bold">NOMBRE:</span> {factura.clientes?.nombre}</p>
+                {factura.clientes?.direccion && <p><span className="font-bold">DIRECCIÓN:</span> {factura.clientes.direccion}</p>}
+                {factura.clientes?.email && <p><span className="font-bold">CORREO:</span> {factura.clientes.email}</p>}
+                {factura.vendedores?.nombre && <p><span className="font-bold">VENDEDOR:</span> {factura.vendedores.nombre}</p>}
+            </div>
+
+            {/* ── Detalle ── */}
             <table className="w-full mb-4 border-collapse">
                 <thead className="border-b border-dashed border-black">
                     <tr>
-                        <th className="text-left pb-1">DESCRIPCIÓN</th>
                         <th className="text-center pb-1">CANT</th>
+                        <th className="text-left pb-1">DESCRIPCIÓN</th>
+                        <th className="text-right pb-1">UNIT.</th>
                         <th className="text-right pb-1">TOTAL</th>
                     </tr>
                 </thead>
                 <tbody className="pt-1">
-                    {factura.pedidos?.pedido_detalles?.map((item: any) => (
-                        <tr key={item.id}>
-                            <td className="py-1 uppercase text-[9px]">{item.productos?.nombre}</td>
+                    {items.map((item: any, idx: number) => (
+                        <tr key={item.id ?? idx}>
                             <td className="text-center">{item.cantidad}</td>
-                            <td className="text-right">{formatCurrency(item.subtotal)}</td>
-                        </tr>
-                    ))}
-                    {/* Fallback for details if coming from comprobante_detalles snapshot */}
-                    {!factura.pedidos?.pedido_detalles && factura.comprobante_detalles?.map((item: any) => (
-                        <tr key={item.id}>
-                            <td className="py-1 uppercase text-[9px]">{item.nombre_producto}</td>
-                            <td className="text-center">{item.cantidad}</td>
-                            <td className="text-right">{formatCurrency(item.subtotal)}</td>
+                            <td className="py-1 uppercase text-[9px]">{item.productos?.nombre ?? item.nombre_producto}</td>
+                            <td className="text-right">{formatCurrency(Number(item.precio_unitario || 0))}</td>
+                            <td className="text-right">{formatCurrency(Number(item.subtotal || 0))}</td>
                         </tr>
                     ))}
                 </tbody>
             </table>
 
+            {/* ── Totales ── */}
             <div className="border-t border-dashed border-black pt-2 space-y-1">
                 {/* Nota: det.subtotal ya viene SIN impuestos (base) — no se debe volver a
                     dividir por (1 + tasa/100), eso extraía IVA de un valor que ya era la base
                     y descuadraba contra el RIDE. Mismo criterio que InvoicePrint.tsx. */}
-                {(() => {
-                    const breakdown: Record<number, number> = {}
-                    const items = factura.pedidos?.pedido_detalles || factura.comprobante_detalles || []
-                    items.forEach((det: any) => {
-                        const rate = det.productos?.iva_porcentaje || det.iva_porcentaje || 0
-                        breakdown[rate] = (breakdown[rate] || 0) + Number(det.subtotal || 0)
-                    })
-                    return Object.entries(breakdown).map(([rate, base]) => (
-                        <div key={rate} className="flex justify-between">
-                            <span>SUBTOTAL {rate}%:</span>
-                            <span>{formatCurrency(base)}</span>
-                        </div>
-                    ))
-                })()}
-                {(() => {
-                    const items = factura.pedidos?.pedido_detalles || factura.comprobante_detalles || []
-                    const totalIva = items.reduce((sum: number, det: any) => {
-                        const rate = det.productos?.iva_porcentaje || det.iva_porcentaje || 0
-                        const iva = Number(det.iva_valor ?? (Number(det.subtotal || 0) * rate / 100))
-                        return sum + iva
-                    }, 0)
-                    return (
-                        <div className="flex justify-between">
-                            <span>TOTAL IVA:</span>
-                            <span>{formatCurrency(totalIva)}</span>
-                        </div>
-                    )
-                })()}
+                <div className="flex justify-between">
+                    <span>SUB TOTAL BASE IVA 0%:</span>
+                    <span>{formatCurrency(baseRate['0'] || 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span>SUBTOTAL BASE IVA 5%:</span>
+                    <span>{formatCurrency(baseRate['5'] || 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span>SUBTOTAL BASE IVA 15%:</span>
+                    <span>{formatCurrency(baseRate['15'] || 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span>DESCUENTO:</span>
+                    <span>-{formatCurrency(totalDescuento)}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span>IVA 5%:</span>
+                    <span>{formatCurrency(ivaRate['5'] || 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span>IVA 15%:</span>
+                    <span>{formatCurrency(ivaRate['15'] || 0)}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                    <span>TOTAL IVA:</span>
+                    <span>{formatCurrency(totalIva)}</span>
+                </div>
                 <div className="flex justify-between text-xs font-black pt-1 border-t border-black">
-                    <span>TOTAL A PAGAR:</span>
+                    <span>TOTAL:</span>
                     <span>{formatCurrency(factura.total)}</span>
                 </div>
             </div>
 
+            {/* ── Formas de pago ── */}
             {factura.comprobante_pagos && factura.comprobante_pagos.length > 0 && (
                 <div className="mt-4 border-t border-dashed border-black pt-2 space-y-1">
                     <p className="font-bold">FORMAS DE PAGO:</p>
@@ -146,30 +193,25 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
             {montoRecibido != null && montoRecibido > 0 && (
                 <div className="mt-2 border-t border-dashed border-black pt-2 space-y-1">
                     <div className="flex justify-between text-[9px]">
-                        <span className="font-bold">EFECTIVO RECIBIDO:</span>
+                        <span className="font-bold">RECIBIDO:</span>
                         <span>{formatCurrency(montoRecibido)}</span>
                     </div>
                     <div className="flex justify-between text-xs font-black">
-                        <span>VUELTO / CAMBIO:</span>
+                        <span>VUELTO:</span>
                         <span>{formatCurrency(vuelto ?? 0)}</span>
                     </div>
                 </div>
             )}
 
-            <div className="mt-6 space-y-2 text-[8px]">
-                <p className="font-bold uppercase border-t border-black pt-2 text-center">Información Electrónica SRI</p>
-                <div className="flex flex-col items-center mb-2">
-                    <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${factura.clave_acceso}`}
-                        alt="QR SRI"
-                        className="w-20 h-20"
-                    />
+            {/* ── Observaciones ── */}
+            {factura.observacion && (
+                <div className="mt-2 border-t border-dashed border-black pt-2">
+                    <p className="font-bold">OBSERVACIONES:</p>
+                    <p className="text-[9px]">{factura.observacion}</p>
                 </div>
-                <p className="font-bold">CLAVE DE ACCESO / AUTORIZACIÓN:</p>
-                <p className="break-all font-mono leading-none text-[7px] text-center">{factura.autorizacion_numero || factura.clave_acceso}</p>
-                <p>FECHA AUT.: {factura.fecha_autorizacion ? format(new Date(factura.fecha_autorizacion), 'dd/MM/yyyy HH:mm') : 'PENDIENTE'}</p>
-                <p>AMBIENTE: {factura.ambiente || 'PRUEBAS'}</p>
-                <p>EMISIÓN: NORMAL</p>
+            )}
+
+            <div className="mt-6 space-y-2 text-[8px]">
                 <p className="mt-1">Proveedor de Facturación: Billennium System RUC 0907388268001</p>
                 {avisoLopdp && (
                     <p className="mt-3 pt-2 border-t border-dashed border-black leading-snug">
@@ -195,6 +237,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                         </p>
                     )
                 })()}
+                {/* ── Glosa fija por empresa ── */}
                 {factura.empresas?.glosa_factura && (
                     <p className="text-center text-[9px] mt-1 italic">{factura.empresas.glosa_factura}</p>
                 )}

@@ -429,7 +429,8 @@ export const facturacionService = {
                 clientes (*),
                 empresas (*),
                 comprobante_detalles (*),
-                comprobante_pagos (*)
+                comprobante_pagos (*),
+                vendedores (nombre)
             `)
             .eq('id', id)
             .single()

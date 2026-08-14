@@ -539,6 +539,8 @@ export function ConfigurationPage() {
                     ruc: companyData.ruc,
                     direccion: companyData.direccion || companyData.direccion_matriz || '',
                     telefono: companyData.telefono || null,
+                    ciudad: companyData.ciudad || null,
+                    email: companyData.email || null,
                     logo_url: companyData.logo_url || null,
                     config_sri: configSriNuevo,
                     usar_vendor_management: companyData.usar_vendor_management ?? false,
@@ -1234,6 +1236,32 @@ export function ConfigurationPage() {
                                         className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
                                         value={companyData.telefono || ''}
                                         onChange={e => setCompanyData({ ...companyData, telefono: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Ciudad
+                                        <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">para el ticket POS</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Guayaquil"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
+                                        value={companyData.ciudad || ''}
+                                        onChange={e => setCompanyData({ ...companyData, ciudad: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Correo
+                                        <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">para el ticket POS</span>
+                                    </label>
+                                    <input
+                                        type="email"
+                                        placeholder="contacto@empresa.com"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
+                                        value={companyData.email || ''}
+                                        onChange={e => setCompanyData({ ...companyData, email: e.target.value })}
                                     />
                                 </div>
                                 <div className="space-y-1">
