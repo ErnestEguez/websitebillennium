@@ -1507,6 +1507,15 @@ export function FacturaDirectaPage() {
                             </button>
                         )}
 
+                        {/* Punto de emisión que se va a usar — visible justo antes de
+                            confirmar, para que el cajero pueda verificarlo antes de facturar. */}
+                        {puntoEmisionActivo && (
+                            <div className="flex items-center justify-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg py-2">
+                                <Printer className="w-3.5 h-3.5" />
+                                Se facturará con: {puntoEmisionActivo.establecimiento}-{puntoEmisionActivo.punto_emision} · {puntoEmisionActivo.nombre}
+                            </div>
+                        )}
+
                         {/* Botón Facturar */}
                         <button
                             data-sentinel="btn-generar-factura"
