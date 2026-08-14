@@ -430,6 +430,7 @@ async function generarRidePdf(comprobante: any): Promise<Uint8Array> {
         { label: 'Teléfono',    val: cliente.telefono },
         { label: 'Email',       val: cliente.email },
         { label: 'Observación', val: comprobante.observacion },
+        { label: 'Proveedor de Facturación:', val: 'Billennium System RUC 0907388268001' },
     ].filter(it => it.val);
 
     // LOPDP Fase 4: aviso de privacidad (opcional — solo si la empresa lo
@@ -893,7 +894,9 @@ async function generarRideLcPdf(lc: any, empresa: any): Promise<Uint8Array> {
 
     const TotRH = 5.5;
     const totH  = totRows.length * TotRH;
-    const leftH = retenciones.length > 0 ? 8 + retenciones.length * 5 + 10 : 8;
+    // +5 en ambas ramas: espacio para la línea fija "Proveedor de
+    // Facturación" (obligatoria en todo RIDE, ver retenciones/else abajo).
+    const leftH = (retenciones.length > 0 ? 8 + retenciones.length * 5 + 10 : 8) + 5;
     const S5_H  = Math.max(totH, leftH) + 4;
 
     if (y + S5_H + 9 > PH) { doc.addPage(); y = 10; }
@@ -925,13 +928,19 @@ async function generarRideLcPdf(lc: any, empresa: any): Promise<Uint8Array> {
             doc.text(`-$${f2(r.valor)}`, ML+2+doc.getTextWidth(`${r.tipo} ${r.codigo_retencion} (${r.porcentaje}%): `), retY);
             retY += 5;
         });
+        retY += 2;
+        doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80,80,80);
+        doc.text("Proveedor de Facturación: Billennium System RUC 0907388268001", ML+2, retY);
     } else {
         let infoY = y + 2;
         doc.setFontSize(7.5); doc.setFont("helvetica", "bold"); doc.setTextColor(0,0,0);
         doc.text("INFORMACIÓN ADICIONAL", ML+2, infoY+2);
+        infoY += 6;
+        doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80,80,80);
+        doc.text("Proveedor de Facturación: Billennium System RUC 0907388268001", ML+2, infoY);
         if (lc.observaciones) {
-            infoY += 6;
-            doc.setFont("helvetica", "normal"); doc.setFontSize(7);
+            infoY += 4;
+            doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(0,0,0);
             doc.text(doc.splitTextToSize(lc.observaciones, LW-4), ML+2, infoY);
         }
     }

@@ -250,6 +250,7 @@ function generarXmlNC(nc: any, comprobanteOrigen: any): string {
   <infoAdicional>
     <campoAdicional nombre="Email">${escapeXml(cliente.email || "S/N")}</campoAdicional>
     <campoAdicional nombre="FacturaOrigen">${escapeXml(numDocModificado)}</campoAdicional>
+    <campoAdicional nombre="Proveedor de Facturación">Proveedor de Facturación Billennium System RUC 0907388268001</campoAdicional>
   </infoAdicional>
 </notaCredito>`;
 
@@ -515,6 +516,7 @@ async function generarRidePdfNC(nc: any, comprobanteOrigen: any): Promise<Uint8A
     { label:'Dirección', val:cliente.direccion },
     { label:'Teléfono',  val:cliente.telefono },
     { label:'Email',     val:cliente.email },
+    { label:'Proveedor de Facturación:', val:'Billennium System RUC 0907388268001' },
   ].filter(it => it.val);
   const leftH = 8+infoItems.length*4.5;
   const S5_H = Math.max(totH, leftH)+4;

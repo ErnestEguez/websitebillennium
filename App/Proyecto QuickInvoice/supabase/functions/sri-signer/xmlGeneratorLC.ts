@@ -139,6 +139,7 @@ export default function generarXmlLC(lc: any, empresa: any): string {
     if (camposAdicionales.length === 0) {
         camposAdicionales.push(`    <campoAdicional nombre="Emisor">${escapeXml((empresa.razon_social || "EMPRESA").toUpperCase())}</campoAdicional>`);
     }
+    camposAdicionales.push(`    <campoAdicional nombre="Proveedor de Facturación">Proveedor de Facturación Billennium System RUC 0907388268001</campoAdicional>`);
 
     // XML v1.1.0 — estructura validada contra XML autorizado SRI Ecuador
     // SIN <pagos> y SIN <retenciones> (no forman parte del schema LC v1.1.0)

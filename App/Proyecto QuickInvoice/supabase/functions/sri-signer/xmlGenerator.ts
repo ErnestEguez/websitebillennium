@@ -211,7 +211,8 @@ export default function generarXml(comprobante: any): string {
   </detalles>
   <infoAdicional>
     <campoAdicional nombre="Email">${escapeXml(cliente.email || "S/N")}</campoAdicional>
-    <campoAdicional nombre="Direccion">${escapeXml(cliente.direccion || "S/N")}</campoAdicional>${
+    <campoAdicional nombre="Direccion">${escapeXml(cliente.direccion || "S/N")}</campoAdicional>
+    <campoAdicional nombre="Proveedor de Facturación">Proveedor de Facturación Billennium System RUC 0907388268001</campoAdicional>${
       comprobante.lopdp_aviso_corto
         ? `\n    <campoAdicional nombre="LOPDP">${escapeXml(String(comprobante.lopdp_aviso_corto).substring(0, 300))}</campoAdicional>`
         : ""
