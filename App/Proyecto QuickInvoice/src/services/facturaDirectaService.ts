@@ -169,85 +169,98 @@ export const facturaDirectaService = {
         // evitando que dos cajas que facturan al mismo tiempo obtengan el mismo número.
         const puntoEmision = await puntoEmisionService.resolverParaDispositivo(empresa_id)
 
-        let est: string
-        let pto: string
-        let nextSec: number
-        let actualizarSecuencialInicio = false
-        if (puntoEmision) {
-            est = puntoEmision.establecimiento
-            pto = puntoEmision.punto_emision
-
-            // RPC atómica: lee puntos_emision.secuenciales.FACTURA, suma 1, lo graba y lo devuelve.
-            // El usuario controla ese contador desde:
-            //   a) Configuración → Empresa → "Secuencial Inicial Facturas" (que sincroniza al guardar)
-            //   b) Configuración → Puntos de Emisión → "Cambiar secuencial"
-            const { data: nextSecData, error: errorSec } = await supabase
-                .rpc('qi_next_secuencial_punto', { p_punto_emision_id: puntoEmision.id, p_tipo_comprobante: 'FACTURA' })
-            if (errorSec) throw errorSec
-            nextSec = nextSecData as number
-        } else {
-            // Fallback: empresa todavía sin punto de emisión migrado, usar MAX(secuencial)+1
-            est = config.establecimiento || '001'
-            pto = config.punto_emision || '001'
-            const seriePrefix = `${est.padStart(3, '0')}-${pto.padStart(3, '0')}-`
-            const { data: lastComprobante } = await supabase
-                .from('comprobantes')
-                .select('secuencial')
-                .eq('empresa_id', empresa_id)
-                .like('secuencial', `${seriePrefix}%`)
-                .order('secuencial', { ascending: false })
-                .limit(1)
-                .maybeSingle()
-
-            if (lastComprobante?.secuencial) {
-                const lastNum = parseInt(lastComprobante.secuencial.split('-').pop() || '0', 10)
-                nextSec = lastNum + 1
-            } else {
-                nextSec = config.secuencial_inicio || 1
-            }
-            actualizarSecuencialInicio = true
-        }
-
-        const secuencialFormateado = `${est.padStart(3, '0')}-${pto.padStart(3, '0')}-${nextSec.toString().padStart(9, '0')}`
-
-        // 2. Generar clave de acceso
-        const claveAcceso = sriService.generarClaveAcceso(
-            new Date(),
-            rucEmpresa,
-            config.ambiente || 'PRUEBAS',
-            est,
-            pto,
-            secuencialFormateado
-        )
-
-        // 3. Calcular totales
+        // 3. Calcular totales (no depende del secuencial, se calcula una sola vez)
         const totales = calcularTotalesFactura(detalles)
 
-        // 4. Crear comprobante cabecera (pedido_id = null para factura directa)
-        const { data: factura, error: errorFactura } = await supabase
-            .from('comprobantes')
-            .insert({
-                empresa_id,
-                pedido_id: null,
-                cliente_id,
-                tipo_comprobante: 'FACTURA',
-                secuencial: secuencialFormateado,
-                clave_acceso: claveAcceso,
-                autorizacion_numero: null,
-                ambiente: config.ambiente || 'PRUEBAS',
-                total: totales.total,
-                estado_sri: 'PENDIENTE',
-                fecha_autorizacion: null,
-                sri_utilizacion_sistema_financiero: false,
-                caja_sesion_id: caja_sesion_id || null,
-                vendedor_id: vendedor_id || null,
-                bodega_id: bodega_id || null,
-                observacion: observaciones || null,
-            })
-            .select()
-            .single()
+        // 2 y 4. Generar secuencial + clave de acceso e insertar la cabecera, con
+        // reintentos: el fallback sin punto de emisión (abajo) calcula el siguiente
+        // secuencial con un SELECT MAX(secuencial), sin lock — si dos facturas se
+        // graban casi al mismo tiempo (dos cajas, o doble click), ambas pueden leer
+        // el mismo "último secuencial" y chocar en el UNIQUE de clave_acceso. En vez
+        // de reventar la venta con el error crudo del constraint, se recalcula el
+        // siguiente número y se reintenta unas pocas veces.
+        let est = ''
+        let pto = ''
+        let nextSec = 0
+        let actualizarSecuencialInicio = false
+        let secuencialFormateado = ''
+        let claveAcceso = ''
+        let factura: any = null
+        const MAX_INTENTOS_SECUENCIAL = 4
+        for (let intento = 1; intento <= MAX_INTENTOS_SECUENCIAL; intento++) {
+            if (puntoEmision) {
+                est = puntoEmision.establecimiento
+                pto = puntoEmision.punto_emision
 
-        if (errorFactura) throw errorFactura
+                // RPC atómica: lee puntos_emision.secuenciales.FACTURA, suma 1, lo graba y lo devuelve.
+                // El usuario controla ese contador desde:
+                //   a) Configuración → Empresa → "Secuencial Inicial Facturas" (que sincroniza al guardar)
+                //   b) Configuración → Puntos de Emisión → "Cambiar secuencial"
+                const { data: nextSecData, error: errorSec } = await supabase
+                    .rpc('qi_next_secuencial_punto', { p_punto_emision_id: puntoEmision.id, p_tipo_comprobante: 'FACTURA' })
+                if (errorSec) throw errorSec
+                nextSec = nextSecData as number
+            } else {
+                // Fallback: empresa todavía sin punto de emisión migrado, usar MAX(secuencial)+1
+                est = config.establecimiento || '001'
+                pto = config.punto_emision || '001'
+                const seriePrefix = `${est.padStart(3, '0')}-${pto.padStart(3, '0')}-`
+                const { data: lastComprobante } = await supabase
+                    .from('comprobantes')
+                    .select('secuencial')
+                    .eq('empresa_id', empresa_id)
+                    .like('secuencial', `${seriePrefix}%`)
+                    .order('secuencial', { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
+
+                if (lastComprobante?.secuencial) {
+                    const lastNum = parseInt(lastComprobante.secuencial.split('-').pop() || '0', 10)
+                    nextSec = lastNum + 1
+                } else {
+                    nextSec = config.secuencial_inicio || 1
+                }
+                actualizarSecuencialInicio = true
+            }
+
+            secuencialFormateado = `${est.padStart(3, '0')}-${pto.padStart(3, '0')}-${nextSec.toString().padStart(9, '0')}`
+            claveAcceso = sriService.generarClaveAcceso(
+                new Date(),
+                rucEmpresa,
+                config.ambiente || 'PRUEBAS',
+                est,
+                pto,
+                secuencialFormateado
+            )
+
+            const { data: facturaInsertada, error: errorFactura } = await supabase
+                .from('comprobantes')
+                .insert({
+                    empresa_id,
+                    pedido_id: null,
+                    cliente_id,
+                    tipo_comprobante: 'FACTURA',
+                    secuencial: secuencialFormateado,
+                    clave_acceso: claveAcceso,
+                    autorizacion_numero: null,
+                    ambiente: config.ambiente || 'PRUEBAS',
+                    total: totales.total,
+                    estado_sri: 'PENDIENTE',
+                    fecha_autorizacion: null,
+                    sri_utilizacion_sistema_financiero: false,
+                    caja_sesion_id: caja_sesion_id || null,
+                    vendedor_id: vendedor_id || null,
+                    bodega_id: bodega_id || null,
+                    observacion: observaciones || null,
+                })
+                .select()
+                .single()
+
+            if (!errorFactura) { factura = facturaInsertada; break }
+
+            const esColisionSecuencial = errorFactura.code === '23505'
+            if (!esColisionSecuencial || intento === MAX_INTENTOS_SECUENCIAL) throw errorFactura
+        }
 
         auditService.logEvent({
             empresaId: empresa_id,
