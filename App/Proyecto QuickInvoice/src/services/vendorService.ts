@@ -188,31 +188,47 @@ export const compraService = {
     // registrado y ACTIVO (un documento ANULADO no bloquea — permite corregir un
     // error de digitación y volver a ingresar el número correcto).
     async verificarDuplicado(empresaId: string, claveAcceso?: string, numeroFactura?: string, proveedorId?: string): Promise<boolean> {
-        // .limit(1) en vez de .maybeSingle(): si ya hay 2+ filas duplicadas
-        // preexistentes (datos de antes de este control), maybeSingle() falla
-        // con error "multiple rows" y data queda null — el chequeo reportaba
-        // "no hay duplicado" y dejaba colar más. Con .limit(1) siempre funciona
-        // sin importar cuantas coincidencias existentes haya.
+        // Una cabecera puede quedar "huérfana" (sin ninguna línea de detalle)
+        // si un guardado anterior falló a medio camino -- crearInventario/
+        // crearServicio insertan la cabecera PRIMERO y el detalle/kardex
+        // después, sin transacción; si el segundo paso falla (ej. error de
+        // red), la cabecera queda grabada pero el usuario nunca vio la
+        // compra como guardada. Sin este chequeo, esa cabecera bloqueaba
+        // para siempre cualquier reintento legítimo del mismo número de
+        // factura, con el mensaje de "ya existe" aunque nunca se guardó de
+        // verdad. No se borra automáticamente (dato hasta cierto punto
+        // recuperable) — solo se ignora como candidato a duplicado.
+        const tieneDetalleReal = async (row: { id: string; tipo_compra: string | null }): Promise<boolean> => {
+            const esServicio = row.tipo_compra === 'SERVICIO'
+            const { count } = await supabase
+                .from(esServicio ? 'detalle_servicios' : 'detalle_ingresos_stock')
+                .select('id', { count: 'exact', head: true })
+                .eq(esServicio ? 'compra_id' : 'ingreso_id', row.id)
+            return (count ?? 0) > 0
+        }
+
         if (claveAcceso) {
             const { data } = await supabase
                 .from('ingresos_stock')
-                .select('id')
+                .select('id, tipo_compra')
                 .eq('empresa_id', empresaId)
                 .eq('clave_acceso', claveAcceso)
                 .eq('estado', 'ACTIVO')
-                .limit(1)
-            if (data && data.length > 0) return true
+            for (const row of data ?? []) {
+                if (await tieneDetalleReal(row as any)) return true
+            }
         }
         if (numeroFactura && proveedorId) {
             const { data } = await supabase
                 .from('ingresos_stock')
-                .select('id')
+                .select('id, tipo_compra')
                 .eq('empresa_id', empresaId)
                 .eq('numero_factura', numeroFactura)
                 .eq('proveedor_id', proveedorId)
                 .eq('estado', 'ACTIVO')
-                .limit(1)
-            if (data && data.length > 0) return true
+            for (const row of data ?? []) {
+                if (await tieneDetalleReal(row as any)) return true
+            }
         }
         return false
     },
