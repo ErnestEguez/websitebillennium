@@ -95,6 +95,10 @@ export function NuevaCompraInventarioPage() {
     const [loading, setLoading]       = useState(true)
     const [saving, setSaving]         = useState(false)
     const [ocrLoading, setOcrLoading] = useState(false)
+    // "Sin Detalle": al escanear, solo trae cabecera/totales del PDF, sin
+    // llenar las líneas de producto — para facturas donde no importa el
+    // detalle o para no crear productos nuevos por error.
+    const [ocrSinDetalle, setOcrSinDetalle] = useState(false)
 
     // Cabecera
     const [bodegaId, setBodegaId]           = useState('')
@@ -316,7 +320,10 @@ export function NuevaCompraInventarioPage() {
             }
 
             // ── Validar detalle contra catálogo ───────────────────────────
-            const lineasValidadas: LineaDetalle[] = ocr.detalle.map(item => {
+            // "Sin Detalle": se queda solo con la cabecera/totales ya cargados
+            // arriba (incluye usarIvaManual + baseIva0/5/15 si el PDF traía
+            // el IVA), sin tocar las líneas de producto.
+            const lineasValidadas: LineaDetalle[] = ocrSinDetalle ? [] : ocr.detalle.map(item => {
                 const normStr = (s: string) => (s ?? '').toLowerCase().trim()
                 const codNorm = normStr(item.codigo)
 
@@ -393,7 +400,9 @@ export function NuevaCompraInventarioPage() {
             const provCreado    = rucOcr && !provExistente && proveedorResueltoId
 
             const parts = [
-                `✅ Factura analizada: ${lineasValidadas.length} producto(s)`,
+                ocrSinDetalle
+                    ? '✅ Factura analizada: solo cabecera y totales (Sin Detalle activado)'
+                    : `✅ Factura analizada: ${lineasValidadas.length} producto(s)`,
                 provCreado    ? `🏢 Proveedor nuevo creado: ${ocr.proveedor_nombre} (${rucOcr})` : null,
                 provExistente ? `🏢 Proveedor encontrado: ${provExistente.nombre_empresa}` : null,
                 nFound  > 0 ? `● ${nFound} producto(s) encontrado(s) por código` : null,
@@ -498,6 +507,24 @@ export function NuevaCompraInventarioPage() {
     }
 
     function removeLinea(i: number) { setDetalle(prev => prev.filter((_, j) => j !== i)) }
+
+    // Segunda forma de digitar una línea: Cantidad + Total (en vez de
+    // Cantidad + Costo Unitario) — se despeja el costo unitario hacia atrás
+    // con mínimo 4 decimales, respetando el descuento de línea ya ingresado
+    // (directo en $ o %), para que el subtotal resultante cuadre exacto con
+    // el total que escribió el usuario. Ambas formas conviven: esta solo
+    // cambia costo_unitario, el resto de la fila sigue igual.
+    function setCostoDesdeTotal(i: number, totalNeto: number) {
+        setDetalle(prev => prev.map((d, j) => {
+            if (j !== i || d.cantidad <= 0) return d
+            const valDesc = d.descuento_valor ?? 0
+            const pctDesc = d.descuento_porcentaje ?? 0
+            const bruto = valDesc > 0
+                ? totalNeto + valDesc
+                : pctDesc > 0 ? totalNeto / (1 - pctDesc / 100) : totalNeto
+            return { ...d, costo_unitario: Math.round((bruto / d.cantidad) * 10000) / 10000 }
+        }))
+    }
 
     // ── Guardar ───────────────────────────────────────────────────────────────
     async function handleGuardar() {
@@ -727,7 +754,7 @@ export function NuevaCompraInventarioPage() {
 
             {/* ── OCR: cargar factura (solo si Billennium habilitó esta IA) ───────── */}
             {ocrIaHabilitado && (
-                <div className="card p-4 border-2 border-dashed border-primary-200 bg-primary-50">
+                <div className="card p-4 border-2 border-dashed border-primary-200 bg-primary-50 space-y-3">
                     <div className="flex items-center gap-4">
                         <ScanLine className="w-8 h-8 text-primary-400 shrink-0" />
                         <div className="flex-1">
@@ -754,6 +781,11 @@ export function NuevaCompraInventarioPage() {
                             />
                         </label>
                     </div>
+                    <label className="flex items-center gap-2 text-xs font-medium text-primary-700 cursor-pointer select-none">
+                        <input type="checkbox" checked={ocrSinDetalle} onChange={e => setOcrSinDetalle(e.target.checked)}
+                            className="rounded border-primary-300 text-primary-600 focus:ring-primary-400" />
+                        Sin Detalle — solo traer cabecera y totales, sin llenar las líneas de producto
+                    </label>
                 </div>
             )}
 
@@ -914,9 +946,18 @@ export function NuevaCompraInventarioPage() {
             <div className="card p-5 space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Productos</h2>
-                    <button onClick={addLinea} className="btn btn-primary btn-sm flex items-center gap-1.5">
-                        <Plus className="w-4 h-4" /> Agregar
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {detalle.length > 0 && (
+                            <button
+                                onClick={() => { if (confirm(`¿Vaciar las ${detalle.length} línea(s) de detalle? Esta acción no se puede deshacer.`)) setDetalle([]) }}
+                                className="btn btn-sm flex items-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50">
+                                <Trash2 className="w-4 h-4" /> Vaciar detalle
+                            </button>
+                        )}
+                        <button onClick={addLinea} className="btn btn-primary btn-sm flex items-center gap-1.5">
+                            <Plus className="w-4 h-4" /> Agregar
+                        </button>
+                    </div>
                 </div>
 
                 {/* Leyenda de colores — solo cuando hay líneas OCR */}
@@ -955,10 +996,10 @@ export function NuevaCompraInventarioPage() {
                                         <th className="text-left py-1.5 px-2 w-20 font-semibold">Unidad</th>
                                         <th className="text-left py-1.5 px-2 w-28 font-semibold">Categoría</th>
                                         <th className="text-right py-1.5 px-2 w-16 font-semibold">Cant.</th>
-                                        <th className="text-right py-1.5 px-2 w-20 font-semibold">Costo</th>
+                                        <th className="text-right py-1.5 px-2 w-20 font-semibold" title="Precio unitario">Costo</th>
                                         <th className="text-right py-1.5 px-2 w-16 font-semibold">Dsc. %</th>
                                         <th className="text-right py-1.5 px-2 w-20 font-semibold">Dsc. $</th>
-                                        <th className="text-right py-1.5 px-2 w-24 font-semibold">Subtotal</th>
+                                        <th className="text-right py-1.5 px-2 w-24 font-semibold" title="También editable: escribe el total de la línea y se calcula el costo unitario">Subtotal / Total</th>
                                         <th className="w-8" />
                                     </tr>
                                 </thead>
@@ -996,7 +1037,7 @@ export function NuevaCompraInventarioPage() {
 
                                                 {/* Producto */}
                                                 <td className="py-1.5 pr-2 relative" style={{ minWidth: 200 }}>
-                                                    {isOcr ? (
+                                                    {isOcr && d.status !== 'new' ? (
                                                         <input
                                                             className={cn('w-full border border-slate-200 rounded px-1.5 py-1 text-xs bg-transparent focus:bg-white focus:border-primary-400 outline-none font-medium', textColor)}
                                                             value={d.nombre}
@@ -1009,14 +1050,23 @@ export function NuevaCompraInventarioPage() {
                                                                 className="text-slate-400 hover:text-red-500 text-xs px-1">✕</button>
                                                         </div>
                                                     ) : (
-                                                        <BuscadorProducto
-                                                            empresaId={empresa!.id}
-                                                            placeholder="Buscar (Enter o Buscar)…"
-                                                            onSelect={(p: ProductoResultado) => {
-                                                                setDetalle(prev => prev.map((d2, j) => j !== i ? d2
-                                                                    : { ...d2, producto_id: p.id, nombre: p.nombre, codigo: p.codigo ?? '', unidad_id: p.unidad_id ?? null, categoria_id: p.categoria_id ?? null }))
-                                                            }}
-                                                        />
+                                                        <div className="space-y-1">
+                                                            {/* Línea roja del PDF sin match — el texto se conserva como
+                                                                pista para buscar el producto real que sí existe. */}
+                                                            {d.status === 'new' && d.nombre && (
+                                                                <p className="text-[10px] text-red-500 italic truncate" title={d.nombre}>
+                                                                    PDF: {d.nombre}
+                                                                </p>
+                                                            )}
+                                                            <BuscadorProducto
+                                                                empresaId={empresa!.id}
+                                                                placeholder="Buscar (Enter o Buscar)…"
+                                                                onSelect={(p: ProductoResultado) => {
+                                                                    setDetalle(prev => prev.map((d2, j) => j !== i ? d2
+                                                                        : { ...d2, producto_id: p.id, nombre: p.nombre, codigo: p.codigo ?? '', unidad_id: p.unidad_id ?? null, categoria_id: p.categoria_id ?? null, status: 'found' as LineaStatus }))
+                                                                }}
+                                                            />
+                                                        </div>
                                                     )}
                                                 </td>
 
@@ -1090,16 +1140,22 @@ export function NuevaCompraInventarioPage() {
                                                         onBlur={() => numBlur(`descval_${i}`, v => updLinea(i, 'descuento_valor', Math.max(v, 0)))} />
                                                 </td>
 
-                                                {/* Subtotal (neto de descuento) */}
+                                                {/* Subtotal (neto de descuento) — también editable: escribir el TOTAL
+                                                    de la línea calcula el costo unitario hacia atrás (mín. 4 decimales),
+                                                    para cuando el proveedor solo da el total y no el precio unitario. */}
                                                 <td className="py-1.5 px-2 text-right font-mono">
                                                     {((d.descuento_porcentaje ?? 0) > 0 || (d.descuento_valor ?? 0) > 0) && (
                                                         <div className="text-[9px] text-slate-400 line-through leading-tight">
                                                             ${lineaNeta(d).bruto.toFixed(2)}
                                                         </div>
                                                     )}
-                                                    <div className="text-xs font-semibold text-slate-800">
-                                                        ${lineaNeta(d).neto.toFixed(2)}
-                                                    </div>
+                                                    <input type="text" inputMode="decimal"
+                                                        title="Escribe el TOTAL de la línea para calcular el precio unitario automáticamente"
+                                                        className={cn(inpSm, 'text-right font-semibold text-slate-800')}
+                                                        value={numVal(`total_${i}`, Math.round(lineaNeta(d).neto * 10000) / 10000)}
+                                                        onFocus={e => e.target.select()}
+                                                        onChange={e => numChange(`total_${i}`, e.target.value, v => setCostoDesdeTotal(i, v))}
+                                                        onBlur={() => numBlur(`total_${i}`, v => setCostoDesdeTotal(i, v))} />
                                                 </td>
 
                                                 {/* Eliminar */}
