@@ -30,7 +30,7 @@ import {
     Search, UserPlus, Plus, Trash2, X, Save,
     CheckCircle2, Loader2, FilePlus, FileText, CreditCard,
     Package, Printer, User, Briefcase, ChevronDown, ChevronUp,
-    Layers, RotateCw, PaintBucket,
+    Layers, RotateCw, PaintBucket, Copy,
 } from 'lucide-react'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { bodegaService } from '../services/bodegaService'
@@ -101,6 +101,14 @@ export function FacturaDirectaPage() {
     const [isSavingClient, setIsSavingClient] = useState(false)
     // Alerta de cartera pendiente (vencida / por vencer) del cliente seleccionado
     const [alertaDeuda, setAlertaDeuda] = useState<{ vencida: CarteraCxc[]; porVencer: CarteraCxc[] } | null>(null)
+
+    // Cargar factura anterior como plantilla — solo para llenado rápido
+    // (clientes que compran lo mismo varias veces). El número de la
+    // factura vieja NUNCA se usa para grabar: generarFacturaDirecta()
+    // siempre calcula el secuencial nuevo real al guardar, sin importar
+    // qué se haya cargado en pantalla.
+    const [numeroPlantilla, setNumeroPlantilla] = useState('')
+    const [cargandoPlantilla, setCargandoPlantilla] = useState(false)
 
     // Estado: vendedores
     const [vendedores, setVendedores] = useState<Vendedor[]>([])
@@ -405,6 +413,62 @@ export function FacturaDirectaPage() {
             alert('No se pudo actualizar la lista de clientes')
         } finally {
             setRefreshingClientes(false)
+        }
+    }
+
+    // ─── CARGAR FACTURA ANTERIOR COMO PLANTILLA ────────────
+    async function handleCargarPlantilla() {
+        const partes = numeroPlantilla.trim().split('-')
+        if (partes.length !== 3 || partes.some(p => !/^\d+$/.test(p))) {
+            alert('Formato inválido. Escribe establecimiento-puntoEmisión-secuencial, ej: 001-002-1515')
+            return
+        }
+        const secuencialFormateado = `${partes[0].padStart(3, '0')}-${partes[1].padStart(3, '0')}-${partes[2].padStart(9, '0')}`
+
+        setCargandoPlantilla(true)
+        try {
+            const { data: comp, error } = await supabase
+                .from('comprobantes')
+                .select('*, clientes(*), comprobante_detalles(*), comprobante_pagos(*)')
+                .eq('empresa_id', empresa!.id)
+                .eq('tipo_comprobante', 'FACTURA')
+                .eq('secuencial', secuencialFormateado)
+                .maybeSingle()
+            if (error) throw error
+            if (!comp) { alert(`No se encontró ninguna factura con el número ${secuencialFormateado}.`); return }
+
+            if (comp.clientes) setSelectedCliente(comp.clientes)
+
+            const lineasCargadas: DetalleFacturaDirecta[] = (comp.comprobante_detalles ?? []).map((d: any) => {
+                const prod = productos.find(p => p.id === d.producto_id)
+                const sub = d.subproducto_id ? prod?.subproductos?.find((s: any) => s.id === d.subproducto_id) : null
+                return {
+                    producto_id: d.producto_id,
+                    nombre_producto: d.nombre_producto,
+                    cantidad: Number(d.cantidad) || 1,
+                    precio_unitario: Number(d.precio_unitario) || 0,
+                    descuento: Number(d.descuento) || 0,
+                    iva_porcentaje: Number(d.iva_porcentaje ?? 15),
+                    subproducto_id: d.subproducto_id ?? null,
+                    factor_conversion: sub ? Number(sub.factor_conversion) : 1,
+                    costo_promedio: prod?.costo_promedio ?? 0,
+                }
+            })
+            if (lineasCargadas.length > 0) setDetalles(lineasCargadas)
+
+            const pagosCargados: PagoFactura[] = (comp.comprobante_pagos ?? []).map((p: any) => ({
+                metodo: p.metodo_pago,
+                valor: Number(p.valor) || 0,
+                referencia: p.referencia ?? '',
+            }))
+            if (pagosCargados.length > 0) setPagos(pagosCargados)
+
+            setNumeroPlantilla('')
+            alert(`Factura ${secuencialFormateado} cargada. Revisa los datos — al presionar "Generar Factura" se le asignará el siguiente número correcto de la serie, no este.`)
+        } catch (e: any) {
+            alert('Error al buscar la factura: ' + e.message)
+        } finally {
+            setCargandoPlantilla(false)
         }
     }
 
@@ -759,6 +823,35 @@ export function FacturaDirectaPage() {
                         </span>
                     )}
                 </div>
+            </div>
+
+            {/* ── CARGAR FACTURA ANTERIOR COMO PLANTILLA ── */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700 shrink-0">
+                        <Copy className="w-4 h-4 text-primary-500" />
+                        Repetir factura anterior
+                    </div>
+                    <input
+                        type="text"
+                        value={numeroPlantilla}
+                        onChange={e => setNumeroPlantilla(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCargarPlantilla() } }}
+                        placeholder="001-002-1515"
+                        className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm font-mono outline-none focus:ring-2 focus:ring-primary-400"
+                    />
+                    <button
+                        onClick={handleCargarPlantilla}
+                        disabled={cargandoPlantilla || !numeroPlantilla.trim()}
+                        className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 shrink-0"
+                    >
+                        {cargandoPlantilla ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                        Cargar
+                    </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">
+                    Trae cliente, detalle y forma de pago de una factura ya emitida, para clientes que compran lo mismo seguido — no repite el número, la nueva factura sale con la siguiente serie correcta.
+                </p>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
