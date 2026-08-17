@@ -13,6 +13,7 @@ import {
     X,
     Truck,
     BarChart3,
+    Languages,
     FilePlus,
     FileStack,
     ShoppingCart,
@@ -264,6 +265,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 <SidebarItem to="/admin/reparar-stock" icon={Wrench}        label="Reparación de Inventario" active={location.pathname === '/admin/reparar-stock'} />
                                 <SidebarItem to="/admin/log-sesiones" icon={History}        label="Log de Sesiones" active={location.pathname === '/admin/log-sesiones'} />
                                 <SidebarItem to="/admin/estadisticas-empresa" icon={BarChart3} label="Estadísticas por Empresa" active={location.pathname === '/admin/estadisticas-empresa'} />
+                                <SidebarItem to="/admin/correccion-codificacion" icon={Languages} label="Corrección de Codificación" active={location.pathname === '/admin/correccion-codificacion'} />
                             </>
                         )}
 

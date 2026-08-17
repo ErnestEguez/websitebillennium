@@ -57,6 +57,7 @@ const AdminDepuracionPage          = lz(() => import('./pages/admin/AdminDepurac
 const LogSesionesPage              = lz(() => import('./pages/admin/LogSesionesPage'), 'LogSesionesPage')
 const AdminReparacionStockPage     = lz(() => import('./pages/admin/AdminReparacionStockPage'), 'AdminReparacionStockPage')
 const EstadisticasEmpresaPage      = lz(() => import('./pages/admin/EstadisticasEmpresaPage'), 'EstadisticasEmpresaPage')
+const CorreccionCodificacionPage   = lz(() => import('./pages/admin/CorreccionCodificacionPage'), 'CorreccionCodificacionPage')
 const ImportarClientesPage         = lz(() => import('./pages/ImportarClientesPage'), 'ImportarClientesPage')
 const MigrarCarteraPage            = lz(() => import('./pages/MigrarCarteraPage'), 'MigrarCarteraPage')
 const MigrarCxPPage                = lz(() => import('./pages/MigrarCxPPage'), 'MigrarCxPPage')
@@ -608,6 +609,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
                     <Layout>
                       <EstadisticasEmpresaPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/admin/correccion-codificacion" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
+                    <Layout>
+                      <CorreccionCodificacionPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>
