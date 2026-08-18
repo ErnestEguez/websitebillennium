@@ -90,6 +90,23 @@ function parseIvaPorcentaje(val: string): number {
 // empieza con " puede contener el delimitador o comillas escapadas como ""
 // sin que se corten las columnas. Sin esto, una descripción con comillas
 // (ej. 1" de pulgada) quedaba guardada con las comillas incluidas.
+// Decodifica el archivo probando UTF-8 estricto primero. Si el buffer tiene
+// algún byte que no forma una secuencia UTF-8 válida, TextDecoder con
+// fatal:true lanza — típico de CSV exportado en Windows con codificación
+// ANSI/Windows-1252 o de sistemas DOS/CP437 viejos, donde tildes y ñ quedan
+// como bytes sueltos inválidos en UTF-8. En ese caso se reintenta como
+// Windows-1252, que sí asigna un carácter a cada byte 0x00-0xFF — evita el
+// bug encontrado el 2026-08-18: leer siempre como UTF-8 (readAsText(file,
+// 'UTF-8')) reemplazaba esos bytes por "�" de forma irrecuperable. Mismo
+// mecanismo que ya usa ImportarClientesPage.tsx.
+function decodeCsvBuffer(buffer: ArrayBuffer): string {
+    try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(buffer)
+    } catch {
+        return new TextDecoder('windows-1252').decode(buffer)
+    }
+}
+
 function splitCsvLine(line: string, delimiter: string): string[] {
     const fields: string[] = []
     let current = ''
@@ -242,11 +259,13 @@ export function ImportarArticulosPage() {
         setExcelRows(null)
         const reader = new FileReader()
         reader.onload = (ev) => {
-            const text = ev.target?.result as string
-            setRawText(text)
+            try {
+                const buffer = ev.target?.result as ArrayBuffer
+                setRawText(decodeCsvBuffer(buffer))
+            } catch { setParseError('Error al leer el archivo CSV.') }
         }
         reader.onerror = () => setParseError('Error al leer el archivo CSV.')
-        reader.readAsText(file, 'UTF-8')
+        reader.readAsArrayBuffer(file)
     }, [])
 
     // Reparsea si cambia el archivo (CSV o Excel) o el separador de campo elegido

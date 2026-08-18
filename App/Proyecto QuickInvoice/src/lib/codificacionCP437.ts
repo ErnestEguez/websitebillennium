@@ -57,3 +57,31 @@ export function repararTextoCP437(texto: string): string | null {
     }
     return cambios > 0 ? out : null
 }
+
+// Caso distinto y MÁS GRAVE que el de arriba: si el archivo se decodificó
+// forzando UTF-8 (en vez de intentar UTF-8 y caer a Windows-1252 como el
+// import de clientes), cada byte inválido se reemplaza por el mismo
+// carácter U+FFFD ("�") — a diferencia de CP437, donde cada byte roto
+// mapeaba a una letra distinta, aquí TODOS los bytes perdidos colapsan en
+// el mismo símbolo. No hay forma de recuperar matemáticamente cuál era la
+// letra original: "�" pudo haber sido Ñ, á, é, í, ó, ú, etc.
+//
+// Esta función NO reconstruye el dato — solo propone la Ñ/ñ como
+// estimación (con base en que, en español, es por lejos la letra que más
+// aparece rota en nombres de clientes/productos migrados, mismo patrón que
+// CEDEÑO → CEDE¥O). El caller debe tratar el resultado como una sugerencia
+// que el usuario tiene que confirmar a mano, nunca aplicarla automáticamente.
+export function estimarReemplazoUnicode(texto: string): string | null {
+    if (!texto.includes('�')) return null
+    let out = ''
+    let huboReemplazo = false
+    for (let i = 0; i < texto.length; i++) {
+        const ch = texto[i]
+        if (ch !== '�') { out += ch; continue }
+        const vecino = [texto[i - 1], texto[i + 1]].find(c => c && /[a-zA-Z]/.test(c))
+        if (!vecino) return null // sin pista de mayúscula/minúscula, no arriesgar una propuesta
+        out += vecino === vecino.toUpperCase() ? 'Ñ' : 'ñ'
+        huboReemplazo = true
+    }
+    return huboReemplazo ? out : null
+}
