@@ -64,11 +64,7 @@ const MigrarCxPPage                = lz(() => import('./pages/MigrarCxPPage'), '
 const ImportarArticulosPage        = lz(() => import('./pages/ImportarArticulosPage'), 'ImportarArticulosPage')
 const InvoicePrint                 = lz(() => import('./pages/InvoicePrint'), 'InvoicePrint')
 const TicketPrint                  = lz(() => import('./pages/TicketPrint'), 'TicketPrint')
-const KitchenOrderPrint            = lz(() => import('./pages/KitchenOrderPrint'), 'KitchenOrderPrint')
 const ResumenOperacionalPage       = lz(() => import('./pages/gerencia/ResumenOperacionalPage'), 'ResumenOperacionalPage')
-const MesaGrid                     = lz(() => import('./pages/MesaGrid'), 'MesaGrid')
-const OrderTake                    = lz(() => import('./pages/OrderTake'), 'OrderTake')
-const OrdersPage                   = lz(() => import('./pages/OrdersPage'), 'OrdersPage')
 
 // ── Módulo Cuentas por Pagar (Vendor) ────────────────────────────────────────
 const VMProveedoresPage            = lz(() => import('./pages/vendor/ProveedoresPage'), 'ProveedoresPage')
@@ -327,30 +323,6 @@ function App() {
                       <NuevaPreparacionPinturaPage />
                     </Layout>
                   </RoleProtectedRoute>
-                </ProtectedRoute>
-              } />
-
-              <Route path="/mesas" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <MesaGrid />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              <Route path="/mesas/:mesaId/pedido" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <OrderTake />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-
-              <Route path="/pedidos" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <OrdersPage />
-                  </Layout>
                 </ProtectedRoute>
               } />
 
@@ -633,12 +605,6 @@ function App() {
               <Route path="/comprobante/:id/ticket" element={
                 <ProtectedRoute>
                   <TicketPrint />
-                </ProtectedRoute>
-              } />
-
-              <Route path="/pedido/:id/kitchen" element={
-                <ProtectedRoute>
-                  <KitchenOrderPrint />
                 </ProtectedRoute>
               } />
 
