@@ -15,15 +15,25 @@ interface FilaRevision extends FilaEscaneada {
     incluir: boolean
 }
 
+type TablaFiltro = 'ambos' | 'clientes' | 'productos'
+
 export function CorreccionCodificacionPage() {
     const [empresas, setEmpresas] = useState<{ id: string; nombre: string; ruc: string }[]>([])
     const [empresaId, setEmpresaId] = useState('')
+    const [tablaFiltro, setTablaFiltro] = useState<TablaFiltro>('ambos')
 
     const [escaneando, setEscaneando] = useState(false)
     const [aplicando, setAplicando] = useState(false)
     const [filas, setFilas] = useState<FilaRevision[] | null>(null)
     const [error, setError] = useState('')
     const [resultado, setResultado] = useState('')
+
+    // El RPC siempre trae clientes + productos juntos; el filtro es solo de
+    // presentación/aplicación en el frontend, así que cambiar la tabla no
+    // requiere volver a escanear.
+    const filasVisibles = filas === null ? null
+        : tablaFiltro === 'ambos' ? filas
+        : filas.filter(f => f.tabla === tablaFiltro)
 
     useEffect(() => {
         supabase.from('empresas').select('id, nombre, ruc').order('nombre')
@@ -54,8 +64,8 @@ export function CorreccionCodificacionPage() {
     }
 
     async function handleAplicar() {
-        if (!filas) return
-        const seleccionadas = filas.filter(f => f.incluir && f.valor_propuesto !== null)
+        if (!filasVisibles) return
+        const seleccionadas = filasVisibles.filter(f => f.incluir && f.valor_propuesto !== null)
         if (seleccionadas.length === 0) { alert('No hay filas marcadas para corregir.'); return }
         if (!confirm(`¿Aplicar la corrección a ${seleccionadas.length} registro(s)? Esta acción se puede revertir manualmente, pero no de forma automática.`)) return
 
@@ -78,8 +88,8 @@ export function CorreccionCodificacionPage() {
         }
     }
 
-    function toggleFila(idx: number) {
-        setFilas(prev => prev?.map((f, i) => i === idx ? { ...f, incluir: !f.incluir } : f) ?? null)
+    function toggleFila(key: string) {
+        setFilas(prev => prev?.map(f => (`${f.tabla}-${f.id}-${f.campo}` === key ? { ...f, incluir: !f.incluir } : f)) ?? null)
     }
 
     const empresa = empresas.find(e => e.id === empresaId)
@@ -99,7 +109,7 @@ export function CorreccionCodificacionPage() {
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="md:col-span-2">
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Empresa</label>
                         <select
@@ -111,6 +121,18 @@ export function CorreccionCodificacionPage() {
                             {empresas.map(e => (
                                 <option key={e.id} value={e.id}>{e.nombre} ({e.ruc})</option>
                             ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Tabla</label>
+                        <select
+                            value={tablaFiltro}
+                            onChange={e => setTablaFiltro(e.target.value as TablaFiltro)}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary-500 outline-none"
+                        >
+                            <option value="ambos">Clientes y productos</option>
+                            <option value="clientes">Solo clientes</option>
+                            <option value="productos">Solo productos</option>
                         </select>
                     </div>
                     <button
@@ -135,24 +157,24 @@ export function CorreccionCodificacionPage() {
                 </div>
             )}
 
-            {filas && (
+            {filasVisibles && (
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                         <p className="text-sm text-slate-600">
-                            {empresa?.nombre} — {filas.length} registro(s) con codificación sospechosa
+                            {empresa?.nombre} — {filasVisibles.length} registro(s) con codificación sospechosa
                         </p>
                         <button
                             onClick={handleAplicar}
-                            disabled={aplicando || filas.every(f => !f.incluir)}
+                            disabled={aplicando || filasVisibles.every(f => !f.incluir)}
                             className="btn btn-primary btn-sm flex items-center gap-2 disabled:opacity-50"
                         >
                             {aplicando ? <><Loader2 className="w-4 h-4 animate-spin" /> Aplicando...</> : 'Aplicar corrección'}
                         </button>
                     </div>
 
-                    {filas.length === 0 ? (
+                    {filasVisibles.length === 0 ? (
                         <div className="p-8 text-center text-slate-400 text-sm">
-                            No se encontraron registros con codificación sospechosa en esta empresa.
+                            No se encontraron registros con codificación sospechosa en esta empresa{tablaFiltro !== 'ambos' ? ` (tabla: ${tablaFiltro})` : ''}.
                         </div>
                     ) : (
                         <table className="w-full text-sm">
@@ -166,14 +188,14 @@ export function CorreccionCodificacionPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {filas.map((f, i) => (
+                                {filasVisibles.map(f => (
                                     <tr key={`${f.tabla}-${f.id}-${f.campo}`} className={f.valor_propuesto === null ? 'bg-amber-50/50' : ''}>
                                         <td className="py-2 px-3">
                                             <input
                                                 type="checkbox"
                                                 checked={f.incluir}
                                                 disabled={f.valor_propuesto === null}
-                                                onChange={() => toggleFila(i)}
+                                                onChange={() => toggleFila(`${f.tabla}-${f.id}-${f.campo}`)}
                                             />
                                         </td>
                                         <td className="py-2 px-3 capitalize">{f.tabla}</td>
