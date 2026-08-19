@@ -178,10 +178,13 @@ ${prf.observaciones ? `<div class="obs"><strong>Observaciones:</strong> ${esc(pr
 
 function generarHtml80mm(
     prf: Proforma,
-    emp: { nombre: string; ruc: string },
+    emp: { nombre: string; ruc: string; logo_url?: string | null },
 ): string {
     const fecha = new Date(prf.created_at).toLocaleDateString('es-EC')
     const detalles = prf.detalles ?? []
+    const logoHtml = emp.logo_url
+        ? `<div class="c" style="margin-bottom:4px"><img src="${esc(emp.logo_url)}" alt="Logo" style="width:60mm;max-height:35mm;object-fit:contain"></div>`
+        : ''
     const filas = detalles.map(d => `
         <tr>
           <td style="padding:2px 0">${esc(d.nombre_producto)}<br>
@@ -213,6 +216,7 @@ function generarHtml80mm(
 </style>
 </head>
 <body>
+${logoHtml}
 <div class="emp">${esc(emp.nombre)}</div>
 <div class="c" style="font-size:7.5pt">RUC: ${esc(emp.ruc)}</div>
 <hr class="sep">
