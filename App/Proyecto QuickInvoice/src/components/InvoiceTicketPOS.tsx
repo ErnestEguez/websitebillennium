@@ -116,7 +116,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                         <th className="text-center pb-1">CANT</th>
                         <th className="text-left pb-1">DESCRIPCIÓN</th>
                         <th className="text-right pb-1">UNIT.</th>
-                        <th className="text-right pb-1">TOTAL</th>
+                        <th className="text-right pb-1 pl-3">TOTAL</th>
                     </tr>
                 </thead>
                 <tbody className="pt-1">
@@ -125,7 +125,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                             <td className="text-center">{item.cantidad}</td>
                             <td className="py-1 uppercase text-[9px]">{item.productos?.nombre ?? item.nombre_producto}</td>
                             <td className="text-right">{formatCurrency(Number(item.precio_unitario || 0))}</td>
-                            <td className="text-right">{formatCurrency(Number(item.subtotal || 0))}</td>
+                            <td className="text-right pl-3">{formatCurrency(Number(item.subtotal || 0))}</td>
                         </tr>
                     ))}
                 </tbody>
