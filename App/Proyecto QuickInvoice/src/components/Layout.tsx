@@ -33,6 +33,7 @@ import {
     FileSearch,
     SlidersHorizontal,
     ArrowLeftRight,
+    Barcode,
     ClipboardList,
     CalendarDays,
     ListChecks,
@@ -324,7 +325,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('inventario')}
                             onToggle={() => toggleGroup('inventario')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega','/cambio-codigo-articulos'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub sentinelId="nav-productos" disabled={!p.perm_productos} />
                             <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub disabled={!p.perm_ordenes_compra} />
@@ -333,6 +334,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/transferencia-bodega"     icon={ArrowLeftRight}    label="Transfer. Bodegas"     active={location.pathname === '/transferencia-bodega'} sub disabled={!p.perm_transferencia_bodega} />
                             <SidebarItem to="/inventario-valorizado"    icon={BarChart3}         label="Inventario Valorado"   active={location.pathname === '/inventario-valorizado'} sub disabled={!p.perm_inventario_valorizado} />
                             <SidebarItem to="/kardex"                   icon={ArrowDownUp}       label="Kardex"                active={location.pathname.startsWith('/kardex')} sub disabled={!p.perm_kardex} />
+                            <SidebarItem to="/cambio-codigo-articulos"  icon={Barcode}           label="Cambio Código Artículos" active={location.pathname === '/cambio-codigo-articulos'} sub disabled={!p.perm_cambio_codigo_articulos} />
                         </ModuleSection>}
 
                         {/* ── MÓDULO 1b: Manejo de Clientes ────────────── */}

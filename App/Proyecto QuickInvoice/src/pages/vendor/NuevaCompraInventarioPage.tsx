@@ -57,6 +57,12 @@ interface LineaDetalle {
     // solo lectura, tomadas del producto real (productosCompletos).
     unidad_id?: string | null
     categoria_id?: string | null
+    // Precio de venta sugerido (SIN IVA, canónico — igual que productos.precio_venta).
+    // Solo se usa/edita cuando la empresa tiene activo "Actualizar Precio de Venta al
+    // Comprar". precio_venta_manual queda en true una vez el usuario edita el valor
+    // con IVA a mano, para que no se lo pise un recálculo automático posterior.
+    precio_venta_sugerido?: number
+    precio_venta_manual?: boolean
 }
 
 // Descuento y subtotal neto de una línea (costo_unitario es el precio bruto de factura).
@@ -69,6 +75,13 @@ function lineaNeta(d: LineaDetalle) {
         ? Math.min(Math.round(valorDirecto * 100) / 100, bruto)
         : Math.round(bruto * (d.descuento_porcentaje ?? 0) / 100 * 100) / 100
     return { bruto, montoDescuento, neto: bruto - montoDescuento }
+}
+
+// Precio de venta sugerido (SIN IVA) = costo neto unitario (post-descuento) × (1 + tasa/100).
+// Ej: costo 10, tasa 30% -> 13.00. Redondeado a 2 decimales, igual que productos.precio_venta.
+function precioVentaSugerido(d: LineaDetalle, tasaPct: number): number {
+    const costoNeto = d.cantidad > 0 ? lineaNeta(d).neto / d.cantidad : d.costo_unitario
+    return Math.round(costoNeto * (1 + tasaPct / 100) * 100) / 100
 }
 
 // Similitud por palabras para matching de descripción
@@ -88,7 +101,7 @@ export function NuevaCompraInventarioPage() {
 
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
     const [productosSimple, setProductosSimple] = useState<{ id: string; nombre: string }[]>([])
-    const [productosCompletos, setProductosCompletos] = useState<{ id: string; codigo: string | null; nombre: string; unidad_id: string | null; categoria_id: string | null }[]>([])
+    const [productosCompletos, setProductosCompletos] = useState<{ id: string; codigo: string | null; nombre: string; unidad_id: string | null; categoria_id: string | null; iva_porcentaje: number; precio_venta: number }[]>([])
     const [categorias, setCategorias] = useState<Categoria[]>([])
     const [unidades, setUnidades] = useState<Unidad[]>([])
     const [bodegas, setBodegas]       = useState<Bodega[]>([])
@@ -185,7 +198,7 @@ export function NuevaCompraInventarioPage() {
     async function load() {
         try {
             const { data: prodsData } = await supabase
-                .from('productos').select('id, codigo, nombre, unidad_id, categoria_id')
+                .from('productos').select('id, codigo, nombre, unidad_id, categoria_id, iva_porcentaje, precio_venta')
                 .eq('empresa_id', empresa!.id).eq('activo', true).order('nombre')
             const [provs, ocs, bods, cats, unids, codigos] = await Promise.all([
                 proveedorService.listar(empresa!.id),
@@ -487,22 +500,54 @@ export function NuevaCompraInventarioPage() {
         setDetalle(prev => prev.map(d => ({ ...d, descuento_porcentaje: pct, descuento_valor: 0 })))
     }
 
+    // Campos que afectan el costo neto de la línea — si el toggle de precio
+    // automático está activo y el usuario no editó el precio a mano todavía,
+    // recalculan precio_venta_sugerido en cada cambio.
+    const CAMPOS_RECALCULAN_PRECIO: (keyof LineaDetalle)[] = ['cantidad', 'costo_unitario', 'descuento_porcentaje', 'descuento_valor']
+
     function updLinea(i: number, campo: keyof LineaDetalle, val: unknown) {
         setDetalle(prev => prev.map((d, j) => {
             if (j !== i) return d
+            let next: LineaDetalle
             if (campo === 'producto_id') {
                 const prod = productosSimple.find(p => p.id === val)
-                return { ...d, producto_id: val as string, nombre: prod?.nombre ?? '' }
+                next = { ...d, producto_id: val as string, nombre: prod?.nombre ?? '', precio_venta_manual: false }
+            } else if (campo === 'descuento_porcentaje') {
+                // Descuento por % y descuento directo en $ son mutuamente excluyentes:
+                // al ingresar uno, se limpia el otro.
+                next = { ...d, descuento_porcentaje: val as number, descuento_valor: 0 }
+            } else if (campo === 'descuento_valor') {
+                next = { ...d, descuento_valor: val as number, descuento_porcentaje: 0 }
+            } else {
+                next = { ...d, [campo]: val }
             }
-            // Descuento por % y descuento directo en $ son mutuamente excluyentes:
-            // al ingresar uno, se limpia el otro.
-            if (campo === 'descuento_porcentaje') {
-                return { ...d, descuento_porcentaje: val as number, descuento_valor: 0 }
+            if (empresa?.actualizar_precio_venta_compra && !next.precio_venta_manual
+                && (campo === 'producto_id' || CAMPOS_RECALCULAN_PRECIO.includes(campo))) {
+                next.precio_venta_sugerido = precioVentaSugerido(next, empresa.tasa_incremento_precio_venta ?? 30)
             }
-            if (campo === 'descuento_valor') {
-                return { ...d, descuento_valor: val as number, descuento_porcentaje: 0 }
-            }
-            return { ...d, [campo]: val }
+            return next
+        }))
+    }
+
+    // IVA% de la línea: el de la propia línea (productos nuevos/OCR) o, si no
+    // hay, el del producto ya existente en el catálogo.
+    function ivaPctLinea(d: LineaDetalle): number {
+        if (d.iva_porcentaje !== undefined && d.iva_porcentaje !== null) return d.iva_porcentaje
+        return productosCompletos.find(p => p.id === d.producto_id)?.iva_porcentaje ?? 15
+    }
+
+    // precio_venta_sugerido se guarda SIN IVA (igual que productos.precio_venta);
+    // en pantalla se muestra y edita CON IVA incluido, como pidió el usuario.
+    function precioVentaConIva(d: LineaDetalle): number {
+        return Math.round((d.precio_venta_sugerido ?? 0) * (1 + ivaPctLinea(d) / 100) * 100) / 100
+    }
+
+    function setPrecioVentaConIva(i: number, valorConIva: number) {
+        setDetalle(prev => prev.map((d, j) => {
+            if (j !== i) return d
+            const iva = ivaPctLinea(d)
+            const sinIva = Math.round((valorConIva / (1 + iva / 100)) * 100) / 100
+            return { ...d, precio_venta_sugerido: sinIva, precio_venta_manual: true }
         }))
     }
 
@@ -522,7 +567,15 @@ export function NuevaCompraInventarioPage() {
             const bruto = valDesc > 0
                 ? totalNeto + valDesc
                 : pctDesc > 0 ? totalNeto / (1 - pctDesc / 100) : totalNeto
-            return { ...d, costo_unitario: Math.round((bruto / d.cantidad) * 10000) / 10000 }
+            const next = { ...d, costo_unitario: Math.round((bruto / d.cantidad) * 10000) / 10000 }
+            // Mismo recálculo de precio sugerido que updLinea — esta función cambia
+            // costo_unitario por su cuenta (no pasa por updLinea), así que hay que
+            // repetirlo aquí o el toggle de precio automático no reacciona al
+            // digitar el Total de la línea (solo reaccionaba al Costo Unitario).
+            if (empresa?.actualizar_precio_venta_compra && !next.precio_venta_manual) {
+                next.precio_venta_sugerido = precioVentaSugerido(next, empresa.tasa_incremento_precio_venta ?? 30)
+            }
+            return next
         }))
     }
 
@@ -589,13 +642,19 @@ export function NuevaCompraInventarioPage() {
 
                     // Costo neto (post-descuento) — base real para sugerir precio y costo promedio
                     const costoUnitNeto = d.cantidad > 0 ? lineaNeta(d).neto / d.cantidad : d.costo_unitario
+                    // Precio sugerido: si el toggle de precio automático está activo y hay un
+                    // valor calculado/editado para esta línea, se usa esa tasa configurable.
+                    // Si no, se mantiene el 30% fijo de siempre (comportamiento previo, sin cambios).
+                    const precioVentaNuevo = (empresa?.actualizar_precio_venta_compra && d.precio_venta_sugerido)
+                        ? d.precio_venta_sugerido
+                        : Math.round(costoUnitNeto * 1.3 * 100) / 100
 
                     const newProd = await productoService.createProducto({
                         empresa_id:     empresa!.id,
                         codigo:         d.codigo || null,
                         nombre:         d.nombre,
                         descripcion:    d.nombre,
-                        precio_venta:   Math.round(costoUnitNeto * 1.3 * 100) / 100,
+                        precio_venta:   precioVentaNuevo,
                         categoria_id:   catId,
                         unidad_id:      d.unidad_id ?? null,
                         iva_porcentaje: d.iva_porcentaje ?? 15,
@@ -614,10 +673,14 @@ export function NuevaCompraInventarioPage() {
                 if (!d.producto_id || d.status === 'new') continue  // 'new' ya se creó con lo elegido
                 const original = productosCompletos.find(p => p.id === d.producto_id)
                 if (!original) continue
-                const cambios: { unidad_id?: string | null; categoria_id?: string } = {}
+                const cambios: { unidad_id?: string | null; categoria_id?: string; precio_venta?: number } = {}
                 if (d.unidad_id !== undefined && d.unidad_id !== original.unidad_id) cambios.unidad_id = d.unidad_id
                 // categoria_id no es nullable en el catálogo — solo actualizar si eligió una real
                 if (d.categoria_id && d.categoria_id !== original.categoria_id) cambios.categoria_id = d.categoria_id
+                // Precio de venta — solo si el toggle está activo y quedó un valor calculado/editado para esta línea
+                if (empresa?.actualizar_precio_venta_compra && d.precio_venta_sugerido != null && d.precio_venta_sugerido !== original.precio_venta) {
+                    cambios.precio_venta = d.precio_venta_sugerido
+                }
                 if (Object.keys(cambios).length > 0) {
                     try { await productoService.updateProducto(d.producto_id, cambios) }
                     catch (e) { console.error('No se pudo actualizar la clasificación del producto', d.producto_id, e) }
@@ -1000,6 +1063,9 @@ export function NuevaCompraInventarioPage() {
                                         <th className="text-right py-1.5 px-2 w-16 font-semibold">Dsc. %</th>
                                         <th className="text-right py-1.5 px-2 w-20 font-semibold">Dsc. $</th>
                                         <th className="text-right py-1.5 px-2 w-24 font-semibold" title="También editable: escribe el total de la línea y se calcula el costo unitario">Subtotal / Total</th>
+                                        {empresa?.actualizar_precio_venta_compra && (
+                                            <th className="text-right py-1.5 px-2 w-24 font-semibold text-emerald-700" title="Precio de venta sugerido, con IVA incluido — editable">P. Venta (IVA inc.)</th>
+                                        )}
                                         <th className="w-8" />
                                     </tr>
                                 </thead>
@@ -1157,6 +1223,19 @@ export function NuevaCompraInventarioPage() {
                                                         onChange={e => numChange(`total_${i}`, e.target.value, v => setCostoDesdeTotal(i, v))}
                                                         onBlur={() => numBlur(`total_${i}`, v => setCostoDesdeTotal(i, v))} />
                                                 </td>
+
+                                                {/* Precio de venta sugerido (con IVA) — solo si el toggle está activo */}
+                                                {empresa?.actualizar_precio_venta_compra && (
+                                                    <td className="py-1.5 px-2">
+                                                        <input type="text" inputMode="decimal"
+                                                            title={d.precio_venta_manual ? 'Editado a mano' : 'Sugerido automáticamente — editable'}
+                                                            className={cn(inpSm, 'text-right', d.precio_venta_manual ? 'border-amber-300 bg-amber-50' : 'border-emerald-200')}
+                                                            value={numVal(`pvta_${i}`, precioVentaConIva(d))}
+                                                            onFocus={e => e.target.select()}
+                                                            onChange={e => numChange(`pvta_${i}`, e.target.value, v => setPrecioVentaConIva(i, v))}
+                                                            onBlur={() => numBlur(`pvta_${i}`, v => setPrecioVentaConIva(i, v))} />
+                                                    </td>
+                                                )}
 
                                                 {/* Eliminar */}
                                                 <td className="py-1.5 pl-2">

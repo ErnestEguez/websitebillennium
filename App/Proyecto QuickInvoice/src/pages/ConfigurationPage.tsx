@@ -547,6 +547,8 @@ export function ConfigurationPage() {
                     tope_consumidor_final: companyData.tope_consumidor_final ?? null,
                     glosa_factura: companyData.glosa_factura || null,
                     codigo_prep_pintura: companyData.codigo_prep_pintura || null,
+                    actualizar_precio_venta_compra: companyData.actualizar_precio_venta_compra ?? false,
+                    tasa_incremento_precio_venta: companyData.tasa_incremento_precio_venta ?? 30,
                     // Configuración tributaria — agente de retención
                     es_agente_retencion: companyData.es_agente_retencion ?? false,
                     numero_resolucion_retencion: companyData.es_agente_retencion
@@ -1294,6 +1296,44 @@ export function ConfigurationPage() {
                                     value={companyData.glosa_factura || ''}
                                     onChange={e => setCompanyData({ ...companyData, glosa_factura: e.target.value })}
                                 />
+                            </div>
+
+                            {/* Actualización automática de precio de venta al comprar */}
+                            <div className="space-y-2">
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Actualizar Precio de Venta al Comprar</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Al ingresar un artículo en Compras (nuevo o existente), sugiere el precio de venta como
+                                            costo sin IVA × la tasa de abajo. Se puede editar antes de grabar.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!companyData.actualizar_precio_venta_compra}
+                                        onChange={e => setCompanyData({ ...companyData, actualizar_precio_venta_compra: e.target.checked })}
+                                    />
+                                </label>
+                                {companyData.actualizar_precio_venta_compra && (
+                                    <div className="pl-4">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                            Tasa de Incremento
+                                            <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">
+                                                ej: costo 10 + 30% = precio de venta 13.00 (sin IVA)
+                                            </span>
+                                        </label>
+                                        <div className="relative max-w-[160px]">
+                                            <input
+                                                type="number" step="0.01" min="0"
+                                                className="w-full px-4 py-3 pr-8 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
+                                                value={companyData.tasa_incremento_precio_venta ?? 30}
+                                                onChange={e => setCompanyData({ ...companyData, tasa_incremento_precio_venta: parseFloat(e.target.value) || 0 })}
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Código artículo preparación de pinturas */}

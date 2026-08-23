@@ -46,6 +46,7 @@ const MODULOS = [
             { field: 'perm_transferencia_bodega',   label: 'Transferencia de Bodegas' },
             { field: 'perm_inventario_valorizado',  label: 'Inventario Valorado' },
             { field: 'perm_kardex',                 label: 'Kardex' },
+            { field: 'perm_cambio_codigo_articulos', label: 'Cambio Código Artículos' },
         ],
     },
     {
@@ -194,6 +195,7 @@ export function AdminPermisosPage() {
                     perm_transferencia_bodega:  r.perm_transferencia_bodega  ?? def.perm_transferencia_bodega,
                     perm_inventario_valorizado: r.perm_inventario_valorizado ?? def.perm_inventario_valorizado,
                     perm_kardex:                r.perm_kardex                ?? def.perm_kardex,
+                    perm_cambio_codigo_articulos: r.perm_cambio_codigo_articulos ?? def.perm_cambio_codigo_articulos,
                     perm_importar_articulos:    r.perm_importar_articulos    ?? def.perm_importar_articulos,
                     perm_configuracion:         r.perm_configuracion         ?? def.perm_configuracion,
                     perm_codigos_retencion:     r.perm_codigos_retencion     ?? def.perm_codigos_retencion,
