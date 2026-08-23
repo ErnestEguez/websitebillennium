@@ -30,6 +30,8 @@ interface Empresa {
     es_agente_retencion?: boolean
     numero_resolucion_retencion?: string | null
     fecha_inicio_retencion?: string | null
+    actualizar_precio_venta_compra?: boolean
+    tasa_incremento_precio_venta?: number
 }
 
 export interface Modules {
@@ -81,6 +83,7 @@ export interface Permisos {
     perm_transferencia_bodega:  boolean
     perm_inventario_valorizado: boolean
     perm_kardex:                boolean
+    perm_cambio_codigo_articulos: boolean
     perm_importar_articulos:    boolean
     perm_configuracion:         boolean
     perm_codigos_retencion:     boolean
@@ -165,6 +168,7 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_transferencia_bodega:  true,
     perm_inventario_valorizado: true,
     perm_kardex:                true,
+    perm_cambio_codigo_articulos: true,
     perm_importar_articulos:    true,
     perm_configuracion:         true,
     perm_codigos_retencion:     true,
@@ -418,6 +422,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_transferencia_bodega:  permData.perm_transferencia_bodega  ?? true,
                     perm_inventario_valorizado: permData.perm_inventario_valorizado ?? true,
                     perm_kardex:                permData.perm_kardex                ?? true,
+                    perm_cambio_codigo_articulos: permData.perm_cambio_codigo_articulos ?? true,
                     perm_importar_articulos:    permData.perm_importar_articulos    ?? true,
                     perm_configuracion:         permData.perm_configuracion         ?? true,
                     perm_codigos_retencion:     permData.perm_codigos_retencion     ?? true,

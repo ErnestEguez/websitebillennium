@@ -1195,7 +1195,8 @@ export function FacturaDirectaPage() {
                                                                         {p.codigo && <div className="text-xs text-slate-400 font-mono">{p.codigo}</div>}
                                                                     </div>
                                                                     <span className="flex flex-col items-end shrink-0">
-                                                                        <span className="text-primary-600 font-bold text-xs">{formatCurrency(p.precio_venta)}</span>
+                                                                        <span className="text-primary-600 font-bold text-xs">{formatCurrency(p.precio_venta)} <span className="font-normal text-slate-400">sin IVA</span></span>
+                                                                        <span className="text-slate-600 text-xs">{formatCurrency(p.precio_venta * (1 + (p.iva_porcentaje ?? 0) / 100))} <span className="text-slate-400">con IVA</span></span>
                                                                         <span className="text-slate-500 text-xs">Stock: {p.stock ?? 0}</span>
                                                                     </span>
                                                                 </button>

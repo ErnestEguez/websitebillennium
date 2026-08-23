@@ -1172,13 +1172,13 @@ export function ProformaPage() {
 
                                 {/* Encabezados */}
                                 <div className="hidden md:grid grid-cols-12 gap-2 px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                    <div className={esModoServicio ? 'col-span-5' : 'col-span-3'}>Descripción</div>
+                                    <div className={esModoServicio ? 'col-span-5' : 'col-span-2'}>Descripción</div>
                                     {!esModoServicio && <div className="col-span-2 text-center">Cantidad</div>}
                                     {esModoServicio && <div className="col-span-1 text-center">Cant.</div>}
                                     <div className="col-span-2 text-right">P. Unitario</div>
-                                    <div className="col-span-1 text-right">Dto%</div>
+                                    <div className="col-span-2 text-right">Dto%</div>
                                     <div className="col-span-1 text-center">IVA%</div>
-                                    <div className="col-span-2 text-right">Subtotal</div>
+                                    <div className="col-span-1 text-right">Subtotal</div>
                                     <div className="col-span-1 text-right">Total</div>
                                     <div className="col-span-1" />
                                 </div>
@@ -1193,7 +1193,7 @@ export function ProformaPage() {
                                         return (
                                             <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-slate-50/50 rounded-xl p-2 border border-slate-100">
                                                 {/* Descripción */}
-                                                <div className={cn('relative', esModoServicio ? 'col-span-5' : 'col-span-3')}>
+                                                <div className={cn('relative', esModoServicio ? 'col-span-5' : 'col-span-2')}>
                                                     <input
                                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-violet-400"
                                                         placeholder={esModoServicio ? 'Descripción del servicio' : 'Código/nombre + Enter o Buscar (usa *)'}
@@ -1245,7 +1245,7 @@ export function ProformaPage() {
                                                 </div>
 
                                                 {/* Descuento % */}
-                                                <div className="col-span-1">
+                                                <div className="col-span-2">
                                                     <input type="number" min="0" max="100" step="0.01"
                                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-violet-400"
                                                         value={det.descuento}
@@ -1265,7 +1265,7 @@ export function ProformaPage() {
                                                 </div>
 
                                                 {/* Subtotal (sin IVA) */}
-                                                <div className="col-span-2 flex items-center justify-end">
+                                                <div className="col-span-1 flex items-center justify-end">
                                                     <span className="text-sm font-semibold text-slate-700">
                                                         {formatCurrency(lin.subtotal_neto)}
                                                     </span>

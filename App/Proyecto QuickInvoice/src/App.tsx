@@ -34,6 +34,7 @@ const InventarioPage               = lz(() => import('./pages/InventarioPage'), 
 const ValorizacionInventarioPage   = lz(() => import('./pages/ValorizacionInventarioPage'), 'ValorizacionInventarioPage')
 const KardexPage                   = lz(() => import('./pages/KardexPage'), 'KardexPage')
 const AjusteInventarioPage         = lz(() => import('./pages/AjusteInventarioPage'), 'AjusteInventarioPage')
+const CambioCodigoArticulosPage    = lz(() => import('./pages/CambioCodigoArticulosPage'), 'CambioCodigoArticulosPage')
 const TransferenciaBodegaPage      = lz(() => import('./pages/TransferenciaBodegaPage'), 'TransferenciaBodegaPage')
 const CodigosRetencionPage         = lz(() => import('./pages/CodigosRetencionPage'), 'CodigosRetencionPage')
 const VendedoresPage               = lz(() => import('./pages/VendedoresPage'), 'VendedoresPage')
@@ -421,6 +422,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <AjusteInventarioPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/cambio-codigo-articulos" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <CambioCodigoArticulosPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>
