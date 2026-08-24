@@ -144,6 +144,12 @@ export function FacturaDirectaPage() {
     const [searchProducto, setSearchProducto] = useState<{ [idx: number]: string }>({})
     const [productDropdown, setProductDropdown] = useState<number | null>(null)
     const [searchResults, setSearchResults] = useState<any[]>([])
+    // Texto que la digitadora está escribiendo en "Precio Unitario" — con IVA
+    // incluido, como se transa con el cliente. Mientras existe, manda sobre el
+    // valor derivado de det.precio_unitario (que sigue siendo SIN IVA, igual
+    // que el resto del sistema); se limpia al salir del campo o al cambiar de
+    // producto/cantidad, para no arrastrar un texto viejo.
+    const [precioConIvaInput, setPrecioConIvaInput] = useState<Record<number, string>>({})
     const [buscando, setBuscando] = useState(false)
 
     // Estado: detalle
@@ -501,6 +507,13 @@ export function FacturaDirectaPage() {
     const updateLinea = (idx: number, field: keyof DetalleFacturaDirecta, value: any) => {
         setDetalles(prev => prev.map((d, i) => i === idx ? { ...d, [field]: value } : d))
     }
+    // Precio con IVA incluido para mostrar en el campo "Precio Unitario" —
+    // det.precio_unitario sigue siendo SIN IVA internamente (igual que el
+    // catálogo y el resto del sistema).
+    const precioConIvaDeLinea = (d: DetalleFacturaDirecta) =>
+        Math.round(d.precio_unitario * (1 + d.iva_porcentaje / 100) * 100) / 100
+    const limpiarPrecioRaw = (idx: number) =>
+        setPrecioConIvaInput(prev => { if (!(idx in prev)) return prev; const next = { ...prev }; delete next[idx]; return next })
     const selectProducto = async (idx: number, prod: any) => {
         const subsActivos = (prod.subproductos || []).filter((s: any) => s.estado)
         const tieneSubproductos = subsActivos.length > 0
@@ -526,6 +539,7 @@ export function FacturaDirectaPage() {
         } : d))
         setSearchProducto(prev => ({ ...prev, [idx]: prod.nombre }))
         setProductDropdown(null)
+        limpiarPrecioRaw(idx)
     }
 
     const selectSubproducto = (idx: number, sub: any) => {
@@ -536,6 +550,7 @@ export function FacturaDirectaPage() {
             subproducto_id: sub.id,
             factor_conversion: Number(sub.factor_conversion),
         } : d))
+        limpiarPrecioRaw(idx)
     }
 
     // ─── PAGOS ────────────────────────────────────────────
@@ -1278,20 +1293,30 @@ export function FacturaDirectaPage() {
                                                                 const prod = productos.find(p => p.id === det.producto_id)
                                                                 const precioVol = await precioVolumenService.resolverPrecio(empresa.id, det.producto_id, nuevaCantidad)
                                                                 updateLinea(idx, 'precio_unitario', precioVol !== null ? precioVol : (prod?.precio_venta ?? det.precio_unitario))
+                                                                limpiarPrecioRaw(idx)
                                                             } catch { /* mantener precio actual */ }
                                                         }
                                                     }} />
                                             </div>
 
-                                            {/* Precio Unitario */}
+                                            {/* Precio Unitario — se digita CON IVA incluido (lo que se transa con el
+                                                cliente); internamente se guarda sin IVA como el resto del sistema. */}
                                             <div className="col-span-4 md:col-span-3">
-                                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">P. Unit.</label>
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">P. Unit. (IVA inc.)</label>
                                                 <div className="relative">
                                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
                                                     <input type="number" min="0" step="0.01"
+                                                        title="Precio con IVA incluido"
                                                         className="w-full pl-5 pr-2 py-2 rounded-lg border border-slate-200 text-sm text-right bg-white outline-none focus:ring-2 focus:ring-primary-400"
-                                                        value={det.precio_unitario}
-                                                        onChange={e => updateLinea(idx, 'precio_unitario', parseFloat(e.target.value) || 0)} />
+                                                        value={precioConIvaInput[idx] ?? (det.precio_unitario > 0 ? precioConIvaDeLinea(det).toFixed(2) : '')}
+                                                        onChange={e => {
+                                                            const raw = e.target.value
+                                                            setPrecioConIvaInput(prev => ({ ...prev, [idx]: raw }))
+                                                            const conIva = parseFloat(raw) || 0
+                                                            const sinIva = Math.round((conIva / (1 + det.iva_porcentaje / 100)) * 100) / 100
+                                                            updateLinea(idx, 'precio_unitario', sinIva)
+                                                        }}
+                                                        onBlur={() => limpiarPrecioRaw(idx)} />
                                                 </div>
                                             </div>
 
