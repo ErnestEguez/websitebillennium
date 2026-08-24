@@ -82,6 +82,19 @@ const DETALLE_VACIO: DetalleFacturaDirecta = {
     factor_conversion: 1,
 }
 
+// Busca en el catálogo ya cargado en el dispositivo (offline u respaldo si
+// falla la consulta al servidor). Replica el mismo comportamiento del ILIKE
+// con comodines '*' que usa la búsqueda en servidor: cada segmento debe
+// aparecer en orden dentro del nombre o código.
+function escapeRegExp(s: string) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+
+function filtrarProductosLocal(lista: any[], texto: string): any[] {
+    const segmentos = texto.split(/[*]+/).filter(Boolean)
+    if (segmentos.length === 0) return []
+    const regex = new RegExp(segmentos.map(escapeRegExp).join('.*'), 'i')
+    return lista.filter(p => regex.test(p.nombre ?? '') || regex.test(p.codigo ?? '')).slice(0, 50)
+}
+
 export function FacturaDirectaPage() {
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
@@ -249,13 +262,21 @@ export function FacturaDirectaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prepId, empresa?.id])
 
-    // Búsqueda en servidor con debounce
+    // Búsqueda en servidor con debounce — sin conexión (o si la consulta al
+    // servidor falla) busca en el catálogo ya descargado en el dispositivo
+    // (catalogCacheService, cargado en loadData), para poder seguir facturando
+    // offline en vez de quedarse sin resultados en silencio.
     useEffect(() => {
         if (productDropdown === null || !empresa?.id) { setSearchResults([]); return }
         const texto = (searchProducto[productDropdown] || '').trim()
         if (texto.length < 2) { setSearchResults([]); return }
         const timer = setTimeout(async () => {
             setBuscando(true)
+            if (!isOnline) {
+                setSearchResults(filtrarProductosLocal(productos, texto))
+                setBuscando(false)
+                return
+            }
             try {
                 const pattern = '%' + texto.split(/[*]+/).filter(Boolean).join('%') + '%'
                 const { data } = await supabase
@@ -267,11 +288,13 @@ export function FacturaDirectaPage() {
                     .order('nombre')
                     .limit(50)
                 setSearchResults(data ?? [])
-            } catch { setSearchResults([]) }
+            } catch {
+                setSearchResults(filtrarProductosLocal(productos, texto))
+            }
             setBuscando(false)
         }, 300)
         return () => clearTimeout(timer)
-    }, [searchProducto, productDropdown, empresa?.id])
+    }, [searchProducto, productDropdown, empresa?.id, isOnline, productos])
 
     async function loadData() {
         try {
