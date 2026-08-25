@@ -18,6 +18,9 @@ interface CsvRow {
     costo: number
     stock: number
     iva_porcentaje: number
+    precio2: number
+    precio3: number
+    precio4: number
     // true si la celda de origen traía punto Y coma a la vez — el parseo
     // asume cuál es el decimal, pero es un caso ambiguo que vale la pena
     // que el usuario confirme visualmente antes de importar.
@@ -146,12 +149,16 @@ function mapRowToCsvRow(parts: string[]): CsvRow | null {
     const costo    = parseNumber(costoRaw)   // col 5 (opcional)
     let   stock    = parseNumber(stockRaw)   // col 6 (opcional)
     const iva_porcentaje = parseIvaPorcentaje(parts[6] ?? '')   // col 7 (opcional, 0/5/15)
+    const precio2 = parseNumber(parts[7] ?? '')   // col 8 (opcional, vacío = 0)
+    const precio3 = parseNumber(parts[8] ?? '')   // col 9 (opcional, vacío = 0)
+    const precio4 = parseNumber(parts[9] ?? '')   // col 10 (opcional, vacío = 0)
 
     if (!codigo && !nombre && !categoria) return null
     if (stock < 0) stock = 0
 
     return {
         codigo, nombre, precio_venta: precio, categoria, costo, stock, iva_porcentaje,
+        precio2, precio3, precio4,
         costoAmbiguo: isAmbiguousNumber(costoRaw),
         stockAmbiguo: isAmbiguousNumber(stockRaw),
     }
@@ -354,6 +361,9 @@ export function ImportarArticulosPage() {
                         nombre:         row.nombre,
                         descripcion:    row.nombre,
                         precio_venta:   row.precio_venta,
+                        precio2:        row.precio2,
+                        precio3:        row.precio3,
+                        precio4:        row.precio4,
                         costo_promedio: row.costo,
                         iva_porcentaje: row.iva_porcentaje,
                         activo:         true,
@@ -769,6 +779,9 @@ export function ImportarArticulosPage() {
                                     <th className="px-4 py-2.5 font-semibold text-right">Costo</th>
                                     <th className="px-4 py-2.5 font-semibold text-right">Stock</th>
                                     <th className="px-4 py-2.5 font-semibold text-right">IVA</th>
+                                    <th className="px-4 py-2.5 font-semibold text-right">Precio2</th>
+                                    <th className="px-4 py-2.5 font-semibold text-right">Precio3</th>
+                                    <th className="px-4 py-2.5 font-semibold text-right">Precio4</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -788,6 +801,9 @@ export function ImportarArticulosPage() {
                                             {row.stock}{row.stockAmbiguo && ' ⚠️'}
                                         </td>
                                         <td className="px-4 py-2 text-right tabular-nums">{row.iva_porcentaje}%</td>
+                                        <td className="px-4 py-2 text-right tabular-nums">{row.precio2.toFixed(2)}</td>
+                                        <td className="px-4 py-2 text-right tabular-nums">{row.precio3.toFixed(2)}</td>
+                                        <td className="px-4 py-2 text-right tabular-nums">{row.precio4.toFixed(2)}</td>
                                     </tr>
                                 ))}
                             </tbody>
