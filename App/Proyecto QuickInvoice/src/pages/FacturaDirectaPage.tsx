@@ -1374,7 +1374,11 @@ export function FacturaDirectaPage() {
                                                             const raw = e.target.value
                                                             setPrecioConIvaInput(prev => ({ ...prev, [idx]: raw }))
                                                             const conIva = parseFloat(raw) || 0
-                                                            const sinIva = Math.round((conIva / (1 + det.iva_porcentaje / 100)) * 100) / 100
+                                                            // 4 decimales (igual precisión que precio_unitario en BD) — redondear
+                                                            // a centavos aquí acumula error al multiplicar por la cantidad
+                                                            // (ver caso: 2.50 con IVA / 1.15 = 2.17 recortado, 4 unidades da
+                                                            // $9.98 en vez de $10.00).
+                                                            const sinIva = Math.round((conIva / (1 + det.iva_porcentaje / 100)) * 10000) / 10000
                                                             updateLinea(idx, 'precio_unitario', sinIva)
                                                         }}
                                                         onBlur={() => limpiarPrecioRaw(idx)} />
