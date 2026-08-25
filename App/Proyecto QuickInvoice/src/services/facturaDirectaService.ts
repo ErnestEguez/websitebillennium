@@ -19,10 +19,14 @@ export interface DetalleFacturaDirecta {
     // Solo para el semáforo de rentabilidad en pantalla — NO se persiste en
     // comprobante_detalles (esa tabla no tiene columna de costo).
     costo_promedio?: number
+    // Talla/Color — vienen de Facturación en Vivo o de una consolidación de
+    // Plan Acumulativo. Opcionales; la mayoría de facturas no los usan.
+    talla?: string | null
+    color?: string | null
 }
 
 export interface PagoFactura {
-    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'cheque_fecha' | 'otros' | 'tarjeta' | 'nota_credito'
+    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'cheque_fecha' | 'otros' | 'tarjeta' | 'nota_credito' | 'plan_acumulativo'
     valor: number
     referencia?: string
     cuenta_bancaria_id?: string | null           // solo para transferencia
@@ -56,6 +60,10 @@ export interface FacturaDirectaInput {
     retenciones?: RetencionFactura[] // Retenciones que trae el cliente (opcional)
     numero_retencion?: string        // N° del comprobante de retención del cliente (aplica a todas las líneas)
     created_by?: string | null       // profile.id de quien factura (para retenciones_ventas.created_by)
+    // Solo true al consolidar un Plan Acumulativo: el stock YA se descontó
+    // en el momento de cada venta PA original, así que la factura final (que
+    // solo formaliza el documento SRI) no debe volver a descontarlo.
+    omitir_kardex?: boolean
 }
 
 // Calcula los valores de una línea de detalle
@@ -148,6 +156,7 @@ export const facturaDirectaService = {
         const {
             empresa_id, cliente_id, detalles, pagos, caja_sesion_id, vendedor_id,
             dias_plazo_credito, bodega_id, observaciones, retenciones, numero_retencion, created_by,
+            omitir_kardex,
         } = input
         const correlationId = auditService.nuevaCorrelacion()
 
@@ -320,6 +329,8 @@ export const facturaDirectaService = {
                     iva_valor: l.iva_valor,
                     total: l.total,
                     subproducto_id: d.subproducto_id || null,
+                    talla: d.talla || null,
+                    color: d.color || null,
                 }
             })
 
@@ -328,6 +339,26 @@ export const facturaDirectaService = {
                 .from('comprobante_detalles')
                 .insert(detallesParaInsertar)
             if (errorDet) console.error('Error insertando detalles:', errorDet)
+        }
+
+        // 5.1 Métricas Talla/Color — solo las líneas que efectivamente los
+        // traen (típicamente desde Facturación en Vivo). codigo/nombre se
+        // resuelven en vivo desde productos al consultar el reporte, no se
+        // duplican aquí — solo se guarda la referencia (producto_id).
+        const detallesTallaColor = detallesParaInsertar.filter(d => d.talla || d.color)
+        if (detallesTallaColor.length > 0) {
+            const { error: errorTC } = await supabase
+                .from('ventas_talla_color')
+                .insert(detallesTallaColor.map(d => ({
+                    empresa_id,
+                    producto_id: d.producto_id,
+                    nombre_producto: d.nombre_producto,
+                    talla: d.talla,
+                    color: d.color,
+                    cantidad: d.cantidad,
+                    comprobante_id: factura.id,
+                })))
+            if (errorTC) console.error('Error insertando ventas_talla_color:', errorTC)
         }
 
         // 6. Insertar pagos
@@ -502,7 +533,7 @@ export const facturaDirectaService = {
                 }
             })
 
-        if (kardexDetalles.length > 0) {
+        if (kardexDetalles.length > 0 && !omitir_kardex) {
             kardexService
                 .generarSalidaVenta(empresa_id, factura.id, kardexDetalles, bodega_id ?? undefined)
                 .catch(err => console.error('[kardex] Error en background:', err))

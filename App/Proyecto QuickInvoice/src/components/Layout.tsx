@@ -34,6 +34,7 @@ import {
     SlidersHorizontal,
     ArrowLeftRight,
     Barcode,
+    Radio,
     ClipboardList,
     CalendarDays,
     ListChecks,
@@ -137,6 +138,7 @@ const PERM_RUTAS: [string, string][] = [
     ['/consultas/ventas-cliente',      'perm_consulta_ventas'],
     ['/clientes',                      'perm_clientes'],
     ['/cartera-cxc',                   'perm_cartera_cxc'],
+    ['/cartera-pa',                    'perm_cartera_pa'],
     ['/consultas/cartera-clientes',    'perm_consulta_cartera'],
     ['/cartera/estado-cuenta',         'perm_estado_cuenta'],
     ['/proveedores',                   'perm_proveedores'],
@@ -292,10 +294,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('facturacion')}
                             onToggle={() => toggleGroup('facturacion')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/nueva-factura','/proformas','/facturacion','/facturacion-masiva','/vendedores','/notas-credito','/anulacion-facturas','/guias-remision','/cierres','/consultas/ventas'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/nueva-factura','/proformas','/facturacion-en-vivo','/facturacion','/facturacion-masiva','/vendedores','/notas-credito','/anulacion-facturas','/guias-remision','/cierres','/consultas/ventas','/consultas/talla-color'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/nueva-factura"      icon={FilePlus}        label="Nueva Factura"      active={location.pathname === '/nueva-factura'} sub disabled={!p.perm_nueva_factura} sentinelId="nav-nueva-factura" />
                             <SidebarItem to="/proformas"          icon={FileText}        label="Proformas"          active={location.pathname.startsWith('/proformas')} sub disabled={!p.perm_nueva_factura} />
+                            {empresa?.mostrar_facturacion_en_vivo && <SidebarItem to="/facturacion-en-vivo" icon={Radio} label="Facturación en Vivo" active={location.pathname.startsWith('/facturacion-en-vivo')} sub disabled={!p.perm_nueva_factura} />}
                             {facturacionMasivaEnabled && <SidebarItem to="/facturacion-masiva" icon={FileStack} label="Facturación Masiva" active={location.pathname === '/facturacion-masiva'} sub />}
                             <SidebarItem to="/facturacion"        icon={FileText}        label="Comprobantes"       active={location.pathname === '/facturacion'} sub disabled={!p.perm_comprobantes} />
                             <SidebarItem to="/notas-credito"      icon={FileMinus}       label="Notas de Crédito"   active={location.pathname === '/notas-credito'} sub disabled={!p.perm_notas_credito} />
@@ -304,6 +307,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/cierres"            icon={BookOpen}        label="Cierres de Caja"    active={location.pathname === '/cierres'} sub disabled={!p.perm_cierres_caja} />
                             <SidebarItem to="/consultas/ventas"         icon={Search}    label="Consulta Ventas"      active={location.pathname === '/consultas/ventas'} sub disabled={!p.perm_consulta_ventas} sentinelId="nav-consulta-ventas" />
                             <SidebarItem to="/consultas/ventas-cliente" icon={User}      label="Ventas por Cliente"   active={location.pathname === '/consultas/ventas-cliente'} sub disabled={!p.perm_consulta_ventas} />
+                            {empresa?.mostrar_facturacion_en_vivo && <SidebarItem to="/consultas/talla-color" icon={BarChart3} label={`Consulta ${empresa?.etiqueta_campo_linea || 'Talla'}/${empresa?.etiqueta_campo_subcategoria || 'Color'}`} active={location.pathname === '/consultas/talla-color'} sub disabled={!p.perm_consulta_ventas} />}
                             {profile?.rol === 'oficina' && (
                                 <button
                                     onClick={() => setIsCierreCajaOpen(true)}
@@ -349,6 +353,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         >
                             <SidebarItem to="/clientes"                    icon={Users}      label="Clientes"         active={location.pathname === '/clientes'} sub disabled={!p.perm_clientes} sentinelId="nav-clientes" />
                             <SidebarItem to="/cartera-cxc"                 icon={CreditCard} label="Cartera / Abonos" active={location.pathname === '/cartera-cxc'} sub disabled={!p.perm_cartera_cxc} />
+                            <SidebarItem to="/cartera-pa"                  icon={Wallet}     label="Cartera Plan Acumulativo" active={location.pathname === '/cartera-pa'} sub disabled={!p.perm_cartera_pa} />
                             <SidebarItem to="/clientes/gestion-cartera"    icon={ClipboardList} label="Gestión de Cartera" active={location.pathname === '/clientes/gestion-cartera'} sub disabled={!p.perm_gestion_cartera} />
                             <SidebarItem to="/consultas/cartera-clientes"  icon={FileSearch} label="Consulta Cartera" active={location.pathname === '/consultas/cartera-clientes'} sub disabled={!p.perm_consulta_cartera} />
                             <SidebarItem to="/cartera/estado-cuenta"       icon={BarChart3}  label="Estado de Cuenta" active={location.pathname.startsWith('/cartera/estado-cuenta')} sub disabled={!p.perm_estado_cuenta} />

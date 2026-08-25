@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { HelpButton } from '../components/help/HelpButton'
 import { Barcode, Search, Loader2, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react'
 
 interface ProductoFila {
@@ -127,6 +128,7 @@ export function CambioCodigoArticulosPage() {
                         Busca artículos por código o descripción y asigna el código nuevo. Se valida que no quede repetido antes de grabar.
                     </p>
                 </div>
+                <HelpButton pageKey="cambio-codigo-articulos" />
             </div>
 
             <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">

@@ -32,6 +32,9 @@ interface Empresa {
     fecha_inicio_retencion?: string | null
     actualizar_precio_venta_compra?: boolean
     tasa_incremento_precio_venta?: number
+    mostrar_facturacion_en_vivo?: boolean
+    etiqueta_campo_linea?: string
+    etiqueta_campo_subcategoria?: string
 }
 
 export interface Modules {
@@ -55,6 +58,7 @@ export interface Permisos {
     perm_gestion_cartera:    boolean
     perm_consulta_cartera:   boolean
     perm_estado_cuenta:      boolean
+    perm_cartera_pa:         boolean
     perm_proveedores:        boolean
     perm_compras:            boolean
     perm_cxp:                boolean
@@ -140,6 +144,7 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_gestion_cartera:    true,
     perm_consulta_cartera:   true,
     perm_estado_cuenta:      true,
+    perm_cartera_pa:         true,
     perm_proveedores:        true,
     perm_compras:            true,
     perm_cxp:                true,
@@ -394,6 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_gestion_cartera:    permData.perm_gestion_cartera    ?? true,
                     perm_consulta_cartera:   permData.perm_consulta_cartera   ?? true,
                     perm_estado_cuenta:      permData.perm_estado_cuenta      ?? true,
+                    perm_cartera_pa:         permData.perm_cartera_pa         ?? true,
                     perm_proveedores:        permData.perm_proveedores        ?? true,
                     perm_compras:            permData.perm_compras            ?? true,
                     perm_cxp:                permData.perm_cxp               ?? true,

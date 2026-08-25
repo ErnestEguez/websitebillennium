@@ -8,6 +8,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { facturacionService } from '../services/facturacionService'
 import { carteraCxcService, type CarteraCxc } from '../services/carteraCxcService'
+import { ventaPaService } from '../services/ventaPaService'
+import { facturaEnVivoService } from '../services/facturaEnVivoService'
 import {
     facturaDirectaService,
     calcularLinea,
@@ -55,6 +57,7 @@ const METODOS_PAGO: { value: PagoFactura['metodo']; label: string; cfBlocked?: b
     { value: 'tarjeta',      label: '💳 Tarjeta D/C' },
     { value: 'transferencia',label: '🏦 Transferencia' },
     { value: 'credito',      label: '📄 Crédito', cfBlocked: true },
+    { value: 'plan_acumulativo', label: '📋 Plan Acumulativo (PA)', cfBlocked: true },
     { value: 'nota_credito', label: '🔖 Nota de Crédito' },
     { value: 'cheque',       label: '✏️ Cheque al día' },
     { value: 'cheque_fecha', label: '📅 Cheque a fecha' },
@@ -99,6 +102,7 @@ export function FacturaDirectaPage() {
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
     const prepId = searchParams.get('prep_id')
+    const draftEnVivoId = searchParams.get('draft_en_vivo')
     const { empresa, cajaSesion, profile, permisos } = useAuth()
     const { enabled: vozIaHabilitada } = useIaFeatureEnabled('voz')
     const { isOnline } = useNetworkStatus()
@@ -267,6 +271,28 @@ export function FacturaDirectaPage() {
         })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prepId, empresa?.id])
+
+    // Pre-carga desde un borrador de Facturación en Vivo (?draft_en_vivo=<id>)
+    // — trae cliente/detalle/pagos ya guardados para completar el pago y
+    // emitir. draftEnVivoActivo queda marcado para, al emitir con éxito,
+    // avisarle al borrador cuál fue la factura resultante.
+    const [draftEnVivoActivo, setDraftEnVivoActivo] = useState<string | null>(null)
+    useEffect(() => {
+        if (!draftEnVivoId || !empresa?.id) return
+        ;(async () => {
+            try {
+                const draft = await facturaEnVivoService.obtener(draftEnVivoId)
+                if (draft.clientes) setSelectedCliente(draft.clientes)
+                const { detalles: detallesDraft, pagos: pagosDraft } = facturaEnVivoService.mapearParaFormulario(draft)
+                if (detallesDraft.length > 0) setDetalles(detallesDraft)
+                if (pagosDraft.length > 0) setPagos(pagosDraft)
+                setDraftEnVivoActivo(draftEnVivoId)
+            } catch (e: any) {
+                alert('No se pudo cargar la Factura en Vivo pendiente: ' + e.message)
+            }
+        })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [draftEnVivoId, empresa?.id])
 
     // Búsqueda en servidor con debounce — sin conexión (o si la consulta al
     // servidor falla) busca en el catálogo ya descargado en el dispositivo
@@ -652,6 +678,35 @@ export function FacturaDirectaPage() {
             )
         }
 
+        // ── Path Plan Acumulativo: NO genera factura electrónica — se acumula
+        // en ventas_pa hasta que el cliente cancele el saldo total. No se puede
+        // combinar con otras formas de pago en la misma venta.
+        const pagosPA = pagos.filter(p => p.metodo === 'plan_acumulativo' && p.valor > 0)
+        if (pagosPA.length > 0) {
+            const otrosMetodos = pagos.some(p => p.metodo !== 'plan_acumulativo' && p.valor > 0)
+            if (otrosMetodos) {
+                return alert('Plan Acumulativo no se puede combinar con otras formas de pago en la misma venta.')
+            }
+            try {
+                setSaving(true)
+                await ventaPaService.crearVentaPA({
+                    empresa_id: empresa!.id,
+                    cliente_id: selectedCliente.id,
+                    detalles: detallesValidos,
+                    bodega_id: selectedBodegaId || null,
+                    vendedor_id: selectedVendedorId || null,
+                    created_by: profile?.id ?? null,
+                })
+                alert('✅ Venta registrada en Plan Acumulativo (sin factura electrónica todavía). Se factura automáticamente cuando el cliente cancele el saldo total, desde Cuentas por Cobrar → Plan Acumulativo.')
+                handleNuevaFactura()
+            } catch (e: any) {
+                alert('Error al registrar venta en Plan Acumulativo: ' + e.message)
+            } finally {
+                setSaving(false)
+            }
+            return
+        }
+
         // ── Path offline: guardar en cola de sincronización ──────────────────
         if (!isOnline) {
             try {
@@ -723,6 +778,12 @@ export function FacturaDirectaPage() {
             sessionStorage.removeItem(PREP_IDS_KEY)
             for (const pid of prepIds) {
                 preparacionPinturaService.vincularComprobante(pid, factura.id).catch(console.error)
+            }
+            // Si esta factura vino de un borrador de Facturación en Vivo, avisarle
+            // cuál fue el comprobante resultante (queda como EMITIDA, no se borra).
+            if (draftEnVivoActivo) {
+                facturaEnVivoService.marcarEmitida(draftEnVivoActivo, factura.id).catch(console.error)
+                setDraftEnVivoActivo(null)
             }
         } catch (e: any) {
             alert('Error al generar factura: ' + e.message)
