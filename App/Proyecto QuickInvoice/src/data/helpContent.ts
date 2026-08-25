@@ -616,6 +616,89 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    'cambio-codigo-articulos': {
+        titulo: 'Cambio de Código de Artículos',
+        subtitulo: 'Renombrar el código de un artículo sin perder su historial',
+        secciones: [
+            {
+                titulo: '¿Qué es y por qué es importante?',
+                texto: 'Permite corregir o renombrar el código de un artículo (por ejemplo, si se digitó mal al migrar, o si la empresa cambia su forma de codificar productos) sin crear un artículo duplicado ni perder ventas, compras o movimientos de Kardex ya registrados. El código se actualiza en un solo lugar — el maestro de artículos — y todas las transacciones (pasadas y futuras) lo reflejan automáticamente porque lo consultan por referencia, no guardan una copia propia.',
+                alerta: 'Es un cambio inmediato y directo sobre el maestro de artículos. Las guías de remisión ya emitidas son la única excepción: conservan el código con el que se generaron, no se alteran.',
+            },
+            {
+                titulo: 'Cómo usarlo',
+                texto: 'Busca el artículo por su código actual o por descripción. En la lista de resultados, escribe el código nuevo en la columna correspondiente — puedes corregir varios artículos a la vez. Al presionar "Aplicar cambios", el sistema valida primero que ningún código nuevo choque con el de otro artículo de la misma empresa; si hay un choque, no se aplica nada hasta que lo corrijas.',
+                tips: [
+                    'Puedes dejar sin tocar los artículos que no necesitas corregir en esa misma búsqueda.',
+                    'Si el código nuevo ya lo tiene otro artículo, corrige ese otro primero o usa un código distinto.',
+                ],
+            },
+        ],
+    },
+
+    'cartera-pa': {
+        titulo: 'Cartera — Plan Acumulativo (PA)',
+        subtitulo: 'Ventas que se acumulan como deuda sin factura electrónica inmediata',
+        secciones: [
+            {
+                titulo: '¿Qué es y por qué es importante?',
+                texto: 'Plan Acumulativo (PA) es una forma de pago distinta de Crédito: cuando se factura con PA, NO se genera un comprobante electrónico de inmediato — la venta se registra como deuda acumulada del cliente. El cliente puede seguir comprando y acumulando más, y solo cuando cancela el saldo TOTAL (100%), el sistema junta automáticamente todas esas compras en una sola factura electrónica, con la fecha del día en que se completa el pago.',
+                tips: [
+                    'El stock de los artículos se descuenta en el momento de cada venta PA, no cuando se factura al final — la mercadería ya salió de la tienda.',
+                    'Crédito (CR) y Plan Acumulativo (PA) son cosas distintas y no se mezclan: Crédito factura de inmediato y deja pendiente el cobro; PA no factura hasta que se cobra todo.',
+                ],
+                alerta: 'No hay plazo forzado: mientras el cliente no pague el 100%, la deuda sigue acumulando sin generar factura. El botón "Facturar" solo se habilita cuando el saldo llega exactamente a $0.',
+            },
+            {
+                titulo: 'Registrar un abono',
+                texto: 'En la lista de clientes con saldo PA pendiente, presiona "Registrar pago" e ingresa el valor, la forma de pago y una referencia opcional. El sistema no permite registrar un pago mayor al saldo pendiente.',
+            },
+            {
+                titulo: 'Facturar (consolidar)',
+                texto: 'Cuando el saldo de un cliente llega a $0, el botón "Facturar" se activa. Al presionarlo, se genera UNA sola factura electrónica que incluye, por separado, cada línea de cada compra PA que hizo el cliente (no se fusionan ni se suman artículos repetidos) — así queda trazable qué se compró y cuándo, aunque todo salga en un solo comprobante.',
+            },
+        ],
+    },
+
+    'facturacion-en-vivo': {
+        titulo: 'Facturación en Vivo',
+        subtitulo: 'Facturas pendientes (borrador) para venta en vivo — TikTok, redes u otro formato similar',
+        secciones: [
+            {
+                titulo: '¿Qué es y por qué es importante?',
+                texto: 'Pensado para cuando se vende en vivo (ej. TikTok) y hay que ir armando varias facturas al mismo tiempo, sin poder terminarlas de inmediato. Cada factura queda guardada como "Pendiente" — con cliente, artículos y forma de pago — y se puede seguir editando en cualquier momento, incluso si se cierra la aplicación o se cambia de dispositivo. Es un módulo aparte de Nueva Factura, para no interrumpir la facturación normal del negocio.',
+                tips: [
+                    'Puedes mantener varias facturas pendientes a la vez, una por cada venta que estés armando en vivo.',
+                    'No es necesario tener caja abierta para crear o editar un pendiente — solo se exige al momento de emitir.',
+                ],
+            },
+            {
+                titulo: 'Talla / Color',
+                texto: 'Al agregar un artículo aparecen 2 campos adicionales (sus nombres los define cada empresa en Ajustes → Datos de la Empresa, por defecto "Talla" y "Color"). Son solo para este módulo — no cambian ni afectan los campos Línea/Subcategoría en el resto del sistema.',
+            },
+            {
+                titulo: 'Emitir la factura',
+                texto: 'Cuando la venta está lista, presiona "Guardar y Emitir" (o "Emitir" desde la lista de pendientes). Esto abre Nueva Factura con el cliente, los artículos y la forma de pago ya cargados — revisa/completa lo que falte (por ejemplo, confirmar el pago) y presiona "Generar Factura" normalmente. Ahí se aplica el mismo proceso de siempre (firma y autorización SRI). El pendiente queda marcado como "Emitida" y enlazado a la factura resultante, no se borra.',
+                alerta: 'Si sales de Nueva Factura sin generar la factura, el pendiente sigue existiendo tal como estaba — no se pierde nada.',
+            },
+        ],
+    },
+
+    'consulta-talla-color': {
+        titulo: 'Consulta Talla/Color',
+        subtitulo: 'Cantidad vendida por artículo, talla y color, en un periodo',
+        secciones: [
+            {
+                titulo: '¿Qué es y por qué es importante?',
+                texto: 'Muestra cuánto se vendió de cada artículo, desglosado por Talla y Color (o los nombres que la empresa les haya puesto en Ajustes). Solo incluye ventas donde se capturó Talla/Color — es decir, las que pasaron por Facturación en Vivo. Sirve para saber, de un mismo producto, cuántas unidades se vendieron de cada talla o color.',
+            },
+            {
+                titulo: 'Cómo usarlo',
+                texto: 'Elige un artículo específico (opcional — si lo dejas vacío, trae todos) y un rango de fechas (desde/hasta). Presiona "Buscar". El resultado agrupa las ventas por artículo + talla + color, sumando la cantidad total de cada combinación.',
+            },
+        ],
+    },
+
     'transferencia-bodega': {
         titulo: 'Transferencia entre Bodegas',
         subtitulo: 'Movimiento de mercadería entre ubicaciones sin afectar el stock total',

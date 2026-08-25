@@ -285,6 +285,8 @@ export function InvoicePrint() {
                                     </td>
                                     <td className="border border-slate-200 px-1 py-0.5">
                                         {(d.nombre_producto || d.productos?.nombre || '').toUpperCase()}
+                                        {d.talla ? ` - Talla: ${d.talla}` : ''}
+                                        {d.color ? ` - Color: ${d.color}` : ''}
                                     </td>
                                     <td className="border border-slate-200 px-1 py-0.5 text-center">
                                         {ivaRate > 0 ? `${ivaRate}%` : 'NO'}

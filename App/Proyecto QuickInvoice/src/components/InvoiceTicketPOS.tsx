@@ -123,7 +123,11 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                     {items.map((item: any, idx: number) => (
                         <tr key={item.id ?? idx}>
                             <td className="text-center">{item.cantidad}</td>
-                            <td className="py-1 uppercase text-[9px]">{item.productos?.nombre ?? item.nombre_producto}</td>
+                            <td className="py-1 uppercase text-[9px]">
+                                {item.productos?.nombre ?? item.nombre_producto}
+                                {item.talla ? ` - Talla: ${item.talla}` : ''}
+                                {item.color ? ` - Color: ${item.color}` : ''}
+                            </td>
                             <td className="text-right">{formatCurrency(Number(item.precio_unitario || 0))}</td>
                             <td className="text-right pl-3">{formatCurrency(Number(item.subtotal || 0))}</td>
                         </tr>

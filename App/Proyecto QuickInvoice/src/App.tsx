@@ -22,6 +22,8 @@ const HomePage                     = lz(() => import('./pages/HomePage'), 'HomeP
 const FacturaDirectaPage           = lz(() => import('./pages/FacturaDirectaPage'), 'FacturaDirectaPage')
 const FacturacionMasivaPage        = lz(() => import('./pages/vendor/FacturacionMasivaPage'), 'FacturacionMasivaPage')
 const ProformaPage                 = lz(() => import('./pages/ProformaPage'), 'ProformaPage')
+const FacturaEnVivoPage            = lz(() => import('./pages/FacturaEnVivoPage'), 'FacturaEnVivoPage')
+const ConsultaTallaColorPage       = lz(() => import('./pages/ConsultaTallaColorPage'), 'ConsultaTallaColorPage')
 const PreparacionesPinturaPage     = lz(() => import('./pages/PreparacionesPinturaPage'), 'PreparacionesPinturaPage')
 const NuevaPreparacionPinturaPage  = lz(() => import('./pages/NuevaPreparacionPinturaPage'), 'NuevaPreparacionPinturaPage')
 const ProductsPage                 = lz(() => import('./pages/ProductsPage'), 'ProductsPage')
@@ -39,6 +41,7 @@ const TransferenciaBodegaPage      = lz(() => import('./pages/TransferenciaBodeg
 const CodigosRetencionPage         = lz(() => import('./pages/CodigosRetencionPage'), 'CodigosRetencionPage')
 const VendedoresPage               = lz(() => import('./pages/VendedoresPage'), 'VendedoresPage')
 const CarteraCxcPage               = lz(() => import('./pages/CarteraCxcPage'), 'CarteraCxcPage')
+const CarteraPaPage                = lz(() => import('./pages/CarteraPaPage'), 'CarteraPaPage')
 const ConsultaVentasPage           = lz(() => import('./pages/ConsultaVentasPage'), 'ConsultaVentasPage')
 const VentasClientePage            = lz(() => import('./pages/VentasClientePage'), 'VentasClientePage')
 const GestionCarteraPage           = lz(() => import('./pages/clientes/GestionCarteraPage'), 'GestionCarteraPage')
@@ -307,6 +310,26 @@ function App() {
                 </ProtectedRoute>
               } />
 
+              <Route path="/facturacion-en-vivo" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <FacturaEnVivoPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/consultas/talla-color" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <ConsultaTallaColorPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
               <Route path="/preparaciones-pintura" element={
                 <ProtectedRoute>
                   <RoleProtectedRoute allowedRoles={['oficina']}>
@@ -512,6 +535,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <CarteraCxcPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/cartera-pa" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <CarteraPaPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

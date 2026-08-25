@@ -549,6 +549,9 @@ export function ConfigurationPage() {
                     codigo_prep_pintura: companyData.codigo_prep_pintura || null,
                     actualizar_precio_venta_compra: companyData.actualizar_precio_venta_compra ?? false,
                     tasa_incremento_precio_venta: companyData.tasa_incremento_precio_venta ?? 30,
+                    mostrar_facturacion_en_vivo: companyData.mostrar_facturacion_en_vivo ?? false,
+                    etiqueta_campo_linea: companyData.etiqueta_campo_linea || 'Talla',
+                    etiqueta_campo_subcategoria: companyData.etiqueta_campo_subcategoria || 'Color',
                     // Configuración tributaria — agente de retención
                     es_agente_retencion: companyData.es_agente_retencion ?? false,
                     numero_resolucion_retencion: companyData.es_agente_retencion
@@ -1331,6 +1334,49 @@ export function ConfigurationPage() {
                                                 onChange={e => setCompanyData({ ...companyData, tasa_incremento_precio_venta: parseFloat(e.target.value) || 0 })}
                                             />
                                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Facturación en Vivo */}
+                            <div className="space-y-2">
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Mostrar Facturación en Vivo</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Activa el módulo de facturas pendientes (borrador) para ventas en vivo — aparece un ítem
+                                            nuevo en el menú de Facturación. Pensado para venta por TikTok/redes u otro formato similar.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!companyData.mostrar_facturacion_en_vivo}
+                                        onChange={e => setCompanyData({ ...companyData, mostrar_facturacion_en_vivo: e.target.checked })}
+                                    />
+                                </label>
+                                {companyData.mostrar_facturacion_en_vivo && (
+                                    <div className="pl-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                Nombre del 1er campo
+                                                <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">solo se usa dentro de Facturación en Vivo</span>
+                                            </label>
+                                            <input type="text" placeholder="Ej: Talla"
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
+                                                value={companyData.etiqueta_campo_linea ?? 'Talla'}
+                                                onChange={e => setCompanyData({ ...companyData, etiqueta_campo_linea: e.target.value })} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                Nombre del 2do campo
+                                                <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">solo se usa dentro de Facturación en Vivo</span>
+                                            </label>
+                                            <input type="text" placeholder="Ej: Color"
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500"
+                                                value={companyData.etiqueta_campo_subcategoria ?? 'Color'}
+                                                onChange={e => setCompanyData({ ...companyData, etiqueta_campo_subcategoria: e.target.value })} />
                                         </div>
                                     </div>
                                 )}

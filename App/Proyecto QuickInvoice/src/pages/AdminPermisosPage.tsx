@@ -33,6 +33,7 @@ const MODULOS = [
             { field: 'perm_gestion_cartera',    label: 'Gestión de Cartera' },
             { field: 'perm_consulta_cartera',   label: 'Consulta Cartera' },
             { field: 'perm_estado_cuenta',      label: 'Estado de Cuenta' },
+            { field: 'perm_cartera_pa',         label: 'Cartera Plan Acumulativo' },
         ],
     },
     {
@@ -167,6 +168,7 @@ export function AdminPermisosPage() {
                     perm_gestion_cartera:    r.perm_gestion_cartera    ?? def.perm_gestion_cartera,
                     perm_consulta_cartera:   r.perm_consulta_cartera   ?? def.perm_consulta_cartera,
                     perm_estado_cuenta:      r.perm_estado_cuenta      ?? def.perm_estado_cuenta,
+                    perm_cartera_pa:         r.perm_cartera_pa         ?? def.perm_cartera_pa,
                     perm_proveedores:        r.perm_proveedores        ?? def.perm_proveedores,
                     perm_compras:            r.perm_compras            ?? def.perm_compras,
                     perm_nc_proveedores:     r.perm_nc_proveedores     ?? def.perm_nc_proveedores,
