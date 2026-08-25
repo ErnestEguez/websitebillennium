@@ -253,6 +253,7 @@ export function ImportarArticulosPage() {
     // Bodegas de la empresa
     const [bodegas, setBodegas]   = useState<{ id: string; nombre: string; es_principal: boolean }[]>([])
     const [bodegaId, setBodegaId] = useState<string | null>(null)
+    const [bodegasCargadas, setBodegasCargadas] = useState(false)
 
     useEffect(() => {
         if (!empresa?.id) return
@@ -262,11 +263,13 @@ export function ImportarArticulosPage() {
             .eq('empresa_id', empresa.id)
             .eq('activo', true)
             .order('es_principal', { ascending: false })
-            .then(({ data }) => {
+            .then(({ data, error }) => {
+                if (error) console.error('Error cargando bodegas:', error)
                 const lista = data ?? []
                 setBodegas(lista)
                 const principal = lista.find(b => b.es_principal) ?? lista[0]
                 if (principal) setBodegaId(principal.id)
+                setBodegasCargadas(true)
             })
     }, [empresa?.id])
 
@@ -614,6 +617,16 @@ export function ImportarArticulosPage() {
                     Empresa: <span className="font-medium">{empresa?.nombre || 'N/A'}</span>
                 </p>
             </div>
+
+            {bodegasCargadas && bodegas.length === 0 && (
+                <div className="flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <div>
+                        <p className="font-semibold">No se puede importar: esta empresa no tiene ninguna bodega activa configurada.</p>
+                        <p className="mt-1">Por eso el botón de importar queda deshabilitado aunque la validación no marque errores. Ve a <strong>Ajustes → Bodegas</strong> y crea al menos una (botón "Nueva Bodega") antes de importar artículos.</p>
+                    </div>
+                </div>
+            )}
 
             {/* Modo: importar nuevos vs corregir saldo inicial de existentes */}
             <div className="flex gap-2 border-b border-slate-200">
