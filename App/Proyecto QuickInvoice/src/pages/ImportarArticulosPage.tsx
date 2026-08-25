@@ -209,6 +209,26 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
     return chunks
 }
 
+// Compartido entre la importación real y el botón de "Validar": mapa de
+// categorías de la empresa (nombre → id) y set de códigos que ya existen en
+// productos, para poder detectar de antemano qué filas van a fallar.
+async function cargarCategoriasYExistentes(empresaId: string, codigos: string[]) {
+    const { data: categorias, error: catErr } = await supabase
+        .from('categorias').select('id, nombre').eq('empresa_id', empresaId)
+    if (catErr) throw new Error(`Error cargando categorías: ${catErr.message}`)
+    const catMap = new Map<string, string>()
+    for (const cat of categorias ?? []) catMap.set((cat.nombre ?? '').trim().toUpperCase(), cat.id)
+
+    const codsExistentes = new Set<string>()
+    for (const chunk of chunkArray(codigos, CHUNK_SIZE)) {
+        const { data: existentes, error: existErr } = await supabase
+            .from('productos').select('codigo').eq('empresa_id', empresaId).in('codigo', chunk)
+        if (existErr) throw new Error(`Error verificando duplicados: ${existErr.message}`)
+        for (const p of existentes ?? []) codsExistentes.add((p.codigo ?? '').toUpperCase())
+    }
+    return { catMap, codsExistentes }
+}
+
 /* ── Componente ─────────────────────────────────────────────────────────── */
 
 export function ImportarArticulosPage() {
@@ -227,6 +247,8 @@ export function ImportarArticulosPage() {
     const [progress, setProgress]     = useState({ current: 0, total: 0 })
     const [summary, setSummary]       = useState<ImportSummary | null>(null)
     const [correctionSummary, setCorrectionSummary] = useState<CorrectionSummary | null>(null)
+    const [validating, setValidating] = useState(false)
+    const [validationErrors, setValidationErrors] = useState<{ codigo: string; motivo: string }[] | null>(null)
 
     // Bodegas de la empresa
     const [bodegas, setBodegas]   = useState<{ id: string; nombre: string; es_principal: boolean }[]>([])
@@ -253,7 +275,7 @@ export function ImportarArticulosPage() {
     const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-        setParseError(''); setSummary(null); setCorrectionSummary(null); setFileName(file.name)
+        setParseError(''); setSummary(null); setCorrectionSummary(null); setValidationErrors(null); setFileName(file.name)
 
         if (esArchivoExcel(file)) {
             setRawText(''); setExcelRows(null)
@@ -299,9 +321,37 @@ export function ImportarArticulosPage() {
 
     const handleClear = useCallback(() => {
         setFileName(''); setRawText(''); setExcelRows(null); setAllRows([]); setDuplicates([]); setParseError('')
-        setSummary(null); setCorrectionSummary(null); setProgress({ current: 0, total: 0 })
+        setSummary(null); setCorrectionSummary(null); setValidationErrors(null); setProgress({ current: 0, total: 0 })
         if (fileRef.current) fileRef.current.value = ''
     }, [])
+
+    // Solo lectura: revisa fila por fila qué código tiene una categoría que no
+    // existe en el catálogo de la empresa o ya está registrado en productos,
+    // sin insertar nada — para corregir el archivo de origen antes de importar.
+    const handleValidar = useCallback(async () => {
+        if (!allRows.length || !empresa?.id) return
+        setValidating(true); setValidationErrors(null)
+        try {
+            const codigos = allRows.map(r => r.codigo)
+            const { catMap, codsExistentes } = await cargarCategoriasYExistentes(empresa.id, codigos)
+
+            const errores: { codigo: string; motivo: string }[] = []
+            for (const row of allRows) {
+                if (codsExistentes.has(row.codigo.toUpperCase())) {
+                    errores.push({ codigo: row.codigo, motivo: 'El código ya existe en el sistema (se omitirá al importar)' })
+                    continue
+                }
+                if (!catMap.has(row.categoria.trim().toUpperCase())) {
+                    errores.push({ codigo: row.codigo, motivo: `Categoría no encontrada: "${row.categoria}"` })
+                }
+            }
+            setValidationErrors(errores)
+        } catch (err: any) {
+            setValidationErrors([{ codigo: '—', motivo: err.message || 'Error desconocido al validar' }])
+        } finally {
+            setValidating(false)
+        }
+    }, [allRows, empresa?.id])
 
     const handleImport = useCallback(async () => {
         if (!allRows.length || !empresa?.id || !bodegaId) return
@@ -313,22 +363,8 @@ export function ImportarArticulosPage() {
         }
 
         try {
-            // Categorías de la empresa
-            const { data: categorias, error: catErr } = await supabase
-                .from('categorias').select('id, nombre').eq('empresa_id', empresa.id)
-            if (catErr) throw new Error(`Error cargando categorías: ${catErr.message}`)
-            const catMap = new Map<string, string>()
-            for (const cat of categorias ?? []) catMap.set((cat.nombre ?? '').trim().toUpperCase(), cat.id)
-
-            // Códigos ya existentes (para saltar duplicados en BD)
             const codigos = allRows.map(r => r.codigo)
-            const codsExistentes = new Set<string>()
-            for (const chunk of chunkArray(codigos, CHUNK_SIZE)) {
-                const { data: existentes, error: existErr } = await supabase
-                    .from('productos').select('codigo').eq('empresa_id', empresa.id).in('codigo', chunk)
-                if (existErr) throw new Error(`Error verificando duplicados: ${existErr.message}`)
-                for (const p of existentes ?? []) codsExistentes.add((p.codigo ?? '').toUpperCase())
-            }
+            const { catMap, codsExistentes } = await cargarCategoriasYExistentes(empresa.id, codigos)
 
             const total = allRows.length
             setProgress({ current: 0, total })
@@ -582,7 +618,7 @@ export function ImportarArticulosPage() {
             {/* Modo: importar nuevos vs corregir saldo inicial de existentes */}
             <div className="flex gap-2 border-b border-slate-200">
                 <button
-                    onClick={() => { setMode('importar'); setSummary(null); setCorrectionSummary(null) }}
+                    onClick={() => { setMode('importar'); setSummary(null); setCorrectionSummary(null); setValidationErrors(null) }}
                     className={cn(
                         "px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors",
                         mode === 'importar' ? "border-primary-600 text-primary-700" : "border-transparent text-slate-500 hover:text-slate-700"
@@ -591,7 +627,7 @@ export function ImportarArticulosPage() {
                     Importar artículos nuevos
                 </button>
                 <button
-                    onClick={() => { setMode('corregir'); setSummary(null); setCorrectionSummary(null) }}
+                    onClick={() => { setMode('corregir'); setSummary(null); setCorrectionSummary(null); setValidationErrors(null) }}
                     className={cn(
                         "px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors flex items-center gap-1.5",
                         mode === 'corregir' ? "border-amber-600 text-amber-700" : "border-transparent text-slate-500 hover:text-slate-700"
@@ -737,25 +773,72 @@ export function ImportarArticulosPage() {
                                 (primeras {Math.min(20, allRows.length)} de {allRows.length.toLocaleString()} filas)
                             </span>
                         </h2>
-                        <button
-                            onClick={mode === 'corregir' ? handleCorregirSaldo : handleImport}
-                            disabled={importing || !bodegaId}
-                            className={cn(
-                                "flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-colors",
-                                importing || !bodegaId
-                                    ? "bg-slate-300 text-slate-500 cursor-not-allowed"
-                                    : mode === 'corregir' ? "bg-amber-600 text-white hover:bg-amber-700" : "bg-primary-600 text-white hover:bg-primary-700"
+                        <div className="flex items-center gap-2">
+                            {mode === 'importar' && (
+                                <button
+                                    onClick={handleValidar}
+                                    disabled={importing || validating}
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm border transition-colors",
+                                        importing || validating
+                                            ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                                            : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                                    )}
+                                >
+                                    {validating ? (
+                                        <><Loader2 className="w-4 h-4 animate-spin" /> Validando...</>
+                                    ) : (
+                                        <><CheckCircle className="w-4 h-4" /> Validar antes de importar</>
+                                    )}
+                                </button>
                             )}
-                        >
-                            {importing ? (
-                                <><Loader2 className="w-4 h-4 animate-spin" /> Procesando {progress.current}/{progress.total}...</>
-                            ) : mode === 'corregir' ? (
-                                <><Wrench className="w-4 h-4" /> Corregir saldo de {allRows.length.toLocaleString()} artículos</>
-                            ) : (
-                                <><Upload className="w-4 h-4" /> Importar {allRows.length.toLocaleString()} artículos</>
-                            )}
-                        </button>
+                            <button
+                                onClick={mode === 'corregir' ? handleCorregirSaldo : handleImport}
+                                disabled={importing || validating || !bodegaId}
+                                className={cn(
+                                    "flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-colors",
+                                    importing || validating || !bodegaId
+                                        ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                                        : mode === 'corregir' ? "bg-amber-600 text-white hover:bg-amber-700" : "bg-primary-600 text-white hover:bg-primary-700"
+                                )}
+                            >
+                                {importing ? (
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> Procesando {progress.current}/{progress.total}...</>
+                                ) : mode === 'corregir' ? (
+                                    <><Wrench className="w-4 h-4" /> Corregir saldo de {allRows.length.toLocaleString()} artículos</>
+                                ) : (
+                                    <><Upload className="w-4 h-4" /> Importar {allRows.length.toLocaleString()} artículos</>
+                                )}
+                            </button>
+                        </div>
                     </div>
+
+                    {mode === 'importar' && validationErrors !== null && (
+                        <div className={cn(
+                            "mx-5 mt-4 rounded-lg border p-3",
+                            validationErrors.length === 0 ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
+                        )}>
+                            {validationErrors.length === 0 ? (
+                                <p className="text-sm text-emerald-700 flex items-center gap-2">
+                                    <CheckCircle className="w-4 h-4 shrink-0" /> No se encontraron errores de categoría ni códigos duplicados. Puedes importar.
+                                </p>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-medium text-red-700 mb-2 flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4 shrink-0" />
+                                        {validationErrors.length} fila{validationErrors.length !== 1 ? 's' : ''} con error — corrígelas en el archivo de origen antes de importar:
+                                    </p>
+                                    <div className="max-h-64 overflow-y-auto space-y-1">
+                                        {validationErrors.map((e, i) => (
+                                            <p key={i} className="text-xs text-red-700">
+                                                <span className="font-mono font-semibold">{e.codigo}</span>: {e.motivo}
+                                            </p>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
 
                     {importing && progress.total > 0 && (
                         <div className="px-5 py-2 bg-slate-50 border-b border-slate-100">
