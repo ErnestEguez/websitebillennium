@@ -153,10 +153,10 @@ export const cajaGeneralService = {
         empresaId: string,
         fecha: string
     ): Promise<{ ventas: unknown[]; cartera: unknown[]; cajasIds: string[] }> {
-        const [ventasRes, carteraRes] = await Promise.all([
+        const [ventasRes, carteraRes, paPagosRes] = await Promise.all([
             supabase
                 .from('comprobantes')
-                .select('id, secuencial, total, comprobante_pagos(metodo_pago, valor), clientes(nombre, identificacion)')
+                .select('id, secuencial, total, comprobante_pagos(metodo_pago, valor), clientes(nombre, identificacion), comprobante_detalles(subtotal, producto_id)')
                 .eq('empresa_id', empresaId)
                 .gte('created_at', `${fecha}T00:00:00`)
                 .lte('created_at', `${fecha}T23:59:59`)
@@ -169,10 +169,58 @@ export const cajaGeneralService = {
                 .eq('fecha_pago', fecha)
                 .eq('estado', 'activo')
                 .order('created_at'),
+            // Abonos de Plan Acumulativo — dinero cobrado el mismo día que
+            // antes no se reflejaba para nada en el Cierre de Caja General.
+            supabase
+                .from('ventas_pa_pagos')
+                .select('id, valor, metodo_pago, referencia, clientes(nombre)')
+                .eq('empresa_id', empresaId)
+                .eq('fecha', fecha)
+                .order('created_at'),
         ])
+        if (ventasRes.error) throw ventasRes.error
+        if (carteraRes.error) throw carteraRes.error
+        if (paPagosRes.error) throw paPagosRes.error
+
+        // comprobante_detalles.producto_id es un UUID suelto, SIN foreign key
+        // declarada hacia productos — pedirle a PostgREST que embeba
+        // productos(...) directamente ahí hace fallar TODA la consulta de
+        // ventas (sin lanzar error explícito, PostgREST simplemente no
+        // encuentra la relación). Por eso se resuelve la categoría con una
+        // segunda consulta aparte y se pega manualmente en cada detalle.
+        const ventas = (ventasRes.data ?? []) as any[]
+        const productoIds = [...new Set(
+            ventas.flatMap(v => ((v.comprobante_detalles ?? []) as any[]).map(d => d.producto_id).filter(Boolean))
+        )]
+        const categoriaPorProducto = new Map<string, string>()
+        if (productoIds.length > 0) {
+            const { data: prods, error: prodErr } = await supabase
+                .from('productos')
+                .select('id, categorias(nombre)')
+                .in('id', productoIds)
+            if (prodErr) throw prodErr
+            for (const p of (prods ?? []) as any[]) {
+                categoriaPorProducto.set(p.id, p.categorias?.nombre ?? 'Sin categoría')
+            }
+        }
+        for (const v of ventas) {
+            for (const d of (v.comprobante_detalles ?? []) as any[]) {
+                d.productos = { categorias: { nombre: d.producto_id ? (categoriaPorProducto.get(d.producto_id) ?? 'Sin categoría') : 'Sin categoría' } }
+            }
+        }
+
+        // Se combinan con cartera_cxc_pagos en el mismo arreglo "cartera",
+        // envolviendo el cliente en un "cartera_cxc" sintético para calzar
+        // con la forma que ya espera el resto de la UI/reporte/correo — así
+        // no hace falta tocar esos consumidores para que también los cuenten.
+        const paPagos = ((paPagosRes.data ?? []) as any[]).map(p => ({
+            id: p.id, valor: p.valor, metodo_pago: p.metodo_pago, referencia: p.referencia,
+            cartera_cxc: { clientes: p.clientes },
+        }))
+
         return {
-            ventas: ventasRes.data ?? [],
-            cartera: carteraRes.data ?? [],
+            ventas,
+            cartera: [...(carteraRes.data ?? []), ...paPagos],
             cajasIds: [],
         }
     },

@@ -507,9 +507,9 @@ export function InvoicingPage() {
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-6 py-4 max-w-[220px]">
                                         {doc.observaciones_sri ? (
-                                            <p className={`text-[11px] max-w-md leading-snug ${doc.estado_sri === 'AUTORIZADO' ? 'text-green-600' : 'text-red-500'}`} title={doc.observaciones_sri}>
+                                            <p className={`text-[11px] leading-snug line-clamp-2 break-all ${doc.estado_sri === 'AUTORIZADO' ? 'text-green-600' : 'text-red-500'}`} title={doc.observaciones_sri}>
                                                 {doc.observaciones_sri}
                                             </p>
                                         ) : (
