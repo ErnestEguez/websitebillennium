@@ -50,7 +50,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
     return (
         <div
             ref={ref}
-            className={`mx-auto bg-white p-[5mm] font-mono text-[10px] leading-tight text-black print:p-0 ${zoomClass}`}
+            className={`mx-auto bg-white p-[5mm] font-mono font-bold text-[10px] leading-tight text-black print:p-0 ${zoomClass}`}
             style={{ width: `${anchoContenido}mm` }}
         >
             <style dangerouslySetInnerHTML={{ __html: `
@@ -185,7 +185,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                                 <span>{formatCurrency(p.valor)}</span>
                             </div>
                             {p.referencia && (
-                                <div className="text-[8px] text-left pl-2 opacity-75">
+                                <div className="text-[8px] text-left pl-2">
                                     {p.metodo_pago === 'transferencia' ? `Banco: ${p.referencia}` : `Ref: ${p.referencia}`}
                                 </div>
                             )}
