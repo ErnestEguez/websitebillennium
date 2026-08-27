@@ -20,11 +20,12 @@ import { cuentasBancariasService } from '../services/finance/bancosService'
 import { precioVolumenService } from '../services/precioVolumenService'
 import type { CuentaBancaria } from '../types/finance'
 import { formatCurrency } from '../lib/utils'
+import { mensajeErrorFuncion } from '../lib/functionsError'
 import {
     FileText, FilePlus, Search, Plus, Trash2, X, Save, Loader2,
     User, Briefcase, Package, ChevronDown, ChevronUp, ArrowLeft,
     CheckCircle2, RefreshCw, Ban, CreditCard, Eye,
-    FileCheck, AlertCircle, Printer, PaintBucket,
+    FileCheck, AlertCircle, Printer, PaintBucket, Mail,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -176,21 +177,33 @@ ${prf.observaciones ? `<div class="obs"><strong>Observaciones:</strong> ${esc(pr
 </html>`
 }
 
+interface EmpresaTicket {
+    nombre: string
+    ruc: string
+    logo_url?: string | null
+    direccion?: string | null
+    email?: string | null
+    ciudad?: string | null
+}
+
 function generarHtml80mm(
     prf: Proforma,
-    emp: { nombre: string; ruc: string; logo_url?: string | null },
+    emp: EmpresaTicket,
 ): string {
     const fecha = new Date(prf.created_at).toLocaleDateString('es-EC')
     const detalles = prf.detalles ?? []
     const logoHtml = emp.logo_url
         ? `<div class="c" style="margin-bottom:4px"><img src="${esc(emp.logo_url)}" alt="Logo" style="width:60mm;max-height:35mm;object-fit:contain"></div>`
         : ''
+    // Una sola línea por ítem (Cant/Descripción/Unit./Total), igual que el
+    // ticket de factura real — si la descripción no cabe, se envuelve hacia
+    // abajo sola (word-break), sin arrastrar las demás columnas.
     const filas = detalles.map(d => `
         <tr>
-          <td style="padding:2px 0">${esc(d.nombre_producto)}<br>
-            <span style="font-size:8pt;color:#555">${n2(d.cantidad)} x $${n2(d.precio_unitario)}${d.descuento > 0 ? ` (-${d.descuento}%)` : ''}</span>
-          </td>
-          <td style="text-align:right;font-weight:bold;white-space:nowrap;padding:2px 0 2px 6px">$${n2(d.subtotal)}</td>
+          <td class="c" style="padding:2px 1px">${n2(d.cantidad)}</td>
+          <td style="padding:2px 4px;word-break:break-word">${esc(d.nombre_producto)}${d.descuento > 0 ? ` (-${d.descuento}%)` : ''}</td>
+          <td class="r" style="padding:2px 1px;white-space:nowrap">$${n2(d.precio_unitario)}</td>
+          <td class="r" style="padding:2px 1px;white-space:nowrap">$${n2(d.subtotal)}</td>
         </tr>`).join('')
 
     return `<!DOCTYPE html>
@@ -201,14 +214,17 @@ function generarHtml80mm(
 <style>
   @page{margin:0;size:80mm auto}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Courier New',Courier,monospace;font-size:8pt;color:#000;width:72mm;padding-left:2mm}
+  body{font-family:'Courier New',Courier,monospace;font-size:8pt;font-weight:bold;color:#000;width:72mm;padding-left:2mm}
   .c{text-align:center}
   .r{text-align:right}
   .b{font-weight:bold}
   .emp{font-size:10.5pt;font-weight:900;text-align:center}
   .sep{border:none;border-top:1px dashed #000;margin:4px 0}
   table{width:100%;border-collapse:collapse}
-  td{vertical-align:top}
+  td,th{vertical-align:top}
+  .items-head th{border-bottom:1px dashed #000;padding:0 1px 2px;font-size:7.5pt;text-align:left}
+  .items-head th.c{text-align:center}
+  .items-head th.r{text-align:right}
   .tot-lbl{width:55%}
   .tot-val{width:45%;text-align:right;font-weight:bold}
   .gran-total td{border-top:1px solid #000;padding-top:3px;font-size:9.5pt;font-weight:900}
@@ -219,6 +235,8 @@ function generarHtml80mm(
 ${logoHtml}
 <div class="emp">${esc(emp.nombre)}</div>
 <div class="c" style="font-size:7.5pt">RUC: ${esc(emp.ruc)}</div>
+${emp.direccion ? `<div class="c" style="font-size:7pt">${esc(emp.direccion)}</div>` : ''}
+<div class="c" style="font-size:7pt">${emp.email ? esc(emp.email) + ' - ' : ''}${esc(emp.ciudad || 'Guayaquil')} - Ecuador</div>
 <hr class="sep">
 <div class="c b" style="font-size:9pt">PROFORMA DE VENTA</div>
 <div class="c b" style="font-size:8pt">${esc(prf.numero)}</div>
@@ -229,14 +247,22 @@ ${logoHtml}
 ${prf.cliente?.telefono ? `<div><span class="b">Tel:</span> ${esc(prf.cliente.telefono)}</div>` : ''}
 <hr class="sep">
 <table>
+  <thead class="items-head">
+    <tr>
+      <th class="c">Cant</th>
+      <th>Descripción</th>
+      <th class="r">Unit.</th>
+      <th class="r">Total</th>
+    </tr>
+  </thead>
   <tbody>
-    ${filas || '<tr><td colspan="2" style="text-align:center">Sin ítems</td></tr>'}
+    ${filas || '<tr><td colspan="4" style="text-align:center">Sin ítems</td></tr>'}
   </tbody>
 </table>
 <hr class="sep">
 <table>
-  ${prf.base_iva_0 > 0 ? `<tr><td class="tot-lbl">Subtotal 0%</td><td class="tot-val">$${n2(prf.base_iva_0)}</td></tr>` : ''}
-  ${prf.base_iva_15 > 0 ? `<tr><td class="tot-lbl">Subtotal 15%</td><td class="tot-val">$${n2(prf.base_iva_15)}</td></tr>` : ''}
+  <tr><td class="tot-lbl">Subtotal 0%</td><td class="tot-val">$${n2(prf.base_iva_0)}</td></tr>
+  <tr><td class="tot-lbl">Subtotal 15%</td><td class="tot-val">$${n2(prf.base_iva_15)}</td></tr>
   ${prf.descuento_total > 0 ? `<tr><td class="tot-lbl">Descuentos</td><td class="tot-val">-$${n2(prf.descuento_total)}</td></tr>` : ''}
   <tr><td class="tot-lbl">IVA (15%)</td><td class="tot-val">$${n2(prf.valor_iva)}</td></tr>
   <tr class="gran-total"><td class="tot-lbl">TOTAL</td><td class="tot-val">$${n2(prf.total)}</td></tr>
@@ -247,6 +273,75 @@ ${prf.observaciones ? `<hr class="sep"><div style="font-size:7.5pt"><span class=
 <div class="c" style="font-size:7pt">${new Date().toLocaleDateString('es-EC')}</div>
 </body>
 </html>`
+}
+
+// Correo al cliente con el detalle de la proforma — mismo contenido que el
+// ticket 80mm, con estilo de correo (reutiliza la función edge genérica
+// enviar-reporte-interno, la misma que ya usa el correo de Cierre de Caja).
+function construirHtmlCorreoProforma(prf: Proforma, emp: EmpresaTicket): string {
+    const fecha = new Date(prf.created_at).toLocaleDateString('es-EC')
+    const detalles = prf.detalles ?? []
+    const fila = (label: string, val: string, bold = false) =>
+        `<tr><td style="padding:4px 0;color:#374151${bold ? ';font-weight:700' : ''}">${label}</td><td style="padding:4px 0;text-align:right${bold ? ';font-weight:700' : ''}">${val}</td></tr>`
+    const filasItems = detalles.map(d => `
+        <tr>
+          <td style="padding:6px 4px;border-bottom:1px solid #f3f4f6;text-align:center;font-size:12px">${n2(d.cantidad)}</td>
+          <td style="padding:6px 4px;border-bottom:1px solid #f3f4f6;font-size:13px">${esc(d.nombre_producto)}${d.descuento > 0 ? ` <span style="color:#9ca3af;font-size:11px">(-${d.descuento}%)</span>` : ''}</td>
+          <td style="padding:6px 4px;border-bottom:1px solid #f3f4f6;text-align:right;font-size:12px;white-space:nowrap">$${n2(d.precio_unitario)}</td>
+          <td style="padding:6px 4px;border-bottom:1px solid #f3f4f6;text-align:right;font-size:12px;font-weight:700;white-space:nowrap">$${n2(d.subtotal)}</td>
+        </tr>`).join('')
+    const logoHtml = emp.logo_url
+        ? `<img src="${esc(emp.logo_url)}" alt="" style="max-height:55px;max-width:180px;display:block;margin:0 auto;">`
+        : `<span style="color:#fff;font-weight:800;font-size:18px;">${esc(emp.nombre)}</span>`
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:24px 0;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.14);">
+<tr><td style="background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%);padding:24px 28px;text-align:center">
+  ${logoHtml}
+</td></tr>
+<tr><td style="padding:20px 28px 8px;text-align:center">
+  <p style="margin:0;color:#111827;font-size:17px;font-weight:700;">Proforma de Venta</p>
+  <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">${esc(prf.numero)} · ${fecha}</p>
+</td></tr>
+<tr><td style="padding:8px 28px;color:#374151;font-size:13px;">
+  <b>Cliente:</b> ${esc(prf.cliente?.nombre)}<br>
+  <b>RUC/CI:</b> ${esc(prf.cliente?.identificacion)}
+</td></tr>
+<tr><td style="padding:12px 28px;">
+  <table width="100%" style="border-collapse:collapse;">
+    <tr>
+      <th style="text-align:center;font-size:11px;color:#9ca3af;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Cant</th>
+      <th style="text-align:left;font-size:11px;color:#9ca3af;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Descripción</th>
+      <th style="text-align:right;font-size:11px;color:#9ca3af;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Unit.</th>
+      <th style="text-align:right;font-size:11px;color:#9ca3af;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Total</th>
+    </tr>
+    ${filasItems || '<tr><td colspan="4" style="color:#9ca3af;font-size:12px;padding:8px 4px">Sin ítems</td></tr>'}
+  </table>
+</td></tr>
+<tr><td style="padding:16px 28px;background:#f8faff;border-top:2px solid #ede9fe;">
+  <table width="100%" style="border-collapse:collapse;font-size:13px;">
+    ${fila('Subtotal 0%', `$${n2(prf.base_iva_0)}`)}
+    ${fila('Subtotal 15%', `$${n2(prf.base_iva_15)}`)}
+    ${prf.descuento_total > 0 ? fila('Descuentos', `-$${n2(prf.descuento_total)}`) : ''}
+    ${fila('IVA (15%)', `$${n2(prf.valor_iva)}`)}
+    ${fila('TOTAL', `$${n2(prf.total)}`, true)}
+  </table>
+</td></tr>
+${prf.observaciones ? `<tr><td style="padding:8px 28px;color:#6b7280;font-size:12px;">Obs: ${esc(prf.observaciones)}</td></tr>` : ''}
+<tr><td style="background:#f8faff;padding:14px 28px;text-align:center;">
+  <p style="margin:0;color:#9ca3af;font-size:11px;font-style:italic;">Cotización sin validez tributaria</p>
+</td></tr>
+<tr><td style="background:#4c1d95;padding:16px 28px;text-align:center;">
+  <p style="margin:0 0 4px;color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;">${esc(emp.nombre)} · RUC: ${esc(emp.ruc)}</p>
+  <p style="margin:0;color:rgba(255,255,255,0.55);font-size:10px;">QuickInvoice · www.billenniumsystem.com</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`
 }
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -333,6 +428,11 @@ export function ProformaPage() {
     // ── Modal impresión ───────────────────────────────────────────────────────
     const [printModal, setPrintModal] = useState<{ open: boolean; proforma: Proforma | null }>({ open: false, proforma: null })
     const [printLoading, setPrintLoading] = useState(false)
+    const [enviandoCorreoProforma, setEnviandoCorreoProforma] = useState(false)
+    // Dirección/email/ciudad de la empresa — no vienen en el contexto de auth
+    // (solo trae nombre/ruc/logo), se cargan aparte solo para el encabezado
+    // del ticket 80mm y el correo.
+    const [empresaExtra, setEmpresaExtra] = useState<{ direccion?: string | null; email?: string | null; ciudad?: string | null }>({})
 
     // ── Modal conversión a factura ────────────────────────────────────────────
     const [convertModal, setConvertModal] = useState<{ open: boolean; proforma: Proforma | null }>({ open: false, proforma: null })
@@ -437,6 +537,8 @@ export function ProformaPage() {
             const cf = await facturacionService.ensureConsumidorFinal(empresa!.id)
             if (cf) setSelectedCliente(cf)
         } catch { /* sin conexión, continuar sin CF */ }
+        supabase.from('empresas').select('direccion, email, ciudad').eq('id', empresa!.id).single()
+            .then(({ data }) => { if (data) setEmpresaExtra(data) })
     }
 
     // Búsqueda de clientes: solo al presionar Enter o botón Buscar
@@ -676,7 +778,7 @@ export function ProformaPage() {
                 : await proformaService.getCompleta(prf.id)
             const html = formato === 'a4'
                 ? generarHtmlA4(completa, empresa)
-                : generarHtml80mm(completa, empresa)
+                : generarHtml80mm(completa, { ...empresa, ...empresaExtra })
             const win = window.open('', '_blank', 'width=900,height=700')
             if (win) {
                 win.document.write(html)
@@ -689,6 +791,38 @@ export function ProformaPage() {
             alert('Error al generar impresión: ' + e.message)
         } finally {
             setPrintLoading(false)
+        }
+    }
+
+    // Envía la proforma al correo del cliente (si lo tiene registrado), vía
+    // la misma función edge genérica que ya usa el correo de Cierre de Caja
+    // General — reutiliza el SMTP configurado por empresa, sin firma SRI ni
+    // adjuntos, porque una proforma no es un documento tributario.
+    async function enviarProformaPorCorreo(prf: Proforma) {
+        if (!empresa) return
+        setEnviandoCorreoProforma(true)
+        try {
+            const completa = await proformaService.getCompleta(prf.id)
+            if (!completa.cliente?.email) {
+                alert('El cliente no tiene correo electrónico registrado.')
+                return
+            }
+            const html = construirHtmlCorreoProforma(completa, { ...empresa, ...empresaExtra })
+            const { error } = await supabase.functions.invoke('enviar-reporte-interno', {
+                body: {
+                    empresa_id: empresa.id,
+                    destinatario: completa.cliente.email,
+                    asunto: `Proforma ${completa.numero} — ${empresa.nombre}`,
+                    html,
+                },
+            })
+            if (error) throw new Error(await mensajeErrorFuncion(error, 'Error al enviar el correo'))
+            alert(`✅ Proforma enviada a ${completa.cliente.email}`)
+            setPrintModal({ open: false, proforma: null })
+        } catch (e: any) {
+            alert('Error al enviar: ' + e.message)
+        } finally {
+            setEnviandoCorreoProforma(false)
         }
     }
 
@@ -1431,6 +1565,22 @@ export function ProformaPage() {
                                     <div className="font-bold text-slate-900 text-sm">Ticket 80mm</div>
                                     <div className="text-xs text-slate-500 mt-0.5">Impresora térmica de recibos</div>
                                     <div className="text-xs text-slate-400">Formato compacto para papel de rollo</div>
+                                </div>
+                            </button>
+
+                            {/* Opción enviar por correo */}
+                            <button
+                                onClick={() => enviarProformaPorCorreo(printModal.proforma!)}
+                                disabled={printLoading || enviandoCorreoProforma}
+                                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-slate-200 hover:border-violet-400 hover:bg-violet-50 transition-all group disabled:opacity-60 text-left">
+                                <div className="w-11 h-14 bg-slate-100 group-hover:bg-violet-100 rounded-lg flex items-center justify-center shrink-0 transition-colors">
+                                    {enviandoCorreoProforma
+                                        ? <Loader2 className="w-5 h-5 text-violet-500 animate-spin" />
+                                        : <Mail className="w-5 h-5 text-slate-500 group-hover:text-violet-600" />}
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-900 text-sm">Enviar por correo</div>
+                                    <div className="text-xs text-slate-500 mt-0.5">Al correo del cliente, si está registrado</div>
                                 </div>
                             </button>
                         </div>
