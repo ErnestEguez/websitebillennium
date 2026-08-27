@@ -193,7 +193,7 @@ function generarHtml80mm(
     const fecha = new Date(prf.created_at).toLocaleDateString('es-EC')
     const detalles = prf.detalles ?? []
     const logoHtml = emp.logo_url
-        ? `<div class="c" style="margin-bottom:4px"><img src="${esc(emp.logo_url)}" alt="Logo" style="width:60mm;max-height:35mm;object-fit:contain"></div>`
+        ? `<div class="c" style="margin-bottom:4px"><img src="${esc(emp.logo_url)}" alt="Logo" style="width:52mm;max-height:30mm;object-fit:contain"></div>`
         : ''
     // Una sola línea por ítem (Cant/Descripción/Unit./Total), igual que el
     // ticket de factura real — si la descripción no cabe, se envuelve hacia
@@ -214,33 +214,33 @@ function generarHtml80mm(
 <style>
   @page{margin:0;size:80mm auto}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Courier New',Courier,monospace;font-size:8pt;font-weight:bold;color:#000;width:72mm;padding-left:2mm}
+  body{font-family:'Courier New',Courier,monospace;font-size:7pt;font-weight:bold;color:#000;width:68mm;padding:0 2mm 0 4mm}
   .c{text-align:center}
   .r{text-align:right}
   .b{font-weight:bold}
-  .emp{font-size:10.5pt;font-weight:900;text-align:center}
+  .emp{font-size:8.5pt;font-weight:900;text-align:center}
   .sep{border:none;border-top:1px dashed #000;margin:4px 0}
   table{width:100%;border-collapse:collapse}
   td,th{vertical-align:top}
-  .items-head th{border-bottom:1px dashed #000;padding:0 1px 2px;font-size:7.5pt;text-align:left}
+  .items-head th{border-bottom:1px dashed #000;padding:0 1px 2px;font-size:6.5pt;text-align:left}
   .items-head th.c{text-align:center}
   .items-head th.r{text-align:right}
   .tot-lbl{width:55%}
   .tot-val{width:45%;text-align:right;font-weight:bold}
-  .gran-total td{border-top:1px solid #000;padding-top:3px;font-size:9.5pt;font-weight:900}
+  .gran-total td{border-top:1px solid #000;padding-top:3px;font-size:8.5pt;font-weight:900}
   @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style>
 </head>
 <body>
 ${logoHtml}
 <div class="emp">${esc(emp.nombre)}</div>
-<div class="c" style="font-size:7.5pt">RUC: ${esc(emp.ruc)}</div>
-${emp.direccion ? `<div class="c" style="font-size:7pt">${esc(emp.direccion)}</div>` : ''}
-<div class="c" style="font-size:7pt">${emp.email ? esc(emp.email) + ' - ' : ''}${esc(emp.ciudad || 'Guayaquil')} - Ecuador</div>
+<div class="c" style="font-size:6.5pt">RUC: ${esc(emp.ruc)}</div>
+${emp.direccion ? `<div class="c" style="font-size:6.5pt">${esc(emp.direccion)}</div>` : ''}
+<div class="c" style="font-size:6.5pt">${emp.email ? esc(emp.email) + ' - ' : ''}${esc(emp.ciudad || 'Guayaquil')} - Ecuador</div>
 <hr class="sep">
-<div class="c b" style="font-size:9pt">PROFORMA DE VENTA</div>
-<div class="c b" style="font-size:8pt">${esc(prf.numero)}</div>
-<div class="c" style="font-size:7.5pt">Fecha: ${fecha}</div>
+<div class="c b" style="font-size:8pt">PROFORMA DE VENTA</div>
+<div class="c b" style="font-size:7pt">${esc(prf.numero)}</div>
+<div class="c" style="font-size:6.5pt">Fecha: ${fecha}</div>
 <hr class="sep">
 <div><span class="b">Cliente:</span> ${esc(prf.cliente?.nombre)}</div>
 <div><span class="b">RUC/CI:</span> ${esc(prf.cliente?.identificacion)}</div>
@@ -267,10 +267,10 @@ ${prf.cliente?.telefono ? `<div><span class="b">Tel:</span> ${esc(prf.cliente.te
   <tr><td class="tot-lbl">IVA (15%)</td><td class="tot-val">$${n2(prf.valor_iva)}</td></tr>
   <tr class="gran-total"><td class="tot-lbl">TOTAL</td><td class="tot-val">$${n2(prf.total)}</td></tr>
 </table>
-${prf.observaciones ? `<hr class="sep"><div style="font-size:7.5pt"><span class="b">Obs:</span> ${esc(prf.observaciones)}</div>` : ''}
+${prf.observaciones ? `<hr class="sep"><div style="font-size:6.5pt"><span class="b">Obs:</span> ${esc(prf.observaciones)}</div>` : ''}
 <hr class="sep">
-<div class="c" style="font-size:7pt">Cotización sin validez tributaria</div>
-<div class="c" style="font-size:7pt">${new Date().toLocaleDateString('es-EC')}</div>
+<div class="c" style="font-size:6.5pt">Cotización sin validez tributaria</div>
+<div class="c" style="font-size:6.5pt">${new Date().toLocaleDateString('es-EC')}</div>
 </body>
 </html>`
 }
@@ -292,7 +292,7 @@ function construirHtmlCorreoProforma(prf: Proforma, emp: EmpresaTicket): string 
         </tr>`).join('')
     const logoHtml = emp.logo_url
         ? `<img src="${esc(emp.logo_url)}" alt="" style="max-height:55px;max-width:180px;display:block;margin:0 auto;">`
-        : `<span style="color:#fff;font-weight:800;font-size:18px;">${esc(emp.nombre)}</span>`
+        : ''
 
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;">
@@ -301,6 +301,10 @@ function construirHtmlCorreoProforma(prf: Proforma, emp: EmpresaTicket): string 
 <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.14);">
 <tr><td style="background:linear-gradient(135deg,#7c3aed 0%,#6d28d9 100%);padding:24px 28px;text-align:center">
   ${logoHtml}
+  <p style="margin:8px 0 0;color:#fff;font-size:14px;font-weight:700;">${esc(emp.nombre)}</p>
+  <p style="margin:2px 0 0;color:rgba(255,255,255,0.85);font-size:11px;">RUC: ${esc(emp.ruc)}</p>
+  ${emp.direccion ? `<p style="margin:2px 0 0;color:rgba(255,255,255,0.85);font-size:11px;">${esc(emp.direccion)}</p>` : ''}
+  <p style="margin:2px 0 0;color:rgba(255,255,255,0.85);font-size:11px;">${emp.email ? esc(emp.email) + ' - ' : ''}${esc(emp.ciudad || 'Guayaquil')} - Ecuador</p>
 </td></tr>
 <tr><td style="padding:20px 28px 8px;text-align:center">
   <p style="margin:0;color:#111827;font-size:17px;font-weight:700;">Proforma de Venta</p>
