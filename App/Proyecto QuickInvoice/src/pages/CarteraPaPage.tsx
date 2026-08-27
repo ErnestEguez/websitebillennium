@@ -15,6 +15,92 @@ const METODOS = [
     { value: 'otros', label: 'Otros' },
 ]
 
+// ─── Comprobante de abono (80mm, no tributario) ──────────────────────────────
+
+function esc(s: string | null | undefined): string {
+    if (!s) return ''
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+function n2(n: number): string { return (n ?? 0).toFixed(2) }
+
+interface DatosComprobantePA {
+    empresa: { nombre: string; ruc: string; logo_url?: string | null }
+    cliente: { nombre: string; identificacion: string }
+    valor: number
+    metodoPago: string
+    referencia?: string
+    cuentaBancariaNombre?: string
+    numeroDocumento?: string
+    observaciones?: string
+    saldoAntes: number
+    saldoDespues: number
+    totalAcumulado: number
+}
+
+function generarHtml80mmAbonoPa(d: DatosComprobantePA): string {
+    const fecha = new Date().toLocaleString('es-EC')
+    const metodoLabel = METODOS.find(m => m.value === d.metodoPago)?.label ?? d.metodoPago
+    const logoHtml = d.empresa.logo_url
+        ? `<div class="c" style="margin-bottom:4px"><img src="${esc(d.empresa.logo_url)}" alt="Logo" style="width:60mm;max-height:35mm;object-fit:contain"></div>`
+        : ''
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Comprobante de abono</title>
+<style>
+  @page{margin:0;size:80mm auto}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Courier New',Courier,monospace;font-size:8pt;color:#000;width:72mm;padding-left:2mm}
+  .c{text-align:center}
+  .b{font-weight:bold}
+  .emp{font-size:10.5pt;font-weight:900;text-align:center}
+  .sep{border:none;border-top:1px dashed #000;margin:4px 0}
+  table{width:100%;border-collapse:collapse}
+  td{vertical-align:top;padding:1.5px 0}
+  .lbl{width:55%}
+  .val{width:45%;text-align:right;font-weight:bold}
+  .gran{border-top:1px solid #000;padding-top:3px;font-size:9.5pt;font-weight:900}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+${logoHtml}
+<div class="emp">${esc(d.empresa.nombre)}</div>
+<div class="c" style="font-size:7.5pt">RUC: ${esc(d.empresa.ruc)}</div>
+<hr class="sep">
+<div class="c b" style="font-size:9pt">COMPROBANTE DE ABONO</div>
+<div class="c b" style="font-size:8pt">PLAN ACUMULATIVO</div>
+<div class="c" style="font-size:7.5pt">${esc(fecha)}</div>
+<hr class="sep">
+<div><span class="b">Cliente:</span> ${esc(d.cliente.nombre)}</div>
+<div><span class="b">RUC/CI:</span> ${esc(d.cliente.identificacion)}</div>
+<hr class="sep">
+<table>
+  <tr><td class="lbl">Forma de pago</td><td class="val">${esc(metodoLabel)}</td></tr>
+  ${d.referencia ? `<tr><td class="lbl">Referencia</td><td class="val">${esc(d.referencia)}</td></tr>` : ''}
+  ${d.cuentaBancariaNombre ? `<tr><td class="lbl">Cuenta destino</td><td class="val">${esc(d.cuentaBancariaNombre)}</td></tr>` : ''}
+  ${d.numeroDocumento ? `<tr><td class="lbl">N° comprobante</td><td class="val">${esc(d.numeroDocumento)}</td></tr>` : ''}
+  ${d.observaciones ? `<tr><td class="lbl">Obs.</td><td class="val">${esc(d.observaciones)}</td></tr>` : ''}
+</table>
+<hr class="sep">
+<table>
+  <tr><td class="lbl">Total acumulado</td><td class="val">$${n2(d.totalAcumulado)}</td></tr>
+  <tr><td class="lbl">Saldo anterior</td><td class="val">$${n2(d.saldoAntes)}</td></tr>
+  <tr class="gran"><td class="lbl">ABONO</td><td class="val">$${n2(d.valor)}</td></tr>
+  <tr><td class="lbl">Saldo restante</td><td class="val">$${n2(d.saldoDespues)}</td></tr>
+</table>
+<hr class="sep">
+${d.saldoDespues <= 0.01
+        ? `<div class="c b" style="font-size:7.5pt">Saldo cancelado — ya se puede facturar</div>`
+        : ''}
+<div class="c" style="font-size:7pt">Comprobante interno — no es un documento tributario.</div>
+<div class="c" style="font-size:7pt">La factura electrónica se emite al cancelar el saldo total.</div>
+</body>
+</html>`
+}
+
 export function CarteraPaPage() {
     const { empresa, cajaSesion, profile } = useAuth()
 
@@ -64,6 +150,17 @@ export function CarteraPaPage() {
         setObservacionesPago('')
     }
 
+    function imprimirComprobantePago(d: DatosComprobantePA) {
+        const html = generarHtml80mmAbonoPa(d)
+        const win = window.open('', '_blank', 'width=900,height=700')
+        if (win) {
+            win.document.write(html)
+            win.document.close()
+            win.focus()
+            setTimeout(() => { win.print() }, 450)
+        }
+    }
+
     async function handleRegistrarPago() {
         if (!pagoModal || !empresa?.id) return
         const valor = parseFloat(valorPago) || 0
@@ -71,7 +168,7 @@ export function CarteraPaPage() {
 
         setGuardandoPago(true)
         try {
-            const { listoParaConsolidar } = await ventaPaService.registrarPago({
+            const { saldoDespues, listoParaConsolidar } = await ventaPaService.registrarPago({
                 empresa_id: empresa.id,
                 cliente_id: pagoModal.cliente_id,
                 valor,
@@ -82,12 +179,27 @@ export function CarteraPaPage() {
                 observaciones: metodoPago === 'transferencia' ? (observacionesPago || null) : null,
                 created_by: profile?.id ?? null,
             })
+
+            const cuentaSeleccionada = cuentasBancarias.find(cb => cb.id === cuentaBancariaId)
+            imprimirComprobantePago({
+                empresa: { nombre: empresa.nombre, ruc: empresa.ruc, logo_url: empresa.logo_url },
+                cliente: { nombre: pagoModal.nombre, identificacion: pagoModal.identificacion },
+                valor,
+                metodoPago,
+                referencia: metodoPago !== 'transferencia' ? (referenciaPago || undefined) : undefined,
+                cuentaBancariaNombre: metodoPago === 'transferencia' && cuentaSeleccionada
+                    ? `${cuentaSeleccionada.banco?.nombre ?? ''} — ${cuentaSeleccionada.numero_cuenta}` : undefined,
+                numeroDocumento: metodoPago === 'transferencia' ? (numeroDocumento || undefined) : undefined,
+                observaciones: metodoPago === 'transferencia' ? (observacionesPago || undefined) : undefined,
+                saldoAntes: pagoModal.saldo,
+                saldoDespues,
+                totalAcumulado: pagoModal.total_acumulado,
+            })
+
             setPagoModal(null)
             await cargar()
             if (listoParaConsolidar) {
                 alert(`✅ Pago registrado. ${pagoModal.nombre} canceló el 100% del saldo — ya se puede facturar desde el botón "Facturar".`)
-            } else {
-                alert('✅ Pago registrado.')
             }
         } catch (e: any) {
             alert('Error: ' + e.message)

@@ -188,9 +188,9 @@ function generarHtml80mm(
     const filas = detalles.map(d => `
         <tr>
           <td style="padding:2px 0">${esc(d.nombre_producto)}<br>
-            <span style="font-size:7pt;color:#555">${n2(d.cantidad)} x $${n2(d.precio_unitario)}${d.descuento > 0 ? ` (-${d.descuento}%)` : ''}</span>
+            <span style="font-size:8pt;color:#555">${n2(d.cantidad)} x $${n2(d.precio_unitario)}${d.descuento > 0 ? ` (-${d.descuento}%)` : ''}</span>
           </td>
-          <td style="text-align:right;font-weight:bold;white-space:nowrap;padding:2px 0 2px 6px">$${n2(d.total_linea)}</td>
+          <td style="text-align:right;font-weight:bold;white-space:nowrap;padding:2px 0 2px 6px">$${n2(d.subtotal)}</td>
         </tr>`).join('')
 
     return `<!DOCTYPE html>
@@ -201,7 +201,7 @@ function generarHtml80mm(
 <style>
   @page{margin:0;size:80mm auto}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Courier New',Courier,monospace;font-size:8pt;color:#000;width:72mm}
+  body{font-family:'Courier New',Courier,monospace;font-size:8pt;color:#000;width:72mm;padding-left:2mm}
   .c{text-align:center}
   .r{text-align:right}
   .b{font-weight:bold}
@@ -1290,6 +1290,12 @@ export function ProformaPage() {
                                         )
                                     })}
                                 </div>
+
+                                <button onClick={addLinea}
+                                    className="w-full mt-2 py-2.5 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:border-violet-300 hover:text-violet-500 text-sm font-bold flex items-center justify-center gap-2 transition-colors">
+                                    <Plus className="w-4 h-4" />
+                                    Agregar línea
+                                </button>
                             </div>
 
                             {/* Observaciones */}

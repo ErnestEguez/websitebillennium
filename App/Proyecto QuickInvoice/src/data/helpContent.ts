@@ -348,6 +348,36 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    // ─── CIERRE DE CAJA GENERAL (TESORERÍA) ─────────────────────────────────
+    'cierre-caja-general': {
+        titulo: 'Cierre de Caja General',
+        subtitulo: 'Consolida todos los cajeros del día, registra depósitos y cierra el día contable',
+        secciones: [
+            {
+                titulo: '¿Qué consolida este cierre?',
+                texto: 'A diferencia del cierre de caja individual (por cajero), este proceso junta TODAS las ventas, cobros de cartera y movimientos extra (ingresos/egresos manuales) de la empresa en un día, sin importar cuántas cajas o cajeros hayan trabajado. Solo se puede ejecutar cuando todos los cajeros ya cerraron su sesión individual.',
+                tips: [
+                    'Revisa las pestañas Movimientos, Ventas del Día y Rec. Cartera antes de ir a la pestaña Cierre.',
+                    'La Base de Caja es el efectivo que se queda para el día siguiente (no se deposita).',
+                ],
+            },
+            {
+                titulo: 'Depósitos bancarios',
+                texto: 'Registra en qué cuenta bancaria y por qué monto se hizo cada depósito del efectivo/cheques recaudados. El sistema muestra cuánto debería depositarse (efectivo total menos la base de caja) para que puedas verificar contra lo realmente depositado.',
+            },
+            {
+                titulo: 'Imprimir Reporte y Enviar por correo',
+                texto: 'El botón "Imprimir Reporte" genera un ticket de 80mm con el detalle completo, incluyendo un resumen de Ventas por Categoría (útil para saber qué líneas de negocio vendieron más ese día). El botón "Enviar por correo" manda ese mismo resumen al correo con el que iniciaste sesión, sin necesidad de imprimir.',
+                alerta: 'El envío de correo usa la configuración SMTP de la empresa (Ajustes → Empresa → Configuración SRI/Correo). Si no está configurada, el envío fallará con un mensaje de error explicando qué falta.',
+            },
+            {
+                titulo: 'Ejecutar Cierre Definitivo',
+                texto: 'Al ejecutar el cierre, se genera el asiento contable del día y el día queda bloqueado para nuevos movimientos. Si te equivocaste, un cierre ya ejecutado se puede reversar desde la pestaña Histórico (esto anula el asiento contable y reabre el día para corregirlo).',
+                alerta: 'No se puede ejecutar el cierre si hay cajeros con sesión abierta — deben cerrar su caja individual primero.',
+            },
+        ],
+    },
+
     // ─── CONFIGURACIÓN ──────────────────────────────────────────────────────
     'configuracion': {
         titulo: 'Configuración de Empresa',

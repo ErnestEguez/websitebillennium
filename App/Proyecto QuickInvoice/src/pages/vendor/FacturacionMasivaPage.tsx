@@ -74,6 +74,16 @@ export function FacturacionMasivaPage() {
         setFilas(prev => prev.map(f => ({ ...f, glosa: glosaGeneral })))
     }
 
+    // Cada fila arranca con la tasa guardada en el cliente (clientes.tasa_iva),
+    // que pisa a la general aunque sea 0 — el efecto de arriba solo repropaga
+    // la general cuando el SELECT realmente cambia de valor, así que si ya
+    // estaba en 15% (el default) y los clientes tienen 0% guardado de antes,
+    // no hay forma de forzarlo sin este botón explícito.
+    function aplicarTasaIvaATodos() {
+        setValidado(false)
+        setFilas(prev => prev.map(f => ({ ...f, tasaIva: tasaIvaGeneral })))
+    }
+
     function actualizarFila(clienteId: string, cambios: Partial<FilaFacturacionMasiva>) {
         setValidado(false)
         setFilas(prev => prev.map(f => f.cliente.id === clienteId ? { ...f, ...cambios } : f))
@@ -295,10 +305,13 @@ export function FacturacionMasivaPage() {
                             </div>
                             <div>
                                 <label className="label text-xs">Tasa de IVA general</label>
-                                <select className="input" value={tasaIvaGeneral} onChange={e => setTasaIvaGeneral(Number(e.target.value))}>
-                                    <option value={15}>15%</option>
-                                    <option value={0}>0%</option>
-                                </select>
+                                <div className="flex gap-2">
+                                    <select className="input flex-1" value={tasaIvaGeneral} onChange={e => setTasaIvaGeneral(Number(e.target.value))}>
+                                        <option value={15}>15%</option>
+                                        <option value={0}>0%</option>
+                                    </select>
+                                    <button onClick={aplicarTasaIvaATodos} className="btn btn-secondary text-xs whitespace-nowrap">Aplicar a todos</button>
+                                </div>
                             </div>
                         </div>
                     </div>

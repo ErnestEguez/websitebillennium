@@ -98,6 +98,107 @@ function filtrarProductosLocal(lista: any[], texto: string): any[] {
     return lista.filter(p => regex.test(p.nombre ?? '') || regex.test(p.codigo ?? '')).slice(0, 50)
 }
 
+// ─── Comprobante de venta Plan Acumulativo (80mm, NO es factura electrónica) ─
+
+function escPA(s: string | null | undefined): string {
+    if (!s) return ''
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+function n2PA(n: number): string { return (n ?? 0).toFixed(2) }
+
+interface DatosVentaPaTicket {
+    empresa: { nombre: string; ruc: string; logo_url?: string | null }
+    cliente: { nombre: string; identificacion: string }
+    vendedorNombre?: string | null
+    detalles: DetalleFacturaDirecta[]
+    saldoTotalPendiente: number
+}
+
+function generarHtml80mmVentaPa(d: DatosVentaPaTicket): string {
+    const fecha = new Date().toLocaleString('es-EC')
+    const totales = calcularTotalesFactura(d.detalles)
+    const filas = d.detalles.filter(x => x.cantidad > 0 && x.precio_unitario > 0).map(det => {
+        const l = calcularLinea(det)
+        return `
+        <tr>
+          <td style="padding:2px 0">${escPA(det.nombre_producto)}<br>
+            <span style="font-size:8pt;color:#555">${n2PA(det.cantidad)} x $${n2PA(det.precio_unitario)}${det.descuento > 0 ? ` (-${det.descuento}%)` : ''}</span>
+          </td>
+          <td style="text-align:right;font-weight:bold;white-space:nowrap;padding:2px 0 2px 6px">$${n2PA(l.subtotal_neto)}</td>
+        </tr>`
+    }).join('')
+
+    const logoHtml = d.empresa.logo_url
+        ? `<div class="c" style="margin-bottom:4px"><img src="${escPA(d.empresa.logo_url)}" alt="Logo" style="width:60mm;max-height:35mm;object-fit:contain"></div>`
+        : ''
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Comprobante Plan Acumulativo</title>
+<style>
+  @page{margin:0;size:80mm auto}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Courier New',Courier,monospace;font-size:8pt;color:#000;width:72mm;padding-left:2mm}
+  .c{text-align:center}
+  .b{font-weight:bold}
+  .emp{font-size:10.5pt;font-weight:900;text-align:center}
+  .sep{border:none;border-top:1px dashed #000;margin:4px 0}
+  table{width:100%;border-collapse:collapse}
+  td{vertical-align:top}
+  .tot-lbl{width:55%}
+  .tot-val{width:45%;text-align:right;font-weight:bold}
+  .gran-total td{border-top:1px solid #000;padding-top:3px;font-size:9.5pt;font-weight:900}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+${logoHtml}
+<div class="emp">${escPA(d.empresa.nombre)}</div>
+<div class="c" style="font-size:7.5pt">RUC: ${escPA(d.empresa.ruc)}</div>
+<hr class="sep">
+<div class="c b" style="font-size:9pt">COMPROBANTE DE VENTA</div>
+<div class="c b" style="font-size:8pt">PLAN ACUMULATIVO</div>
+<div class="c" style="font-size:7.5pt">${escPA(fecha)}</div>
+<hr class="sep">
+<div><span class="b">Cliente:</span> ${escPA(d.cliente.nombre)}</div>
+<div><span class="b">RUC/CI:</span> ${escPA(d.cliente.identificacion)}</div>
+${d.vendedorNombre ? `<div><span class="b">Vendedor:</span> ${escPA(d.vendedorNombre)}</div>` : ''}
+<hr class="sep">
+<table>
+  <tbody>
+    ${filas || '<tr><td colspan="2" style="text-align:center">Sin ítems</td></tr>'}
+  </tbody>
+</table>
+<hr class="sep">
+<table>
+  <tr><td class="tot-lbl">Subtotal</td><td class="tot-val">$${n2PA(totales.subtotal)}</td></tr>
+  ${totales.descuentos > 0 ? `<tr><td class="tot-lbl">Descuentos</td><td class="tot-val">-$${n2PA(totales.descuentos)}</td></tr>` : ''}
+  <tr><td class="tot-lbl">IVA</td><td class="tot-val">$${n2PA(totales.iva)}</td></tr>
+  <tr class="gran-total"><td class="tot-lbl">TOTAL VENTA</td><td class="tot-val">$${n2PA(totales.total)}</td></tr>
+</table>
+<hr class="sep">
+<div class="c b" style="font-size:8pt">Saldo total pendiente: $${n2PA(d.saldoTotalPendiente)}</div>
+<hr class="sep">
+<div class="c" style="font-size:7pt">Este comprobante NO es una factura electrónica.</div>
+<div class="c" style="font-size:7pt">Registro interno de Plan Acumulativo — sin validez tributaria.</div>
+<div class="c" style="font-size:7pt">Se factura al SRI cuando el cliente cancele el saldo total.</div>
+</body>
+</html>`
+}
+
+function imprimirComprobantePA(d: DatosVentaPaTicket) {
+    const html = generarHtml80mmVentaPa(d)
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (win) {
+        win.document.write(html)
+        win.document.close()
+        win.focus()
+        setTimeout(() => { win.print() }, 450)
+    }
+}
+
 export function FacturaDirectaPage() {
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
@@ -696,6 +797,14 @@ export function FacturaDirectaPage() {
                     bodega_id: selectedBodegaId || null,
                     vendedor_id: selectedVendedorId || null,
                     created_by: profile?.id ?? null,
+                })
+                const saldoTotalPendiente = await ventaPaService.calcularSaldoPendiente(empresa!.id, selectedCliente.id)
+                imprimirComprobantePA({
+                    empresa: { nombre: empresa!.nombre, ruc: empresa!.ruc, logo_url: empresa!.logo_url },
+                    cliente: { nombre: selectedCliente.nombre, identificacion: selectedCliente.identificacion },
+                    vendedorNombre: vendedores.find(v => v.id === selectedVendedorId)?.nombre || null,
+                    detalles: detallesValidos,
+                    saldoTotalPendiente,
                 })
                 alert('✅ Venta registrada en Plan Acumulativo (sin factura electrónica todavía). Se factura automáticamente cuando el cliente cancele el saldo total, desde Cuentas por Cobrar → Plan Acumulativo.')
                 handleNuevaFactura()
@@ -1456,9 +1565,9 @@ export function FacturaDirectaPage() {
                         <div className="space-y-3">
                             {pagos.map((p, i) => (
                                 <div key={i} className="space-y-1.5 animate-in fade-in">
-                                    <div className="flex gap-2 items-center">
+                                    <div className="flex gap-2 items-center flex-wrap">
                                         <select
-                                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+                                            className="flex-1 min-w-[190px] px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-primary-400 bg-white"
                                             value={p.metodo}
                                             onChange={e => {
                                                 updatePago(i, 'metodo', e.target.value as PagoFactura['metodo'])

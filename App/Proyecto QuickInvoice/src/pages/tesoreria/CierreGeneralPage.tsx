@@ -1,11 +1,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
     Wallet, ArrowUpCircle, ArrowDownCircle, Printer, CheckCircle,
-    AlertCircle, X, Plus, RotateCcw, Loader2, FileText, Search, Calendar,
+    AlertCircle, X, Plus, RotateCcw, Loader2, FileText, Search, Calendar, Mail,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 import { supabaseContabilidad } from '../../lib/supabaseContabilidad'
 import { cn, formatMoneda } from '../../lib/utils'
+import { HelpButton } from '../../components/help/HelpButton'
 import {
     cajaGeneralService,
     type MovimientoCajaGeneral,
@@ -14,6 +16,7 @@ import {
 } from '../../services/cajaGeneralService'
 import { cuentasBancariasService } from '../../services/finance/bancosService'
 import type { CuentaBancaria } from '../../types/finance'
+import { mensajeErrorFuncion } from '../../lib/functionsError'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -282,6 +285,23 @@ ${mov.cuenta_contable_codigo ? `<p class="center" style="font-size:9px;color:#55
     w.onload = () => { w.print(); w.close() }
 }
 
+// Agrupa el subtotal (sin IVA) de cada línea de venta por el nombre de la
+// categoría de su producto — 'Sin categoría' para líneas de servicio o
+// productos sin categoría asignada.
+function calcularVentasPorCategoria(ventas: unknown[]): Record<string, number> {
+    const porCategoria: Record<string, number> = {}
+    for (const v of ventas) {
+        const vt = v as Record<string, unknown>
+        for (const d of (vt.comprobante_detalles as unknown[]) ?? []) {
+            const dt = d as Record<string, unknown>
+            const prod = dt.productos as Record<string, unknown> | null
+            const cat = (prod?.categorias as Record<string, string> | null)?.nombre || 'Sin categoría'
+            porCategoria[cat] = (porCategoria[cat] ?? 0) + (Number(dt.subtotal) || 0)
+        }
+    }
+    return porCategoria
+}
+
 function imprimirReporteCierre(
     cierre: CierreGeneral,
     movimientos: MovimientoCajaGeneral[],
@@ -345,6 +365,12 @@ function imprimirReporteCierre(
         </tr>`
     }).join('')
 
+    const ventasPorCategoria = calcularVentasPorCategoria(ventas)
+    const filasCategoria = Object.entries(ventasPorCategoria)
+        .sort(([, a], [, b]) => b - a)
+        .map(([cat, total]) => `<div class="row"><span>${trunc(cat, 26)}</span><span>${formatMoneda(total)}</span></div>`)
+        .join('')
+
     const totalDepositos = depositos.reduce((s, d) => s + d.valor, 0)
     const totalADepositar = Math.max(0, cierre.total_efectivo_dia - cierre.base_caja) + cierre.total_cheques_dia
 
@@ -385,6 +411,10 @@ ${filasVentas}
 <p class="sub">Por forma de pago:</p>
 ${resumenFP(ventasPorFP)}
 <div class="row bold"><span>TOTAL VENTAS:</span><span>${formatMoneda(cierre.total_ventas)}</span></div>
+<div class="line"></div>
+
+<p class="section">Ventas por Categoría</p>
+${filasCategoria || '<p style="font-size:8px;color:#888">Sin ventas con categoría registradas</p>'}
 <div class="line"></div>
 
 <p class="section">Recuperación Cartera (${cartera.length})</p>
@@ -432,6 +462,145 @@ ${cierre.observaciones ? `<div class="line"></div><p style="font-size:8px">Obs: 
     w.document.write(html)
     w.document.close()
     w.onload = () => { w.print(); w.close() }
+}
+
+// Versión HTML por correo del mismo reporte de cierre — mismo contenido que
+// imprimirReporteCierre (mismos totales, desgloses por forma de pago, detalle
+// de ventas/cartera/movimientos y depósitos), solo con estilo de correo en
+// vez de ticket 80mm.
+function construirHtmlCorreoCierre(
+    cierre: CierreGeneral,
+    movimientos: MovimientoCajaGeneral[],
+    ventas: unknown[],
+    cartera: unknown[],
+    depositos: DepositoCierre[],
+    empresaNombre: string,
+    cajeroNombre: string,
+): string {
+    const trunc = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + '…' : s
+
+    // ── Totales por forma de pago (mismo cálculo que imprimirReporteCierre) ──
+    const ventasPorFP: Record<string, number> = {}
+    for (const v of ventas) {
+        const vt = v as Record<string, unknown>
+        for (const p of (vt.comprobante_pagos as unknown[]) ?? []) {
+            const pt = p as Record<string, unknown>
+            const met = String(pt.metodo_pago || 'otros').toLowerCase()
+            ventasPorFP[met] = (ventasPorFP[met] ?? 0) + Number(pt.valor || 0)
+        }
+    }
+    const carteraPorFP: Record<string, number> = {}
+    for (const p of cartera) {
+        const pt = p as Record<string, unknown>
+        const met = String(pt.metodo_pago || 'otros').toLowerCase()
+        carteraPorFP[met] = (carteraPorFP[met] ?? 0) + Number(pt.valor || 0)
+    }
+
+    // ── Detalle: una fila por venta/cobro/movimiento, solo si con_detalle ──
+    const filasVentas = ventas.map(v => {
+        const vt = v as Record<string, unknown>
+        const pagos = (vt.comprobante_pagos as unknown[]) ?? []
+        const cli = trunc((vt.clientes as Record<string, string> | null)?.nombre ?? '', 22)
+        const num = String(vt.secuencial ?? '').split('-').pop() ?? String(vt.secuencial ?? '')
+        return pagos.map((p, i) => {
+            const pt = p as Record<string, unknown>
+            const met = String(pt.metodo_pago || 'otros').toLowerCase()
+            return filaTabla([i === 0 ? num : '', i === 0 ? cli : '', formatMoneda(Number(pt.valor || 0)), fmtMetodo(met)])
+        }).join('')
+    }).join('')
+
+    const filasCartera = cartera.map(p => {
+        const pt = p as Record<string, unknown>
+        const cxc = pt.cartera_cxc as Record<string, unknown> | null
+        const cli = trunc((cxc?.clientes as Record<string, string> | null)?.nombre ?? '—', 22)
+        const ref = trunc(String(pt.referencia || '—'), 16)
+        const met = String(pt.metodo_pago || 'otros').toLowerCase()
+        return filaTabla([ref, cli, formatMoneda(Number(pt.valor || 0)), fmtMetodo(met)])
+    }).join('')
+
+    const filasMovIngresos = movimientos.filter(m => m.tipo === 'INGRESO').map(m => filaTabla([m.numero, trunc(m.motivo, 22), formatMoneda(m.valor), 'I'])).join('')
+    const filasMovEgresos = movimientos.filter(m => m.tipo === 'EGRESO').map(m => filaTabla([m.numero, trunc(m.motivo, 22), formatMoneda(m.valor), 'E'])).join('')
+
+    const ventasPorCategoria = calcularVentasPorCategoria(ventas)
+    const totalDepositos = depositos.reduce((s, d) => s + d.valor, 0)
+    const totalADepositar = Math.max(0, cierre.total_efectivo_dia - cierre.base_caja) + cierre.total_cheques_dia
+
+    const filaCat = (cat: string, total: number) =>
+        `<tr><td style="padding:4px 0;color:#374151">${cat}</td><td style="padding:4px 0;text-align:right;font-weight:700">${formatMoneda(total)}</td></tr>`
+    const fila = (label: string, val: string, bold = false) =>
+        `<tr><td style="padding:4px 0;color:#374151${bold ? ';font-weight:700' : ''}">${label}</td><td style="padding:4px 0;text-align:right${bold ? ';font-weight:700' : ''}">${val}</td></tr>`
+    function filaTabla(cols: string[]): string {
+        return `<tr>${cols.map((c, i) => `<td style="padding:3px 4px;font-size:12px;${i === cols.length - 1 ? 'text-align:right;font-weight:700' : ''}">${c}</td>`).join('')}</tr>`
+    }
+    const resumenFP = (map: Record<string, number>) =>
+        Object.entries(map).filter(([, v]) => v > 0)
+            .map(([m, v]) => fila(fmtMetodo(m), formatMoneda(v)))
+            .join('')
+    const seccion = (titulo: string, contenido: string) => `
+<tr><td style="padding:12px 28px;border-top:1px solid #f3f4f6;">
+  <p style="margin:0 0 6px;color:#1e4db8;font-size:12px;font-weight:700;text-transform:uppercase;">${titulo}</p>
+  ${contenido}
+</td></tr>`
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:24px 0;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.14);">
+<tr><td style="background:linear-gradient(135deg,#1e4db8 0%,#2563eb 100%);padding:24px 28px;text-align:center">
+  <span style="color:#fff;font-weight:800;font-size:18px;">${empresaNombre}</span>
+</td></tr>
+<tr><td style="padding:20px 28px 8px;text-align:center">
+  <p style="margin:0;color:#111827;font-size:17px;font-weight:700;">Reporte de Cierre de Caja General</p>
+  <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">${fmtFecha(cierre.fecha)}</p>
+</td></tr>
+${seccion(`Ventas del Día (${ventas.length})`, `
+  ${cierre.con_detalle && ventas.length > 0 ? `<table width="100%" style="border-collapse:collapse;margin-bottom:6px;">${filasVentas}</table>` : ''}
+  <p style="margin:6px 0 2px;color:#9ca3af;font-size:11px;">Por forma de pago:</p>
+  <table width="100%" style="border-collapse:collapse;font-size:13px;">${resumenFP(ventasPorFP)}${fila('TOTAL VENTAS', formatMoneda(cierre.total_ventas), true)}</table>
+`)}
+${seccion('Ventas por Categoría', `
+  <table width="100%" style="border-collapse:collapse;font-size:13px;">
+    ${Object.entries(ventasPorCategoria).sort(([, a], [, b]) => b - a).map(([cat, total]) => filaCat(cat, total)).join('') || '<tr><td style="color:#9ca3af;font-size:12px">Sin ventas con categoría registradas</td></tr>'}
+  </table>
+`)}
+${seccion(`Recuperación Cartera (${cartera.length})`, `
+  ${cierre.con_detalle && cartera.length > 0 ? `<table width="100%" style="border-collapse:collapse;margin-bottom:6px;">${filasCartera}</table>` : ''}
+  <p style="margin:6px 0 2px;color:#9ca3af;font-size:11px;">Por forma de pago:</p>
+  <table width="100%" style="border-collapse:collapse;font-size:13px;">${resumenFP(carteraPorFP)}${fila('TOTAL CARTERA', formatMoneda(cierre.total_cartera), true)}</table>
+`)}
+${movimientos.length > 0 ? seccion('Movimientos Extra', `
+  ${cierre.con_detalle ? `<table width="100%" style="border-collapse:collapse;margin-bottom:6px;">${filasMovIngresos}${filasMovEgresos}</table>` : ''}
+  <table width="100%" style="border-collapse:collapse;font-size:13px;">
+    ${fila('Total ingresos', formatMoneda(cierre.total_ingresos_extra))}
+    ${fila('Total egresos', formatMoneda(cierre.total_egresos_extra))}
+  </table>
+`) : ''}
+${seccion('Resumen Final', `
+  <table width="100%" style="border-collapse:collapse;font-size:13px;">
+    ${fila('Efectivo total', formatMoneda(cierre.total_efectivo_dia), true)}
+    ${fila('Cheques total', formatMoneda(cierre.total_cheques_dia), true)}
+    ${fila('(-) Base de caja', formatMoneda(cierre.base_caja))}
+    ${fila('A depositar', formatMoneda(totalADepositar), true)}
+  </table>
+`)}
+${seccion('Depósitos', `
+  <table width="100%" style="border-collapse:collapse;font-size:13px;">
+    ${depositos.length > 0
+        ? depositos.map(d => fila(`${trunc(d.cuenta_banco_nombre, 30)} (${fmtMetodo(d.tipo_deposito.toLowerCase())})`, formatMoneda(d.valor))).join('')
+        : '<tr><td style="color:#9ca3af;font-size:12px">Sin depósitos registrados</td></tr>'}
+    ${fila('Total depósitos', formatMoneda(totalDepositos), true)}
+  </table>
+`)}
+${cierre.observaciones ? `<tr><td style="padding:8px 28px;color:#6b7280;font-size:12px;">Obs: ${cierre.observaciones}</td></tr>` : ''}
+<tr><td style="background:#1e3a8a;padding:16px 28px;text-align:center;">
+  <p style="margin:0 0 4px;color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;">Cerrado por: ${cajeroNombre}</p>
+  <p style="margin:0;color:rgba(255,255,255,0.55);font-size:10px;">QuickInvoice · www.billenniumsystem.com</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`
 }
 
 // ─── Modal Movimiento ────────────────────────────────────────────────────────
@@ -715,6 +884,8 @@ export function CierreGeneralPage() {
     const [conDetalle, setConDetalle]       = useState(true)
     const [baseCajaEdit, setBaseCajaEdit]   = useState('0')
     const [cerrandoCierre, setCerrandoCierre] = useState(false)
+    const [enviandoCorreo, setEnviandoCorreo] = useState(false)
+    const [correoEnviado, setCorreoEnviado] = useState(false)
     const [savingBase, setSavingBase]         = useState(false)
     const [baseSaved, setBaseSaved]           = useState(false)
 
@@ -909,10 +1080,45 @@ export function CierreGeneralPage() {
                 user.id
             )
             await cargarDia()
+            // Envío automático del reporte por correo al ejecutar el cierre,
+            // sin preguntar — si el correo falla (ej. SMTP mal configurado)
+            // no debe aparentar que el cierre en sí falló, por eso corre en
+            // su propio try/catch separado del flujo principal.
+            handleEnviarCorreoCierre(cierre!).catch(() => {})
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : String(e))
         } finally {
             setCerrandoCierre(false)
+        }
+    }
+
+    async function handleEnviarCorreoCierre(cierreOverride?: CierreGeneral) {
+        const cierreParaEnviar = cierreOverride ?? cierre
+        if (!empresa?.id || !cierreParaEnviar) return
+        if (!user?.email) { setError('Tu usuario no tiene un correo registrado.'); return }
+        setEnviandoCorreo(true); setError(''); setCorreoEnviado(false)
+        try {
+            const html = construirHtmlCorreoCierre(
+                { ...cierreParaEnviar, ...totales, base_caja: baseEdited },
+                movimientos, ventas, cartera, depositoRows,
+                empresa.nombre || '',
+                profile?.nombre || user.email || '',
+            )
+            const { error: fnErr } = await supabase.functions.invoke('enviar-reporte-interno', {
+                body: {
+                    empresa_id: empresa.id,
+                    destinatario: user.email,
+                    asunto: `Cierre de Caja General ${fmtFecha(fechaSeleccionada)} — ${empresa.nombre || ''}`,
+                    html,
+                },
+            })
+            if (fnErr) throw new Error(await mensajeErrorFuncion(fnErr, 'Error al enviar el correo'))
+            setCorreoEnviado(true)
+            setTimeout(() => setCorreoEnviado(false), 4000)
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : String(e))
+        } finally {
+            setEnviandoCorreo(false)
         }
     }
 
@@ -1365,6 +1571,18 @@ export function CierreGeneralPage() {
                     >
                         <Printer className="w-4 h-4" /> Imprimir Reporte
                     </button>
+                    <button
+                        onClick={() => handleEnviarCorreoCierre()}
+                        disabled={enviandoCorreo}
+                        className="flex items-center gap-2 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                    >
+                        {enviandoCorreo
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : correoEnviado
+                                ? <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                : <Mail className="w-4 h-4" />}
+                        {correoEnviado ? `Enviado a ${user?.email}` : 'Enviar por correo'}
+                    </button>
                     {!isCerrado && (
                         <button
                             onClick={ejecutarCierreDefinitivo}
@@ -1468,6 +1686,7 @@ export function CierreGeneralPage() {
                                 ● Abierto — auto-guardado
                             </span>
                         )}
+                        <HelpButton pageKey="cierre-caja-general" />
                     </h1>
                     <p className="text-slate-500 text-sm mt-0.5">
                         {new Date(fechaSeleccionada + 'T12:00:00').toLocaleDateString('es-EC', {
