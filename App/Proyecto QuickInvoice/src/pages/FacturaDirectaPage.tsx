@@ -32,7 +32,7 @@ import {
     Search, UserPlus, Plus, Trash2, X, Save,
     CheckCircle2, Loader2, FilePlus, FileText, CreditCard,
     Package, Printer, User, Briefcase, ChevronDown, ChevronUp,
-    Layers, RotateCw, PaintBucket, Copy,
+    Layers, RotateCw, PaintBucket, Copy, Barcode,
 } from 'lucide-react'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { bodegaService } from '../services/bodegaService'
@@ -256,6 +256,20 @@ export function FacturaDirectaPage() {
     // producto/cantidad, para no arrastrar un texto viejo.
     const [precioConIvaInput, setPrecioConIvaInput] = useState<Record<number, string>>({})
     const [buscando, setBuscando] = useState(false)
+    // Modo lector de código de barras — por dispositivo (localStorage, igual
+    // que el punto de emisión del dispositivo), apagado por defecto para no
+    // cambiar el comportamiento actual en cajas sin lector físico. Encendido:
+    // Enter en el buscador (venga de una pistola o tecleado a mano) busca
+    // coincidencia EXACTA de código y agrega la línea sola.
+    const MODO_ESCANER_KEY = `qi_modo_escaner_${empresa?.id ?? ''}`
+    const [modoEscaner, setModoEscanerState] = useState(() => {
+        try { return localStorage.getItem(MODO_ESCANER_KEY) === '1' } catch { return false }
+    })
+    const setModoEscaner = (v: boolean) => {
+        setModoEscanerState(v)
+        try { localStorage.setItem(MODO_ESCANER_KEY, v ? '1' : '0') } catch { /* localStorage no disponible */ }
+    }
+    const buscadorRefs = useRef<Record<number, HTMLInputElement | null>>({})
 
     // Estado: detalle
     const [detalles, setDetalles] = useState<DetalleFacturaDirecta[]>([{ ...DETALLE_VACIO }])
@@ -667,6 +681,76 @@ export function FacturaDirectaPage() {
         setSearchProducto(prev => ({ ...prev, [idx]: prod.nombre }))
         setProductDropdown(null)
         limpiarPrecioRaw(idx)
+    }
+
+    // Enter en el buscador con Modo escáner activo — el navegador no puede
+    // distinguir una pistola de código de barras de alguien tecleando el
+    // código a mano y presionando Enter, así que este mismo camino sirve
+    // para las dos formas. No depende del buscador difuso con debounce (que
+    // puede no haber corrido todavía si el Enter llega muy rápido) — hace su
+    // propia consulta. Primero intenta código EXACTO; si no hay nada (ej. el
+    // código tiene espacios de más guardados en la BD), cae a una búsqueda
+    // por coincidencia parcial y prefiere ahí el que calce exacto con el
+    // código tecleado/escaneado.
+    const handleScanEnter = async (idx: number) => {
+        if (!modoEscaner) return
+        const texto = (searchProducto[idx] ?? '').trim()
+        if (!texto) return
+        setBuscando(true)
+        try {
+            let candidatos: any[] = []
+            if (isOnline && empresa?.id) {
+                const { data, error } = await supabase
+                    .from('productos')
+                    .select('*, subproductos(*)')
+                    .eq('empresa_id', empresa.id)
+                    .eq('activo', true)
+                    .ilike('codigo', texto)
+                    .limit(5)
+                if (error) console.error('[modoEscaner] error buscando código exacto:', error)
+                candidatos = data ?? []
+            }
+            if (candidatos.length === 0) {
+                candidatos = productos.filter((p: any) => p.activo && (p.codigo ?? '').trim().toLowerCase() === texto.toLowerCase())
+            }
+            if (candidatos.length === 0 && isOnline && empresa?.id) {
+                const { data } = await supabase
+                    .from('productos')
+                    .select('*, subproductos(*)')
+                    .eq('empresa_id', empresa.id)
+                    .eq('activo', true)
+                    .ilike('codigo', `%${texto}%`)
+                    .limit(5)
+                candidatos = data ?? []
+            }
+
+            const prod = candidatos.length === 1
+                ? candidatos[0]
+                : candidatos.find((p: any) => (p.codigo ?? '').trim().toLowerCase() === texto.toLowerCase()) ?? null
+
+            if (prod) {
+                await selectProducto(idx, prod)
+                setProductDropdown(null)
+                // Si era la última línea, agrega una nueva vacía y enfoca su
+                // buscador para poder seguir escaneando sin tocar el mouse.
+                if (idx === detalles.length - 1) {
+                    addLinea()
+                    setTimeout(() => buscadorRefs.current[idx + 1]?.focus(), 50)
+                }
+            } else if (candidatos.length > 1) {
+                // Varios resultados ambiguos, ninguno calza exacto — deja la
+                // lista normal abierta para que el usuario elija a mano.
+                setSearchResults(candidatos)
+                setProductDropdown(idx)
+            } else {
+                // Sin ningún match: deja el texto tal cual — el mismo aviso
+                // rojo que ya existe para "nombre_producto sin producto_id"
+                // avisa que ese código no se encontró.
+                setDetalles(prev => prev.map((d, i) => i !== idx ? d : { ...d, nombre_producto: texto, producto_id: null }))
+            }
+        } finally {
+            setBuscando(false)
+        }
     }
 
     const selectSubproducto = (idx: number, sub: any) => {
@@ -1313,6 +1397,25 @@ export function FacturaDirectaPage() {
                                         Factura de Servicios
                                     </span>
                                 </label>
+                                {/* Toggle modo escáner de código de barras */}
+                                <label className="flex items-center gap-2 cursor-pointer select-none"
+                                    title="Con esto encendido, presionar Enter en el buscador (pistola o tecleado a mano) agrega el producto por código exacto automáticamente.">
+                                    <div
+                                        onClick={() => setModoEscaner(!modoEscaner)}
+                                        className={cn(
+                                            'relative w-10 h-5 rounded-full transition-colors duration-200',
+                                            modoEscaner ? 'bg-primary-600' : 'bg-slate-300'
+                                        )}
+                                    >
+                                        <span className={cn(
+                                            'absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200',
+                                            modoEscaner ? 'left-5' : 'left-0.5'
+                                        )} />
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-600 flex items-center gap-1">
+                                        <Barcode className="w-3.5 h-3.5" /> Modo lector código de barras
+                                    </span>
+                                </label>
                                 <button onClick={addLinea}
                                     className="text-primary-600 hover:text-primary-700 flex items-center gap-1 text-sm font-bold">
                                     <Plus className="w-4 h-4" /> Agregar línea
@@ -1352,7 +1455,9 @@ export function FacturaDirectaPage() {
                                                 ) : (
                                                     <>
                                                     <input
-                                                        placeholder="Buscar: riel*45*luxus ..."
+                                                        ref={el => { buscadorRefs.current[idx] = el }}
+                                                        placeholder={modoEscaner ? 'Escanear o escribir código + Enter...' : 'Buscar: riel*45*luxus ...'}
+                                                        autoComplete="off"
                                                         className={`w-full px-3 py-2 rounded-lg border text-sm bg-white outline-none focus:ring-2 ${
                                                             det.nombre_producto && !det.producto_id
                                                                 ? 'border-red-400 focus:ring-red-400 bg-red-50'
@@ -1370,6 +1475,13 @@ export function FacturaDirectaPage() {
                                                                 producto_id: null,
                                                             }))
                                                             setProductDropdown(idx)
+                                                        }}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' && modoEscaner) {
+                                                                e.preventDefault()
+                                                                e.stopPropagation()
+                                                                handleScanEnter(idx)
+                                                            }
                                                         }}
                                                         onFocus={() => {
                                                             setSearchProducto(prev => ({ ...prev, [idx]: '' }))
