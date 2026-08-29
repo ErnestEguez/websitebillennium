@@ -150,7 +150,7 @@ export function EstadoCuentaClientePage() {
   <div class="row big" style="color:#dc2626"><span>SALDO PENDIENTE:</span><span>${formatCurrency(totalSaldo)}</span></div>
 </div>
 
-<div class="footer">Estado de cuenta generado por QuickInvoice — ${ahora}</div>
+<div class="footer">Estado de cuenta generado por Corina ERP — ${ahora}</div>
 <div class="no-print" style="text-align:center;margin-top:16px">
   <button onclick="window.print()" style="padding:8px 24px;background:#1e3a5f;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px">Imprimir</button>
 </div>

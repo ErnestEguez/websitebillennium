@@ -391,7 +391,7 @@ export function VoiceAssistant({ clientes, servicios, onApply, empresaId }: Prop
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-slate-900 text-sm">Asistente de Voz</h3>
-                                    <p className="text-xs text-slate-400">QuickInvoice — sin costo</p>
+                                    <p className="text-xs text-slate-400">Corina ERP — sin costo</p>
                                 </div>
                             </div>
                             <button onClick={() => { setOpen(false); recognitionRef.current?.stop() }}

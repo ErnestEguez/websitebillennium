@@ -667,7 +667,7 @@ export function CarteraCxcPage() {
   <div><label>Saldo pendiente</label><span style="color:#dc2626">${formatCurrency(totalSaldo)}</span></div>
 </div>
 
-<div class="footer">QuickInvoice — Reporte interno de cartera</div>
+<div class="footer">Corina ERP — Reporte interno de cartera</div>
 <div class="no-print" style="text-align:center;margin-top:16px">
   <button onclick="window.print()" style="padding:8px 24px;background:#1e3a5f;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px">Imprimir</button>
 </div>

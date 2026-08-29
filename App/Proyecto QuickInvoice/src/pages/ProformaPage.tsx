@@ -171,7 +171,7 @@ ${prf.observaciones ? `<div class="obs"><strong>Observaciones:</strong> ${esc(pr
 
 <div class="footer">
   Este documento es una cotización referencial y <strong>no tiene validez tributaria</strong>.<br>
-  Generado por QuickInvoice &nbsp;·&nbsp; ${new Date().toLocaleDateString('es-EC')}
+  Generado por Corina ERP &nbsp;·&nbsp; ${new Date().toLocaleDateString('es-EC')}
 </div>
 </body>
 </html>`
@@ -340,7 +340,7 @@ ${prf.observaciones ? `<tr><td style="padding:8px 28px;color:#6b7280;font-size:1
 </td></tr>
 <tr><td style="background:#4c1d95;padding:16px 28px;text-align:center;">
   <p style="margin:0 0 4px;color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;">${esc(emp.nombre)} · RUC: ${esc(emp.ruc)}</p>
-  <p style="margin:0;color:rgba(255,255,255,0.55);font-size:10px;">QuickInvoice · www.billenniumsystem.com</p>
+  <p style="margin:0;color:rgba(255,255,255,0.55);font-size:10px;">Corina ERP · www.billenniumsystem.com</p>
 </td></tr>
 </table>
 </td></tr>

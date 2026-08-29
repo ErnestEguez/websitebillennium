@@ -233,7 +233,7 @@ export function IntegracionQIPage() {
         })
 
         if (eComp) {
-            setError(`Error al leer facturas de QuickInvoice: ${eComp.message}`)
+            setError(`Error al leer facturas de Corina ERP: ${eComp.message}`)
             setCargandoFact(false)
             return
         }
@@ -534,9 +534,9 @@ export function IntegracionQIPage() {
             <div>
                 <div className="flex items-start justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900">Integración QuickInvoice</h1>
+                        <h1 className="text-2xl font-bold text-slate-900">Integración con Facturación</h1>
                         <p className="text-slate-500 text-sm mt-0.5">
-                            Genera asientos contables desde las facturas de ventas de QuickInvoice
+                            Genera asientos contables desde las facturas de ventas de Corina ERP
                         </p>
                     </div>
                     <HelpButton pageKey="integracion-qi" />

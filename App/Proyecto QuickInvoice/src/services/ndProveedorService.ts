@@ -15,6 +15,15 @@ export interface NDProveedor {
     total: number
     concepto: string | null
     estado: 'ACTIVA' | 'ANULADA'
+    // Documento modificado — solo cuando no hay compra vinculada (o la
+    // vinculada no tiene clave_acceso real), único dato con el que el ATS
+    // puede declarar esta N/D (tipoComprobante 05). Ver migración
+    // 20260828_docmod_manual_nc_nd_proveedores.sql.
+    doc_mod_tipo: string | null
+    doc_mod_establecimiento: string | null
+    doc_mod_punto_emision: string | null
+    doc_mod_secuencial: string | null
+    doc_mod_autorizacion: string | null
     created_at: string
     created_by: string | null
     // joins
@@ -53,6 +62,14 @@ export const ndProveedorService = {
         total: number
         concepto?: string
         usuarioId: string
+        // Documento modificado — capturar solo si NO hay compraId (o el
+        // usuario quiere forzar el dato porque la compra vinculada no tiene
+        // clave_acceso). Necesario para que el ATS pueda declarar esta N/D.
+        docModTipo?: string
+        docModEstablecimiento?: string
+        docModPuntoEmision?: string
+        docModSecuencial?: string
+        docModAutorizacion?: string
     }): Promise<NDProveedor> {
         // Validar N/D duplicada (mismo número + proveedor, ya registrada y ACTIVA)
         // ANTES de tocar cualquier CxP — una N/D ANULADA no bloquea.
@@ -138,6 +155,11 @@ export const ndProveedorService = {
                 total:               params.total,
                 concepto:            params.concepto || null,
                 created_by:          params.usuarioId,
+                doc_mod_tipo:             params.docModTipo || null,
+                doc_mod_establecimiento:  params.docModEstablecimiento || null,
+                doc_mod_punto_emision:    params.docModPuntoEmision || null,
+                doc_mod_secuencial:       params.docModSecuencial || null,
+                doc_mod_autorizacion:     params.docModAutorizacion || null,
             })
             .select()
             .single()

@@ -607,7 +607,7 @@ export function EstadoCuentaProveedorPage() {
                     {/* ── Pie de página ── */}
                     <div className="rpt-footer">
                         <div className="footer-note">
-                            QuickInvoice — Finance Suite · Billennium System
+                            Corina ERP — Finance Suite · Billennium System
                         </div>
                         <div className="footer-conf">
                             Documento confidencial — uso exclusivo de {empresa?.nombre ?? 'la empresa'}

@@ -696,7 +696,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 <div className="w-16 h-16 bg-white rounded-2xl shadow-xl flex items-center justify-center mb-8 animate-pulse">
                     <div className="w-8 h-8 bg-primary-600 rounded-lg animate-spin"></div>
                 </div>
-                <h1 className="text-xl font-bold text-slate-900 mb-2">QuickInvoice</h1>
+                <h1 className="text-xl font-bold text-slate-900 mb-2">Corina ERP</h1>
                 <p className="text-slate-500 font-medium">
                     {user ? 'Validando tu perfil de acceso...' : 'Iniciando sistema...'}
                 </p>

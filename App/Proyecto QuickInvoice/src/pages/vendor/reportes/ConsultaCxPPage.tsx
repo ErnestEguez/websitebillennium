@@ -358,7 +358,7 @@ export function ConsultaCxPPage() {
                     </table>
 
                     <div className="rpt-footer">
-                        <span>QuickInvoice — Finance Suite · Billennium System</span>
+                        <span>Corina ERP — Finance Suite · Billennium System</span>
                         <span>Documento confidencial — uso exclusivo de {empresa?.nombre ?? 'la empresa'}</span>
                         <span>{generadoEl}</span>
                     </div>

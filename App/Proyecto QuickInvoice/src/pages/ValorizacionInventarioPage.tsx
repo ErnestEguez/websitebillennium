@@ -560,7 +560,7 @@ export function ValorizacionInventarioPage() {
                     </table>
 
                     <p className="text-center text-xs text-gray-400 mt-6">
-                        Generado por QuickInvoice — {fechaLabel}
+                        Generado por Corina ERP — {fechaLabel}
                     </p>
                 </div>
             </div>

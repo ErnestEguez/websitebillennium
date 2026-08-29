@@ -40,6 +40,13 @@ export function NdProveedoresPage() {
     const [buscandoFactura, setBuscandoFactura] = useState(false)
     const [compraSeleccionada, setCompraSeleccionada] = useState<any>(null)
 
+    // Documento modificado (para el ATS) — solo hace falta si la factura del
+    // proveedor no está en el sistema. El SRI exige declarar qué documento
+    // modifica esta N/D, sin excepción.
+    const [docModTipo, setDocModTipo] = useState<'01' | '03'>('01')
+    const [docModNumero, setDocModNumero] = useState('')
+    const [docModAutorizacion, setDocModAutorizacion] = useState('')
+
     const [guardando, setGuardando] = useState(false)
     const [error, setError] = useState('')
     const [ok, setOk] = useState<NDProveedor | null>(null)
@@ -122,6 +129,7 @@ export function NdProveedoresPage() {
         setProveedorId(''); setNumeroNd(''); setFechaEmision(HOY); setNumeroAutorizacion('')
         setBaseImponible(0); setIva(0); setConcepto('')
         setCompraSeleccionada(null); setSearchFactura(''); setResultadosFactura([])
+        setDocModTipo('01'); setDocModNumero(''); setDocModAutorizacion('')
         setOk(null); setError('')
     }
 
@@ -131,6 +139,22 @@ export function NdProveedoresPage() {
         if (!numeroNd.trim()) { setError('Ingresa el número de la N/D.'); return }
         if (!fechaEmision) { setError('Ingresa la fecha de emisión.'); return }
         if (total <= 0) { setError('El total de la N/D debe ser mayor a 0.'); return }
+
+        // Sin factura vinculada en el sistema: el SRI exige igual saber qué
+        // documento modifica esta N/D para poder declararla en el ATS.
+        let docModEstablecimiento: string | undefined
+        let docModPuntoEmision: string | undefined
+        let docModSecuencial: string | undefined
+        if (!compraSeleccionada) {
+            const partes = docModNumero.trim().replace(/\s/g, '').split('-')
+            if (partes.length !== 3 || !docModAutorizacion.trim()) {
+                setError('Como no vinculaste una factura del sistema, completa el documento que modifica esta N/D (número completo est-ptoemi-secuencial y autorización) — el SRI lo exige para declararla en el ATS.')
+                return
+            }
+            docModEstablecimiento = partes[0].padStart(3, '0')
+            docModPuntoEmision = partes[1].padStart(3, '0')
+            docModSecuencial = partes[2]
+        }
         if (!profile?.id || !empresa?.id) return
 
         setGuardando(true)
@@ -148,6 +172,11 @@ export function NdProveedoresPage() {
                 total,
                 concepto: concepto || undefined,
                 usuarioId: profile.id,
+                docModTipo: compraSeleccionada ? undefined : docModTipo,
+                docModEstablecimiento,
+                docModPuntoEmision,
+                docModSecuencial,
+                docModAutorizacion: compraSeleccionada ? undefined : docModAutorizacion.trim(),
             })
             setOk(nd)
         } catch (e: any) {
@@ -303,6 +332,34 @@ export function NdProveedoresPage() {
                                 Si la factura ya está en el sistema, aparece en la lista al escribir su número — selecciónala para vincularla directo. Si no aparece (factura no digitada aún), la N/D igual se registra como deuda nueva usando lo que escribas aquí como referencia.
                             </p>
                         </div>
+
+                        {!compraSeleccionada && (
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                                <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">
+                                    Documento que modifica (obligatorio para el ATS)
+                                </p>
+                                <p className="text-[11px] text-amber-700">
+                                    Como no vinculaste una factura del sistema, el SRI igual exige saber qué documento modifica esta N/D para poder declararla en el Anexo Transaccional.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-xs text-slate-500 mb-1">Tipo de documento</label>
+                                        <select className={inp} value={docModTipo} onChange={e => setDocModTipo(e.target.value as '01' | '03')}>
+                                            <option value="01">Factura</option>
+                                            <option value="03">Liquidación de Compra</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 mb-1">Número completo (est-ptoemi-secuencial)</label>
+                                        <input className={cn(inp, 'font-mono text-xs')} value={docModNumero} onChange={e => setDocModNumero(e.target.value)} placeholder="001-001-000012345" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 mb-1">Autorización SRI (clave de acceso)</label>
+                                        <input className={cn(inp, 'font-mono text-xs')} maxLength={49} value={docModAutorizacion} onChange={e => setDocModAutorizacion(e.target.value)} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <div>

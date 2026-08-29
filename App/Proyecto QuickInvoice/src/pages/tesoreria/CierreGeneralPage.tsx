@@ -276,7 +276,7 @@ h2{font-size:13px;text-align:center;margin-bottom:2mm}
 <p class="center" style="font-size:10px;margin-top:1mm">${mov.motivo}</p>
 ${mov.cuenta_contable_codigo ? `<p class="center" style="font-size:9px;color:#555">Cta: ${mov.cuenta_contable_codigo} ${mov.cuenta_contable_nombre || ''}</p>` : ''}
 <div class="line"></div>
-<p class="center" style="font-size:9px">Documento interno — QuickInvoice</p>
+<p class="center" style="font-size:9px">Documento interno — Corina ERP</p>
 </body></html>`
     const w = window.open('', '_blank', 'width=320,height=480')
     if (!w) return
@@ -595,7 +595,7 @@ ${seccion('Depósitos', `
 ${cierre.observaciones ? `<tr><td style="padding:8px 28px;color:#6b7280;font-size:12px;">Obs: ${cierre.observaciones}</td></tr>` : ''}
 <tr><td style="background:#1e3a8a;padding:16px 28px;text-align:center;">
   <p style="margin:0 0 4px;color:rgba(255,255,255,0.9);font-size:12px;font-weight:600;">Cerrado por: ${cajeroNombre}</p>
-  <p style="margin:0;color:rgba(255,255,255,0.55);font-size:10px;">QuickInvoice · www.billenniumsystem.com</p>
+  <p style="margin:0;color:rgba(255,255,255,0.55);font-size:10px;">Corina ERP · www.billenniumsystem.com</p>
 </td></tr>
 </table>
 </td></tr>

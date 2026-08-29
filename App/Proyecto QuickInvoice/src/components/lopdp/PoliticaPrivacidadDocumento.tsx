@@ -71,7 +71,7 @@ export function PoliticaPrivacidadDocumento({ contenido, numeroVersion, fechaPub
                     ))}
                 </div>
                 <p className="text-xs text-slate-400 pt-1">
-                    QuickInvoice / Billennium System actúa únicamente como encargado de tratamiento (proveedor de la plataforma tecnológica) — nunca como responsable de los datos aquí descritos.
+                    Corina ERP / Billennium System actúa únicamente como encargado de tratamiento (proveedor de la plataforma tecnológica) — nunca como responsable de los datos aquí descritos.
                 </p>
             </div>
 

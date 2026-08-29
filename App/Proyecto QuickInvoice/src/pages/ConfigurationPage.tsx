@@ -1747,7 +1747,7 @@ export function ConfigurationPage() {
                             <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside">
                                 <li>En Windows, ve a <strong>Impresoras y escáneres</strong> → selecciona tu impresora 80mm → <strong>Establecer como predeterminada</strong></li>
                                 <li>Descarga el acceso directo (botón abajo) y guárdalo en el escritorio</li>
-                                <li>Abre QuickInvoice siempre usando ese acceso directo — Chrome imprimirá directo sin diálogo</li>
+                                <li>Abre Corina ERP siempre usando ese acceso directo — Chrome imprimirá directo sin diálogo</li>
                             </ol>
 
                             <div className="bg-slate-50 rounded-xl p-3">
@@ -1763,7 +1763,7 @@ export function ConfigurationPage() {
                                         const url = window.location.origin
                                         const bat = [
                                             '@echo off',
-                                            'title QuickInvoice — Impresion Directa',
+                                            'title Corina ERP — Impresion Directa',
                                             '',
                                             'SET CHROME1="C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"',
                                             'SET CHROME2="C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"',
@@ -1785,7 +1785,7 @@ export function ConfigurationPage() {
                                         const blob = new Blob([bat], { type: 'text/plain' })
                                         const a = document.createElement('a')
                                         a.href = URL.createObjectURL(blob)
-                                        a.download = 'QuickInvoice_ImpresionDirecta.bat'
+                                        a.download = 'CorinaERP_ImpresionDirecta.bat'
                                         a.click()
                                         URL.revokeObjectURL(a.href)
                                     }}
@@ -3144,7 +3144,7 @@ export function ConfigurationPage() {
                                         <p className="text-sm font-bold text-slate-800">Sesión única por usuario</p>
                                         <p className="text-xs text-slate-500 mt-0.5">
                                             Al iniciar sesión desde otro dispositivo, cierra automáticamente cualquier
-                                            sesión anterior de ese mismo usuario en todo QuickInvoice.
+                                            sesión anterior de ese mismo usuario en todo Corina ERP.
                                         </p>
                                     </div>
                                     <input
