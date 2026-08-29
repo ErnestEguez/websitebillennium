@@ -77,7 +77,7 @@ const MODULOS = [
         key: 'finance', label: 'Tesorería',
         items: [
             { field: 'perm_bancos',             label: 'Cuentas Bancarias' },
-            { field: 'perm_egresos',            label: 'Egresos' },
+            { field: 'perm_egresos',            label: 'Pagos (Egresos)' },
             { field: 'perm_cheques',            label: 'Cheques' },
             { field: 'perm_movimientos_banc',   label: 'Movimientos Bancarios' },
             { field: 'perm_conciliacion',       label: 'Conciliación' },

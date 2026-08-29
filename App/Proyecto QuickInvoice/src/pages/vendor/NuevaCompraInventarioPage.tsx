@@ -22,7 +22,7 @@ import { unidadService, type Unidad } from '../../services/unidadService'
 import type { TipoProveedor } from '../../types/vendors'
 import {
     ArrowLeft, Plus, Trash2, Save, Package, ChevronDown, ChevronUp, CheckSquare,
-    ScanLine, Upload, Loader2, Info,
+    ScanLine, Upload, Loader2, Info, AlertTriangle,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { BuscadorProducto, type ProductoResultado } from '../../components/BuscadorProducto'
@@ -122,6 +122,11 @@ export function NuevaCompraInventarioPage() {
     const [secuencial, setSecuencial]       = useState('')
     const [numeroFactura, setNumeroFactura] = useState('')
     const [claveAcceso, setClaveAcceso]     = useState('')
+    // Aviso temprano de duplicado — no bloquea nada, solo avisa apenas hay
+    // proveedor + número/clave para que el usuario no llene toda la factura
+    // y recién al Guardar se entere. El chequeo real (el que sí bloquea)
+    // sigue estando en handleGuardar, sin tocar.
+    const [avisoDuplicado, setAvisoDuplicado] = useState('')
     const [tipoSustento, setTipoSustento]   = useState<'01'|'02'|'03'|'04'|'05'>('04')
     const [tipoDocumentoSri, setTipoDocumentoSri] = useState<TipoDocumentoSri>('01')
     const [formaPago, setFormaPago]         = useState<'CONTADO'|'CREDITO'>('CREDITO')
@@ -228,6 +233,20 @@ export function NuevaCompraInventarioPage() {
         if (estab && ptoEmi && secuencial)
             setNumeroFactura(`${estab.padStart(3,'0')}-${ptoEmi.padStart(3,'0')}-${secuencial.padStart(9,'0')}`)
     }, [estab, ptoEmi, secuencial])
+
+    // Aviso temprano: apenas hay proveedor + número de factura (o clave de
+    // acceso), avisa si ya existe — sin esperar a que llene todo el detalle
+    // y presione Guardar. Con debounce para no disparar en cada tecla.
+    useEffect(() => {
+        if (!empresa?.id || !proveedorId || (!numeroFactura && !claveAcceso)) { setAvisoDuplicado(''); return }
+        const t = setTimeout(async () => {
+            try {
+                const duplicado = await compraService.verificarDuplicado(empresa.id, claveAcceso || undefined, numeroFactura || undefined, proveedorId)
+                setAvisoDuplicado(duplicado ? 'Ya existe una compra registrada con este número de factura (o clave de acceso) para este proveedor. Verifica en el listado de Compras antes de continuar.' : '')
+            } catch { /* silencioso — el chequeo real y bloqueante sigue en Guardar */ }
+        }, 500)
+        return () => clearTimeout(t)
+    }, [empresa?.id, proveedorId, numeroFactura, claveAcceso])
 
     useEffect(() => {
         if (retSeccion && !numeroRetencion && empresa?.id) {
@@ -961,6 +980,13 @@ export function NuevaCompraInventarioPage() {
                     <input className={cn(inp, 'font-mono text-xs')} maxLength={49} value={claveAcceso}
                         onChange={e => setClaveAcceso(e.target.value)} placeholder="49 dígitos SRI" />
                 </div>
+
+                {avisoDuplicado && (
+                    <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+                        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                        <span>{avisoDuplicado}</span>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
