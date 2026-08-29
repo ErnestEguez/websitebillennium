@@ -149,7 +149,7 @@ export interface EncargadoTercero {
 }
 
 export const ENCARGADO_QUICKINVOICE: EncargadoTercero = {
-    nombre: 'QuickInvoice (Billennium System)',
+    nombre: 'Corina ERP (Billennium System)',
     tipo:   'Encargado de tratamiento — proveedor de la plataforma tecnológica',
     fijo:   true,
 }

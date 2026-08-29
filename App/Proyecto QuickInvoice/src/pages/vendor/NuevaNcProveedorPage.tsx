@@ -58,6 +58,12 @@ export function NuevaNcProveedorPage() {
     const [autorizacionNc, setAutorizacionNc] = useState('')
     const [fechaNc, setFechaNc] = useState(new Date().toISOString().split('T')[0])
     const [observacion, setObservacion] = useState('')
+    // Documento modificado — respaldo manual solo si la compra vinculada no
+    // tiene clave_acceso real (proveedor sin factura electrónica). El SRI
+    // exige este dato para declarar la N/C en el ATS.
+    const [docModTipo, setDocModTipo] = useState<'01' | '03'>('01')
+    const [docModNumero, setDocModNumero] = useState('')
+    const [docModAutorizacion, setDocModAutorizacion] = useState('')
     const [items, setItems] = useState<ItemDevolucion[]>([])
     const [baseIva0, setBaseIva0] = useState(0)
     const [baseIva5, setBaseIva5] = useState(0)
@@ -242,6 +248,13 @@ export function NuevaNcProveedorPage() {
             setErrStep('Elige una factura del proveedor para aplicar el valor de la N/C (o deja "sin aplicar a CxP").')
             return false
         }
+        if (!compra?.clave_acceso) {
+            const partes = docModNumero.trim().replace(/\s/g, '').split('-')
+            if (partes.length !== 3 || !docModAutorizacion.trim()) {
+                setErrStep('La compra vinculada no tiene una autorización SRI real — completa el documento que modifica esta N/C (número completo est-ptoemi-secuencial y autorización) para poder declararla en el ATS.')
+                return false
+            }
+        }
         setErrStep('')
         return true
     }
@@ -251,6 +264,8 @@ export function NuevaNcProveedorPage() {
         setProcesando(true)
         setErrStep('')
         try {
+            const sinClaveReal = !compra.clave_acceso
+            const docModPartes = sinClaveReal ? docModNumero.trim().replace(/\s/g, '').split('-') : []
             const nc = await ncProveedorService.crear({
                 empresaId: empresa.id,
                 proveedorId: compra.proveedor_id!,
@@ -265,6 +280,11 @@ export function NuevaNcProveedorPage() {
                 baseIva0, baseIva5, baseIva15,
                 valorIva, total,
                 cuentaContraId: tipo === 'NC_VALOR' ? cuentaContraId : null,
+                docModTipo: sinClaveReal ? docModTipo : undefined,
+                docModEstablecimiento: sinClaveReal ? docModPartes[0]?.padStart(3, '0') : undefined,
+                docModPuntoEmision: sinClaveReal ? docModPartes[1]?.padStart(3, '0') : undefined,
+                docModSecuencial: sinClaveReal ? docModPartes[2] : undefined,
+                docModAutorizacion: sinClaveReal ? docModAutorizacion.trim() : undefined,
                 detalle: tipo === 'DEVOLUCION_MERCADERIA'
                     ? items.filter(i => i.incluir && i.cantidadNC > 0).map(i => ({
                         detalleIngresoId: i.id,
@@ -480,6 +500,37 @@ export function NuevaNcProveedorPage() {
                                     value={observacion} onChange={e => setObservacion(e.target.value)} placeholder='Ej: "Cliente desiste"' />
                             </div>
                         </div>
+
+                        {!compra.clave_acceso && (
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                                <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">
+                                    Documento que modifica (obligatorio para el ATS)
+                                </p>
+                                <p className="text-[11px] text-amber-700">
+                                    La factura vinculada ({compra.numero_factura}) no tiene una autorización SRI real — el SRI igual exige declarar qué documento modifica esta N/C en el Anexo Transaccional.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-xs text-slate-500 mb-1">Tipo de documento</label>
+                                        <select className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm bg-white"
+                                            value={docModTipo} onChange={e => setDocModTipo(e.target.value as '01' | '03')}>
+                                            <option value="01">Factura</option>
+                                            <option value="03">Liquidación de Compra</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 mb-1">Número completo (est-ptoemi-secuencial)</label>
+                                        <input className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm font-mono text-xs"
+                                            value={docModNumero} onChange={e => setDocModNumero(e.target.value)} placeholder="001-001-000012345" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 mb-1">Autorización SRI (clave de acceso)</label>
+                                        <input className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm font-mono text-xs"
+                                            maxLength={49} value={docModAutorizacion} onChange={e => setDocModAutorizacion(e.target.value)} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {tipo === 'DEVOLUCION_MERCADERIA' && (
                             <div>

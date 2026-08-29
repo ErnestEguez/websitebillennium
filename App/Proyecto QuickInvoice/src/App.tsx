@@ -110,6 +110,7 @@ const IntegracionSRIPage           = lz(() => import('./pages/contabilidad/integ
 const IntegracionExcelVentasPage   = lz(() => import('./pages/contabilidad/integracion/IntegracionExcelVentasPage'), 'IntegracionExcelVentasPage')
 const ContaCompras                 = lz(() => import('./pages/contabilidad/tributario/ConsultaComprasPage'), 'ConsultaComprasPage')
 const ConsultaRetencionesPage      = lz(() => import('./pages/contabilidad/tributario/ConsultaRetencionesPage'), 'ConsultaRetencionesPage')
+const ConsultaRetencionesClientesPage = lz(() => import('./pages/contabilidad/tributario/ConsultaRetencionesClientesPage'), 'ConsultaRetencionesClientesPage')
 const ConsultaFacturasVentasPage   = lz(() => import('./pages/contabilidad/tributario/ConsultaFacturasVentasPage'), 'ConsultaFacturasVentasPage')
 const ConsultaNcNdPage             = lz(() => import('./pages/contabilidad/tributario/ConsultaNcNdPage'), 'ConsultaNcNdPage')
 const ConsultaNcProveedoresPage    = lz(() => import('./pages/contabilidad/tributario/ConsultaNcProveedoresPage'), 'ConsultaNcProveedoresPage')
@@ -838,6 +839,7 @@ function App() {
                           <Route path="integracion/excel"              element={<IntegracionExcelVentasPage />} />
                           <Route path="tributario/compras"             element={<ContaCompras />} />
                           <Route path="tributario/retenciones"         element={<ConsultaRetencionesPage />} />
+                          <Route path="tributario/retenciones-clientes" element={<ConsultaRetencionesClientesPage />} />
                           <Route path="tributario/facturas-ventas"     element={<ConsultaFacturasVentasPage />} />
                           <Route path="tributario/nc-nd"               element={<ConsultaNcNdPage />} />
                           <Route path="tributario/nc-proveedores"      element={<ConsultaNcProveedoresPage />} />

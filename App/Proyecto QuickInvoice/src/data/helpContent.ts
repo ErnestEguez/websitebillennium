@@ -236,7 +236,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         secciones: [
             {
                 titulo: '¿Qué es la cartera?',
-                texto: 'La cartera registra las facturas emitidas a crédito que aún no han sido pagadas en su totalidad. Cada vez que emites una factura con forma de pago "Crédito", QuickInvoice crea automáticamente un registro de deuda en la cartera del cliente.',
+                texto: 'La cartera registra las facturas emitidas a crédito que aún no han sido pagadas en su totalidad. Cada vez que emites una factura con forma de pago "Crédito", Corina ERP crea automáticamente un registro de deuda en la cartera del cliente.',
             },
             {
                 titulo: 'Registrar un abono o pago',
@@ -423,7 +423,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         secciones: [
             {
                 titulo: '¿Qué significa anular?',
-                texto: 'En QuickInvoice, "anular" marca la factura como ANULADA en el sistema interno. El SRI no tiene un proceso de anulación electrónica para facturas autorizadas; la anulación es un control interno. Para efectos tributarios, la forma correcta de revertir una factura es emitir una Nota de Crédito por el valor total.',
+                texto: 'En Corina ERP, "anular" marca la factura como ANULADA en el sistema interno. El SRI no tiene un proceso de anulación electrónica para facturas autorizadas; la anulación es un control interno. Para efectos tributarios, la forma correcta de revertir una factura es emitir una Nota de Crédito por el valor total.',
                 alerta: 'Anula una factura solo si hay un error grave y no puedes emitir nota de crédito. Consulta con tu contador antes de anular.',
             },
             {
@@ -896,6 +896,30 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    'retenciones-clientes': {
+        titulo: 'Retenciones de Clientes',
+        subtitulo: 'Retenciones que los clientes aplican a esta empresa sobre sus ventas',
+        secciones: [
+            {
+                titulo: '¿Qué son estas retenciones?',
+                texto: 'Cuando un cliente que es agente de retención te compra, él descuenta un porcentaje del pago (retención en la fuente y/o de IVA) y te entrega un comprobante de retención. Esos valores son crédito tributario a tu favor y deben acumularse por RUC/cédula del cliente para el ATS de ventas (<valorRetIva>/<valorRetRenta>) y para el casillero 601 del Formulario 104.',
+                tips: [
+                    'Si la retención llega al momento de facturar, ya se captura directo en Nueva Factura — no hace falta registrarla aquí de nuevo.',
+                    'Si la factura tiene saldo pendiente en Cartera CxC, también puedes registrar la retención desde el botón "Abonar" de Cartera CxC.',
+                ],
+            },
+            {
+                titulo: 'Registrar retención de cliente',
+                texto: 'Úsalo cuando la retención llega DESPUÉS de facturar y la factura ya fue pagada en efectivo o tarjeta (sin saldo en Cartera CxC) — ese es el único caso que no tiene otro lugar donde grabarse. Busca la factura por su número completo, ingresa la fecha y las líneas de retención (Fuente y/o IVA).',
+            },
+            {
+                titulo: 'Registrar retención de tarjeta',
+                texto: 'Las retenciones de IVA que aplican los bancos sobre consumos con tarjeta de crédito llegan agrupadas en un RECAP, sin número de factura. No se declaran en el ATS, pero sí se suman en el Formulario 104. Regístralas aquí indicando el banco, la fecha y el valor retenido.',
+                alerta: 'Este tipo de retención nunca aparece en el ATS — solo afecta el casillero 601 del Formulario 104.',
+            },
+        ],
+    },
+
     'cxp': {
         titulo: 'Cuentas por Pagar (CxP)',
         subtitulo: 'Control de obligaciones con proveedores y fechas de vencimiento',
@@ -1055,7 +1079,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         secciones: [
             {
                 titulo: '¿Qué es el plan de cuentas?',
-                texto: 'El plan de cuentas es el catálogo ordenado y codificado de todas las cuentas contables que usa la empresa para registrar sus operaciones. Es la columna vertebral de la contabilidad: sin un plan bien estructurado no existen estados financieros confiables. En Ecuador, el SRI establece la estructura mínima obligatoria. QuickInvoice implementa esta estructura con 5 niveles: Clase (1 dígito), Grupo (2 dígitos), Subgrupo (4 dígitos), Cuenta (6 dígitos) y Subcuenta (8+ dígitos). Solo las cuentas de nivel subcuenta admiten movimientos en asientos.',
+                texto: 'El plan de cuentas es el catálogo ordenado y codificado de todas las cuentas contables que usa la empresa para registrar sus operaciones. Es la columna vertebral de la contabilidad: sin un plan bien estructurado no existen estados financieros confiables. En Ecuador, el SRI establece la estructura mínima obligatoria. Corina ERP implementa esta estructura con 5 niveles: Clase (1 dígito), Grupo (2 dígitos), Subgrupo (4 dígitos), Cuenta (6 dígitos) y Subcuenta (8+ dígitos). Solo las cuentas de nivel subcuenta admiten movimientos en asientos.',
                 tips: [
                     'Las clases son fijas: 1-Activo, 2-Pasivo, 3-Patrimonio, 4-Ingresos, 5-Gastos, 6-Costos.',
                     'Crea subcuentas auxiliares para mayor detalle (ej: 1.1.1.01.001 - Banco Pichincha cta. corriente).',
@@ -1080,7 +1104,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         secciones: [
             {
                 titulo: '¿Qué es el libro diario?',
-                texto: 'El libro diario es el registro primario de la contabilidad por partida doble: cada transacción se registra como un asiento que tiene débitos y créditos que siempre deben sumar igual. Es el origen de todos los saldos contables: el balance general y el estado de resultados se construyen a partir de los saldos acumulados de cada cuenta en el diario. En QuickInvoice, muchos asientos se generan automáticamente (facturas de venta, compras, nóminas) pero también puedes crear asientos manuales para ajustes, provisiones, depreciaciones y otros movimientos no transaccionales.',
+                texto: 'El libro diario es el registro primario de la contabilidad por partida doble: cada transacción se registra como un asiento que tiene débitos y créditos que siempre deben sumar igual. Es el origen de todos los saldos contables: el balance general y el estado de resultados se construyen a partir de los saldos acumulados de cada cuenta en el diario. En Corina ERP, muchos asientos se generan automáticamente (facturas de venta, compras, nóminas) pero también puedes crear asientos manuales para ajustes, provisiones, depreciaciones y otros movimientos no transaccionales.',
                 tips: [
                     'Todo asiento debe estar equilibrado: suma de débitos = suma de créditos.',
                     'El concepto del asiento debe ser descriptivo: "Fact. 001-001-000001234 cliente XYZ".',
@@ -1149,12 +1173,12 @@ export const AYUDA: Record<string, PaginaAyuda> = {
     },
 
     'integracion-qi': {
-        titulo: 'Integración QuickInvoice → Contabilidad',
+        titulo: 'Integración Facturación → Contabilidad',
         subtitulo: 'Generación automática de asientos desde facturas y compras',
         secciones: [
             {
                 titulo: '¿Qué hace esta integración?',
-                texto: 'La integración QI-Contabilidad automatiza la generación de asientos contables a partir de los comprobantes de facturación y compras registrados en QuickInvoice. Sin esta integración, el contador debería re-digitar en contabilidad cada factura emitida o recibida — un proceso manual propenso a errores y duplicación de trabajo. Con la integración activa, cada factura autorizada genera su asiento en el diario de forma automática con las cuentas contables correctas según la configuración.',
+                texto: 'La integración Facturación-Contabilidad automatiza la generación de asientos contables a partir de los comprobantes de facturación y compras registrados en Corina ERP. Sin esta integración, el contador debería re-digitar en contabilidad cada factura emitida o recibida — un proceso manual propenso a errores y duplicación de trabajo. Con la integración activa, cada factura autorizada genera su asiento en el diario de forma automática con las cuentas contables correctas según la configuración.',
                 tips: [
                     'Configura correctamente el mapeo de cuentas (venta con IVA → qué cuenta, sin IVA → qué cuenta, etc.) antes de activar.',
                     'Revisa periódicamente los asientos generados para verificar que sean correctos.',
@@ -1177,7 +1201,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         secciones: [
             {
                 titulo: '¿Para qué sirve?',
-                texto: 'El portal del SRI registra todas las facturas que tus proveedores han emitido a tu RUC. Esta integración permite importar esas facturas directamente al módulo de compras y contabilidad de QuickInvoice sin digitarlas manualmente. Es especialmente útil para conciliar que todas las facturas de proveedores están registradas y para la elaboración del ATS (Anexo Transaccional Simplificado) mensual que se declara ante el SRI.',
+                texto: 'El portal del SRI registra todas las facturas que tus proveedores han emitido a tu RUC. Esta integración permite importar esas facturas directamente al módulo de compras y contabilidad de Corina ERP sin digitarlas manualmente. Es especialmente útil para conciliar que todas las facturas de proveedores están registradas y para la elaboración del ATS (Anexo Transaccional Simplificado) mensual que se declara ante el SRI.',
                 tips: [
                     'Descarga el archivo de compras del portal SRI en formato XML o Excel.',
                     'Revisa cada compra importada para verificar que las cuentas contables sean las correctas.',
@@ -1185,7 +1209,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
             {
                 titulo: 'Proceso de importación',
-                texto: 'Descarga del portal SRI (sri.gob.ec → Servicios en línea → Comprobantes Electrónicos) el archivo de facturas recibidas para el período. En QuickInvoice, haz clic en "Importar desde SRI", selecciona el archivo descargado y el sistema leerá cada comprobante. Revisa la lista y confirma los que deseas registrar.',
+                texto: 'Descarga del portal SRI (sri.gob.ec → Servicios en línea → Comprobantes Electrónicos) el archivo de facturas recibidas para el período. En Corina ERP, haz clic en "Importar desde SRI", selecciona el archivo descargado y el sistema leerá cada comprobante. Revisa la lista y confirma los que deseas registrar.',
             },
         ],
     },
@@ -1652,7 +1676,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
             {
                 titulo: 'Pestaña Compras',
-                texto: 'Muestra facturas de compra y Liquidaciones de Compra del período. Se combinan las registradas en QuickInvoice con lo importado desde el CSV del SRI (sin duplicar). Cada fila muestra el código de tipo de comprobante que va al XML (01 Factura, 03 Liquidación de Compra).',
+                texto: 'Muestra facturas de compra y Liquidaciones de Compra del período. Se combinan las registradas en Corina ERP con lo importado desde el CSV del SRI (sin duplicar). Cada fila muestra el código de tipo de comprobante que va al XML (01 Factura, 03 Liquidación de Compra).',
             },
             {
                 titulo: 'Pestañas N/C y N/D Proveedores',
@@ -1660,7 +1684,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
             {
                 titulo: 'Pestaña Ventas',
-                texto: 'Facturas de venta emitidas en QuickInvoice, agrupadas por cliente. Se puede excluir del XML con la casilla "Excluir ventas del ATS" si vas a declararlas por otro medio.',
+                texto: 'Facturas de venta emitidas en Corina ERP, agrupadas por cliente. Se puede excluir del XML con la casilla "Excluir ventas del ATS" si vas a declararlas por otro medio.',
             },
             {
                 titulo: 'Pestaña Retenciones',
@@ -1714,7 +1738,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         secciones: [
             {
                 titulo: '¿Cómo se arma esta declaración?',
-                texto: 'Ventas y compras se calculan en vivo desde lo registrado en QuickInvoice (facturas, Liquidaciones de Compra, N/C y N/D de proveedores). Las retenciones de IVA que tus clientes te hicieron en ventas (casillero 601) vienen del CSV importado en Integración SRI.',
+                texto: 'Ventas y compras se calculan en vivo desde lo registrado en Corina ERP (facturas, Liquidaciones de Compra, N/C y N/D de proveedores). Las retenciones de IVA que tus clientes te hicieron en ventas (casillero 601) también se calculan en vivo, sumando lo registrado en Retenciones de Clientes (al facturar, después de facturar y las de tarjeta vía RECAP del banco).',
             },
             {
                 titulo: 'Crear y recalcular',
@@ -1799,7 +1823,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             {
                 titulo: '5. Transferencias a terceros / internacionales',
                 texto: 'Activa "¿Hay transferencia a terceros?" si compartes estos datos con alguien fuera de tu empresa (ej. una aseguradora, el SRI, un proveedor de nómina externo) y describe con quién. Activa "¿Hay transferencia internacional?" si esos datos salen de Ecuador (ej. un servidor o proveedor en el extranjero) e indica el país.',
-                alerta: 'QuickInvoice, como tu proveedor tecnológico, ya actúa como encargado del tratamiento de estos datos — no necesitas declararlo aquí como "tercero", eso se documenta en la Política de Privacidad (Fase 3 del módulo).',
+                alerta: 'Corina ERP, como tu proveedor tecnológico, ya actúa como encargado del tratamiento de estos datos — no necesitas declararlo aquí como "tercero", eso se documenta en la Política de Privacidad (Fase 3 del módulo).',
             },
             {
                 titulo: '6. Archivar en vez de eliminar',
@@ -1872,7 +1896,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             {
                 titulo: '¿Para qué sirve esta página?',
                 texto: 'La LOPDP (Art. 10) exige que toda empresa informe de forma clara y accesible cómo trata los datos personales que recibe. Lo que armas aquí se publica en una URL pública (sin necesidad de iniciar sesión) para que tus clientes, empleados o proveedores puedan consultarla en cualquier momento — por ejemplo, enlazándola desde tu sitio web o desde el pie de tus facturas.',
-                alerta: 'Tu empresa es la "Responsable del tratamiento" — la que legalmente responde ante la Superintendencia (SPDP) por estos datos. QuickInvoice/Billennium System solo aparece como "Encargado de tratamiento" (el proveedor tecnológico que procesa los datos por instrucción tuya). Esto queda explícito en la página pública y no se puede quitar ni editar — es un requisito legal, no una opción de personalización.',
+                alerta: 'Tu empresa es la "Responsable del tratamiento" — la que legalmente responde ante la Superintendencia (SPDP) por estos datos. Corina ERP/Billennium System solo aparece como "Encargado de tratamiento" (el proveedor tecnológico que procesa los datos por instrucción tuya). Esto queda explícito en la página pública y no se puede quitar ni editar — es un requisito legal, no una opción de personalización.',
             },
             {
                 titulo: '1. Borrador vs. Publicado — la diferencia importa',
@@ -1892,7 +1916,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
             {
                 titulo: '4. Encargados de tratamiento',
-                texto: 'Aquí declaras a qué terceros les compartes datos para que los procesen en tu nombre (tu contador externo, un courier, una aseguradora, etc.). QuickInvoice ya aparece de forma fija como encargado tecnológico — no se puede quitar ni editar, pero puedes agregar los propios de tu negocio.',
+                texto: 'Aquí declaras a qué terceros les compartes datos para que los procesen en tu nombre (tu contador externo, un courier, una aseguradora, etc.). Corina ERP ya aparece de forma fija como encargado tecnológico — no se puede quitar ni editar, pero puedes agregar los propios de tu negocio.',
             },
             {
                 titulo: '5. Email para ARCO-POL',
@@ -1913,7 +1937,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             {
                 titulo: '¿Qué es un "encargado de tratamiento"?',
                 texto: 'Es cualquier tercero al que le entregas datos personales para que los procese siguiendo TUS instrucciones — no son responsables, son tus proveedores de confianza. Ejemplos típicos: un contador externo, una empresa de courier, un proveedor de nómina externo, un servicio de correo masivo.',
-                alerta: 'QuickInvoice ya aparece arriba de la lista como encargado fijo (bloqueado, no editable) — es tu proveedor tecnológico. Esta pantalla es para los encargados PROPIOS de tu negocio, no para volver a registrar a QuickInvoice.',
+                alerta: 'Corina ERP ya aparece arriba de la lista como encargado fijo (bloqueado, no editable) — es tu proveedor tecnológico. Esta pantalla es para los encargados PROPIOS de tu negocio, no para volver a registrar a Corina ERP.',
             },
             {
                 titulo: '¿Por qué importa tener el contrato/DPA al día?',

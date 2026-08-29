@@ -474,7 +474,7 @@ export function KardexPage() {
                     </table>
 
                     <p className="text-center text-gray-400 mt-6 text-xs">
-                        Generado por QuickInvoice — {new Date().toLocaleDateString('es-EC')}
+                        Generado por Corina ERP — {new Date().toLocaleDateString('es-EC')}
                     </p>
                 </div>
             </div>

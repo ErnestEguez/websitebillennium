@@ -147,7 +147,7 @@ export function HelpPanel({ pageKey, onClose }: Props) {
                     {/* Pie */}
                     <div className="px-4 py-2 border-t border-slate-100 bg-slate-50 shrink-0">
                         <p className="text-[10px] text-slate-400 text-center">
-                            Puedes mover esta ventana · QuickInvoice Ayuda
+                            Puedes mover esta ventana · Corina ERP Ayuda
                         </p>
                     </div>
                 </>

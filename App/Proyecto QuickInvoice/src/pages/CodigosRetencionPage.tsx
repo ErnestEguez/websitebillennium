@@ -47,6 +47,7 @@ type FormState = Omit<CodigoRetencion, 'id' | 'empresa_id' | 'created_at' | 'upd
 
 const EMPTY_FORM: FormState = {
     codigo: '',
+    codigo_ats: '',
     descripcion: '',
     tipo: 'FUENTE',
     porcentaje: 0,
@@ -198,6 +199,7 @@ export function CodigosRetencionPage() {
         setEditando(c)
         setForm({
             codigo:                 c.codigo,
+            codigo_ats:             c.codigo_ats ?? '',
             descripcion:            c.descripcion,
             tipo:                   c.tipo,
             porcentaje:             c.porcentaje,
@@ -219,7 +221,7 @@ export function CodigosRetencionPage() {
         setSaving(true)
         setModalError('')
         try {
-            const payload = { ...form, base_legal: form.base_legal || null }
+            const payload = { ...form, base_legal: form.base_legal || null, codigo_ats: form.codigo_ats || null }
             if (editando) {
                 await codigoRetencionService.actualizar(editando.id, payload)
             } else {
@@ -407,7 +409,14 @@ export function CodigosRetencionPage() {
                                                 {c.tipo}
                                             </span>
                                         </td>
-                                        <td className="py-2 px-3 font-mono font-black text-slate-800">{c.codigo}</td>
+                                        <td className="py-2 px-3 font-mono font-black text-slate-800">
+                                            {c.codigo}
+                                            {c.codigo_ats && (
+                                                <span className="block text-[10px] font-normal text-slate-400" title="Código equivalente en el ATS">
+                                                    ATS: {c.codigo_ats}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="py-2 px-3 text-slate-700 text-xs leading-snug">{c.descripcion}</td>
                                         <td className="py-2 px-3 text-right font-mono font-black text-slate-900">{c.porcentaje}%</td>
                                         <td className="py-2 px-3">
@@ -494,6 +503,24 @@ export function CodigosRetencionPage() {
                                         onChange={e => setForm(f => ({ ...f, porcentaje: parseFloat(e.target.value) || 0 }))} />
                                 </div>
                             </div>
+
+                            {form.tipo === 'IVA' && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+                                        Código equivalente en el ATS (opcional)
+                                    </label>
+                                    <input type="text" maxLength={10}
+                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary-400"
+                                        value={form.codigo_ats ?? ''}
+                                        onChange={e => setForm(f => ({ ...f, codigo_ats: e.target.value.toUpperCase() }))}
+                                        placeholder="725" />
+                                    <p className="text-[11px] text-slate-400 mt-1">
+                                        El comprobante de retención electrónico y el Anexo Transaccional (ATS) usan
+                                        catálogos distintos del SRI para la misma tarifa de IVA. "Código SRI" arriba es
+                                        el del comprobante; este es solo de referencia para cuando se declare el ATS.
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Descripción */}
                             <div>

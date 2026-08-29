@@ -70,6 +70,23 @@ interface SidebarItemProps {
     sentinelId?: string
 }
 
+// Mismos criterios que cada anyActive de ModuleSection más abajo — se usan acá
+// para auto-expandir el módulo correspondiente al navegar, sin cerrar los
+// demás que el usuario ya haya abierto manualmente.
+const MODULE_ACTIVE_TESTS: [string, (p: string) => boolean][] = [
+    ['gerencia',     p => p === '/dashboard' || p.startsWith('/gerencia')],
+    ['facturacion',  p => ['/nueva-factura', '/proformas', '/facturacion-en-vivo', '/facturacion', '/facturacion-masiva', '/vendedores', '/notas-credito', '/anulacion-facturas', '/guias-remision', '/cierres', '/consultas/ventas', '/consultas/talla-color'].some(x => p.startsWith(x))],
+    ['inventario',   p => ['/productos', '/compras/ordenes', '/compras/nueva-inventario', '/inventario-valorizado', '/kardex', '/ajuste-inventario', '/transferencia-bodega', '/cambio-codigo-articulos'].some(x => p.startsWith(x))],
+    ['clientes',     p => ['/clientes', '/cartera', '/consultas/cartera'].some(x => p.startsWith(x))],
+    ['cxp',          p => ['/proveedores', '/compras', '/cxp', '/reportes/compras', '/reportes/cxp', '/reportes/estado-cuenta', '/ajustes', '/retenciones', '/liquidaciones'].some(x => p.startsWith(x))],
+    ['tesoreria',    p => p.startsWith('/teso/')],
+    ['contabilidad', p => ['/conta/', '/lp-'].some(x => p.includes(x))],
+    ['tributario',   p => p.startsWith('/conta/tributario')],
+    ['talento',      p => p.startsWith('/talento/')],
+    ['nominas',      p => p.startsWith('/nominas/')],
+    ['lopdp',        p => p.startsWith('/lopdp/')],
+]
+
 const SidebarItem = ({ to, icon: Icon, label, active, sub, disabled, sentinelId }: SidebarItemProps) => {
     if (disabled) return null  // ocultar completamente cuando no tiene permiso
     return (
@@ -203,7 +220,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
         setDarkSidebar(next)
         localStorage.setItem('qi-dark-sidebar', String(next))
     }
-    const [openGroups, setOpenGroups] = React.useState<string[]>([])
+    // Persistido en localStorage + auto-expandido según la ruta activa, para
+    // que un módulo que ya abriste (o en el que estás navegando) no se
+    // "cierre solo" al moverte entre sus páginas o al recargar.
+    const [openGroups, setOpenGroups] = React.useState<string[]>(() => {
+        try {
+            const saved = JSON.parse(localStorage.getItem('qi-sidebar-open-groups') || '[]')
+            return Array.isArray(saved) ? saved : []
+        } catch { return [] }
+    })
+
+    React.useEffect(() => {
+        const activos = MODULE_ACTIVE_TESTS.filter(([, test]) => test(location.pathname)).map(([key]) => key)
+        if (activos.length === 0) return
+        setOpenGroups(prev => activos.every(k => prev.includes(k)) ? prev : Array.from(new Set([...prev, ...activos])))
+    }, [location.pathname])
+
+    React.useEffect(() => {
+        localStorage.setItem('qi-sidebar-open-groups', JSON.stringify(openGroups))
+    }, [openGroups])
 
     const toggleGroup = (label: string) => {
         setOpenGroups(prev => prev.includes(label) ? prev.filter(g => g !== label) : [...prev, label])
@@ -513,7 +548,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 </button>
                                 {openGroups.includes('conta-int') && isSidebarOpen && (
                                     <div className="ml-4 border-l border-slate-100 pl-1 space-y-0.5">
-                                        <SidebarItem to="/conta/integracion/qi"    icon={FileText} label="Integración QI"  active={location.pathname === '/conta/integracion/qi'} sub disabled={!p.perm_asientos} />
+                                        <SidebarItem to="/conta/integracion/qi"    icon={FileText} label="Integración Facturación"  active={location.pathname === '/conta/integracion/qi'} sub disabled={!p.perm_asientos} />
                                         <SidebarItem to="/conta/integracion/sri"   icon={FileText} label="Integración SRI" active={location.pathname === '/conta/integracion/sri'} sub disabled={!p.perm_asientos} />
                                         <SidebarItem to="/conta/integracion/excel" icon={FileText} label="Excel Ventas"    active={location.pathname === '/conta/integracion/excel'} sub disabled={!p.perm_asientos} />
                                     </div>
@@ -535,6 +570,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         >
                             <SidebarItem to="/conta/tributario/compras"     icon={ShoppingCart} label="Compras SRI"    active={location.pathname === '/conta/tributario/compras'} sub />
                             <SidebarItem to="/conta/tributario/retenciones"     icon={FileText}  label="Retenciones"     active={location.pathname === '/conta/tributario/retenciones'} sub />
+                            <SidebarItem to="/conta/tributario/retenciones-clientes" icon={CreditCard} label="Retenciones de Clientes" active={location.pathname === '/conta/tributario/retenciones-clientes'} sub />
                             <SidebarItem to="/conta/tributario/facturas-ventas" icon={Receipt}   label="Facturas Ventas" active={location.pathname === '/conta/tributario/facturas-ventas'} sub />
                             <SidebarItem to="/conta/tributario/nc-nd"           icon={FileMinus} label="N/C y N/D (Importación SRI)" active={location.pathname === '/conta/tributario/nc-nd'} sub />
                             <SidebarItem to="/conta/tributario/nc-proveedores"  icon={FileMinus} label="N/C Proveedores" active={location.pathname === '/conta/tributario/nc-proveedores'} sub />

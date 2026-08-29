@@ -56,28 +56,61 @@ export const proveedorService = {
     },
 
     async crear(proveedor: Omit<Proveedor, 'id' | 'created_at' | 'updated_at'>): Promise<Proveedor> {
-        // Verificar RUC duplicado en la misma empresa
+        const ruc = proveedor.ruc.trim()
+
+        // Verificar RUC/Cédula duplicado en la misma empresa. Además de este
+        // chequeo, la tabla tiene un índice único (empresa_id, ruc recortado)
+        // como respaldo por si dos guardados casi simultáneos pasan ambos
+        // esta verificación antes de que cualquiera termine de insertar.
         const { data: existente } = await supabase
             .from('proveedores')
             .select('id, nombre_empresa')
             .eq('empresa_id', proveedor.empresa_id)
-            .eq('ruc', proveedor.ruc)
+            .eq('ruc', ruc)
             .maybeSingle()
         if (existente)
-            throw new Error(`Ya existe un proveedor con RUC ${proveedor.ruc}: "${(existente as any).nombre_empresa}"`)
+            throw new Error(`Ya existe un proveedor con RUC/Cédula ${ruc}: "${(existente as any).nombre_empresa}"`)
 
         const { data, error } = await supabase
-            .from('proveedores').insert(proveedor).select().single()
-        if (error) throw error
+            .from('proveedores').insert({ ...proveedor, ruc }).select().single()
+        if (error) {
+            if ((error as any).code === '23505') throw new Error(`Ya existe un proveedor con RUC/Cédula ${ruc}.`)
+            throw error
+        }
         return data as Proveedor
     },
 
     async actualizar(id: string, cambios: Partial<Proveedor>): Promise<Proveedor> {
+        const payload = { ...cambios, updated_at: new Date().toISOString() }
+
+        // Si se está cambiando el RUC/Cédula, verificar que no choque con
+        // otro proveedor de la misma empresa (antes esta validación solo
+        // corría al crear, no al editar).
+        if (typeof cambios.ruc === 'string') {
+            payload.ruc = cambios.ruc.trim()
+            const { data: actual } = await supabase
+                .from('proveedores').select('empresa_id, ruc').eq('id', id).single()
+            if (actual && actual.ruc !== payload.ruc) {
+                const { data: existente } = await supabase
+                    .from('proveedores')
+                    .select('id, nombre_empresa')
+                    .eq('empresa_id', actual.empresa_id)
+                    .eq('ruc', payload.ruc)
+                    .neq('id', id)
+                    .maybeSingle()
+                if (existente)
+                    throw new Error(`Ya existe un proveedor con RUC/Cédula ${payload.ruc}: "${(existente as any).nombre_empresa}"`)
+            }
+        }
+
         const { data, error } = await supabase
             .from('proveedores')
-            .update({ ...cambios, updated_at: new Date().toISOString() })
+            .update(payload)
             .eq('id', id).select().single()
-        if (error) throw error
+        if (error) {
+            if ((error as any).code === '23505') throw new Error(`Ya existe un proveedor con RUC/Cédula ${payload.ruc}.`)
+            throw error
+        }
         return data as Proveedor
     },
 

@@ -103,7 +103,7 @@ export function Dashboard() {
             <div className="space-y-8">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Panel de Administración</h1>
-                    <p className="text-slate-500 text-sm mt-1">Vista global de la plataforma QuickInvoice</p>
+                    <p className="text-slate-500 text-sm mt-1">Vista global de la plataforma Corina ERP</p>
                 </div>
                 <div className="card p-12 text-center space-y-4">
                     <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto">

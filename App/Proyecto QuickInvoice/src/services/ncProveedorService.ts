@@ -37,6 +37,14 @@ export interface NCProveedor {
     total: number
     cuenta_contra_id?: string | null
     estado: EstadoNCProveedor
+    // Documento modificado — respaldo manual cuando la compra vinculada no
+    // tiene clave_acceso real, único caso en que el ATS no la puede armar
+    // sola. Ver migración 20260828_docmod_manual_nc_nd_proveedores.sql.
+    doc_mod_tipo?: string | null
+    doc_mod_establecimiento?: string | null
+    doc_mod_punto_emision?: string | null
+    doc_mod_secuencial?: string | null
+    doc_mod_autorizacion?: string | null
     motivo_anulacion?: string | null
     fecha_anulacion?: string | null
     anulado_por?: string | null
@@ -70,6 +78,13 @@ export interface NcProveedorInput {
     valorIva: number
     total: number
     cuentaContraId?: string | null
+    // Documento modificado — solo hace falta llenarlo si la compra vinculada
+    // no tiene clave_acceso real (proveedor sin factura electrónica).
+    docModTipo?: string
+    docModEstablecimiento?: string
+    docModPuntoEmision?: string
+    docModSecuencial?: string
+    docModAutorizacion?: string
     detalle?: {
         detalleIngresoId: string
         productoId: string
@@ -227,6 +242,11 @@ export const ncProveedorService = {
                 cuenta_contra_id: input.cuentaContraId || null,
                 estado: 'ACTIVA',
                 created_by: input.usuarioId,
+                doc_mod_tipo:             input.docModTipo || null,
+                doc_mod_establecimiento:  input.docModEstablecimiento || null,
+                doc_mod_punto_emision:    input.docModPuntoEmision || null,
+                doc_mod_secuencial:       input.docModSecuencial || null,
+                doc_mod_autorizacion:     input.docModAutorizacion || null,
             })
             .select().single()
         if (eNc || !nc) throw eNc ?? new Error('Error creando N/C de proveedor')

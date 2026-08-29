@@ -261,7 +261,7 @@ export function Formulario103Page() {
             {/* Info */}
             <div className="text-xs text-slate-400 flex items-center gap-2">
                 <Send className="w-3.5 h-3.5" />
-                Los valores se calculan automáticamente desde las retenciones registradas en compras (QuickInvoice).
+                Los valores se calculan automáticamente desde las retenciones registradas en compras (Corina ERP).
                 Cubre únicamente retención en la fuente de IR sobre pagos a residentes locales — no incluye pagos al
                 exterior, dividendos, loterías ni banano. Puedes ajustar casilleros manualmente antes de generar el XML.
             </div>

@@ -67,7 +67,7 @@ export function EncargadosTercerosEditor({ value, onChange }: Props) {
                 </div>
             </div>
             <p className="text-xs text-slate-400">
-                Agrega aquí otros terceros a los que tu empresa transfiere datos (ej. tu contador externo, un courier, una aseguradora). QuickInvoice ya aparece arriba de forma fija como encargado tecnológico.
+                Agrega aquí otros terceros a los que tu empresa transfiere datos (ej. tu contador externo, un courier, una aseguradora). Corina ERP ya aparece arriba de forma fija como encargado tecnológico.
             </p>
         </div>
     )

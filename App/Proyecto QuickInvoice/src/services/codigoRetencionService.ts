@@ -7,6 +7,14 @@ export interface CodigoRetencion {
     id: string
     empresa_id: string
     codigo: string
+    // Código equivalente en el ATS (anexo transaccional) para este mismo
+    // concepto — solo aplica a los códigos de IVA, donde el comprobante de
+    // retención electrónico y el ATS usan catálogos DISTINTOS del SRI para
+    // la misma tarifa (ej. comprobante="1" / ATS="725" para 30%). Puramente
+    // de referencia hoy — el generador del ATS no la usa todavía porque las
+    // retenciones de IVA en compras van en otro bloque del XML, no en
+    // <codRetAir>. Ver AtsPage.tsx.
+    codigo_ats?: string | null
     descripcion: string
     tipo: TipoRetencionCodigo
     porcentaje: number
@@ -223,20 +231,29 @@ export const CODIGOS_SRI_DEFAULT: CodigoDefault[] = [
       cuenta_contable_id: null, cuenta_contable_codigo: null, cuenta_contable_nombre: null },
 
     // ── Retención del IVA — impuestoSRI=2 ─────────────────────────────────────
-    // Código real confirmado por autorización SRI en producción el 2026-08-10
-    // (comprobante ConHierro/PINO ARISTATA: con codigoRetencion=725 el SRI
-    // rechazó "no existe o no está vigente"; con codigoRetencion=1 autorizó).
-    // Los demás códigos IVA de esta tabla (726-730) NO están verificados así
-    // — no tocarlos sin la misma prueba.
-    { tipo: 'IVA', codigo: '1', porcentaje: 30, activo: true, aplica_a: 'TODOS',
+    // "codigo" = el que va en el comprobante de retención electrónico que
+    // firmamos y enviamos al SRI (catálogo simplificado por tarifa: 1=30%,
+    // 2=70%, 3=100% — confirmado en producción el 2026-08-10 para el 30%, y
+    // por el usuario para 70%/100% el 2026-08-27). "codigo_ats" = el código
+    // equivalente en el Anexo Transaccional (ATS) para la MISMA tarifa —
+    // catálogo distinto del SRI, NO se usa para el comprobante de retención.
+    // OJO: "codigo" es único por (empresa, codigo, tipo) en la base — no se
+    // puede repetir "3" en las 4 entradas de 100%, así que solo se corrigió
+    // la más común (servicios profesionales / Liquidaciones de Compra). Las
+    // otras tres (728/729/730 — sector público, importación de servicios,
+    // pagos exterior digital) son casos raros para una empresa típica de
+    // este ERP y quedan SIN TOCAR hasta confirmar si también deben ir con
+    // "3" en el comprobante — no se puede meter un segundo/tercer/cuarto "3"
+    // aquí sin violar esa restricción de unicidad.
+    { tipo: 'IVA', codigo: '1', codigo_ats: '725', porcentaje: 30, activo: true, aplica_a: 'TODOS',
       base_legal: 'Art. 63 LIVA / Res. NAC-DGERCGC15-00000284',
       descripcion: 'Retención IVA 30% — compra de bienes (agentes de retención sector privado)',
       cuenta_contable_id: null, cuenta_contable_codigo: null, cuenta_contable_nombre: null },
-    { tipo: 'IVA', codigo: '726', porcentaje: 70, activo: true, aplica_a: 'TODOS',
+    { tipo: 'IVA', codigo: '2', codigo_ats: '729', porcentaje: 70, activo: true, aplica_a: 'TODOS',
       base_legal: 'Art. 63 LIVA / Res. NAC-DGERCGC15-00000284',
       descripcion: 'Retención IVA 70% — prestación de servicios (agentes de retención sector privado)',
       cuenta_contable_id: null, cuenta_contable_codigo: null, cuenta_contable_nombre: null },
-    { tipo: 'IVA', codigo: '727', porcentaje: 100, activo: true, aplica_a: 'PERSONA_NATURAL',
+    { tipo: 'IVA', codigo: '3', codigo_ats: '731', porcentaje: 100, activo: true, aplica_a: 'PERSONA_NATURAL',
       base_legal: 'Art. 63 LIVA',
       descripcion: 'Retención IVA 100% — servicios profesionales y Liquidaciones de Compra',
       cuenta_contable_id: null, cuenta_contable_codigo: null, cuenta_contable_nombre: null },
