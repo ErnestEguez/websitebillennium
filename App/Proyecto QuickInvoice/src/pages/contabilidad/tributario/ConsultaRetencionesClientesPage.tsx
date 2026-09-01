@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Receipt, Loader2, AlertCircle, X, Plus, Search, CreditCard } from 'lucide-react'
+import { Receipt, Loader2, AlertCircle, X, Plus, Search, CreditCard, Trash2 } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { formatMoneda, mesNombre } from '../../../lib/utils'
 import { HelpButton } from '../../../components/help/HelpButton'
@@ -43,6 +43,7 @@ export function ConsultaRetencionesClientesPage() {
     const [error, setError] = useState('')
 
     const [codigos, setCodigos] = useState<CodigoRetencion[]>([])
+    const [eliminandoId, setEliminandoId] = useState<string | null>(null)
 
     // ── Modal: registrar retención de cliente (posterior a facturar) ──
     const [modalCliente, setModalCliente] = useState(false)
@@ -96,6 +97,36 @@ export function ConsultaRetencionesClientesPage() {
             setError(e.message)
         } finally {
             setCargando(false)
+        }
+    }
+
+    async function eliminarRetencionVenta(row: RetVentaRow) {
+        if (row.origen === 'FACTURA') {
+            alert('Esta retención se capturó al emitir la factura y está ligada a su pago — no se puede eliminar desde aquí.')
+            return
+        }
+        if (!confirm(`¿Eliminar esta retención de ${row.cliente_nombre} (${formatMoneda(row.valor)})? Esta acción no se puede deshacer — vuelve a registrarla con los datos correctos después.`)) return
+        setEliminandoId(row.id)
+        try {
+            await retencionesVentasService.anularRetencionVenta(row.id, row.origen)
+            await cargar()
+        } catch (e: any) {
+            setError(e.message)
+        } finally {
+            setEliminandoId(null)
+        }
+    }
+
+    async function eliminarRetencionTarjeta(row: RetencionTarjetaBanco) {
+        if (!confirm(`¿Eliminar esta retención de tarjeta (${row.banco}, ${formatMoneda(row.valor)})? Esta acción no se puede deshacer.`)) return
+        setEliminandoId(row.id)
+        try {
+            await retencionesVentasService.anularRetencionTarjeta(row.id)
+            await cargar()
+        } catch (e: any) {
+            setError(e.message)
+        } finally {
+            setEliminandoId(null)
         }
     }
 
@@ -293,6 +324,7 @@ export function ConsultaRetencionesClientesPage() {
                                     <th className="py-2 px-2 text-right border border-slate-600 whitespace-nowrap">%</th>
                                     <th className="py-2 px-2 text-right border border-slate-600 whitespace-nowrap">Valor</th>
                                     <th className="py-2 px-2 border border-slate-600 whitespace-nowrap">Origen</th>
+                                    <th className="py-2 px-2 border border-slate-600 whitespace-nowrap"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -310,6 +342,14 @@ export function ConsultaRetencionesClientesPage() {
                                         <td className="py-2 px-2 border border-slate-200 text-right">{f2(r.porcentaje)}%</td>
                                         <td className="py-2 px-2 border border-slate-200 text-right font-semibold text-emerald-700">{f2(r.valor)}</td>
                                         <td className="py-2 px-2 border border-slate-200 text-center text-slate-500">{r.origen === 'FACTURA' ? 'Al facturar' : 'Posterior'}</td>
+                                        <td className="py-2 px-2 border border-slate-200 text-center">
+                                            {r.origen === 'CARTERA' && (
+                                                <button onClick={() => eliminarRetencionVenta(r)} disabled={eliminandoId === r.id}
+                                                    title="Eliminar retención" className="text-red-400 hover:text-red-600 disabled:opacity-40">
+                                                    {eliminandoId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                </button>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -337,6 +377,7 @@ export function ConsultaRetencionesClientesPage() {
                                     <th className="py-2 px-2 text-right border border-slate-500 whitespace-nowrap">%</th>
                                     <th className="py-2 px-2 text-right border border-slate-500 whitespace-nowrap">Valor</th>
                                     <th className="py-2 px-2 text-left border border-slate-500 whitespace-nowrap">Observaciones</th>
+                                    <th className="py-2 px-2 border border-slate-500 whitespace-nowrap"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -349,6 +390,12 @@ export function ConsultaRetencionesClientesPage() {
                                         <td className="py-2 px-2 border border-slate-200 text-right">{f2(r.porcentaje)}%</td>
                                         <td className="py-2 px-2 border border-slate-200 text-right font-semibold text-emerald-700">{f2(r.valor)}</td>
                                         <td className="py-2 px-2 border border-slate-200 text-slate-500">{r.observaciones ?? '—'}</td>
+                                        <td className="py-2 px-2 border border-slate-200 text-center">
+                                            <button onClick={() => eliminarRetencionTarjeta(r)} disabled={eliminandoId === r.id}
+                                                title="Eliminar retención" className="text-red-400 hover:text-red-600 disabled:opacity-40">
+                                                {eliminandoId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
