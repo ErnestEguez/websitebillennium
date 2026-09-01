@@ -611,7 +611,8 @@ export const facturaDirectaService = {
                 empresas (*),
                 vendedores (nombre),
                 comprobante_detalles (*),
-                comprobante_pagos (*)
+                comprobante_pagos (*),
+                cartera_cxc (fecha_vencimiento)
             `)
             .eq('id', id)
             .single()
