@@ -526,6 +526,22 @@ export function FacturaDirectaPage() {
         }
     }
 
+    // Al salir del campo de identificación en "Nuevo Cliente": si ese RUC/cédula
+    // ya está grabado, seleccionarlo de una vez y cerrar el formulario — antes
+    // el vendedor no se enteraba hasta terminar de llenar todo y presionar
+    // Guardar, donde recién salía el error de "ya está grabado".
+    const checkClienteExistenteYVolver = (): boolean => {
+        const id = newClient.identificacion.trim()
+        if (!id) return false
+        const existente = clientes.find(c => c.identificacion === id)
+        if (!existente) return false
+        handleSeleccionarCliente(existente)
+        setIsClientFormOpen(false)
+        setNewClient({ identificacion: '', nombre: '', email: '', direccion: '', telefono: '' })
+        alert(`Este cliente ya estaba grabado como "${existente.nombre}" — se seleccionó automáticamente.`)
+        return true
+    }
+
     const lookupSRI = async () => {
         const id = newClient.identificacion.trim()
         if (!id) return
@@ -1235,7 +1251,11 @@ export function FacturaDirectaPage() {
                                                 className="w-full px-4 py-2 rounded-lg border border-slate-200 pr-10 text-sm"
                                                 value={newClient.identificacion}
                                                 onChange={e => setNewClient({ ...newClient, identificacion: e.target.value })}
-                                                onBlur={() => { if (newClient.identificacion.length >= 10 && !newClient.nombre) lookupSRI() }}
+                                                onBlur={() => {
+                                                    if (newClient.identificacion.length < 10) return
+                                                    if (checkClienteExistenteYVolver()) return
+                                                    if (!newClient.nombre) lookupSRI()
+                                                }}
                                             />
                                             <button type="button" onClick={lookupSRI} disabled={isSearchingSRI}
                                                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-primary-600 hover:bg-slate-100"
