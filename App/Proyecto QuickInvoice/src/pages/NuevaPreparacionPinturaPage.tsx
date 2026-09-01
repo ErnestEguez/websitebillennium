@@ -27,10 +27,14 @@ interface InsumoRow {
     codigo: string
     cantidad: number
     unidad: string
+    // costo_unitario/costo_total son los valores que se usan en el cálculo
+    // real (Costo Total de Producción + Kardex): para insumos tipo BASE es
+    // el precio_venta del producto, para MEZCLA es su costo_promedio.
     costo_unitario: number
     costo_total: number
-    // Precio de venta del producto elegido (solo referencia visual para
-    // insumos tipo BASE — no participa en el costeo ni en Kardex).
+    // Valores crudos del producto elegido, para poder recalcular al cambiar
+    // el Tipo (BASE/MEZCLA) sin tener que volver a buscar.
+    costo_promedio: number
     precio_venta: number
     // búsqueda
     search: string
@@ -38,6 +42,12 @@ interface InsumoRow {
     searching: boolean
     dropdownOpen: boolean
 }
+
+// Valor a usar como "costo unitario" según el tipo de insumo — BASE usa el
+// precio de venta del producto (a pedido del usuario: el costo_promedio de
+// estos productos suele estar en $0), MEZCLA sigue usando costo_promedio.
+const unitarioParaTipo = (tipo: TipoInsumo, costoPromedio: number, precioVenta: number): number =>
+    tipo === 'BASE' ? (precioVenta || 0) : (costoPromedio || 0)
 
 const INSUMO_VACIO = (tipo: TipoInsumo = 'BASE'): InsumoRow => ({
     tipo,
@@ -48,6 +58,7 @@ const INSUMO_VACIO = (tipo: TipoInsumo = 'BASE'): InsumoRow => ({
     unidad: 'L',
     costo_unitario: 0,
     costo_total: 0,
+    costo_promedio: 0,
     precio_venta: 0,
     search: '',
     results: [],
@@ -178,15 +189,19 @@ export function NuevaPreparacionPinturaPage() {
     function selectProductoInsumo(idx: number, prod: any) {
         setInsumos(prev => prev.map((r, i) => {
             if (i !== idx) return r
-            const ct = parseFloat(((r.cantidad || 1) * (prod.costo_promedio || 0)).toFixed(2))
+            const costoPromedio = prod.costo_promedio || 0
+            const precioVenta = prod.precio_venta || 0
+            const cu = unitarioParaTipo(r.tipo, costoPromedio, precioVenta)
+            const ct = parseFloat(((r.cantidad || 1) * cu).toFixed(2))
             return {
                 ...r,
                 producto_id:   prod.id,
                 nombre:        prod.nombre,
                 codigo:        prod.codigo,
-                costo_unitario: prod.costo_promedio || 0,
+                costo_unitario: cu,
                 costo_total:   ct,
-                precio_venta:  prod.precio_venta || 0,
+                costo_promedio: costoPromedio,
+                precio_venta:  precioVenta,
                 search:        prod.nombre,
                 results:       [],
                 dropdownOpen:  false,
@@ -207,7 +222,12 @@ export function NuevaPreparacionPinturaPage() {
     }
 
     function updateTipo(idx: number, tipo: TipoInsumo) {
-        setInsumos(prev => prev.map((r, i) => i === idx ? { ...r, tipo } : r))
+        setInsumos(prev => prev.map((r, i) => {
+            if (i !== idx) return r
+            const cu = unitarioParaTipo(tipo, r.costo_promedio, r.precio_venta)
+            const ct = parseFloat(((r.cantidad || 1) * cu).toFixed(2))
+            return { ...r, tipo, costo_unitario: cu, costo_total: ct }
+        }))
     }
 
     function addInsumo() {
@@ -442,10 +462,7 @@ export function NuevaPreparacionPinturaPage() {
                                     </div>
                                 )}
                                 {row.producto_id && (
-                                    <p className="text-[10px] text-emerald-600 mt-0.5">
-                                        ✓ {row.nombre}
-                                        {row.tipo === 'BASE' && ` · Precio venta: ${formatCurrency(row.precio_venta || 0)}`}
-                                    </p>
+                                    <p className="text-[10px] text-emerald-600 mt-0.5">✓ {row.nombre}</p>
                                 )}
                             </div>
 
@@ -478,9 +495,11 @@ export function NuevaPreparacionPinturaPage() {
                                 </datalist>
                             </div>
 
-                            {/* Costo unitario */}
+                            {/* Costo unitario — para BASE es el precio de venta del producto */}
                             <div className="col-span-2">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">C. Unit.</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                                    {row.tipo === 'BASE' ? 'P. Venta' : 'C. Unit.'}
+                                </label>
                                 <div className="px-3 py-2.5 rounded-lg border border-slate-100 bg-slate-50 text-sm text-right text-slate-600 font-mono">
                                     {formatCurrency(row.costo_unitario)}
                                 </div>
