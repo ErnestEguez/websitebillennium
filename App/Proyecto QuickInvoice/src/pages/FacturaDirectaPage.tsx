@@ -255,6 +255,11 @@ export function FacturaDirectaPage() {
     // que el resto del sistema); se limpia al salir del campo o al cambiar de
     // producto/cantidad, para no arrastrar un texto viejo.
     const [precioConIvaInput, setPrecioConIvaInput] = useState<Record<number, string>>({})
+    // Nivel de precio elegido por línea (1=precio_venta, 2/3/4=precio2..4 del
+    // producto). Por defecto 1 — mismo comportamiento de siempre (incluye
+    // precio por volumen si aplica). Al elegir 2/3/4 se fija ese precio y
+    // deja de recalcularse automáticamente al cambiar la cantidad.
+    const [precioNivel, setPrecioNivel] = useState<Record<number, 1 | 2 | 3 | 4>>({})
     const [buscando, setBuscando] = useState(false)
     // Modo lector de código de barras — por dispositivo (localStorage, igual
     // que el punto de emisión del dispositivo), apagado por defecto para no
@@ -655,6 +660,15 @@ export function FacturaDirectaPage() {
         Math.round(d.precio_unitario * (1 + d.iva_porcentaje / 100) * 100) / 100
     const limpiarPrecioRaw = (idx: number) =>
         setPrecioConIvaInput(prev => { if (!(idx in prev)) return prev; const next = { ...prev }; delete next[idx]; return next })
+    // Precio de lista de un producto para un nivel dado (1=precio_venta, 2..4=precio2..4).
+    const precioDeNivel = (prod: any, nivel: 1 | 2 | 3 | 4): number | null => {
+        const campo = nivel === 1 ? 'precio_venta' : `precio${nivel}`
+        const v = prod?.[campo]
+        return v === null || v === undefined ? null : Number(v)
+    }
+    // Niveles de precio configurados en el producto (siempre incluye el 1).
+    const nivelesDisponibles = (prod: any): (1 | 2 | 3 | 4)[] =>
+        ([1, 2, 3, 4] as const).filter(n => n === 1 || precioDeNivel(prod, n) !== null)
     const selectProducto = async (idx: number, prod: any) => {
         const subsActivos = (prod.subproductos || []).filter((s: any) => s.estado)
         const tieneSubproductos = subsActivos.length > 0
@@ -678,8 +692,19 @@ export function FacturaDirectaPage() {
             factor_conversion: 1,
             costo_promedio: prod.costo_promedio ?? 0,
         } : d))
+        setPrecioNivel(prev => { const next = { ...prev }; delete next[idx]; return next })
         setSearchProducto(prev => ({ ...prev, [idx]: prod.nombre }))
         setProductDropdown(null)
+        limpiarPrecioRaw(idx)
+    }
+    // Cambiar el nivel de precio elegido para una línea — fija precio_unitario
+    // al valor de ese nivel y deja de recalcularlo por cantidad/volumen
+    // (salvo que vuelva a elegir Precio 1).
+    const selectNivelPrecio = (idx: number, prod: any, nivel: 1 | 2 | 3 | 4) => {
+        const precio = precioDeNivel(prod, nivel)
+        if (precio === null) return
+        setPrecioNivel(prev => ({ ...prev, [idx]: nivel }))
+        updateLinea(idx, 'precio_unitario', precio)
         limpiarPrecioRaw(idx)
     }
 
@@ -999,6 +1024,7 @@ export function FacturaDirectaPage() {
         setObservacionFactura('')
         setSearchCliente('')
         setSearchProducto({})
+        setPrecioNivel({})
         sessionStorage.removeItem(PREP_IDS_KEY)
         // Mantener vendedor seleccionado entre facturas
         setDiasPlazoCredito(30)
@@ -1570,7 +1596,10 @@ export function FacturaDirectaPage() {
                                                     onChange={async e => {
                                                         const nuevaCantidad = parseFloat(e.target.value) || 0
                                                         updateLinea(idx, 'cantidad', nuevaCantidad)
-                                                        if (det.producto_id && !det.subproducto_id && empresa?.id && nuevaCantidad > 0) {
+                                                        // Solo recalcula por precio-volumen en Precio 1 (nivel por defecto).
+                                                        // Si eligió Precio 2/3/4, ese precio queda fijo sin importar la cantidad.
+                                                        const nivelActual = precioNivel[idx] ?? 1
+                                                        if (nivelActual === 1 && det.producto_id && !det.subproducto_id && empresa?.id && nuevaCantidad > 0) {
                                                             try {
                                                                 const prod = productos.find(p => p.id === det.producto_id)
                                                                 const precioVol = await precioVolumenService.resolverPrecio(empresa.id, det.producto_id, nuevaCantidad)
@@ -1585,6 +1614,26 @@ export function FacturaDirectaPage() {
                                                 cliente); internamente se guarda sin IVA como el resto del sistema. */}
                                             <div className="col-span-4 md:col-span-3">
                                                 <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">P. Unit. (IVA inc.)</label>
+                                                {!esModoServicio && (() => {
+                                                    const prod = productos.find(p => p.id === det.producto_id)
+                                                    if (!prod || det.subproducto_id) return null
+                                                    const niveles = nivelesDisponibles(prod)
+                                                    if (niveles.length <= 1) return null
+                                                    return (
+                                                        <select
+                                                            title="Lista de precio"
+                                                            value={precioNivel[idx] ?? 1}
+                                                            onChange={e => selectNivelPrecio(idx, prod, Number(e.target.value) as 1 | 2 | 3 | 4)}
+                                                            className="w-full mb-1 px-1.5 py-1 rounded-md border border-slate-200 text-[11px] bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                        >
+                                                            {niveles.map(n => (
+                                                                <option key={n} value={n}>
+                                                                    Precio {n} · {formatCurrency(precioDeNivel(prod, n) ?? 0)}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    )
+                                                })()}
                                                 <div className="relative">
                                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
                                                     <input type="number" min="0" step="0.01"
