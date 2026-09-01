@@ -3,6 +3,16 @@ import { formatCurrency } from '../lib/utils'
 import { format } from 'date-fns'
 import { IMPRESION_POS_DEFAULTS, type SriConfig } from '../services/facturacionService'
 
+const MESES_ABR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+function formatVencimiento(fecha: string | null | undefined): string {
+    if (!fecha) return ''
+    // fecha_vencimiento es DATE puro ("2026-12-31") — parsear a mano evita el
+    // corrimiento de un día que da `new Date('2026-12-31')` por zona horaria.
+    const [y, m, d] = fecha.split('-').map(Number)
+    if (!y || !m || !d) return ''
+    return `${String(d).padStart(2, '0')}/${MESES_ABR[m - 1]}/${y}`
+}
+
 interface InvoiceTicketPOSProps {
     factura: any
     montoRecibido?: number
@@ -184,19 +194,23 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
             {factura.comprobante_pagos && factura.comprobante_pagos.length > 0 && (
                 <div className="mt-4 border-t border-dashed border-black pt-2 space-y-1">
                     <p className="font-bold">FORMAS DE PAGO:</p>
-                    {factura.comprobante_pagos.map((p: any, idx: number) => (
-                        <div key={idx} className="space-y-0.5">
-                            <div className="flex justify-between text-[9px]">
-                                <span className="uppercase">{p.metodo_pago.replace(/_/g, ' ')}:</span>
-                                <span>{formatCurrency(p.valor)}</span>
-                            </div>
-                            {p.referencia && (
-                                <div className="text-[8px] text-left pl-2">
-                                    {p.metodo_pago === 'transferencia' ? `Banco: ${p.referencia}` : `Ref: ${p.referencia}`}
+                    {factura.comprobante_pagos.map((p: any, idx: number) => {
+                        const cartera = Array.isArray(factura.cartera_cxc) ? factura.cartera_cxc[0] : factura.cartera_cxc
+                        const vencimiento = p.metodo_pago === 'credito' ? formatVencimiento(cartera?.fecha_vencimiento) : ''
+                        return (
+                            <div key={idx} className="space-y-0.5">
+                                <div className="flex justify-between text-[9px]">
+                                    <span className="uppercase">{p.metodo_pago.replace(/_/g, ' ')}:</span>
+                                    <span>{formatCurrency(p.valor)}{vencimiento && ` Vencimiento ${vencimiento}`}</span>
                                 </div>
-                            )}
-                        </div>
-                    ))}
+                                {p.referencia && (
+                                    <div className="text-[8px] text-left pl-2">
+                                        {p.metodo_pago === 'transferencia' ? `Banco: ${p.referencia}` : `Ref: ${p.referencia}`}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
                 </div>
             )}
 

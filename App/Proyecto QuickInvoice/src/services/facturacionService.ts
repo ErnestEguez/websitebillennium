@@ -430,7 +430,8 @@ export const facturacionService = {
                 empresas (*),
                 comprobante_detalles (*),
                 comprobante_pagos (*),
-                vendedores (nombre)
+                vendedores (nombre),
+                cartera_cxc (fecha_vencimiento)
             `)
             .eq('id', id)
             .single()
