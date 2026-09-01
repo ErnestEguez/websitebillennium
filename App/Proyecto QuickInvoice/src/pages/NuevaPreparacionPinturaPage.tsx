@@ -29,6 +29,9 @@ interface InsumoRow {
     unidad: string
     costo_unitario: number
     costo_total: number
+    // Precio de venta del producto elegido (solo referencia visual para
+    // insumos tipo BASE — no participa en el costeo ni en Kardex).
+    precio_venta: number
     // búsqueda
     search: string
     results: any[]
@@ -45,6 +48,7 @@ const INSUMO_VACIO = (tipo: TipoInsumo = 'BASE'): InsumoRow => ({
     unidad: 'L',
     costo_unitario: 0,
     costo_total: 0,
+    precio_venta: 0,
     search: '',
     results: [],
     searching: false,
@@ -89,6 +93,7 @@ export function NuevaPreparacionPinturaPage() {
                 cantidad: r.cantidad,
                 costo_unitario: r.costo_unitario,
                 costo_total: r.costo_total,
+                precio_venta: r.precio_venta,
             })),
             descripcion,
             unidad,
@@ -181,6 +186,7 @@ export function NuevaPreparacionPinturaPage() {
                 codigo:        prod.codigo,
                 costo_unitario: prod.costo_promedio || 0,
                 costo_total:   ct,
+                precio_venta:  prod.precio_venta || 0,
                 search:        prod.nombre,
                 results:       [],
                 dropdownOpen:  false,
@@ -436,7 +442,10 @@ export function NuevaPreparacionPinturaPage() {
                                     </div>
                                 )}
                                 {row.producto_id && (
-                                    <p className="text-[10px] text-emerald-600 mt-0.5">✓ {row.nombre}</p>
+                                    <p className="text-[10px] text-emerald-600 mt-0.5">
+                                        ✓ {row.nombre}
+                                        {row.tipo === 'BASE' && ` · Precio venta: ${formatCurrency(row.precio_venta || 0)}`}
+                                    </p>
                                 )}
                             </div>
 
