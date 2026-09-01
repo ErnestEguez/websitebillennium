@@ -27,7 +27,7 @@ import { RetencionesEditor } from '../components/vendor/RetencionesEditor'
 import type { RetLine } from '../components/vendor/RetencionesEditor'
 import { codigoRetencionService, type CodigoRetencion } from '../services/codigoRetencionService'
 import { InvoiceTicketPOS } from '../components/InvoiceTicketPOS'
-import { formatCurrency, validateIdentificacion } from '../lib/utils'
+import { formatCurrency } from '../lib/utils'
 import {
     Search, UserPlus, Plus, Trash2, X, Save,
     CheckCircle2, Loader2, FilePlus, FileText, CreditCard,
@@ -67,6 +67,12 @@ const METODOS_PAGO: { value: PagoFactura['metodo']; label: string; cfBlocked?: b
 
 // Permite usar * como comodín (ej. "Erne*Eg") al buscar cliente por nombre,
 // igual que ya funciona en los buscadores de productos.
+function calcularVencimiento(dias: number): string {
+    const f = new Date()
+    f.setDate(f.getDate() + dias)
+    return f.toISOString().split('T')[0]
+}
+
 function coincideComodin(texto: string, patron: string): boolean {
     if (!patron) return true
     if (!patron.includes('*')) return texto.toLowerCase().includes(patron.toLowerCase())
@@ -215,6 +221,10 @@ export function FacturaDirectaPage() {
     const [selectedCliente, setSelectedCliente] = useState<any>(null)
     const [isClientFormOpen, setIsClientFormOpen] = useState(false)
     const [newClient, setNewClient] = useState({ identificacion: '', nombre: '', email: '', direccion: '', telefono: '' })
+    // Tipo de documento elegido ANTES de escribir — así se aplica la validación
+    // correcta (10 dígitos cédula / 13 RUC) y no se confunden por el número de
+    // dígitos; Pasaporte no lleva ninguna validación de formato.
+    const [tipoDocNuevoCliente, setTipoDocNuevoCliente] = useState<'CEDULA' | 'RUC' | 'PASAPORTE'>('CEDULA')
     const [isSearchingSRI, setIsSearchingSRI] = useState(false)
     const [isSavingClient, setIsSavingClient] = useState(false)
     // Alerta de cartera pendiente (vencida / por vencer) del cliente seleccionado
@@ -232,6 +242,10 @@ export function FacturaDirectaPage() {
     const [vendedores, setVendedores] = useState<Vendedor[]>([])
     const [selectedVendedorId, setSelectedVendedorId] = useState<string>('')
     const [diasPlazoCredito, setDiasPlazoCredito] = useState<number>(30)
+    // Fecha de vencimiento del crédito — se autocalcula desde diasPlazoCredito
+    // pero queda editable directamente; es la que manda y la que se imprime
+    // en el ticket como "Vencimiento" en Formas de Pago.
+    const [fechaVencimiento, setFechaVencimiento] = useState<string>(() => calcularVencimiento(30))
 
     // Estado: bodegas
     const [bodegas, setBodegas] = useState<Bodega[]>([])
@@ -310,7 +324,7 @@ export function FacturaDirectaPage() {
     const clearDraft = useFormDraft(
         'draft_factura_directa',
         () => ({
-            selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, detalles, pagos, montoRecibido, esModoServicio,
+            selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, fechaVencimiento, detalles, pagos, montoRecibido, esModoServicio,
             retenciones, numeroRetencion, observacionFactura,
         }),
         (d) => {
@@ -318,6 +332,7 @@ export function FacturaDirectaPage() {
             if (d.selectedVendedorId) setSelectedVendedorId(d.selectedVendedorId)
             if (d.selectedBodegaId)   setSelectedBodegaId(d.selectedBodegaId)
             if (d.diasPlazoCredito)   setDiasPlazoCredito(d.diasPlazoCredito)
+            if (d.fechaVencimiento)   setFechaVencimiento(d.fechaVencimiento)
             if (d.detalles?.length)   setDetalles(d.detalles)
             if (d.pagos?.length)      setPagos(d.pagos)
             if (d.montoRecibido)      setMontoRecibido(d.montoRecibido)
@@ -326,7 +341,7 @@ export function FacturaDirectaPage() {
             if (d.numeroRetencion)    setNumeroRetencion(d.numeroRetencion)
             if (d.observacionFactura) setObservacionFactura(d.observacionFactura)
         },
-        [selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, detalles, pagos, montoRecibido, esModoServicio,
+        [selectedCliente, selectedVendedorId, selectedBodegaId, diasPlazoCredito, fechaVencimiento, detalles, pagos, montoRecibido, esModoServicio,
             retenciones, numeroRetencion, observacionFactura],
     )
     const printRef = useRef<HTMLDivElement>(null)
@@ -625,14 +640,26 @@ export function FacturaDirectaPage() {
         return true
     }
 
+    // Valida el formato según el tipo de documento elegido ANTES de escribir
+    // (Cédula/RUC/Pasaporte) — evita que un error de dígitos en cédula/RUC se
+    // cuele, y no le aplica ninguna validación a Pasaporte (formato libre).
+    function validarPorTipoDoc(id: string): string | null {
+        if (tipoDocNuevoCliente === 'PASAPORTE') return null
+        if (!/^\d+$/.test(id)) return 'La identificación debe contener solo números.'
+        if (tipoDocNuevoCliente === 'CEDULA' && id.length !== 10) {
+            return `La Cédula debe tener 10 dígitos (tiene ${id.length}).`
+        }
+        if (tipoDocNuevoCliente === 'RUC' && id.length !== 13) {
+            return `El RUC debe tener 13 dígitos (tiene ${id.length}).`
+        }
+        return null
+    }
+
     const lookupSRI = async () => {
         const id = newClient.identificacion.trim()
-        if (!id) return
-        const validation = validateIdentificacion(id)
-        if (!validation.isValid) {
-            const ok = confirm(`La identificación "${id}" no parece válida. ¿Es un Pasaporte?`)
-            if (!ok) return
-        }
+        if (!id || tipoDocNuevoCliente === 'PASAPORTE') return
+        const error = validarPorTipoDoc(id)
+        if (error) { alert(error); return }
         try {
             setIsSearchingSRI(true)
             const { data, error } = await supabase.functions.invoke('sri-lookup', { body: { identificacion: id } })
@@ -650,6 +677,8 @@ export function FacturaDirectaPage() {
     const handleSaveClient = async () => {
         const id = newClient.identificacion.trim()
         if (!id || !newClient.nombre.trim()) return alert('Identificación y nombre son requeridos')
+        const errorDoc = validarPorTipoDoc(id)
+        if (errorDoc) return alert(errorDoc)
         try {
             setIsSavingClient(true)
             const created = await facturacionService.createCliente({ ...newClient, empresa_id: empresa!.id })
@@ -1076,6 +1105,7 @@ export function FacturaDirectaPage() {
                         caja_sesion_id: cajaSesion?.id ?? null,
                         vendedor_id: selectedVendedorId || null,
                         dias_plazo_credito: diasPlazoCredito,
+                        fecha_vencimiento: fechaVencimiento,
                         observaciones: observacionFactura || undefined,
                         retenciones: retenciones.filter(r => r.valor > 0) as RetencionFactura[],
                         numero_retencion: numeroRetencion || undefined,
@@ -1110,6 +1140,7 @@ export function FacturaDirectaPage() {
                 caja_sesion_id: cajaSesion!.id,
                 vendedor_id: selectedVendedorId || null,
                 dias_plazo_credito: diasPlazoCredito,
+                fecha_vencimiento: fechaVencimiento,
                 bodega_id: selectedBodegaId || null,
                 observaciones: observacionFactura || undefined,
                 retenciones: retenciones.filter(r => r.valor > 0) as RetencionFactura[],
@@ -1161,6 +1192,7 @@ export function FacturaDirectaPage() {
         sessionStorage.removeItem(PREP_IDS_KEY)
         // Mantener vendedor seleccionado entre facturas
         setDiasPlazoCredito(30)
+        setFechaVencimiento(calcularVencimiento(30))
         const cf = clientes.find(c => c.identificacion === '9999999999999')
         setSelectedCliente(cf || null)
     }
@@ -1337,7 +1369,7 @@ export function FacturaDirectaPage() {
                                     </button>
                                 )}
                                 {!clienteCollapsed && !isClientFormOpen && (
-                                    <button onClick={e => { e.stopPropagation(); setIsClientFormOpen(true) }}
+                                    <button onClick={e => { e.stopPropagation(); setTipoDocNuevoCliente('CEDULA'); setIsClientFormOpen(true) }}
                                         className="text-primary-600 hover:text-primary-700 flex items-center gap-1 text-xs font-bold">
                                         <UserPlus className="w-3.5 h-3.5" /> Nuevo
                                     </button>
@@ -1362,23 +1394,50 @@ export function FacturaDirectaPage() {
                             <div className="px-5 pb-5 space-y-3 border-t border-slate-50">
                                 {isClientFormOpen ? (
                                     <div className="bg-slate-50 rounded-xl border border-primary-100 p-4 space-y-3 mt-3">
+                                        {/* Tipo de documento — se elige ANTES de escribir, así se aplica la
+                                            validación correcta (10 dígitos Cédula / 13 RUC) y Pasaporte queda
+                                            sin ninguna validación de formato. */}
+                                        <div className="flex gap-1.5">
+                                            {(['CEDULA', 'RUC', 'PASAPORTE'] as const).map(t => (
+                                                <button key={t} type="button"
+                                                    onClick={() => { setTipoDocNuevoCliente(t); setNewClient({ ...newClient, identificacion: '' }) }}
+                                                    className={cn(
+                                                        'flex-1 py-1.5 rounded-lg text-xs font-bold border transition-colors',
+                                                        tipoDocNuevoCliente === t
+                                                            ? 'bg-primary-600 text-white border-primary-600'
+                                                            : 'bg-white text-slate-500 border-slate-200 hover:border-primary-300'
+                                                    )}>
+                                                    {t === 'CEDULA' ? 'Cédula' : t === 'RUC' ? 'RUC' : 'Pasaporte'}
+                                                </button>
+                                            ))}
+                                        </div>
                                         <div className="relative">
                                             <input
-                                                placeholder="Identificación / RUC / Cédula"
+                                                placeholder={tipoDocNuevoCliente === 'CEDULA' ? 'Cédula (10 dígitos)' : tipoDocNuevoCliente === 'RUC' ? 'RUC (13 dígitos)' : 'Número de pasaporte'}
+                                                inputMode={tipoDocNuevoCliente === 'PASAPORTE' ? 'text' : 'numeric'}
+                                                maxLength={tipoDocNuevoCliente === 'CEDULA' ? 10 : tipoDocNuevoCliente === 'RUC' ? 13 : undefined}
                                                 className="w-full px-4 py-2 rounded-lg border border-slate-200 pr-10 text-sm"
                                                 value={newClient.identificacion}
-                                                onChange={e => setNewClient({ ...newClient, identificacion: e.target.value })}
+                                                onChange={e => {
+                                                    const raw = e.target.value
+                                                    const val = tipoDocNuevoCliente === 'PASAPORTE' ? raw : raw.replace(/\D/g, '')
+                                                    setNewClient({ ...newClient, identificacion: val })
+                                                }}
                                                 onBlur={() => {
-                                                    if (newClient.identificacion.length < 10) return
+                                                    const id = newClient.identificacion.trim()
+                                                    const largoEsperado = tipoDocNuevoCliente === 'CEDULA' ? 10 : tipoDocNuevoCliente === 'RUC' ? 13 : null
+                                                    if (largoEsperado !== null && id.length !== largoEsperado) return
                                                     if (checkClienteExistenteYVolver()) return
                                                     if (!newClient.nombre) lookupSRI()
                                                 }}
                                             />
-                                            <button type="button" onClick={lookupSRI} disabled={isSearchingSRI}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-primary-600 hover:bg-slate-100"
-                                                title="Consultar SRI">
-                                                {isSearchingSRI ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                                            </button>
+                                            {tipoDocNuevoCliente !== 'PASAPORTE' && (
+                                                <button type="button" onClick={lookupSRI} disabled={isSearchingSRI}
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-primary-600 hover:bg-slate-100"
+                                                    title="Consultar SRI">
+                                                    {isSearchingSRI ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                                </button>
+                                            )}
                                         </div>
                                         <input placeholder="Nombre / Razón Social *" className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm"
                                             value={newClient.nombre} onChange={e => setNewClient({ ...newClient, nombre: e.target.value })} />
@@ -1541,17 +1600,24 @@ export function FacturaDirectaPage() {
                                     </div>
                                 )}
 
-                                {/* Plazo de crédito — solo visible cuando hay pago a crédito */}
+                                {/* Plazo de crédito — solo visible cuando hay pago a crédito.
+                                    La fecha de vencimiento es la que manda (se imprime en el
+                                    ticket) — el selector de días solo la autocalcula, pero se
+                                    puede corregir directo en el campo de fecha. */}
                                 {pagos.some(p => p.metodo === 'credito') && (
-                                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                                    <div className="flex flex-wrap items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
                                         <CreditCard className="w-5 h-5 text-amber-600 shrink-0" />
                                         <label className="text-sm font-bold text-amber-800 whitespace-nowrap">
                                             Plazo crédito
                                         </label>
                                         <select
-                                            className="flex-1 px-3 py-2 rounded-lg border border-amber-200 text-sm bg-white outline-none focus:ring-2 focus:ring-amber-400"
+                                            className="px-3 py-2 rounded-lg border border-amber-200 text-sm bg-white outline-none focus:ring-2 focus:ring-amber-400"
                                             value={diasPlazoCredito}
-                                            onChange={e => setDiasPlazoCredito(Number(e.target.value))}
+                                            onChange={e => {
+                                                const dias = Number(e.target.value)
+                                                setDiasPlazoCredito(dias)
+                                                setFechaVencimiento(calcularVencimiento(dias))
+                                            }}
                                 >
                                             <option value={15}>15 días</option>
                                             <option value={30}>30 días</option>
@@ -1560,6 +1626,13 @@ export function FacturaDirectaPage() {
                                             <option value={90}>90 días</option>
                                             <option value={120}>120 días</option>
                                         </select>
+                                        <label className="text-sm font-bold text-amber-800 whitespace-nowrap">
+                                            Vence
+                                        </label>
+                                        <input type="date"
+                                            className="px-3 py-2 rounded-lg border border-amber-200 text-sm bg-white outline-none focus:ring-2 focus:ring-amber-400"
+                                            value={fechaVencimiento}
+                                            onChange={e => setFechaVencimiento(e.target.value)} />
                                     </div>
                                 )}
                             </div>
