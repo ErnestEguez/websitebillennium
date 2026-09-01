@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { facturacionService } from '../services/facturacionService'
 import { politicaPrivacidadService } from '../services/lopdp/politicaPrivacidadService'
+import { puntoEmisionService } from '../services/puntoEmisionService'
 import { Printer, ChevronLeft } from 'lucide-react'
 import { InvoiceTicketPOS } from '../components/InvoiceTicketPOS'
 
@@ -11,12 +12,24 @@ export function TicketPrint() {
     const [searchParams] = useSearchParams()
     const [factura, setFactura] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    // Copias configuradas para el punto de emisión de ESTE dispositivo (la
+    // impresora física que va a sacar la reimpresión), no la del punto que
+    // originalmente emitió la factura.
+    const [copiasDispositivo, setCopiasDispositivo] = useState<number | null>(null)
     // LOPDP Fase 4: opcional, nunca bloquea la impresión del ticket.
     const [avisoLopdp, setAvisoLopdp] = useState<string | null>(null)
 
     useEffect(() => {
         if (id) loadFactura()
     }, [id])
+
+    useEffect(() => {
+        const empresaId = factura?.empresas?.id
+        if (!empresaId) return
+        puntoEmisionService.resolverParaDispositivo(empresaId)
+            .then(pe => setCopiasDispositivo(pe?.copias_pos_factura ?? 1))
+            .catch(() => setCopiasDispositivo(1))
+    }, [factura?.empresas?.id])
 
     useEffect(() => {
         const empresaId = factura?.empresas?.id
@@ -37,12 +50,6 @@ export function TicketPrint() {
             setLoading(true)
             const data = await facturacionService.getComprobanteCompleto(id!)
             setFactura(data)
-
-            if (searchParams.get('auto') === 'true') {
-                setTimeout(() => {
-                    window.print()
-                }, 800)
-            }
         } catch (error) {
             console.error('Error loading ticket:', error)
         } finally {
@@ -50,16 +57,25 @@ export function TicketPrint() {
         }
     }
 
+    // Auto-imprimir (?auto=true) — espera a que se resuelvan las copias del
+    // punto de emisión de este dispositivo, para no imprimir de menos/más
+    // por una carrera contra ese fetch.
+    useEffect(() => {
+        if (searchParams.get('auto') !== 'true' || !factura || copiasDispositivo === null) return
+        const t = setTimeout(() => window.print(), 800)
+        return () => clearTimeout(t)
+    }, [factura, copiasDispositivo, searchParams])
+
     const montoUrl  = parseFloat(searchParams.get('monto')  || '0')
     const vueltoUrl = parseFloat(searchParams.get('vuelto') || '0')
 
     if (loading) return <div className="p-12 text-center animate-pulse">Generando Ticket...</div>
     if (!factura) return <div className="p-12 text-center text-red-500">No se encontró el comprobante.</div>
 
-    // Copias automáticas configuradas en Ajustes (Impresión POS) — un solo
-    // window.print() imprime todas de corrido, separadas por un corte de
-    // página para que la impresora térmica las corte entre copia y copia.
-    const copias = Math.max(1, Number(factura?.empresas?.config_sri?.copias_pos_factura) || 1)
+    // Copias configuradas para el punto de emisión de este dispositivo — un
+    // solo window.print() imprime todas de corrido, separadas por un corte
+    // de página para que la impresora térmica las corte entre copia y copia.
+    const copias = Math.max(1, copiasDispositivo ?? 1)
 
     return (
         <div className="min-h-screen bg-slate-100 pb-12 print:bg-white print:pb-0">

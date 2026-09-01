@@ -35,6 +35,10 @@ interface Empresa {
     mostrar_facturacion_en_vivo?: boolean
     etiqueta_campo_linea?: string
     etiqueta_campo_subcategoria?: string
+    // Si está en false, Nueva Factura bloquea vender un producto con stock
+    // en cero (o insuficiente). Default true (permitir) para no cambiar el
+    // comportamiento de ninguna empresa existente.
+    permitir_venta_sin_stock?: boolean
 }
 
 export interface Modules {
