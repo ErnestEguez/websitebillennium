@@ -150,6 +150,32 @@ export const retencionesVentasService = {
         if (error) throw error
     },
 
+    // Anula (soft-delete) una retención de venta registrada DESPUÉS de
+    // facturar (origen='CARTERA') — permite corregir un error de digitación
+    // sin dejar rastro roto: no toca comprobante_pagos ni cartera_cxc/saldo
+    // porque registrarRetencionPosterior() tampoco los tocó al crearla.
+    // Las de origen='FACTURA' (capturadas al emitir) NO se anulan desde acá
+    // — están ligadas al pago de esa factura y se corrigen desde ahí.
+    async anularRetencionVenta(id: string, origen: 'FACTURA' | 'CARTERA'): Promise<void> {
+        if (origen === 'FACTURA') {
+            throw new Error('Esta retención se capturó al emitir la factura y está ligada a su pago — no se puede eliminar desde aquí.')
+        }
+        const { error } = await supabase
+            .from('retenciones_ventas')
+            .update({ estado: 'ANULADO' })
+            .eq('id', id)
+            .eq('origen', 'CARTERA')
+        if (error) throw error
+    },
+
+    async anularRetencionTarjeta(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('retenciones_tarjeta_banco')
+            .update({ estado: 'ANULADO' })
+            .eq('id', id)
+        if (error) throw error
+    },
+
     // Retenciones de clientes del período (para el reporte y para ATS/104) —
     // ambos orígenes FACTURA + CARTERA, más las de tarjeta por separado.
     async listarPorPeriodo(empresaId: string, desde: string, hasta: string): Promise<{

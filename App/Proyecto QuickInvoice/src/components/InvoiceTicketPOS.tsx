@@ -117,22 +117,22 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
             <table className="w-full mb-4 border-collapse">
                 <thead className="border-b border-dashed border-black">
                     <tr>
-                        <th className="text-center pb-1">CANT</th>
+                        <th className="text-center pb-1 pr-2">CANT</th>
                         <th className="text-left pb-1">DESCRIPCIÓN</th>
-                        <th className="text-right pb-1">UNIT.</th>
+                        <th className="text-right pb-1 pl-2">UNIT.</th>
                         <th className="text-right pb-1 pl-3">TOTAL</th>
                     </tr>
                 </thead>
                 <tbody className="pt-1">
                     {items.map((item: any, idx: number) => (
                         <tr key={item.id ?? idx}>
-                            <td className="text-center">{item.cantidad}</td>
+                            <td className="text-center pr-2">{item.cantidad}</td>
                             <td className="py-1 uppercase text-[9px]">
                                 {item.productos?.nombre ?? item.nombre_producto}
                                 {item.talla ? ` - Talla: ${item.talla}` : ''}
                                 {item.color ? ` - Color: ${item.color}` : ''}
                             </td>
-                            <td className="text-right">{formatCurrency(Number(item.precio_unitario || 0))}</td>
+                            <td className="text-right pl-2">{formatCurrency(Number(item.precio_unitario || 0))}</td>
                             <td className="text-right pl-3">{formatCurrency(Number(item.subtotal || 0))}</td>
                         </tr>
                     ))}
@@ -201,11 +201,12 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
             )}
 
             {montoRecibido != null && montoRecibido > 0 && (
-                <div className="mt-2 border-t border-dashed border-black pt-2 space-y-1">
+                <div className="mt-2 border-t border-dashed border-black pt-2">
                     <div className="flex justify-between text-[9px]">
                         <span className="font-bold">RECIBIDO:</span>
                         <span>{formatCurrency(montoRecibido)}</span>
                     </div>
+                    <p>&nbsp;</p>
                     <div className="flex justify-between text-xs font-black">
                         <span>CAMBIO:</span>
                         <span>{formatCurrency(vuelto ?? 0)}</span>
