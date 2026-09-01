@@ -56,6 +56,7 @@ export interface FacturaDirectaInput {
     observaciones?: string
     vendedor_id?: string | null      // FK a vendedores.id (puede ser null)
     dias_plazo_credito?: number      // Solo aplica cuando hay pago a crédito; default 30
+    fecha_vencimiento?: string       // Override explícito (YYYY-MM-DD) del vencimiento del crédito — si viene, manda sobre dias_plazo_credito
     bodega_id?: string | null        // Bodega desde la que se descuenta el stock
     retenciones?: RetencionFactura[] // Retenciones que trae el cliente (opcional)
     numero_retencion?: string        // N° del comprobante de retención del cliente (aplica a todas las líneas)
@@ -155,7 +156,7 @@ export const facturaDirectaService = {
     async generarFacturaDirecta(input: FacturaDirectaInput) {
         const {
             empresa_id, cliente_id, detalles, pagos, caja_sesion_id, vendedor_id,
-            dias_plazo_credito, bodega_id, observaciones, retenciones, numero_retencion, created_by,
+            dias_plazo_credito, fecha_vencimiento, bodega_id, observaciones, retenciones, numero_retencion, created_by,
             omitir_kardex,
         } = input
         const correlationId = auditService.nuevaCorrelacion()
@@ -423,10 +424,17 @@ export const facturaDirectaService = {
         const pagosCredito = pagos.filter(p => p.metodo === 'credito' && p.valor > 0)
         if (pagosCredito.length > 0) {
             const montoCredito = pagosCredito.reduce((sum, p) => sum + Number(p.valor), 0)
-            const diasPlazo = dias_plazo_credito ?? 30
             const fechaEmision = new Date()
-            const fechaVencimiento = new Date(fechaEmision)
-            fechaVencimiento.setDate(fechaVencimiento.getDate() + diasPlazo)
+            let fechaVencimientoStr: string
+            if (fecha_vencimiento) {
+                // Override explícito desde la pantalla — manda sobre días de plazo.
+                fechaVencimientoStr = fecha_vencimiento
+            } else {
+                const diasPlazo = dias_plazo_credito ?? 30
+                const fechaVencimiento = new Date(fechaEmision)
+                fechaVencimiento.setDate(fechaVencimiento.getDate() + diasPlazo)
+                fechaVencimientoStr = fechaVencimiento.toISOString().split('T')[0]
+            }
 
             const { error: errorCartera } = await supabase
                 .from('cartera_cxc')
@@ -435,7 +443,7 @@ export const facturaDirectaService = {
                     cliente_id,
                     comprobante_id: factura.id,
                     fecha_emision: fechaEmision.toISOString().split('T')[0],
-                    fecha_vencimiento: fechaVencimiento.toISOString().split('T')[0],
+                    fecha_vencimiento: fechaVencimientoStr,
                     valor_original: montoCredito,
                     saldo: montoCredito,
                     estado: 'pendiente',
