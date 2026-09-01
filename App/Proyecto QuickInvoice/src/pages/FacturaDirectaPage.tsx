@@ -2017,7 +2017,7 @@ export function FacturaDirectaPage() {
             <div className="hidden">
                 {facturaFinal && (
                     <div ref={printRef}>
-                        {Array.from({ length: Math.max(1, Number(empresa?.config_sri?.copias_pos_factura) || 1) }).map((_, i, arr) => (
+                        {Array.from({ length: Math.max(1, Number((empresa as any)?.config_sri?.copias_pos_factura) || 1) }).map((_, i, arr) => (
                             <div key={i} className={i < arr.length - 1 ? 'break-after-page' : ''}>
                                 <InvoiceTicketPOS
                                     factura={facturaFinal}
