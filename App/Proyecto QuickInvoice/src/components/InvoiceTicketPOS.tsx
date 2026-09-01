@@ -50,8 +50,12 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
     return (
         <div
             ref={ref}
-            className={`mx-auto bg-white p-[5mm] font-mono font-bold text-[10px] leading-tight text-black print:p-0 ${zoomClass}`}
-            style={{ width: `${anchoContenido}mm` }}
+            className={`mx-auto bg-white p-[5mm] font-bold text-[10px] leading-tight text-black print:p-0 ${zoomClass}`}
+            // 'Courier New' en vez de la pila font-mono de Tailwind (que en Windows
+            // suele resolver a Consolas, cuyo "0" lleva un punto/raya que a tamaño
+            // de ticket térmico se confunde con un cero tachado) — Courier New usa
+            // un cero ovalado sin raya y está instalada en todos los Windows.
+            style={{ width: `${anchoContenido}mm`, fontFamily: "'Courier New', Courier, monospace" }}
         >
             <style dangerouslySetInnerHTML={{ __html: `
                 @page { size: ${config.ancho_papel_mm}mm auto; margin: 0; }
@@ -91,9 +95,9 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                     />
                 </div>
                 <p className="font-bold">CLAVE DE ACCESO:</p>
-                <p className="break-all font-mono leading-none">{factura.clave_acceso}</p>
+                <p className="break-all leading-none">{factura.clave_acceso}</p>
                 <p className="font-bold mt-1">AUTORIZACIÓN:</p>
-                <p className="break-all font-mono leading-none">{factura.autorizacion_numero || factura.clave_acceso}</p>
+                <p className="break-all leading-none">{factura.autorizacion_numero || factura.clave_acceso}</p>
                 <p>AMBIENTE: {factura.ambiente || 'PRUEBAS'}</p>
                 <p>FECHA AUT.: {factura.fecha_autorizacion ? format(new Date(factura.fecha_autorizacion), 'dd/MM/yyyy HH:mm') : 'PENDIENTE'}</p>
                 <p>EMISIÓN: NORMAL</p>
@@ -136,7 +140,9 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
             </table>
 
             {/* ── Totales ── */}
-            <div className="border-t border-dashed border-black pt-2 space-y-1">
+            {/* text-xs (12px) en vez del 10px base del ticket — a pedido del usuario,
+                para que se lea mejor; hay margen suficiente en 80mm de ancho. */}
+            <div className="border-t border-dashed border-black pt-2 space-y-1 text-xs">
                 {/* Nota: det.subtotal ya viene SIN impuestos (base) — no se debe volver a
                     dividir por (1 + tasa/100), eso extraía IVA de un valor que ya era la base
                     y descuadraba contra el RIDE. Mismo criterio que InvoicePrint.tsx. */}
@@ -168,7 +174,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                     <span>TOTAL IVA:</span>
                     <span>{formatCurrency(totalIva)}</span>
                 </div>
-                <div className="flex justify-between text-xs font-black pt-1 border-t border-black">
+                <div className="flex justify-between text-base font-black pt-1 border-t border-black">
                     <span>TOTAL:</span>
                     <span>{formatCurrency(factura.total)}</span>
                 </div>
