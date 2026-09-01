@@ -2010,14 +2010,22 @@ export function FacturaDirectaPage() {
             </div>
 
             {/* ── TICKET POS OCULTO PARA IMPRESIÓN ─── */}
+            {/* Copias automáticas configuradas en Ajustes (Impresión POS) — igual
+                patrón que TicketPrint.tsx (reimpresión): un solo handlePrint()
+                imprime todas de corrido, con corte de página entre copia y copia
+                para que la impresora térmica las separe. */}
             <div className="hidden">
                 {facturaFinal && (
                     <div ref={printRef}>
-                        <InvoiceTicketPOS
-                            factura={facturaFinal}
-                            montoRecibido={ticketMontoRecibido}
-                            vuelto={ticketVuelto}
-                        />
+                        {Array.from({ length: Math.max(1, Number(empresa?.config_sri?.copias_pos_factura) || 1) }).map((_, i, arr) => (
+                            <div key={i} className={i < arr.length - 1 ? 'break-after-page' : ''}>
+                                <InvoiceTicketPOS
+                                    factura={facturaFinal}
+                                    montoRecibido={ticketMontoRecibido}
+                                    vuelto={ticketVuelto}
+                                />
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>

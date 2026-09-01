@@ -260,7 +260,7 @@ export const facturaDirectaService = {
                     caja_sesion_id: caja_sesion_id || null,
                     vendedor_id: vendedor_id || null,
                     bodega_id: bodega_id || null,
-                    observacion: observaciones || null,
+                    observacion: observaciones?.trim() || null,
                 })
                 .select()
                 .single()
