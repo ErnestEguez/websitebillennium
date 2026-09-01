@@ -609,6 +609,7 @@ export const facturaDirectaService = {
                 *,
                 clientes (*),
                 empresas (*),
+                vendedores (nombre),
                 comprobante_detalles (*),
                 comprobante_pagos (*)
             `)

@@ -146,7 +146,7 @@ export function NuevaPreparacionPinturaPage() {
             const pattern = '%' + texto + '%'
             const { data } = await supabase
                 .from('productos')
-                .select('id, nombre, codigo, costo_promedio, maneja_stock, stock')
+                .select('id, nombre, codigo, costo_promedio, precio_venta, maneja_stock, stock')
                 .eq('empresa_id', empresa.id)
                 .eq('activo', true)
                 .eq('maneja_stock', true)
@@ -427,7 +427,9 @@ export function NuevaPreparacionPinturaPage() {
                                                 <span className="text-sm font-semibold text-slate-800">{p.nombre}</span>
                                                 <span className="text-xs text-slate-400 ml-2">{p.codigo}</span>
                                                 <span className="text-xs text-slate-500 ml-2">
-                                                    Stock: {p.stock} · Costo: {formatCurrency(p.costo_promedio || 0)}
+                                                    Stock: {p.stock} · {row.tipo === 'BASE'
+                                                        ? `Precio venta: ${formatCurrency(p.precio_venta || 0)}`
+                                                        : `Costo: ${formatCurrency(p.costo_promedio || 0)}`}
                                                 </span>
                                             </button>
                                         ))}
