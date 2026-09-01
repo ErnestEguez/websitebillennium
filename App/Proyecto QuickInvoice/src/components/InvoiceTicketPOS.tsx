@@ -77,7 +77,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                 <p>{emailEmpresa ? `${emailEmpresa} - ` : ''}{ciudadEmpresa} - Ecuador</p>
                 <div className="border-t border-b border-dashed border-black py-1 my-2">
                     <p className="font-bold uppercase">Factura Electronica</p>
-                    <p className="font-bold">No. {factura.secuencial}</p>
+                    <p className="font-black text-base">No. {factura.secuencial}</p>
                 </div>
             </div>
 
@@ -103,7 +103,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
             <div className="space-y-1 mb-3 border-t border-dashed border-black pt-2">
                 <p><span className="font-bold">EMISIÓN:</span> {format(new Date(factura.created_at || new Date()), 'dd/MM/yyyy HH:mm')}</p>
                 <p><span className="font-bold">CÉDULA/RUC:</span> {factura.clientes?.identificacion}</p>
-                <p><span className="font-bold">NOMBRE:</span> {factura.clientes?.nombre}</p>
+                <p><span className="font-bold">CLIENTE:</span> {factura.clientes?.nombre}</p>
                 {factura.clientes?.direccion && <p><span className="font-bold">DIRECCIÓN:</span> {factura.clientes.direccion}</p>}
                 {factura.clientes?.email && <p><span className="font-bold">CORREO:</span> {factura.clientes.email}</p>}
                 {factura.vendedores?.nombre && <p><span className="font-bold">VENDEDOR:</span> {factura.vendedores.nombre}</p>}
@@ -201,17 +201,20 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                         <span>{formatCurrency(montoRecibido)}</span>
                     </div>
                     <div className="flex justify-between text-xs font-black">
-                        <span>VUELTO:</span>
+                        <span>CAMBIO:</span>
                         <span>{formatCurrency(vuelto ?? 0)}</span>
                     </div>
                 </div>
             )}
 
             {/* ── Observaciones ── */}
-            {factura.observacion && (
+            {/* .trim() para no imprimir la etiqueta cuando el campo llega con
+                solo espacios en blanco (guardado como no-vacío mismo estando
+                "vacío" a la vista). */}
+            {factura.observacion?.trim() && (
                 <div className="mt-2 border-t border-dashed border-black pt-2">
                     <p className="font-bold">OBSERVACIONES:</p>
-                    <p className="text-[9px]">{factura.observacion}</p>
+                    <p className="text-[9px]">{factura.observacion.trim()}</p>
                 </div>
             )}
 
