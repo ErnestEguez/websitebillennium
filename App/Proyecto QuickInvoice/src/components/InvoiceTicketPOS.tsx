@@ -207,23 +207,23 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                         <span>{formatCurrency(montoRecibido)}</span>
                     </div>
                     <p>&nbsp;</p>
-                    <div className="flex justify-between text-xs font-black">
-                        <span>CAMBIO:</span>
-                        <span>{formatCurrency(vuelto ?? 0)}</span>
+                    {/* Courier New no tiene un peso "black" real — un 900 sobre un 700
+                        se ve casi igual impreso. Para que de verdad resalte, además de
+                        negrita explícita en cada parte, se sube el tamaño (igual que el
+                        TOTAL de arriba). */}
+                    <div className="flex justify-between text-base">
+                        <span className="font-black">CAMBIO:</span>
+                        <span className="font-black">{formatCurrency(vuelto ?? 0)}</span>
                     </div>
                 </div>
             )}
 
             {/* ── Observaciones ── */}
-            {/* .trim() para no imprimir la etiqueta cuando el campo llega con
-                solo espacios en blanco (guardado como no-vacío mismo estando
-                "vacío" a la vista). */}
-            {factura.observacion?.trim() && (
-                <div className="mt-2 border-t border-dashed border-black pt-2">
-                    <p className="font-bold">OBSERVACIONES:</p>
-                    <p className="text-[9px]">{factura.observacion.trim()}</p>
-                </div>
-            )}
+            {/* Siempre se imprime la etiqueta, tenga o no contenido grabado. */}
+            <div className="mt-2 border-t border-dashed border-black pt-2">
+                <p className="font-bold">OBSERVACIONES:</p>
+                <p className="text-[9px]">{factura.observacion?.trim() || ''}</p>
+            </div>
 
             <div className="mt-6 space-y-2 text-[8px]">
                 <p className="mt-1">Proveedor de Facturación: Billennium System RUC 0907388268001</p>
