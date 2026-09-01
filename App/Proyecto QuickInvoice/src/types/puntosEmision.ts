@@ -13,6 +13,10 @@ export interface PuntoEmision {
     // Secuencial actual por tipo de comprobante, ej. { FACTURA: 1500, NOTA_CREDITO: 12 }
     secuenciales: Record<string, number>
     bodega_id?: string | null
+    // Copias del ticket 80mm de factura que se imprimen automáticamente en
+    // este punto de emisión — antes era un solo valor por empresa; ahora es
+    // por caja física, para poder poner 1 en la que tiene impresora matricial.
+    copias_pos_factura?: number
     es_principal: boolean
     activo: boolean
     created_at?: string

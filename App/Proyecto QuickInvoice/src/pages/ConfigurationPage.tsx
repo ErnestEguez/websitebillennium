@@ -550,6 +550,7 @@ export function ConfigurationPage() {
                     actualizar_precio_venta_compra: companyData.actualizar_precio_venta_compra ?? false,
                     tasa_incremento_precio_venta: companyData.tasa_incremento_precio_venta ?? 30,
                     mostrar_facturacion_en_vivo: companyData.mostrar_facturacion_en_vivo ?? false,
+                    permitir_venta_sin_stock: companyData.permitir_venta_sin_stock ?? true,
                     etiqueta_campo_linea: companyData.etiqueta_campo_linea || 'Talla',
                     etiqueta_campo_subcategoria: companyData.etiqueta_campo_subcategoria || 'Color',
                     // Configuración tributaria — agente de retención
@@ -863,6 +864,7 @@ export function ConfigurationPage() {
                     direccion: editingPuntoEmision.direccion || undefined,
                     descripcion: editingPuntoEmision.descripcion || undefined,
                     bodega_id: editingPuntoEmision.bodega_id || undefined,
+                    copias_pos_factura: editingPuntoEmision.copias_pos_factura ?? 1,
                     es_principal: editingPuntoEmision.es_principal ?? false,
                     activo: true,
                 })
@@ -1339,6 +1341,25 @@ export function ConfigurationPage() {
                                 )}
                             </div>
 
+                            {/* Venta con stock en cero/negativo */}
+                            <div className="space-y-2">
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Permitir Facturar con Stock en Cero</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Encendido (por defecto): se puede facturar un artículo aunque no tenga stock disponible, igual que hoy.
+                                            Apagado: Nueva Factura bloquea la línea si la cantidad supera el stock disponible del artículo.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={companyData.permitir_venta_sin_stock ?? true}
+                                        onChange={e => setCompanyData({ ...companyData, permitir_venta_sin_stock: e.target.checked })}
+                                    />
+                                </label>
+                            </div>
+
                             {/* Facturación en Vivo */}
                             <div className="space-y-2">
                                 <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
@@ -1505,16 +1526,10 @@ export function ConfigurationPage() {
                                 <p className="text-xs text-slate-400">
                                     Cuántas copias del ticket se imprimen automáticamente al hacer clic en "Imprimir Ticket" — útil para entregar una copia al cliente y quedarse con otra.
                                 </p>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Copias — Factura</label>
-                                        <input
-                                            type="number" min={1} max={5}
-                                            className="w-full px-4 py-3 rounded-xl border font-mono"
-                                            value={companyData.config_sri?.copias_pos_factura ?? 1}
-                                            onChange={e => setCompanyData({ ...companyData, config_sri: { ...(companyData.config_sri || {}), copias_pos_factura: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) } })}
-                                        />
-                                    </div>
+                                <p className="text-xs text-slate-400">
+                                    Las copias del ticket de <strong>Factura</strong> ahora se configuran por Punto de Emisión (más abajo, en "Puntos de Emisión") — así cada caja puede tener su propio número de copias según su impresora.
+                                </p>
+                                <div className="grid grid-cols-2 gap-4 max-w-[240px]">
                                     <div className="space-y-1">
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Copias — Nota de Crédito</label>
                                         <input
@@ -2366,7 +2381,7 @@ export function ConfigurationPage() {
                         </div>
                         <button
                             onClick={() => {
-                                setEditingPuntoEmision({ establecimiento: '001', punto_emision: '001', nombre: '', direccion: '', descripcion: '', bodega_id: null, es_principal: puntosEmision.length === 0, activo: true })
+                                setEditingPuntoEmision({ establecimiento: '001', punto_emision: '001', nombre: '', direccion: '', descripcion: '', bodega_id: null, copias_pos_factura: 1, es_principal: puntosEmision.length === 0, activo: true })
                                 setIsPuntoEmisionModalOpen(true)
                             }}
                             className="btn btn-primary py-2 px-4 text-sm flex items-center gap-2"
@@ -3639,6 +3654,18 @@ export function ConfigurationPage() {
                                             <option key={b.id} value={b.id}>{b.nombre}</option>
                                         ))}
                                     </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                        Copias del ticket (Factura)
+                                    </label>
+                                    <input
+                                        type="number" min={1} max={5}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-400 font-mono"
+                                        value={editingPuntoEmision?.copias_pos_factura ?? 1}
+                                        onChange={e => setEditingPuntoEmision({ ...editingPuntoEmision, copias_pos_factura: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) })}
+                                    />
+                                    <p className="text-[10px] text-slate-400">Ej. 1 para una impresora matricial que solo debe sacar una copia.</p>
                                 </div>
                             </div>
 

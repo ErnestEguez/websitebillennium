@@ -21,6 +21,18 @@
 }
 
 @layer components {
+  /* Casillero de solo ingreso/corrección — sin flechas de incremento
+     (webkit/blink) ni las de Firefox. El campo sigue siendo type="number"
+     (valida y formatea igual), solo se ocultan los controles de +/-. */
+  .no-spinner::-webkit-outer-spin-button,
+  .no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .no-spinner {
+    -moz-appearance: textfield;
+  }
+
   .btn {
     @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors duration-200;
   }

@@ -32,7 +32,7 @@ import {
     Search, UserPlus, Plus, Trash2, X, Save,
     CheckCircle2, Loader2, FilePlus, FileText, CreditCard,
     Package, Printer, User, Briefcase, ChevronDown, ChevronUp,
-    Layers, RotateCw, PaintBucket, Copy, Barcode,
+    Layers, RotateCw, PaintBucket, Copy, Barcode, Pencil, History,
 } from 'lucide-react'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { bodegaService } from '../services/bodegaService'
@@ -204,7 +204,7 @@ export function FacturaDirectaPage() {
     const navigate = useNavigate()
     const prepId = searchParams.get('prep_id')
     const draftEnVivoId = searchParams.get('draft_en_vivo')
-    const { empresa, cajaSesion, profile, permisos } = useAuth()
+    const { empresa, cajaSesion, profile, permisos, isAdmin } = useAuth()
     const { enabled: vozIaHabilitada } = useIaFeatureEnabled('voz')
     const { isOnline } = useNetworkStatus()
     const [offlineSaved, setOfflineSaved] = useState(false)
@@ -260,6 +260,11 @@ export function FacturaDirectaPage() {
     // precio por volumen si aplica). Al elegir 2/3/4 se fija ese precio y
     // deja de recalcularse automáticamente al cambiar la cantidad.
     const [precioNivel, setPrecioNivel] = useState<Record<number, 1 | 2 | 3 | 4>>({})
+    // Stock EXACTO consultado en vivo al seleccionar el producto — el catálogo
+    // local (productos state) puede estar cacheado/desactualizado, y este
+    // valor es solo para que el vendedor sepa cuánto había en ese momento
+    // (no participa en ningún cálculo de la factura).
+    const [stockLinea, setStockLinea] = useState<Record<number, number | null>>({})
     const [buscando, setBuscando] = useState(false)
     // Modo lector de código de barras — por dispositivo (localStorage, igual
     // que el punto de emisión del dispositivo), apagado por defecto para no
@@ -512,6 +517,7 @@ export function FacturaDirectaPage() {
         setSelectedCliente(c)
         setSearchCliente('')
         setClienteCollapsed(true)
+        setEditandoCliente(false)
         if (!empresa?.id || c.identificacion === '9999999999999') return
         try {
             const cartera = await carteraCxcService.getCarteraActivaPorCliente(empresa.id, c.id)
@@ -523,6 +529,83 @@ export function FacturaDirectaPage() {
             setAlertaDeuda(vencida.length || porVencer.length ? { vencida, porVencer } : null)
         } catch (e) {
             console.error('Error consultando cartera CxC del cliente:', e)
+        }
+    }
+
+    // ── Mantenimiento en línea del cliente seleccionado ─────
+    const [editandoCliente, setEditandoCliente] = useState(false)
+    const [clienteEditForm, setClienteEditForm] = useState({ nombre: '', direccion: '', telefono: '', email: '' })
+    const [guardandoClienteEdit, setGuardandoClienteEdit] = useState(false)
+
+    function abrirEdicionCliente() {
+        if (!selectedCliente) return
+        setClienteEditForm({
+            nombre: selectedCliente.nombre ?? '',
+            direccion: selectedCliente.direccion ?? '',
+            telefono: selectedCliente.telefono ?? '',
+            email: selectedCliente.email ?? '',
+        })
+        setEditandoCliente(true)
+    }
+
+    async function guardarEdicionCliente() {
+        if (!selectedCliente) return
+        if (!clienteEditForm.nombre.trim()) return alert('El nombre es obligatorio')
+        setGuardandoClienteEdit(true)
+        try {
+            const actualizado = await facturacionService.updateCliente(selectedCliente.id, {
+                nombre: clienteEditForm.nombre.trim(),
+                direccion: clienteEditForm.direccion.trim() || null,
+                telefono: clienteEditForm.telefono.trim() || null,
+                email: clienteEditForm.email.trim() || null,
+            } as any)
+            setSelectedCliente(actualizado)
+            setClientes(prev => prev.map(c => c.id === actualizado.id ? actualizado : c))
+            setEditandoCliente(false)
+        } catch (e: any) {
+            alert('Error al actualizar cliente: ' + e.message)
+        } finally {
+            setGuardandoClienteEdit(false)
+        }
+    }
+
+    // ── Historial de ventas de un producto a este cliente ───
+    // Solo referencia — para responder "¿ya le habíamos vendido esto más
+    // barato antes?" con datos reales, no participa en ningún cálculo.
+    const [historialModal, setHistorialModal] = useState<{
+        nombreProducto: string
+        loading: boolean
+        filas: { secuencial: string; fecha: string; cantidad: number; precio_unitario: number }[]
+    } | null>(null)
+
+    async function verHistorialVentas(idx: number) {
+        const det = detalles[idx]
+        if (!det.producto_id || !selectedCliente?.id || !empresa?.id) return
+        setHistorialModal({ nombreProducto: det.nombre_producto, loading: true, filas: [] })
+        try {
+            const { data, error } = await supabase
+                .from('comprobante_detalles')
+                .select('cantidad, precio_unitario, comprobantes!inner(secuencial, created_at, cliente_id, empresa_id, tipo_comprobante)')
+                .eq('producto_id', det.producto_id)
+                .eq('comprobantes.cliente_id', selectedCliente.id)
+                .eq('comprobantes.empresa_id', empresa.id)
+                .eq('comprobantes.tipo_comprobante', 'FACTURA')
+                .order('created_at', { foreignTable: 'comprobantes', ascending: false })
+                .limit(30)
+            if (error) throw error
+            setHistorialModal({
+                nombreProducto: det.nombre_producto,
+                loading: false,
+                filas: (data ?? []).map((d: any) => ({
+                    secuencial: d.comprobantes?.secuencial ?? '',
+                    fecha: d.comprobantes?.created_at ?? '',
+                    cantidad: Number(d.cantidad) || 0,
+                    precio_unitario: Number(d.precio_unitario) || 0,
+                })),
+            })
+        } catch (e: any) {
+            setHistorialModal(null)
+            alert('Error al consultar el historial: ' + e.message)
         }
     }
 
@@ -712,6 +795,14 @@ export function FacturaDirectaPage() {
         setSearchProducto(prev => ({ ...prev, [idx]: prod.nombre }))
         setProductDropdown(null)
         limpiarPrecioRaw(idx)
+
+        // Stock exacto en vivo — el catálogo local puede estar cacheado.
+        setStockLinea(prev => { const next = { ...prev }; delete next[idx]; return next })
+        if (!tieneSubproductos) {
+            Promise.resolve(supabase.from('productos').select('stock').eq('id', prod.id).maybeSingle())
+                .then(({ data }) => setStockLinea(prev => ({ ...prev, [idx]: data ? Number(data.stock) : null })))
+                .catch(() => {})
+        }
     }
     // Cambiar el nivel de precio elegido para una línea — fija precio_unitario
     // al valor de ese nivel y deja de recalcularlo por cantidad/volumen
@@ -888,6 +979,30 @@ export function FacturaDirectaPage() {
             }
         }
 
+        // Stock en cero/negativo — solo si la empresa lo tiene apagado
+        // explícitamente (por defecto permitir_venta_sin_stock es true, igual
+        // que el comportamiento de siempre). Solo aplica a productos que
+        // manejan stock y que sí vienen del catálogo (no modo Servicio).
+        if ((empresa as any)?.permitir_venta_sin_stock === false) {
+            for (let i = 0; i < detalles.length; i++) {
+                const d = detalles[i]
+                if (!(d.nombre_producto && d.cantidad > 0 && d.precio_unitario > 0)) continue
+                if (!d.producto_id) continue
+                const prod = productos.find(p => p.id === d.producto_id)
+                if (!prod?.maneja_stock) continue
+                // Preferir el stock exacto consultado en vivo (stockLinea) sobre
+                // el catálogo cacheado, mismo criterio que la caja informativa.
+                const stockLive = stockLinea[i]
+                const stockDisponible = stockLive != null ? stockLive : (Number(prod.stock) || 0)
+                if (d.cantidad > stockDisponible) {
+                    return alert(
+                        `"${d.nombre_producto}" no tiene stock suficiente (disponible: ${stockDisponible}, solicitado: ${d.cantidad}).\n\n` +
+                        `Esta empresa tiene apagada la venta con stock en cero (Ajustes → Empresa).`
+                    )
+                }
+            }
+        }
+
         // Validar N/C: no exceder saldo disponible
         for (const p of pagos.filter(pg => pg.metodo === 'nota_credito' && pg.nota_credito_id)) {
             const nc = notasCredito.find(n => n.id === p.nota_credito_id)
@@ -1041,6 +1156,8 @@ export function FacturaDirectaPage() {
         setSearchCliente('')
         setSearchProducto({})
         setPrecioNivel({})
+        setStockLinea({})
+        setEditandoCliente(false)
         sessionStorage.removeItem(PREP_IDS_KEY)
         // Mantener vendedor seleccionado entre facturas
         setDiasPlazoCredito(30)
@@ -1309,17 +1426,25 @@ export function FacturaDirectaPage() {
                                                 )}
                                             </div>
                                         )}
-                                        {selectedCliente && (
+                                        {selectedCliente && !editandoCliente && (
                                             <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                                                 <div className="flex items-start justify-between">
                                                     <div>
                                                         <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Seleccionado</p>
-                                                        <p className="font-black text-emerald-900 text-sm">{selectedCliente.nombre}</p>
-                                                        <p className="text-xs text-emerald-600">{selectedCliente.identificacion}</p>
+                                                        <p className="font-black text-emerald-900 text-sm">
+                                                            {selectedCliente.nombre} <span className="font-normal text-emerald-600">({selectedCliente.identificacion})</span>
+                                                        </p>
                                                     </div>
-                                                    <button onClick={() => setSelectedCliente(null)} className="text-emerald-400 hover:text-emerald-700 mt-0.5">
-                                                        <X className="w-4 h-4" />
-                                                    </button>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        {selectedCliente.identificacion !== '9999999999999' && (
+                                                            <button onClick={abrirEdicionCliente} className="text-emerald-400 hover:text-emerald-700 mt-0.5 p-1" title="Corregir datos del cliente">
+                                                                <Pencil className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        )}
+                                                        <button onClick={() => setSelectedCliente(null)} className="text-emerald-400 hover:text-emerald-700 mt-0.5 p-1">
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 {(selectedCliente.direccion || selectedCliente.telefono || selectedCliente.email) && (
                                                     <div className="mt-2 pt-2 border-t border-emerald-100 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-emerald-700">
@@ -1328,6 +1453,30 @@ export function FacturaDirectaPage() {
                                                         {selectedCliente.email && <span>✉️ {selectedCliente.email}</span>}
                                                     </div>
                                                 )}
+                                            </div>
+                                        )}
+                                        {selectedCliente && editandoCliente && (
+                                            <div className="bg-white border border-primary-200 rounded-xl p-3 space-y-2">
+                                                <p className="text-[10px] font-bold text-primary-600 uppercase tracking-widest">
+                                                    Corregir datos — {selectedCliente.identificacion}
+                                                </p>
+                                                <input placeholder="Nombre / Razón Social *" className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-sm"
+                                                    value={clienteEditForm.nombre} onChange={e => setClienteEditForm({ ...clienteEditForm, nombre: e.target.value })} />
+                                                <input placeholder="Dirección" className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-sm"
+                                                    value={clienteEditForm.direccion} onChange={e => setClienteEditForm({ ...clienteEditForm, direccion: e.target.value })} />
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <input placeholder="Teléfono" className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm"
+                                                        value={clienteEditForm.telefono} onChange={e => setClienteEditForm({ ...clienteEditForm, telefono: e.target.value })} />
+                                                    <input placeholder="Correo" className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm"
+                                                        value={clienteEditForm.email} onChange={e => setClienteEditForm({ ...clienteEditForm, email: e.target.value })} />
+                                                </div>
+                                                <div className="flex gap-2 pt-1">
+                                                    <button onClick={() => setEditandoCliente(false)} className="flex-1 py-1.5 bg-slate-100 rounded-lg text-xs font-bold hover:bg-slate-200">Cancelar</button>
+                                                    <button onClick={guardarEdicionCliente} disabled={guardandoClienteEdit}
+                                                        className="flex-1 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-60">
+                                                        {guardandoClienteEdit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Guardar
+                                                    </button>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -1572,6 +1721,13 @@ export function FacturaDirectaPage() {
                                                     </>
                                                 )}
                                             </div>
+                                            {det.producto_id && selectedCliente && selectedCliente.identificacion !== '9999999999999' && (
+                                                <button onClick={() => verHistorialVentas(idx)}
+                                                    className="p-2 text-slate-300 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors shrink-0 self-start"
+                                                    title="Ver historial de ventas de este artículo a este cliente">
+                                                    <History className="w-4 h-4" />
+                                                </button>
+                                            )}
                                             <button onClick={() => removeLinea(idx)} disabled={detalles.length === 1}
                                                 className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20 shrink-0 self-start">
                                                 <Trash2 className="w-4 h-4" />
@@ -1611,8 +1767,11 @@ export function FacturaDirectaPage() {
                                             <div className="col-span-4 md:col-span-3">
                                                 <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">Cantidad</label>
                                                 <input type="number" min="0.01" step="0.01"
-                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-base font-bold text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                    className="no-spinner w-full px-3 py-2 rounded-lg border border-slate-200 text-base font-bold text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
                                                     value={det.cantidad}
+                                                    // La cantidad siempre se digita — sin flechas de +/- y sin que un
+                                                    // scroll accidental del mouse (con foco) pueda cambiarla.
+                                                    onWheel={e => (e.target as HTMLInputElement).blur()}
                                                     onChange={async e => {
                                                         const nuevaCantidad = parseFloat(e.target.value) || 0
                                                         updateLinea(idx, 'cantidad', nuevaCantidad)
@@ -1631,10 +1790,12 @@ export function FacturaDirectaPage() {
                                             </div>
 
                                             {/* Precio Unitario — se digita CON IVA incluido (lo que se transa con el
-                                                cliente); internamente se guarda sin IVA como el resto del sistema. */}
+                                                cliente); internamente se guarda sin IVA como el resto del sistema.
+                                                Solo el administrador de la empresa puede cambiarlo — el resto ve el
+                                                precio del catálogo fijo, sin poder editarlo. */}
                                             <div className="col-span-4 md:col-span-3">
                                                 <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">P. Unit. (IVA inc.)</label>
-                                                {!esModoServicio && (() => {
+                                                {isAdmin && !esModoServicio && (() => {
                                                     const prod = productos.find(p => p.id === det.producto_id)
                                                     if (!prod || det.subproducto_id) return null
                                                     const niveles = nivelesDisponibles(prod)
@@ -1654,25 +1815,32 @@ export function FacturaDirectaPage() {
                                                         </select>
                                                     )
                                                 })()}
-                                                <div className="relative">
-                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
-                                                    <input type="number" min="0" step="0.01"
-                                                        title="Precio con IVA incluido"
-                                                        className="w-full pl-5 pr-2 py-2 rounded-lg border border-slate-200 text-sm text-right bg-white outline-none focus:ring-2 focus:ring-primary-400"
-                                                        value={precioConIvaInput[idx] ?? (det.precio_unitario > 0 ? precioConIvaDeLinea(det).toFixed(2) : '')}
-                                                        onChange={e => {
-                                                            const raw = e.target.value
-                                                            setPrecioConIvaInput(prev => ({ ...prev, [idx]: raw }))
-                                                            const conIva = parseFloat(raw) || 0
-                                                            // 4 decimales (igual precisión que precio_unitario en BD) — redondear
-                                                            // a centavos aquí acumula error al multiplicar por la cantidad
-                                                            // (ver caso: 2.50 con IVA / 1.15 = 2.17 recortado, 4 unidades da
-                                                            // $9.98 en vez de $10.00).
-                                                            const sinIva = Math.round((conIva / (1 + det.iva_porcentaje / 100)) * 10000) / 10000
-                                                            updateLinea(idx, 'precio_unitario', sinIva)
-                                                        }}
-                                                        onBlur={() => limpiarPrecioRaw(idx)} />
-                                                </div>
+                                                {isAdmin ? (
+                                                    <div className="relative">
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
+                                                        <input type="number" min="0" step="0.01"
+                                                            title="Precio con IVA incluido"
+                                                            className="w-full pl-5 pr-2 py-2 rounded-lg border border-slate-200 text-sm text-right bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                            value={precioConIvaInput[idx] ?? (det.precio_unitario > 0 ? precioConIvaDeLinea(det).toFixed(2) : '')}
+                                                            onChange={e => {
+                                                                const raw = e.target.value
+                                                                setPrecioConIvaInput(prev => ({ ...prev, [idx]: raw }))
+                                                                const conIva = parseFloat(raw) || 0
+                                                                // 4 decimales (igual precisión que precio_unitario en BD) — redondear
+                                                                // a centavos aquí acumula error al multiplicar por la cantidad
+                                                                // (ver caso: 2.50 con IVA / 1.15 = 2.17 recortado, 4 unidades da
+                                                                // $9.98 en vez de $10.00).
+                                                                const sinIva = Math.round((conIva / (1 + det.iva_porcentaje / 100)) * 10000) / 10000
+                                                                updateLinea(idx, 'precio_unitario', sinIva)
+                                                            }}
+                                                            onBlur={() => limpiarPrecioRaw(idx)} />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full px-3 py-2 rounded-lg border border-slate-100 bg-slate-50 text-sm text-right text-slate-600 font-mono"
+                                                        title="Solo el administrador de la empresa puede cambiar el precio">
+                                                        {det.precio_unitario > 0 ? formatCurrency(precioConIvaDeLinea(det)) : '—'}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Descuento % */}
@@ -1687,17 +1855,41 @@ export function FacturaDirectaPage() {
                                                 </div>
                                             </div>
 
-                                            {/* IVA % */}
-                                            <div className="col-span-6 md:col-span-2">
+                                            {/* IVA % — de solo lectura cuando la línea viene del catálogo (si está
+                                                mal, se corrige en Artículos, no aquí). En modo Servicio no hay
+                                                artículo de donde tomarlo, así que ahí se mantiene editable. */}
+                                            <div className="col-span-3 md:col-span-1">
                                                 <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">IVA%</label>
-                                                <select
-                                                    className="w-full px-2 py-2 rounded-lg border border-slate-200 text-sm text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
-                                                    value={det.iva_porcentaje}
-                                                    onChange={e => updateLinea(idx, 'iva_porcentaje', parseFloat(e.target.value))}>
-                                                    <option value={0}>0%</option>
-                                                    <option value={5}>5%</option>
-                                                    <option value={15}>15%</option>
-                                                </select>
+                                                {esModoServicio ? (
+                                                    <select
+                                                        className="w-full px-1 py-2 rounded-lg border border-slate-200 text-xs text-center bg-white outline-none focus:ring-2 focus:ring-primary-400"
+                                                        value={det.iva_porcentaje}
+                                                        onChange={e => updateLinea(idx, 'iva_porcentaje', parseFloat(e.target.value))}>
+                                                        <option value={0}>0%</option>
+                                                        <option value={5}>5%</option>
+                                                        <option value={15}>15%</option>
+                                                    </select>
+                                                ) : (
+                                                    <div className="w-full px-1 py-2 rounded-lg border border-slate-100 bg-slate-50 text-xs text-center text-slate-600 font-mono"
+                                                        title="El IVA se corrige en Artículos, no aquí">
+                                                        {det.iva_porcentaje}%
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Stock — solo informativo, no participa en ningún cálculo. Se
+                                                consulta en vivo al seleccionar el producto (stockLinea), no
+                                                del catálogo cacheado, para mostrar el valor exacto y actual. */}
+                                            <div className="col-span-3 md:col-span-1">
+                                                <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">Stock</label>
+                                                <div className="w-full px-1 py-2 rounded-lg border border-slate-100 bg-slate-50 text-xs text-center text-slate-500 font-mono"
+                                                    title="Stock del artículo al momento de agregarlo — solo referencia">
+                                                    {!det.producto_id
+                                                        ? '—'
+                                                        : idx in stockLinea
+                                                            ? (stockLinea[idx] ?? '—')
+                                                            : <Loader2 className="w-3 h-3 animate-spin inline" />}
+                                                </div>
                                             </div>
 
                                             {/* Total línea */}
@@ -1872,9 +2064,10 @@ export function FacturaDirectaPage() {
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
                                     <input
                                         type="number" min="0" step="0.01"
-                                        className="w-full pl-7 pr-3 py-2.5 rounded-xl border-2 border-emerald-200 bg-emerald-50 text-emerald-900 font-bold text-lg outline-none focus:border-emerald-400"
+                                        className="no-spinner w-full pl-7 pr-3 py-2.5 rounded-xl border-2 border-emerald-200 bg-emerald-50 text-emerald-900 font-bold text-lg outline-none focus:border-emerald-400"
                                         placeholder="0.00"
                                         value={montoRecibido || ''}
+                                        onWheel={e => (e.target as HTMLInputElement).blur()}
                                         onChange={e => setMontoRecibido(parseFloat(e.target.value) || 0)}
                                     />
                                 </div>
@@ -2037,7 +2230,7 @@ export function FacturaDirectaPage() {
             <div className="hidden">
                 {facturaFinal && (
                     <div ref={printRef}>
-                        {Array.from({ length: Math.max(1, Number((empresa as any)?.config_sri?.copias_pos_factura) || 1) }).map((_, i, arr) => (
+                        {Array.from({ length: Math.max(1, Number(puntoEmisionActivo?.copias_pos_factura) || 1) }).map((_, i, arr) => (
                             <div key={i} className={i < arr.length - 1 ? 'break-after-page' : ''}>
                                 <InvoiceTicketPOS
                                     factura={facturaFinal}
@@ -2049,6 +2242,50 @@ export function FacturaDirectaPage() {
                     </div>
                 )}
             </div>
+
+            {/* ── MODAL HISTORIAL DE VENTAS (producto × cliente) ── */}
+            {historialModal && (
+                <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-[60]" onClick={() => setHistorialModal(null)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-4 border-b border-slate-100 sticky top-0 bg-white">
+                            <div>
+                                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5"><History className="w-4 h-4 text-primary-500" /> Historial de ventas</h3>
+                                <p className="text-xs text-slate-400 mt-0.5">{historialModal.nombreProducto} — {selectedCliente?.nombre}</p>
+                            </div>
+                            <button onClick={() => setHistorialModal(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="p-4">
+                            {historialModal.loading ? (
+                                <div className="py-8 text-center text-slate-400"><Loader2 className="w-5 h-5 animate-spin inline mr-2" />Cargando...</div>
+                            ) : historialModal.filas.length === 0 ? (
+                                <p className="py-8 text-center text-sm text-slate-400">No hay ventas anteriores de este artículo a este cliente.</p>
+                            ) : (
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="text-slate-400 text-left border-b border-slate-100">
+                                            <th className="pb-1.5 font-bold">No. Factura</th>
+                                            <th className="pb-1.5 font-bold text-center">Cant.</th>
+                                            <th className="pb-1.5 font-bold text-right">Precio Unit.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {historialModal.filas.map((f, i) => (
+                                            <tr key={i} className="border-b border-slate-50 last:border-0">
+                                                <td className="py-1.5 font-mono text-slate-700">
+                                                    {f.secuencial}
+                                                    <p className="text-[10px] text-slate-400 font-sans">{f.fecha ? new Date(f.fecha).toLocaleDateString('es-EC') : ''}</p>
+                                                </td>
+                                                <td className="py-1.5 text-center text-slate-600">{f.cantidad}</td>
+                                                <td className="py-1.5 text-right font-semibold text-slate-800">{formatCurrency(f.precio_unitario)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── MODAL ÉXITO OFFLINE ────────────────────── */}
             {offlineSaved && (
