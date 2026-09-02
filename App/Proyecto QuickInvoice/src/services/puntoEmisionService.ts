@@ -40,29 +40,37 @@ export const puntoEmisionService = {
     },
 
     async getPrincipal(empresaId: string): Promise<PuntoEmision | null> {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('puntos_emision')
             .select('*')
             .eq('empresa_id', empresaId)
             .eq('es_principal', true)
             .eq('activo', true)
             .maybeSingle()
+        // Un error de red/consulta NO es lo mismo que "no hay principal
+        // configurado" — antes se trataban igual y el fallo silencioso podía
+        // terminar facturando por el punto de emisión equivocado.
+        if (error) throw error
         return (data as PuntoEmision) ?? null
     },
 
     // Punto de emisión con el que factura ESTE dispositivo (asignación guardada
     // en localStorage desde Configuración). Si no hay asignación, o el punto
-    // guardado ya no es válido/activo, usa el "Principal" de la empresa.
+    // guardado ya no es válido/activo, usa el "Principal" de la empresa. Un
+    // error de conexión al consultar NO cae en silencio al "Principal" — se
+    // propaga para que la factura se bloquee y se reintente, en vez de salir
+    // con el punto de emisión (y por lo tanto el secuencial) equivocado.
     async resolverParaDispositivo(empresaId: string): Promise<PuntoEmision | null> {
         const idDispositivo = getPuntoEmisionDispositivo(empresaId)
         if (idDispositivo) {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from('puntos_emision')
                 .select('*')
                 .eq('id', idDispositivo)
                 .eq('empresa_id', empresaId)
                 .eq('activo', true)
                 .maybeSingle()
+            if (error) throw error
             if (data) return data as PuntoEmision
         }
         return this.getPrincipal(empresaId)
