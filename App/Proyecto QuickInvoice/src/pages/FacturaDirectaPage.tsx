@@ -1600,41 +1600,6 @@ export function FacturaDirectaPage() {
                                     </div>
                                 )}
 
-                                {/* Plazo de crédito — solo visible cuando hay pago a crédito.
-                                    La fecha de vencimiento es la que manda (se imprime en el
-                                    ticket) — el selector de días solo la autocalcula, pero se
-                                    puede corregir directo en el campo de fecha. */}
-                                {pagos.some(p => p.metodo === 'credito') && (
-                                    <div className="flex flex-wrap items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
-                                        <CreditCard className="w-5 h-5 text-amber-600 shrink-0" />
-                                        <label className="text-sm font-bold text-amber-800 whitespace-nowrap">
-                                            Plazo crédito
-                                        </label>
-                                        <select
-                                            className="px-3 py-2 rounded-lg border border-amber-200 text-sm bg-white outline-none focus:ring-2 focus:ring-amber-400"
-                                            value={diasPlazoCredito}
-                                            onChange={e => {
-                                                const dias = Number(e.target.value)
-                                                setDiasPlazoCredito(dias)
-                                                setFechaVencimiento(calcularVencimiento(dias))
-                                            }}
-                                >
-                                            <option value={15}>15 días</option>
-                                            <option value={30}>30 días</option>
-                                            <option value={45}>45 días</option>
-                                            <option value={60}>60 días</option>
-                                            <option value={90}>90 días</option>
-                                            <option value={120}>120 días</option>
-                                        </select>
-                                        <label className="text-sm font-bold text-amber-800 whitespace-nowrap">
-                                            Vence
-                                        </label>
-                                        <input type="date"
-                                            className="px-3 py-2 rounded-lg border border-amber-200 text-sm bg-white outline-none focus:ring-2 focus:ring-amber-400"
-                                            value={fechaVencimiento}
-                                            onChange={e => setFechaVencimiento(e.target.value)} />
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
@@ -2007,6 +1972,38 @@ export function FacturaDirectaPage() {
                                 <Plus className="w-4 h-4" /> Agregar
                             </button>
                         </div>
+
+                        {pagos.some(p => p.metodo === 'credito') && (
+                            <div className="flex flex-wrap items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                                <CreditCard className="w-5 h-5 text-amber-600 shrink-0" />
+                                <label className="text-sm font-bold text-amber-800 whitespace-nowrap">
+                                    Plazo crédito
+                                </label>
+                                <select
+                                    className="px-3 py-2 rounded-lg border border-amber-200 text-sm bg-white outline-none focus:ring-2 focus:ring-amber-400"
+                                    value={diasPlazoCredito}
+                                    onChange={e => {
+                                        const dias = Number(e.target.value)
+                                        setDiasPlazoCredito(dias)
+                                        setFechaVencimiento(calcularVencimiento(dias))
+                                    }}
+                                >
+                                    <option value={15}>15 días</option>
+                                    <option value={30}>30 días</option>
+                                    <option value={45}>45 días</option>
+                                    <option value={60}>60 días</option>
+                                    <option value={90}>90 días</option>
+                                    <option value={120}>120 días</option>
+                                </select>
+                                <label className="text-sm font-bold text-amber-800 whitespace-nowrap">
+                                    Vence
+                                </label>
+                                <input type="date"
+                                    className="px-3 py-2 rounded-lg border border-amber-200 text-sm bg-white outline-none focus:ring-2 focus:ring-amber-400"
+                                    value={fechaVencimiento}
+                                    onChange={e => setFechaVencimiento(e.target.value)} />
+                            </div>
+                        )}
 
                         <div className="space-y-3">
                             {pagos.map((p, i) => (
