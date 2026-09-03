@@ -1197,19 +1197,23 @@ export const AYUDA: Record<string, PaginaAyuda> = {
 
     'integracion-sri': {
         titulo: 'Integración SRI — Compras del Portal',
-        subtitulo: 'Importación de facturas de compra desde el portal del SRI',
+        subtitulo: 'Importación de facturas de compra desde el archivo TXT del portal del SRI',
         secciones: [
             {
                 titulo: '¿Para qué sirve?',
-                texto: 'El portal del SRI registra todas las facturas que tus proveedores han emitido a tu RUC. Esta integración permite importar esas facturas directamente al módulo de compras y contabilidad de Corina ERP sin digitarlas manualmente. Es especialmente útil para conciliar que todas las facturas de proveedores están registradas y para la elaboración del ATS (Anexo Transaccional Simplificado) mensual que se declara ante el SRI.',
+                texto: 'El portal del SRI permite descargar un archivo de texto (TXT) con las facturas de compra registradas a tu RUC. Esta pantalla importa ese archivo y, por sí sola, solo genera los ASIENTOS CONTABLES correspondientes en el módulo de Contabilidad. NO registra las compras en el módulo de Compras/Inventario ni crea Cuentas por Pagar automáticamente — eso son módulos separados. Si además quieres que una factura importada quede registrada como Compra (y opcionalmente con su Cuenta por Pagar), debes marcarlo fila por fila con el checklist "Compras" de la pestaña Comprobantes.',
                 tips: [
-                    'Descarga el archivo de compras del portal SRI en formato XML o Excel.',
-                    'Revisa cada compra importada para verificar que las cuentas contables sean las correctas.',
+                    'El archivo que se sube es el TXT de compras del portal SRI, no XML ni Excel.',
+                    'Este proceso NO reemplaza la emisión electrónica ni alimenta "Consulta de Compras" a menos que uses el checklist "Compras" fila por fila.',
                 ],
             },
             {
-                titulo: 'Proceso de importación',
-                texto: 'Descarga del portal SRI (sri.gob.ec → Servicios en línea → Comprobantes Electrónicos) el archivo de facturas recibidas para el período. En Corina ERP, haz clic en "Importar desde SRI", selecciona el archivo descargado y el sistema leerá cada comprobante. Revisa la lista y confirma los que deseas registrar.',
+                titulo: 'Proceso paso a paso',
+                texto: '1) Pestaña "Importar": descarga el TXT del portal SRI (sri.gob.ec → Servicios en línea → Comprobantes Electrónicos) para el período, selecciónalo y confirma la importación — esto solo guarda los datos en estado "pendiente", todavía no afecta ningún saldo. 2) Pestaña "Comprobantes": cada fila necesita una cuenta contable de gasto, IVA y proveedor asignada (ícono ⚙ o una regla de mapeo por proveedor en la pestaña "Reglas") para pasar de "pendiente" a "listo". 3) Con filas en estado "listo", usa el botón "Generar diarios" para crear los asientos contables — este paso es independiente y no requiere nada del punto 4. 4) Si además quieres la Compra real (y opcionalmente su Cuenta por Pagar a crédito), marca la casilla "Compra" de la fila (y "+ CxP" si aplica) y usa "Registrar en Compras" — esto sí impacta el módulo de Compras/Auxiliar de Proveedores y, si se marcó CxP, el saldo por pagar.',
+                tips: [
+                    'Ninguna fila avanza de "pendiente" sola: siempre hace falta asignar cuentas o tener una regla de mapeo creada para ese proveedor.',
+                    'El sistema revisa que no exista ya una Compra con el mismo número y proveedor antes de crearla, para no duplicar una factura ya digitada a mano.',
+                ],
             },
         ],
     },

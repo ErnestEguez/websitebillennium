@@ -1,13 +1,13 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { HelpButton } from '../../../components/help/HelpButton'
-import { useNavigate } from 'react-router-dom'
 import {
     Upload, CheckCircle, AlertCircle, Loader2,
-    Settings, List, Search, ChevronDown, ChevronUp, Zap, X, Plus, Trash2, FileDown,
+    Settings, List, Search, ChevronDown, ChevronUp, Zap, X, Plus, Trash2,
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
+import { compraService, proveedorService } from '../../../services/vendorService'
 
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -46,6 +46,7 @@ interface Comprobante extends FilaParsed {
     cuenta_iva_id?:      string
     cuenta_retencion_id?:string
     cuenta_proveedor_id?:string
+    compra_id?:          string | null
 }
 
 interface Mapeo {
@@ -165,7 +166,6 @@ function normalizarFecha(s: string): string {
 
 export function IntegracionSRIPage() {
     const { empresaActiva } = useAuth()
-    const navigate  = useNavigate()
     const fileRef   = useRef<HTMLInputElement>(null)
 
     const [tab, setTab]           = useState<'importar' | 'comprobantes' | 'reglas'>('importar')
@@ -190,6 +190,11 @@ export function IntegracionSRIPage() {
     const [cargandoComp, setCargandoComp] = useState(false)
     const [generando, setGenerando]       = useState(false)
     const [logGen, setLogGen]             = useState<string[]>([])
+
+    // ── Migración a Compras/CxP ───────────────────────────────────────────
+    const [seleccionCompras, setSeleccionCompras] = useState<Record<string, { compras: boolean; cxp: boolean }>>({})
+    const [migrando, setMigrando]         = useState(false)
+    const [logMigracion, setLogMigracion] = useState<string[]>([])
 
     // ── Mapeos ─────────────────────────────────────────────────────────────
     const [mapeos, setMapeos]       = useState<Mapeo[]>([])
@@ -533,6 +538,138 @@ export function IntegracionSRIPage() {
         setLogGen(prev => [...prev, `[${new Date().toLocaleTimeString('es-EC')}] ${m}`])
     }
 
+    // ── Migrar a Compras / Cuentas por Pagar ────────────────────────────────
+    // Reutiliza compraService.crearServicio (mismo camino ya probado que usa
+    // "Nueva Compra de Servicio" manual), para que la reversa segura
+    // (fn_anular_compra / fn_eliminar_compra) también aplique aquí sin
+    // duplicar lógica. Cada comprobante SRI se registra como UNA línea de
+    // servicio genérica porque el archivo del SRI no trae detalle de
+    // producto, solo totales de la factura.
+    function addLogMigracion(m: string) {
+        setLogMigracion(prev => [...prev, `[${new Date().toLocaleTimeString('es-EC')}] ${m}`])
+    }
+
+    async function migrarACompras() {
+        const qiEmpresaId = empresaActiva?.qi_empresa_id
+        if (!qiEmpresaId) {
+            setError('Esta empresa de Contabilidad no está vinculada a una empresa de Facturación — no se puede registrar en Compras.')
+            return
+        }
+
+        const seleccionados = compFiltrados.filter(c =>
+            c.tipo === 'factura' && !c.compra_id && seleccionCompras[c.id]?.compras
+        )
+        if (!seleccionados.length) return
+
+        setMigrando(true)
+        setLogMigracion([])
+        let ok = 0
+
+        for (const c of seleccionados) {
+            try {
+                const generarCxp = !!seleccionCompras[c.id]?.cxp
+
+                // 1. Proveedor: buscar por RUC exacto, crear si no existe todavía
+                const candidatos = await proveedorService.buscar(qiEmpresaId, c.proveedor_ruc)
+                let proveedor = candidatos.find(p => p.ruc.trim() === c.proveedor_ruc.trim())
+                if (!proveedor) {
+                    proveedor = await proveedorService.crear({
+                        empresa_id: qiEmpresaId,
+                        ruc: c.proveedor_ruc,
+                        nombre_empresa: c.proveedor_nombre,
+                        tipo_identificacion: c.proveedor_ruc.trim().length === 10 ? 'CEDULA' : 'RUC',
+                        tipo_proveedor: 'SOCIEDAD',
+                        estado: 'ACTIVO',
+                        condicion_pago: 'CONTADO',
+                        pais: 'Ecuador',
+                        contribuyente_especial: false,
+                        agente_retencion: false,
+                        tipo_regimen: 'GENERAL',
+                    })
+                }
+
+                // 2. Anti-duplicado: no crear de nuevo una factura ya digitada a mano
+                const yaExiste = await compraService.verificarDuplicado(
+                    qiEmpresaId, c.clave_acceso || undefined, c.numero, proveedor.id
+                )
+                if (yaExiste) {
+                    addLogMigracion(`✗ ${c.numero} — ya existe una Compra con ese número para ${c.proveedor_nombre}, se omite.`)
+                    continue
+                }
+
+                const subtotal = c.base_cero + c.base_iva
+                const dias = proveedor.dias_credito ?? 30
+                const fechaVenc = generarCxp
+                    ? new Date(new Date(c.fecha_emision).getTime() + dias * 86400000).toISOString().slice(0, 10)
+                    : undefined
+                const formaPago: 'CONTADO' | 'CREDITO' = generarCxp ? 'CREDITO' : 'CONTADO'
+
+                const cabecera = {
+                    empresa_id: qiEmpresaId,
+                    proveedor_id: proveedor.id,
+                    numero_factura: c.numero,
+                    fecha_ingreso: c.fecha_emision,
+                    fecha_emision: c.fecha_emision,
+                    total: c.total,
+                    tipo_compra: 'SERVICIO' as const,
+                    estado: 'ACTIVO' as const,
+                    origen: 'SRI' as const,
+                    base_iva_0: c.base_cero,
+                    base_iva_5: 0,
+                    base_iva_15: c.base_iva,
+                    subtotal,
+                    valor_iva: c.iva,
+                    forma_pago: formaPago,
+                    fecha_vencimiento: fechaVenc,
+                    tipo_sustento: '02' as const,
+                    tipo_documento_sri: '01' as const,
+                    tipo_regimen_pago: '01' as const,
+                    aplica_convenio_ddi: false,
+                    observaciones: 'Migrado desde Integración SRI (Contabilidad)',
+                }
+
+                const detalle = [{
+                    descripcion: `Compra según comprobante SRI ${c.numero} — ${c.proveedor_nombre}`,
+                    cantidad: 1,
+                    precio_unitario: subtotal,
+                    subtotal,
+                    aplica_iva: c.iva > 0,
+                    tipo_gasto: 'OTROS' as const,
+                    orden: 1,
+                }]
+
+                const retenciones = c.valor_retenido > 0 ? [{
+                    empresa_id: qiEmpresaId,
+                    proveedor_id: proveedor.id,
+                    fecha_emision: c.fecha_emision,
+                    tipo: 'FUENTE' as const,
+                    codigo_retencion: c.codigo_retencion || '',
+                    base_imponible: subtotal,
+                    porcentaje: c.porcentaje_ret || 0,
+                    valor: c.valor_retenido,
+                    estado: 'ACTIVO' as const,
+                    origen: 'SRI' as const,
+                }] : []
+
+                const compra = await compraService.crearServicio(cabecera, detalle, retenciones)
+                await supabase.from('lp_sri_comprobantes').update({ compra_id: compra.id }).eq('id', c.id)
+
+                addLogMigracion(
+                    `✓ ${c.numero} — ${c.proveedor_nombre} — Compra registrada${generarCxp ? ' + CxP' : ''}` +
+                    (compra.cxpError ? ` (aviso CxP: ${compra.cxpError})` : '')
+                )
+                ok++
+            } catch (e: any) {
+                addLogMigracion(`✗ Error en ${c.numero}: ${e.message ?? e}`)
+            }
+        }
+
+        addLogMigracion(`──── Completado: ${ok} compra(s) registradas.`)
+        setSeleccionCompras({})
+        await cargarComprobantes()
+        setMigrando(false)
+    }
+
     // ── Mapeos CRUD ────────────────────────────────────────────────────────
 
     async function cargarMapeos() {
@@ -789,13 +926,6 @@ export function IntegracionSRIPage() {
                             <Settings className="w-4 h-4" /> Aplicar reglas
                         </button>
                         <button
-                            onClick={() => navigate(`/tributario/ats?año=${filtAño}&mes=${filtMes}`)}
-                            className="btn border border-emerald-200 text-emerald-700 hover:bg-emerald-50 gap-2"
-                            title="Ir al módulo ATS con este período seleccionado"
-                        >
-                            <FileDown className="w-4 h-4" /> Exportar ATS
-                        </button>
-                        <button
                             onClick={eliminarPeriodo}
                             disabled={cargandoComp || compFiltrados.filter(c => c.estado !== 'contabilizado').length === 0}
                             className="btn border border-red-200 text-red-600 hover:bg-red-50 gap-2 disabled:opacity-40"
@@ -832,16 +962,17 @@ export function IntegracionSRIPage() {
                                         <th className="py-2 px-3 text-right">IVA</th>
                                         <th className="py-2 px-3 text-right">Total</th>
                                         <th className="py-2 px-3 text-center">Estado</th>
+                                        <th className="py-2 px-3 text-center" title="Registrar en el módulo de Compras / Cuentas por Pagar">Compras</th>
                                         <th className="py-2 px-2 w-8" title="Regla de mapeo"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {cargandoComp ? (
-                                        <tr><td colSpan={10} className="py-8 text-center text-slate-400">
+                                        <tr><td colSpan={11} className="py-8 text-center text-slate-400">
                                             <Loader2 className="w-5 h-5 animate-spin inline mr-2" />Cargando...
                                         </td></tr>
                                     ) : compFiltrados.length === 0 ? (
-                                        <tr><td colSpan={10} className="py-8 text-center text-slate-400">
+                                        <tr><td colSpan={11} className="py-8 text-center text-slate-400">
                                             Sin comprobantes. Importa un CSV del SRI.
                                         </td></tr>
                                     ) : compFiltrados.map(c => {
@@ -872,6 +1003,40 @@ export function IntegracionSRIPage() {
                                                         <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', ESTADO_BADGE[c.estado])}>
                                                             {c.estado}
                                                         </span>
+                                                    </td>
+                                                    <td className="py-2 px-3 text-center">
+                                                        {c.tipo !== 'factura' ? (
+                                                            <span className="text-slate-300 text-xs">—</span>
+                                                        ) : c.compra_id ? (
+                                                            <span className="text-emerald-600 text-xs font-medium" title="Ya registrado en Compras">
+                                                                ✓ Registrado
+                                                            </span>
+                                                        ) : (
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <label className="flex items-center gap-1 text-xs text-slate-600 cursor-pointer" title="Registrar en Compras">
+                                                                    <input type="checkbox"
+                                                                        checked={!!seleccionCompras[c.id]?.compras}
+                                                                        onChange={e => setSeleccionCompras(prev => ({
+                                                                            ...prev,
+                                                                            [c.id]: { compras: e.target.checked, cxp: e.target.checked ? prev[c.id]?.cxp ?? false : false },
+                                                                        }))}
+                                                                    />
+                                                                    Compra
+                                                                </label>
+                                                                {seleccionCompras[c.id]?.compras && (
+                                                                    <label className="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer" title="Generar Cuenta por Pagar a crédito">
+                                                                        <input type="checkbox"
+                                                                            checked={!!seleccionCompras[c.id]?.cxp}
+                                                                            onChange={e => setSeleccionCompras(prev => ({
+                                                                                ...prev,
+                                                                                [c.id]: { compras: true, cxp: e.target.checked },
+                                                                            }))}
+                                                                        />
+                                                                        + CxP
+                                                                    </label>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className="py-2 px-2 flex gap-0.5">
                                                         <button
@@ -924,6 +1089,7 @@ export function IntegracionSRIPage() {
                                             <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(compFiltrados.reduce((s,c)=>s+c.iva,0),sym)}</td>
                                             <td className="py-2.5 px-3 text-right">{formatMoneda(compFiltrados.reduce((s,c)=>s+c.total,0),sym)}</td>
                                             <td />
+                                            <td />
                                         </tr>
                                     </tfoot>
                                 )}
@@ -931,18 +1097,48 @@ export function IntegracionSRIPage() {
                         </div>
                     </div>
 
-                    {/* Botón generar + log */}
-                    {compFiltrados.filter(c=>c.estado==='listo').length > 0 && (
-                        <div className="card px-5 py-4 bg-green-50 border-green-200 flex items-center gap-4 flex-wrap">
-                            <p className="text-sm text-green-800 flex-1">
-                                <strong>{compFiltrados.filter(c=>c.estado==='listo').length} comprobante(s)</strong> listos para generar diarios contables.
-                            </p>
-                            <button onClick={generarDiarios} disabled={generando} className="btn btn-primary gap-2 shrink-0">
-                                {generando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                                Generar diarios
-                            </button>
+                    {/* Botón registrar en Compras / CxP */}
+                    {(() => {
+                        const nSel = compFiltrados.filter(c => c.tipo === 'factura' && !c.compra_id && seleccionCompras[c.id]?.compras).length
+                        return (
+                            <div className={cn('card px-5 py-4 border flex items-center gap-4 flex-wrap',
+                                nSel > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200')}>
+                                <p className="text-sm flex-1" style={{ color: nSel > 0 ? '#1e40af' : '#64748b' }}>
+                                    {nSel > 0
+                                        ? <><strong>{nSel} comprobante(s)</strong> seleccionados para registrar en Compras (marca "+ CxP" en la fila para generar Cuenta por Pagar a crédito).</>
+                                        : 'Marca "Compra" en las filas de tipo Factura que quieras registrar en el módulo de Compras / Cuentas por Pagar.'}
+                                </p>
+                                <button onClick={migrarACompras} disabled={migrando || nSel === 0} className="btn btn-primary gap-2 shrink-0 disabled:opacity-40">
+                                    {migrando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                                    Registrar en Compras
+                                </button>
+                            </div>
+                        )
+                    })()}
+                    {logMigracion.length > 0 && (
+                        <div className="card p-4 bg-slate-900 font-mono text-xs text-blue-300 space-y-0.5 max-h-48 overflow-y-auto">
+                            {logMigracion.map((l,i) => <div key={i}>{l}</div>)}
                         </div>
                     )}
+
+                    {/* Botón generar diarios + log */}
+                    {(() => {
+                        const nListos = compFiltrados.filter(c=>c.estado==='listo').length
+                        return (
+                            <div className={cn('card px-5 py-4 border flex items-center gap-4 flex-wrap',
+                                nListos > 0 ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200')}>
+                                <p className="text-sm flex-1" style={{ color: nListos > 0 ? '#166534' : '#64748b' }}>
+                                    {nListos > 0
+                                        ? <><strong>{nListos} comprobante(s)</strong> listos para generar diarios contables.</>
+                                        : 'Ningún comprobante está "listo" todavía. Asigna cuentas contables (ícono ⚙ de cada fila) o crea una regla de mapeo por proveedor en la pestaña "Reglas" para que pasen a "listo".'}
+                                </p>
+                                <button onClick={generarDiarios} disabled={generando || nListos === 0} className="btn btn-primary gap-2 shrink-0 disabled:opacity-40">
+                                    {generando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                                    Generar diarios
+                                </button>
+                            </div>
+                        )
+                    })()}
                     {logGen.length > 0 && (
                         <div className="card p-4 bg-slate-900 font-mono text-xs text-green-400 space-y-0.5 max-h-48 overflow-y-auto">
                             {logGen.map((l,i) => <div key={i}>{l}</div>)}

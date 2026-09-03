@@ -288,7 +288,12 @@ export function FacturaDirectaPage() {
     // local (productos state) puede estar cacheado/desactualizado, y este
     // valor es solo para que el vendedor sepa cuánto había en ese momento
     // (no participa en ningún cálculo de la factura).
-    const [stockLinea, setStockLinea] = useState<Record<number, number | null>>({})
+    // Clave = producto_id (NO índice de línea) — el índice se corre cada vez
+    // que se reordenan/insertan líneas (ej. al cargar preparaciones de
+    // pintura, que se anteponen a las líneas manuales), lo que dejaba líneas
+    // "huérfanas" sin su stock ya consultado y con el spinner girando para
+    // siempre.
+    const [stockLinea, setStockLinea] = useState<Record<string, number | null>>({})
     const [buscando, setBuscando] = useState(false)
     // Modo lector de código de barras — por dispositivo (localStorage, igual
     // que el punto de emisión del dispositivo), apagado por defecto para no
@@ -307,6 +312,30 @@ export function FacturaDirectaPage() {
 
     // Estado: detalle
     const [detalles, setDetalles] = useState<DetalleFacturaDirecta[]>([{ ...DETALLE_VACIO }])
+
+    // Respaldo del fetch de stockLinea de selectProducto: cubre líneas cuyo
+    // producto_id se fija por otro camino (preload de preparación de
+    // pintura, escáner de código de barras, copiar factura anterior, etc.),
+    // que antes se quedaban con el spinner girando para siempre porque
+    // nadie disparaba la consulta de stock para ellas.
+    useEffect(() => {
+        const idsFaltantes = Array.from(new Set(
+            detalles
+                .filter(d => d.producto_id && !(d.producto_id in stockLinea))
+                .map(d => d.producto_id as string)
+        ))
+        if (!idsFaltantes.length) return
+        Promise.resolve(supabase.from('productos').select('id, stock').in('id', idsFaltantes))
+            .then(({ data }) => {
+                if (!data) return
+                setStockLinea(prev => {
+                    const next = { ...prev }
+                    for (const p of data) next[p.id] = p.stock != null ? Number(p.stock) : null
+                    return next
+                })
+            })
+            .catch(() => {})
+    }, [detalles, stockLinea])
     const [esModoServicio, setEsModoServicio] = useState(false)
 
     // Estado: pagos + campo "recibido en efectivo"
@@ -415,7 +444,15 @@ export function FacturaDirectaPage() {
                         producto_id:       prod?.id ?? null,
                         nombre_producto:   prep.descripcion,
                         cantidad:          1,
-                        precio_unitario:   prep.precio_sin_iva ?? 0,
+                        // Se recalcula sin IVA a 4 decimales desde precio_con_iva (el valor
+                        // que el usuario realmente ingresó) en vez de reusar prep.precio_sin_iva
+                        // (redondeado a 2 decimales) — reusar ese valor de 2 decimales y luego
+                        // volver a aplicarle el IVA para mostrarlo en la línea (precioConIvaDeLinea)
+                        // perdía un centavo por doble redondeo (ej. $12.00 con IVA terminaba
+                        // mostrando $11.99 en la factura).
+                        precio_unitario:   prep.precio_con_iva
+                            ? Math.round((prep.precio_con_iva / (1 + prep.iva_porcentaje / 100)) * 10000) / 10000
+                            : (prep.precio_sin_iva ?? 0),
                         descuento:         0,
                         iva_porcentaje:    prep.iva_porcentaje,
                         subproducto_id:    null,
@@ -855,10 +892,12 @@ export function FacturaDirectaPage() {
         limpiarPrecioRaw(idx)
 
         // Stock exacto en vivo — el catálogo local puede estar cacheado.
-        setStockLinea(prev => { const next = { ...prev }; delete next[idx]; return next })
+        // Se guarda por producto_id (ver comentario en la declaración de
+        // stockLinea), así que no hace falta "limpiar" nada antes: si otra
+        // línea ya consultó este mismo producto, se reusa al instante.
         if (!tieneSubproductos) {
             Promise.resolve(supabase.from('productos').select('stock').eq('id', prod.id).maybeSingle())
-                .then(({ data }) => setStockLinea(prev => ({ ...prev, [idx]: data ? Number(data.stock) : null })))
+                .then(({ data }) => setStockLinea(prev => ({ ...prev, [prod.id]: data ? Number(data.stock) : null })))
                 .catch(() => {})
         }
     }
@@ -1050,7 +1089,7 @@ export function FacturaDirectaPage() {
                 if (!prod?.maneja_stock) continue
                 // Preferir el stock exacto consultado en vivo (stockLinea) sobre
                 // el catálogo cacheado, mismo criterio que la caja informativa.
-                const stockLive = stockLinea[i]
+                const stockLive = stockLinea[d.producto_id]
                 const stockDisponible = stockLive != null ? stockLive : (Number(prod.stock) || 0)
                 if (d.cantidad > stockDisponible) {
                     return alert(
@@ -1976,8 +2015,8 @@ export function FacturaDirectaPage() {
                                                     title="Stock del artículo al momento de agregarlo — solo referencia">
                                                     {!det.producto_id
                                                         ? '—'
-                                                        : idx in stockLinea
-                                                            ? (stockLinea[idx] ?? '—')
+                                                        : det.producto_id in stockLinea
+                                                            ? (stockLinea[det.producto_id] ?? '—')
                                                             : <Loader2 className="w-3 h-3 animate-spin inline" />}
                                                 </div>
                                             </div>
@@ -2175,34 +2214,6 @@ export function FacturaDirectaPage() {
                                 </div>
                             ))}
                         </div>
-
-                        {/* ✅ Campo Monto Recibido (para calcular vuelto en efectivo) */}
-                        {tieneEfectivo && (
-                            <div className="border-t border-slate-100 pt-3 space-y-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                    Efectivo Recibido del Cliente
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
-                                    <input
-                                        type="number" min="0" step="0.01"
-                                        className="no-spinner w-full pl-7 pr-3 py-2.5 rounded-xl border-2 border-emerald-200 bg-emerald-50 text-emerald-900 font-bold text-lg outline-none focus:border-emerald-400"
-                                        placeholder="0.00"
-                                        value={montoRecibido || ''}
-                                        onWheel={e => (e.target as HTMLInputElement).blur()}
-                                        onChange={e => setMontoRecibido(parseFloat(e.target.value) || 0)}
-                                    />
-                                </div>
-                                {montoRecibido > 0 && (
-                                    <div className="flex justify-between text-sm pt-1">
-                                        <span className="text-slate-500">Vuelto a entregar:</span>
-                                        <span className={cn('font-black text-lg', vuelto >= 0 ? 'text-emerald-600' : 'text-red-500')}>
-                                            {formatCurrency(vuelto)}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     {/* ── OBSERVACIÓN ───────────────────── */}
@@ -2319,12 +2330,31 @@ export function FacturaDirectaPage() {
                             </button>
                         )}
 
-                        {/* Punto de emisión que se va a usar — visible justo antes de
-                            confirmar, para que el cajero pueda verificarlo antes de facturar. */}
-                        {puntoEmisionActivo && (
-                            <div className="flex items-center justify-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg py-2">
-                                <Printer className="w-3.5 h-3.5" />
-                                Se facturará con: {puntoEmisionActivo.establecimiento}-{puntoEmisionActivo.punto_emision} · {puntoEmisionActivo.nombre}
+                        {/* ✅ Campo Monto Recibido (para calcular vuelto en efectivo) */}
+                        {tieneEfectivo && (
+                            <div className="border-t border-slate-100 pt-3 space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    Efectivo Recibido del Cliente
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">$</span>
+                                    <input
+                                        type="number" min="0" step="0.01"
+                                        className="no-spinner w-full pl-7 pr-3 py-2.5 rounded-xl border-2 border-emerald-200 bg-emerald-50 text-emerald-900 font-bold text-lg outline-none focus:border-emerald-400"
+                                        placeholder="0.00"
+                                        value={montoRecibido || ''}
+                                        onWheel={e => (e.target as HTMLInputElement).blur()}
+                                        onChange={e => setMontoRecibido(parseFloat(e.target.value) || 0)}
+                                    />
+                                </div>
+                                {montoRecibido > 0 && (
+                                    <div className="flex justify-between text-sm pt-1">
+                                        <span className="text-slate-500">Vuelto a entregar:</span>
+                                        <span className={cn('font-black text-lg', vuelto >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                                            {formatCurrency(vuelto)}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         )}
 

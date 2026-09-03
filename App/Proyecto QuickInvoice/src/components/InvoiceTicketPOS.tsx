@@ -226,7 +226,7 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                 const saldoActual = saldoAnteriorCliente + estaFactura
                 return (
                     <div className="mt-2 border-t border-dashed border-black pt-2 text-[9px] font-bold leading-snug">
-                        Saldo Anterior: {formatCurrency(saldoAnteriorCliente)} + Esta Factura: {formatCurrency(estaFactura)} = Saldo Actual: {formatCurrency(saldoActual)}
+                        Deuda Anterior: {formatCurrency(saldoAnteriorCliente)} + Esta Factura: {formatCurrency(estaFactura)} = Deuda Actual: {formatCurrency(saldoActual)}
                     </div>
                 )
             })()}
