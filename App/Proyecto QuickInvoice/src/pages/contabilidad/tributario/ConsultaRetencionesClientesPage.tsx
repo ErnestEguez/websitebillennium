@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Receipt, Loader2, AlertCircle, X, Plus, Search, CreditCard, Trash2 } from 'lucide-react'
+import { Receipt, Loader2, AlertCircle, X, Plus, Search, CreditCard, Trash2, Pencil } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { formatMoneda, mesNombre } from '../../../lib/utils'
 import { HelpButton } from '../../../components/help/HelpButton'
@@ -58,13 +58,24 @@ export function ConsultaRetencionesClientesPage() {
     const [basesFactura, setBasesFactura] = useState({ baseFuente: 0, baseIva: 0 })
     const [guardandoRet, setGuardandoRet] = useState(false)
 
-    // ── Modal: registrar retención de tarjeta (RECAP banco) ──
+    // ── Modal: registrar retención de tarjeta (RECAP banco) — hasta 4 líneas
+    // por lote, mismo límite que el comprobante de retención a proveedores.
+    const LINEA_TARJETA_VACIA = { base_imponible: 0, porcentaje: 0, valor: 0 }
     const [modalTarjeta, setModalTarjeta] = useState(false)
     const [formTarjeta, setFormTarjeta] = useState({
         fecha: new Date().toISOString().slice(0, 10),
-        banco: '', numero_lote: '', base_imponible: 0, porcentaje: 0, valor: 0, observaciones: '',
+        banco: '', numero_lote: '', observaciones: '',
     })
+    const [lineasTarjeta, setLineasTarjeta] = useState([{ ...LINEA_TARJETA_VACIA }])
     const [guardandoTarjeta, setGuardandoTarjeta] = useState(false)
+
+    // ── Modal: corregir retención de cliente ya registrada (origen CARTERA) ──
+    const [modalEditar, setModalEditar] = useState<RetVentaRow | null>(null)
+    const [fechaEditar, setFechaEditar] = useState('')
+    const [numeroEditar, setNumeroEditar] = useState('')
+    const [formEditar, setFormEditar] = useState<RetLine>({ tipo: 'FUENTE', codigo: '', descripcion: '', base: 0, pct: 0, valor: 0 })
+    const [errorEditar, setErrorEditar] = useState('')
+    const [guardandoEditar, setGuardandoEditar] = useState(false)
 
     useEffect(() => {
         if (empresa?.id) { cargar(); codigoRetencionService.listar(empresa.id).then(setCodigos).catch(() => {}) }
@@ -114,6 +125,53 @@ export function ConsultaRetencionesClientesPage() {
             setError(e.message)
         } finally {
             setEliminandoId(null)
+        }
+    }
+
+    function abrirModalEditar(row: RetVentaRow) {
+        if (row.origen === 'FACTURA') {
+            alert('Esta retención se capturó al emitir la factura y está ligada a su pago — no se puede corregir desde aquí.')
+            return
+        }
+        setFechaEditar(row.fecha_emision?.slice(0, 10) ?? new Date().toISOString().slice(0, 10))
+        setNumeroEditar(row.numero_retencion ?? '')
+        setFormEditar({
+            tipo: row.tipo, codigo: row.codigo_retencion, descripcion: row.descripcion ?? '',
+            base: row.base_imponible, pct: row.porcentaje, valor: row.valor,
+        })
+        setErrorEditar('')
+        setModalEditar(row)
+    }
+
+    function selCodigoEditar(codigo: string) {
+        const item = codigos.find(c => c.tipo === formEditar.tipo && c.codigo === codigo)
+        const pct = item?.porcentaje ?? formEditar.pct
+        setFormEditar(f => ({
+            ...f, codigo, descripcion: item?.descripcion ?? f.descripcion, pct,
+            valor: Math.round(f.base * pct / 100 * 100) / 100,
+        }))
+    }
+
+    async function guardarEdicionCliente() {
+        if (!modalEditar) return
+        setGuardandoEditar(true); setErrorEditar('')
+        try {
+            await retencionesVentasService.corregirRetencionVenta(modalEditar.id, {
+                fecha_emision: fechaEditar,
+                numero_retencion: numeroEditar || undefined,
+                tipo: formEditar.tipo,
+                codigo_retencion: formEditar.codigo,
+                descripcion: formEditar.descripcion,
+                base_imponible: formEditar.base,
+                porcentaje: formEditar.pct,
+                valor: formEditar.valor,
+            })
+            setModalEditar(null)
+            await cargar()
+        } catch (e: any) {
+            setErrorEditar(e.message)
+        } finally {
+            setGuardandoEditar(false)
         }
     }
 
@@ -200,17 +258,36 @@ export function ConsultaRetencionesClientesPage() {
     // ── Modal tarjeta ──
 
     function abrirModalTarjeta() {
-        setFormTarjeta({ fecha: new Date().toISOString().slice(0, 10), banco: '', numero_lote: '', base_imponible: 0, porcentaje: 0, valor: 0, observaciones: '' })
+        setFormTarjeta({ fecha: new Date().toISOString().slice(0, 10), banco: '', numero_lote: '', observaciones: '' })
+        setLineasTarjeta([{ ...LINEA_TARJETA_VACIA }])
         setModalTarjeta(true)
+    }
+
+    function agregarLineaTarjeta() {
+        setLineasTarjeta(prev => prev.length >= 4 ? prev : [...prev, { ...LINEA_TARJETA_VACIA }])
+    }
+    function quitarLineaTarjeta(i: number) {
+        setLineasTarjeta(prev => prev.filter((_, j) => j !== i))
+    }
+    function actualizarLineaTarjeta(i: number, campo: 'base_imponible' | 'porcentaje' | 'valor', val: number) {
+        setLineasTarjeta(prev => prev.map((l, j) => {
+            if (j !== i) return l
+            const next = { ...l, [campo]: val }
+            if (campo === 'base_imponible' || campo === 'porcentaje') {
+                next.valor = Math.round(next.base_imponible * next.porcentaje / 100 * 100) / 100
+            }
+            return next
+        }))
     }
 
     async function guardarRetencionTarjeta() {
         if (!empresa?.id) return
         setGuardandoTarjeta(true); setError('')
         try {
-            await retencionesVentasService.registrarRetencionTarjeta({
+            await retencionesVentasService.registrarRetencionesTarjeta({
                 empresa_id: empresa.id,
                 ...formTarjeta,
+                lineas: lineasTarjeta,
                 created_by: profile?.id ?? null,
             })
             setModalTarjeta(false)
@@ -344,10 +421,16 @@ export function ConsultaRetencionesClientesPage() {
                                         <td className="py-2 px-2 border border-slate-200 text-center text-slate-500">{r.origen === 'FACTURA' ? 'Al facturar' : 'Posterior'}</td>
                                         <td className="py-2 px-2 border border-slate-200 text-center">
                                             {r.origen === 'CARTERA' && (
-                                                <button onClick={() => eliminarRetencionVenta(r)} disabled={eliminandoId === r.id}
-                                                    title="Eliminar retención" className="text-red-400 hover:text-red-600 disabled:opacity-40">
-                                                    {eliminandoId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                                </button>
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button onClick={() => abrirModalEditar(r)}
+                                                        title="Corregir retención" className="text-slate-400 hover:text-primary-600">
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => eliminarRetencionVenta(r)} disabled={eliminandoId === r.id}
+                                                        title="Eliminar retención" className="text-red-400 hover:text-red-600 disabled:opacity-40">
+                                                        {eliminandoId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                    </button>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
@@ -517,30 +600,50 @@ export function ConsultaRetencionesClientesPage() {
                                 <input className="input" value={formTarjeta.numero_lote}
                                     onChange={e => setFormTarjeta(f => ({ ...f, numero_lote: e.target.value }))} />
                             </div>
-                            <div className="grid grid-cols-3 gap-3">
-                                <div>
-                                    <label className="label text-xs">Base imponible</label>
-                                    <input type="number" step={0.01} className="input text-right"
-                                        value={formTarjeta.base_imponible || ''}
-                                        onChange={e => {
-                                            const base = parseFloat(e.target.value) || 0
-                                            setFormTarjeta(f => ({ ...f, base_imponible: base, valor: Math.round(base * f.porcentaje / 100 * 100) / 100 }))
-                                        }} />
-                                </div>
-                                <div>
-                                    <label className="label text-xs">%</label>
-                                    <input type="number" step={0.01} className="input text-right"
-                                        value={formTarjeta.porcentaje || ''}
-                                        onChange={e => {
-                                            const pct = parseFloat(e.target.value) || 0
-                                            setFormTarjeta(f => ({ ...f, porcentaje: pct, valor: Math.round(f.base_imponible * pct / 100 * 100) / 100 }))
-                                        }} />
-                                </div>
-                                <div>
-                                    <label className="label text-xs">Valor retenido</label>
-                                    <input type="number" step={0.01} className="input text-right font-bold"
-                                        value={formTarjeta.valor || ''}
-                                        onChange={e => setFormTarjeta(f => ({ ...f, valor: parseFloat(e.target.value) || 0 }))} />
+                            <div className="space-y-3">
+                                {lineasTarjeta.map((l, i) => (
+                                    <div key={i} className="border border-slate-200 rounded-xl p-3 space-y-2 bg-slate-50/50">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Línea {i + 1}</span>
+                                            {lineasTarjeta.length > 1 && (
+                                                <button type="button" onClick={() => quitarLineaTarjeta(i)}
+                                                    className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="label text-xs">Base imponible</label>
+                                                <input type="number" step={0.01} className="input text-right"
+                                                    value={l.base_imponible || ''}
+                                                    onChange={e => actualizarLineaTarjeta(i, 'base_imponible', parseFloat(e.target.value) || 0)} />
+                                            </div>
+                                            <div>
+                                                <label className="label text-xs">%</label>
+                                                <input type="number" step={0.01} className="input text-right"
+                                                    value={l.porcentaje || ''}
+                                                    onChange={e => actualizarLineaTarjeta(i, 'porcentaje', parseFloat(e.target.value) || 0)} />
+                                            </div>
+                                            <div>
+                                                <label className="label text-xs">Valor retenido</label>
+                                                <input type="number" step={0.01} className="input text-right font-bold"
+                                                    value={l.valor || ''}
+                                                    onChange={e => actualizarLineaTarjeta(i, 'valor', parseFloat(e.target.value) || 0)} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                <div className="flex items-center justify-between gap-2">
+                                    <button type="button" onClick={agregarLineaTarjeta}
+                                        disabled={lineasTarjeta.length >= 4}
+                                        className="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors text-primary-700 hover:bg-primary-50 border border-primary-200 disabled:opacity-40 disabled:cursor-not-allowed">
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Agregar línea {lineasTarjeta.length < 4 ? `(${lineasTarjeta.length}/4)` : '(máx 4)'}
+                                    </button>
+                                    <span className="text-xs font-semibold text-slate-600">
+                                        Total: <span className="font-mono">{formatMoneda(lineasTarjeta.reduce((s, l) => s + l.valor, 0))}</span>
+                                    </span>
                                 </div>
                             </div>
                             <div>
@@ -552,10 +655,93 @@ export function ConsultaRetencionesClientesPage() {
                         <div className="flex justify-end gap-3 p-5 border-t">
                             <button onClick={() => setModalTarjeta(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
                             <button onClick={guardarRetencionTarjeta}
-                                disabled={guardandoTarjeta || !formTarjeta.banco.trim() || !(formTarjeta.valor > 0)}
+                                disabled={guardandoTarjeta || !formTarjeta.banco.trim() || !lineasTarjeta.some(l => l.valor > 0)}
                                 className="btn btn-primary gap-2 disabled:opacity-50">
                                 {guardandoTarjeta ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                                 Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════ MODAL: Corregir retención de cliente ══════════ */}
+            {modalEditar && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+                        <div className="flex items-center justify-between p-5 border-b">
+                            <h2 className="font-bold text-slate-900 text-lg">Corregir retención</h2>
+                            <button onClick={() => setModalEditar(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm">
+                                <p className="font-semibold text-slate-700">{modalEditar.cliente_nombre}</p>
+                                <p className="text-slate-500 text-xs">Factura {modalEditar.factura_numero} · {modalEditar.cliente_identificacion}</p>
+                            </div>
+                            {errorEditar && <p className="text-red-600 text-sm">{errorEditar}</p>}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="label text-xs">Fecha de la retención</label>
+                                    <input type="date" className="input" value={fechaEditar} onChange={e => setFechaEditar(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="label text-xs">Nº Retención (opcional)</label>
+                                    <input className="input font-mono" value={numeroEditar} onChange={e => setNumeroEditar(e.target.value)} placeholder="001-001-000000001" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="label text-xs">Tipo</label>
+                                    <select className="input" value={formEditar.tipo}
+                                        onChange={e => setFormEditar(f => ({ ...f, tipo: e.target.value as RetLine['tipo'], codigo: '', descripcion: '' }))}>
+                                        <option value="FUENTE">Ret. en la fuente</option>
+                                        <option value="IVA">Ret. de IVA</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="label text-xs">Código SRI</label>
+                                    <select className="input" value={formEditar.codigo} onChange={e => selCodigoEditar(e.target.value)}>
+                                        <option value="">Seleccionar...</option>
+                                        {codigos.filter(c => c.tipo === formEditar.tipo && c.activo).map(c => (
+                                            <option key={c.codigo} value={c.codigo}>{c.codigo} — {c.descripcion.slice(0, 45)} ({c.porcentaje}%)</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="label text-xs">Base imponible</label>
+                                    <input type="number" step={0.01} className="input text-right"
+                                        value={formEditar.base || ''}
+                                        onChange={e => {
+                                            const base = parseFloat(e.target.value) || 0
+                                            setFormEditar(f => ({ ...f, base, valor: Math.round(base * f.pct / 100 * 100) / 100 }))
+                                        }} />
+                                </div>
+                                <div>
+                                    <label className="label text-xs">% Retención</label>
+                                    <input type="number" step={0.01} className="input text-right"
+                                        value={formEditar.pct || ''}
+                                        onChange={e => {
+                                            const pct = parseFloat(e.target.value) || 0
+                                            setFormEditar(f => ({ ...f, pct, valor: Math.round(f.base * pct / 100 * 100) / 100 }))
+                                        }} />
+                                </div>
+                                <div>
+                                    <label className="label text-xs">Valor retenido</label>
+                                    <input type="number" step={0.01} className="input text-right font-bold"
+                                        value={formEditar.valor || ''}
+                                        onChange={e => setFormEditar(f => ({ ...f, valor: parseFloat(e.target.value) || 0 }))} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 p-5 border-t">
+                            <button onClick={() => setModalEditar(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                            <button onClick={guardarEdicionCliente}
+                                disabled={guardandoEditar || !formEditar.codigo || !(formEditar.valor > 0)}
+                                className="btn btn-primary gap-2 disabled:opacity-50">
+                                {guardandoEditar ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                Guardar corrección
                             </button>
                         </div>
                     </div>

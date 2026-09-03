@@ -21,9 +21,15 @@ interface Compra {
     base_iva: number   // total gravada (5+15)
     iva: number        // total IVA
     total: number
-    codigo_retencion: string | null
-    porcentaje_ret: number | null
-    valor_retenido: number | null
+    // Retención en la Fuente (Renta) y de IVA son conceptos y campos
+    // distintos del SRI — antes se mezclaban en una sola suma/código,
+    // perdiendo la separación.
+    codigo_ret_fuente: string | null
+    pct_ret_fuente: number | null
+    valor_ret_fuente: number
+    codigo_ret_iva: string | null
+    pct_ret_iva: number | null
+    valor_ret_iva: number
     tipo_compra?: string
 }
 
@@ -66,7 +72,7 @@ export function ConsultaComprasPage() {
         try {
             const comprasRes = await supabase
                 .from('ingresos_stock')
-                .select('id, numero_factura, clave_acceso, fecha_emision, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, tipo_compra, proveedor:proveedores(ruc, nombre_empresa), retenciones:retenciones_compras(codigo_retencion, porcentaje, valor)')
+                .select('id, numero_factura, clave_acceso, fecha_emision, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, tipo_compra, proveedor:proveedores(ruc, nombre_empresa), retenciones:retenciones_compras(tipo, codigo_retencion, porcentaje, valor)')
                 .eq('empresa_id', empresa.id)
                 .eq('estado', 'ACTIVO')
                 .gte('fecha_emision', desde)
@@ -78,6 +84,8 @@ export function ConsultaComprasPage() {
                 const b15 = r.base_iva_15 ?? 0
                 const iv5  = Math.round(b5  * 0.05 * 100) / 100
                 const iv15 = Math.round(b15 * 0.15 * 100) / 100
+                const retsFuente = (r.retenciones ?? []).filter((x: any) => x.tipo === 'FUENTE')
+                const retsIva    = (r.retenciones ?? []).filter((x: any) => x.tipo === 'IVA')
                 return {
                     id:               r.id,
                     tipo:             'compra' as const,
@@ -94,9 +102,12 @@ export function ConsultaComprasPage() {
                     base_iva:         b5 + b15,
                     iva:              r.valor_iva ?? 0,
                     total:            r.total ?? 0,
-                    codigo_retencion: r.retenciones?.[0]?.codigo_retencion ?? null,
-                    porcentaje_ret:   r.retenciones?.[0]?.porcentaje ?? null,
-                    valor_retenido:   r.retenciones?.reduce((s: number, ret: any) => s + (ret.valor ?? 0), 0) || null,
+                    codigo_ret_fuente: retsFuente[0]?.codigo_retencion ?? null,
+                    pct_ret_fuente:    retsFuente[0]?.porcentaje ?? null,
+                    valor_ret_fuente:  retsFuente.reduce((s: number, ret: any) => s + (ret.valor ?? 0), 0),
+                    codigo_ret_iva:    retsIva[0]?.codigo_retencion ?? null,
+                    pct_ret_iva:       retsIva[0]?.porcentaje ?? null,
+                    valor_ret_iva:     retsIva.reduce((s: number, ret: any) => s + (ret.valor ?? 0), 0),
                     tipo_compra:      r.tipo_compra,
                 }
             })
@@ -132,7 +143,8 @@ export function ConsultaComprasPage() {
         iva:       filtradas.reduce((s, r) => s + r.iva,          0),
         totalBases: filtradas.reduce((s, r) => s + r.base_cero + r.base_iva5 + r.base_iva15, 0),
         total:     filtradas.reduce((s, r) => s + r.total,        0),
-        retenido:  filtradas.reduce((s, r) => s + (r.valor_retenido ?? 0), 0),
+        retenidoFuente: filtradas.reduce((s, r) => s + r.valor_ret_fuente, 0),
+        retenidoIva:    filtradas.reduce((s, r) => s + r.valor_ret_iva,    0),
     }
 
     function exportarExcel() {
@@ -140,7 +152,8 @@ export function ConsultaComprasPage() {
             'numero', 'tipo', 'secuencial', 'clave_autorizacion', 'ruc_emisor', 'nombre_emisor',
             'fecha_emision', 'subtotal_cero', 'subtotal_iva_15', 'subtotal_iva_5', 'subtotal_exento',
             'total_bases', 'iva 5%', 'iva 15%', 'importe_total',
-            'Cód. Ret. IR', '% Retención', 'Valor Retenido',
+            'Cód. Ret. Fuente', '% Ret. Fuente', 'Valor Ret. Fuente',
+            'Cód. Ret. IVA', '% Ret. IVA', 'Valor Ret. IVA',
         ]
 
         const filas = filtradas.map((r, i) => [
@@ -159,16 +172,20 @@ export function ConsultaComprasPage() {
             r.iva5,
             r.iva15,
             r.total,
-            r.codigo_retencion ?? '',
-            r.porcentaje_ret ?? '',
-            r.valor_retenido ?? 0,
+            r.codigo_ret_fuente ?? '',
+            r.pct_ret_fuente ?? '',
+            r.valor_ret_fuente,
+            r.codigo_ret_iva ?? '',
+            r.pct_ret_iva ?? '',
+            r.valor_ret_iva,
         ])
 
         const filaTotales = [
             '', '', '', '', '', '', 'TOTALES',
             totales.base0, totales.base15, totales.base5, 0, totales.totalBases,
             totales.iva5, totales.iva15, totales.total,
-            '', '', totales.retenido,
+            '', '', totales.retenidoFuente,
+            '', '', totales.retenidoIva,
         ]
 
         const nombreEmpresa = empresa?.razon_social || empresa?.nombre || ''
@@ -298,7 +315,8 @@ export function ConsultaComprasPage() {
                                     <th className="py-2 px-3 text-right">IVA 15%</th>
                                     <th className="py-2 px-3 text-right">Total Bases</th>
                                     <th className="py-2 px-3 text-right">Total</th>
-                                    <th className="py-2 px-3 text-center">Ret. IR</th>
+                                    <th className="py-2 px-3 text-center">Ret. Fuente</th>
+                                    <th className="py-2 px-3 text-center">Ret. IVA</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -348,9 +366,18 @@ export function ConsultaComprasPage() {
                                                     {formatMoneda(r.total)}
                                                 </td>
                                                 <td className="py-2 px-3 text-center">
-                                                    {r.codigo_retencion ? (
+                                                    {r.codigo_ret_fuente ? (
                                                         <span className="text-xs font-mono bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
-                                                            {r.codigo_retencion} · {r.porcentaje_ret}%
+                                                            {r.codigo_ret_fuente} · {r.pct_ret_fuente}%
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-slate-300">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-2 px-3 text-center">
+                                                    {r.codigo_ret_iva ? (
+                                                        <span className="text-xs font-mono bg-violet-100 text-violet-700 px-2 py-0.5 rounded">
+                                                            {r.codigo_ret_iva} · {r.pct_ret_iva}%
                                                         </span>
                                                     ) : (
                                                         <span className="text-xs text-slate-300">—</span>
@@ -359,7 +386,7 @@ export function ConsultaComprasPage() {
                                             </tr>
                                             {isExp && (
                                                 <tr key={`${r.id}-det`} className="bg-slate-50 border-b border-slate-100">
-                                                    <td colSpan={13} className="px-8 py-3">
+                                                    <td colSpan={14} className="px-8 py-3">
                                                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Detalle</p>
                                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs font-mono text-slate-600">
                                                             <div><span className="text-slate-400">Base 0%:</span> {r.base_cero.toFixed(2)}</div>
@@ -369,11 +396,18 @@ export function ConsultaComprasPage() {
                                                             <div><span className="text-slate-400">IVA 15%:</span> {r.iva15.toFixed(2)}</div>
                                                             <div><span className="text-slate-400">Total IVA:</span> {r.iva.toFixed(2)}</div>
                                                             {r.tipo_compra && <div><span className="text-slate-400">Tipo compra:</span> {r.tipo_compra}</div>}
-                                                            {r.codigo_retencion && (
+                                                            {r.codigo_ret_fuente && (
                                                                 <>
-                                                                    <div><span className="text-slate-400">Cód. Ret. IR:</span> {r.codigo_retencion}</div>
-                                                                    <div><span className="text-slate-400">% Retención:</span> {r.porcentaje_ret}%</div>
-                                                                    <div><span className="text-slate-400">Valor retenido:</span> {(r.valor_retenido ?? 0).toFixed(2)}</div>
+                                                                    <div><span className="text-slate-400">Cód. Ret. Fuente:</span> {r.codigo_ret_fuente}</div>
+                                                                    <div><span className="text-slate-400">% Ret. Fuente:</span> {r.pct_ret_fuente}%</div>
+                                                                    <div><span className="text-slate-400">Valor Ret. Fuente:</span> {r.valor_ret_fuente.toFixed(2)}</div>
+                                                                </>
+                                                            )}
+                                                            {r.codigo_ret_iva && (
+                                                                <>
+                                                                    <div><span className="text-slate-400">Cód. Ret. IVA:</span> {r.codigo_ret_iva}</div>
+                                                                    <div><span className="text-slate-400">% Ret. IVA:</span> {r.pct_ret_iva}%</div>
+                                                                    <div><span className="text-slate-400">Valor Ret. IVA:</span> {r.valor_ret_iva.toFixed(2)}</div>
                                                                 </>
                                                             )}
                                                             <div className="col-span-2 md:col-span-3">
@@ -399,7 +433,10 @@ export function ConsultaComprasPage() {
                                     <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.totalBases)}</td>
                                     <td className="py-2.5 px-3 text-right">{formatMoneda(totales.total)}</td>
                                     <td className="py-2.5 px-3 text-center text-xs text-slate-500">
-                                        {totales.retenido > 0 ? formatMoneda(totales.retenido) : ''}
+                                        {totales.retenidoFuente > 0 ? formatMoneda(totales.retenidoFuente) : ''}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center text-xs text-slate-500">
+                                        {totales.retenidoIva > 0 ? formatMoneda(totales.retenidoIva) : ''}
                                     </td>
                                 </tr>
                             </tfoot>

@@ -121,32 +121,35 @@ export const retencionesVentasService = {
         if (error) throw error
     },
 
-    async registrarRetencionTarjeta(input: {
+    // Un mismo RECAP del banco puede traer varias líneas de retención (distintas
+    // tarifas/conceptos dentro del mismo lote) — hasta 4, mismo límite que usa
+    // el comprobante de retención a proveedores. Todas comparten fecha/banco/
+    // lote/observaciones; cada línea es una fila independiente en la tabla.
+    async registrarRetencionesTarjeta(input: {
         empresa_id: string
         fecha: string
         banco: string
         numero_lote?: string
-        base_imponible: number
-        porcentaje: number
-        valor: number
         observaciones?: string
+        lineas: { base_imponible: number; porcentaje: number; valor: number }[]
         created_by?: string | null
     }): Promise<void> {
         if (!input.banco.trim()) throw new Error('El banco es obligatorio')
-        if (!(input.valor > 0)) throw new Error('El valor retenido debe ser mayor a cero')
+        const validas = input.lineas.filter(l => l.valor > 0)
+        if (validas.length === 0) throw new Error('Agrega al menos una línea de retención con valor mayor a cero')
         const { error } = await supabase
             .from('retenciones_tarjeta_banco')
-            .insert({
+            .insert(validas.map(l => ({
                 empresa_id: input.empresa_id,
                 fecha: input.fecha,
                 banco: input.banco.trim(),
                 numero_lote: input.numero_lote || null,
-                base_imponible: input.base_imponible,
-                porcentaje: input.porcentaje,
-                valor: input.valor,
+                base_imponible: l.base_imponible,
+                porcentaje: l.porcentaje,
+                valor: l.valor,
                 observaciones: input.observaciones || null,
                 created_by: input.created_by || null,
-            })
+            })))
         if (error) throw error
     },
 
@@ -163,6 +166,39 @@ export const retencionesVentasService = {
         const { error } = await supabase
             .from('retenciones_ventas')
             .update({ estado: 'ANULADO' })
+            .eq('id', id)
+            .eq('origen', 'CARTERA')
+        if (error) throw error
+    },
+
+    // Corrige una retención ya registrada (origen='CARTERA') sin necesidad de
+    // eliminarla y volver a crearla — mismo alcance que anularRetencionVenta:
+    // solo las de origen='CARTERA', porque no tocan cartera_cxc/saldo. Las de
+    // origen='FACTURA' se corrigen desde la factura misma.
+    async corregirRetencionVenta(id: string, campos: {
+        fecha_emision: string
+        numero_retencion?: string | null
+        tipo: 'FUENTE' | 'IVA'
+        codigo_retencion: string
+        descripcion?: string | null
+        base_imponible: number
+        porcentaje: number
+        valor: number
+    }): Promise<void> {
+        if (!campos.codigo_retencion) throw new Error('El código de retención es obligatorio')
+        if (!(campos.valor > 0)) throw new Error('El valor debe ser mayor a cero')
+        const { error } = await supabase
+            .from('retenciones_ventas')
+            .update({
+                fecha_emision:    campos.fecha_emision,
+                numero_retencion: campos.numero_retencion || null,
+                tipo:             campos.tipo,
+                codigo_retencion: campos.codigo_retencion,
+                descripcion:      campos.descripcion || null,
+                base_imponible:   campos.base_imponible,
+                porcentaje:       campos.porcentaje,
+                valor:            campos.valor,
+            })
             .eq('id', id)
             .eq('origen', 'CARTERA')
         if (error) throw error

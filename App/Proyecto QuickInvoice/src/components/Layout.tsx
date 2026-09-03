@@ -300,6 +300,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                 <SidebarItem to="/configuracion" icon={Settings} label="Plataforma" active={location.pathname === '/configuracion'} />
                                 <SidebarItem to="/admin/user-empresas" icon={ArrowLeftRight} label="Asignar empresas"  active={location.pathname === '/admin/user-empresas'} />
                                 <SidebarItem to="/admin/depuracion"   icon={Trash2}         label="Depuración de Datos" active={location.pathname === '/admin/depuracion'} />
+                                <SidebarItem to="/admin/mantenimiento-cartera" icon={Trash2} label="Mantenimiento Cartera Migrada" active={location.pathname === '/admin/mantenimiento-cartera'} />
                                 <SidebarItem to="/admin/reparar-stock" icon={Wrench}        label="Reparación de Inventario" active={location.pathname === '/admin/reparar-stock'} />
                                 <SidebarItem to="/admin/log-sesiones" icon={History}        label="Log de Sesiones" active={location.pathname === '/admin/log-sesiones'} />
                                 <SidebarItem to="/admin/estadisticas-empresa" icon={BarChart3} label="Estadísticas por Empresa" active={location.pathname === '/admin/estadisticas-empresa'} />
