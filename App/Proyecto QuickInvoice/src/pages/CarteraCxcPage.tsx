@@ -10,13 +10,14 @@ import {
 import { formatCurrency } from '../lib/utils'
 import {
     CreditCard, DollarSign, AlertCircle, CheckCircle2, X,
-    Save, ChevronDown, ChevronUp, Search, Printer, Users,
+    Save, ChevronDown, ChevronUp, Search, Printer, Users, ShieldAlert,
 } from 'lucide-react'
 import { cuentasBancariasService } from '../services/finance/bancosService'
 import type { CuentaBancaria } from '../types/finance'
 import { contabilidadVentasService } from '../services/contabilidadVentasService'
 import { contableConfigService } from '../services/contableConfigService'
 import { codigoRetencionService, type CodigoRetencion } from '../services/codigoRetencionService'
+import { MantenimientoCarteraModal } from '../components/admin/MantenimientoCarteraModal'
 
 const METODOS_PAGO: { value: CarteraCxcPago['metodo_pago']; label: string }[] = [
     { value: 'efectivo',      label: 'Efectivo' },
@@ -54,6 +55,7 @@ function distribuirFIFO(facturas: CarteraCxc[], totalPago: number): Distribucion
 
 export function CarteraCxcPage() {
     const { empresa } = useAuth()
+    const [mantenimientoOpen, setMantenimientoOpen] = useState(false)
     const [cartera, setCartera]         = useState<CarteraCxc[]>([])
     const [loading, setLoading]         = useState(true)
     const [filtroEstado, setFiltroEstado] = useState('activos')
@@ -753,6 +755,13 @@ export function CarteraCxcPage() {
                 </div>
                 <div className="flex gap-2">
                     <HelpButton pageKey="cartera-cxc" />
+                    <button
+                        onClick={() => setMantenimientoOpen(true)}
+                        title="Corrección puntual de errores de una migración de cartera — requiere credenciales de superadministrador"
+                        className="flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 text-slate-400 rounded-xl text-xs font-semibold hover:bg-slate-50 hover:text-slate-600"
+                    >
+                        <ShieldAlert className="w-4 h-4" />
+                    </button>
                     <button
                         onClick={() => { setMultiModal(true); setFiltroEstado('pendiente') }}
                         className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-700"
@@ -1639,6 +1648,14 @@ export function CarteraCxcPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {mantenimientoOpen && empresa && (
+                <MantenimientoCarteraModal
+                    empresaId={empresa.id}
+                    empresaNombre={empresa.nombre}
+                    onClose={() => setMantenimientoOpen(false)}
+                />
             )}
         </div>
     )
