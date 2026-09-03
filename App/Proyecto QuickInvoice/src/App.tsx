@@ -58,7 +58,6 @@ const AdminPermisosPage            = lz(() => import('./pages/AdminPermisosPage'
 const AuditoriaPage                = lz(() => import('./pages/AuditoriaPage'), 'AuditoriaPage')
 const AdminUserEmpresasPage        = lz(() => import('./pages/AdminUserEmpresasPage'), 'AdminUserEmpresasPage')
 const AdminDepuracionPage          = lz(() => import('./pages/admin/AdminDepuracionPage'), 'AdminDepuracionPage')
-const MantenimientoCarteraMigradaPage = lz(() => import('./pages/admin/MantenimientoCarteraMigradaPage'), 'MantenimientoCarteraMigradaPage')
 const LogSesionesPage              = lz(() => import('./pages/admin/LogSesionesPage'), 'LogSesionesPage')
 const AdminReparacionStockPage     = lz(() => import('./pages/admin/AdminReparacionStockPage'), 'AdminReparacionStockPage')
 const EstadisticasEmpresaPage      = lz(() => import('./pages/admin/EstadisticasEmpresaPage'), 'EstadisticasEmpresaPage')
@@ -597,16 +596,6 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
                     <Layout>
                       <AdminDepuracionPage />
-                    </Layout>
-                  </RoleProtectedRoute>
-                </ProtectedRoute>
-              } />
-
-              <Route path="/admin/mantenimiento-cartera" element={
-                <ProtectedRoute>
-                  <RoleProtectedRoute allowedRoles={['admin_plataforma']}>
-                    <Layout>
-                      <MantenimientoCarteraMigradaPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>
