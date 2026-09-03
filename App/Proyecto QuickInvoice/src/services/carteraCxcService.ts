@@ -13,11 +13,20 @@ export interface CarteraCxc {
     saldo: number
     estado: 'pendiente' | 'parcial' | 'pagada' | 'anulada'
     observaciones: string | null
+    // Solo en cartera migrada (comprobante_id null) — número de factura del
+    // sistema anterior, capturado en la migración. Ver MigrarCarteraPage.tsx.
+    numero_documento_externo?: string | null
     created_at: string
     updated_at: string
     // joins
     clientes?: { nombre: string; identificacion: string }
     comprobantes?: { secuencial: string; total: number }
+}
+
+// Número de factura a mostrar: el real si tiene comprobante vinculado, o el
+// capturado en la migración si es cartera migrada (comprobante_id null).
+export function numeroFacturaCartera(c: Pick<CarteraCxc, 'comprobantes' | 'numero_documento_externo'>): string {
+    return c.comprobantes?.secuencial || c.numero_documento_externo || '—'
 }
 
 export interface CarteraCxcPago {

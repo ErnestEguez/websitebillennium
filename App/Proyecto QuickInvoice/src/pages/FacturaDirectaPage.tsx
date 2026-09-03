@@ -229,6 +229,16 @@ export function FacturaDirectaPage() {
     const [isSavingClient, setIsSavingClient] = useState(false)
     // Alerta de cartera pendiente (vencida / por vencer) del cliente seleccionado
     const [alertaDeuda, setAlertaDeuda] = useState<{ vencida: CarteraCxc[]; porVencer: CarteraCxc[] } | null>(null)
+    // Saldo total pendiente del cliente ANTES de esta factura (toda la cartera
+    // activa, no solo vencida/por vencer) — para el desglose Saldo Anterior +
+    // Esta Factura = Saldo Actual que se imprime en el ticket cuando se vende
+    // a crédito.
+    const [saldoAnteriorCliente, setSaldoAnteriorCliente] = useState<number>(0)
+
+    // Facturas de ESTA empresa sin autorizar por el SRI (PENDIENTE/ENVIADO) —
+    // aviso corto arriba de la pantalla donde el cajero pasa todo el día, para
+    // que no dependa de que alguien revise un correo que nunca ve.
+    const [facturasSinAutorizar, setFacturasSinAutorizar] = useState<number>(0)
 
     // Cargar factura anterior como plantilla — solo para llenado rápido
     // (clientes que compran lo mismo varias veces). El número de la
@@ -361,6 +371,23 @@ export function FacturaDirectaPage() {
     useEffect(() => {
         if (empresa?.id) loadData()
     }, [empresa?.id])
+
+    // Facturas sin autorizar por el SRI de esta empresa — se recarga al
+    // entrar y otra vez cada vez que se genera una factura nueva.
+    useEffect(() => {
+        if (!empresa?.id) return
+        Promise.resolve(
+            supabase
+                .from('comprobantes')
+                .select('id', { count: 'exact', head: true })
+                .eq('empresa_id', empresa.id)
+                .eq('tipo_comprobante', 'FACTURA')
+                .in('estado_sri', ['PENDIENTE', 'ENVIADO'])
+                .neq('estado_sistema', 'ANULADA')
+        )
+            .then(({ count }) => setFacturasSinAutorizar(count ?? 0))
+            .catch(() => {})
+    }, [empresa?.id, facturaFinal])
 
     // Pre-carga desde preparación de pintura — carga TODOS los preps acumulados
     const PREP_IDS_KEY = `qi_prep_ids_${empresa?.id ?? ''}`
@@ -533,9 +560,11 @@ export function FacturaDirectaPage() {
         setSearchCliente('')
         setClienteCollapsed(true)
         setEditandoCliente(false)
+        setSaldoAnteriorCliente(0)
         if (!empresa?.id || c.identificacion === '9999999999999') return
         try {
             const cartera = await carteraCxcService.getCarteraActivaPorCliente(empresa.id, c.id)
+            setSaldoAnteriorCliente(cartera.reduce((s, x) => s + Number(x.saldo || 0), 0))
             const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
             const limite = new Date(hoy); limite.setDate(limite.getDate() + 30)
             const vencida = cartera.filter(x => x.fecha_vencimiento && new Date(x.fecha_vencimiento) < hoy)
@@ -1048,6 +1077,22 @@ export function FacturaDirectaPage() {
             )
         }
 
+        // El SRI exige que la suma de formas de pago sea <= al total del
+        // comprobante (nunca de más) — si supera el total, la factura se
+        // ENVÍA pero el SRI la deja en "diferencias" sin autorizar. El
+        // campo de forma de pago es lo que se cobra de la factura, NO lo
+        // que el cliente entregó en efectivo — eso va aparte en "Efectivo
+        // Recibido", solo para calcular el cambio, y no se manda al SRI.
+        if (totalPagado > totales.total + 0.01) {
+            return alert(
+                `El monto en formas de pago (${formatCurrency(totalPagado)}) supera el total de la factura ` +
+                `(${formatCurrency(totales.total)}).\n\n` +
+                `Si el cliente pagó con un billete más grande, no cambies el valor en "Formas de Pago" — ` +
+                `ese campo es lo que se cobra de ESTA factura. Usa el campo "Efectivo Recibido" ` +
+                `(más abajo) para que el sistema calcule el cambio automáticamente.`
+            )
+        }
+
         // ── Path Plan Acumulativo: NO genera factura electrónica — se acumula
         // en ventas_pa hasta que el cliente cancele el saldo total. No se puede
         // combinar con otras formas de pago en la misma venta.
@@ -1189,6 +1234,7 @@ export function FacturaDirectaPage() {
         setPrecioNivel({})
         setStockLinea({})
         setEditandoCliente(false)
+        setSaldoAnteriorCliente(0)
         sessionStorage.removeItem(PREP_IDS_KEY)
         // Mantener vendedor seleccionado entre facturas
         setDiasPlazoCredito(30)
@@ -1265,6 +1311,12 @@ export function FacturaDirectaPage() {
     return (
         <>
         <div className="space-y-6">
+            {facturasSinAutorizar > 0 && (
+                <Link to="/facturacion"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-100 text-red-800 text-sm font-bold hover:bg-red-200 transition-colors">
+                    ⚠️ {facturasSinAutorizar} factura{facturasSinAutorizar !== 1 ? 's' : ''} sin autorizar por el SRI — revisa Comprobantes
+                </Link>
+            )}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
@@ -2306,6 +2358,7 @@ export function FacturaDirectaPage() {
                                     factura={facturaFinal}
                                     montoRecibido={ticketMontoRecibido}
                                     vuelto={ticketVuelto}
+                                    saldoAnteriorCliente={saldoAnteriorCliente}
                                 />
                             </div>
                         ))}

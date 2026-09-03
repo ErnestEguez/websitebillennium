@@ -1,10 +1,13 @@
 // ============================================================
 // EDGE FUNCTION: sri-retry-facturas — QuickInvoice
 // Barrido automático (llamado por pg_cron cada 15 min) de facturas
-// no autorizadas: reintenta sri-signer hasta MAX_INTENTOS veces;
-// al agotarse sin autorizar, avisa por correo (SMTP de la empresa
-// Billennium System, RUC 0907388268001) sin importar de qué
-// empresa cliente sea la factura.
+// no autorizadas: reintenta sri-signer cada 15 min hasta MAX_INTENTOS
+// veces (~2h); al agotarse, avisa por correo UNA vez (SMTP de la
+// empresa Billennium System, RUC 0907388268001) pero SIGUE
+// reintentando indefinidamente cada 2 horas — antes se abandonaba la
+// factura para siempre tras el aviso, y si nadie revisaba ese correo
+// (llega a una casilla personal, no a la empresa) quedaba sin
+// autorizar para siempre sin que nadie se enterara.
 //
 // 2026-08-03: se agregó el caso RECHAZADO (rechazo firme del SRI, no
 // solo "sigue pendiente"). Antes solo se barrían PENDIENTE/ENVIADO,
@@ -40,19 +43,35 @@ serve(async (req) => {
 
     try {
         const quinceMinAtras = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        const dosHorasAtras  = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+        const SELECT_COLS = "id, secuencial, empresa_id, estado_sri, estado_sistema, intentos_sri, alerta_enviada, observaciones_sri, empresas(nombre, razon_social, ruc)";
 
-        const { data: pendientes, error: errQuery } = await supabase
+        // Fase rápida (intentos_sri < MAX_INTENTOS): cada 15 min, igual que antes.
+        const { data: rapidos, error: errRapidos } = await supabase
             .from("comprobantes")
-            .select("id, secuencial, empresa_id, estado_sri, estado_sistema, intentos_sri, alerta_enviada, observaciones_sri, empresas(nombre, razon_social, ruc)")
+            .select(SELECT_COLS)
             .eq("tipo_comprobante", "FACTURA")
             .in("estado_sri", ["PENDIENTE", "ENVIADO"])
             .neq("estado_sistema", "ANULADA")
             .lt("intentos_sri", MAX_INTENTOS)
             .or(`ultimo_intento_sri.is.null,ultimo_intento_sri.lt.${quinceMinAtras}`);
+        if (errRapidos) throw errRapidos;
 
-        if (errQuery) throw errQuery;
+        // Fase lenta (intentos_sri >= MAX_INTENTOS): ya se avisó una vez por
+        // correo, pero NO se deja de reintentar — sigue cada 2 horas
+        // indefinidamente en vez de abandonarla para siempre.
+        const { data: lentos, error: errLentos } = await supabase
+            .from("comprobantes")
+            .select(SELECT_COLS)
+            .eq("tipo_comprobante", "FACTURA")
+            .in("estado_sri", ["PENDIENTE", "ENVIADO"])
+            .neq("estado_sistema", "ANULADA")
+            .gte("intentos_sri", MAX_INTENTOS)
+            .lt("ultimo_intento_sri", dosHorasAtras);
+        if (errLentos) throw errLentos;
 
-        resumen.revisadas = pendientes?.length ?? 0;
+        const pendientes = [...(rapidos ?? []), ...(lentos ?? [])];
+        resumen.revisadas = pendientes.length;
 
         for (const comp of pendientes ?? []) {
             try {
@@ -184,7 +203,7 @@ async function enviarAlerta(
             : `Después de ${MAX_INTENTOS} intentos automáticos, esta factura no logró autorizarse:`;
 
         await transporter.sendMail({
-            from: `Alertas QuickInvoice <${mailUser}>`,
+            from: `Alertas Corina ERP <${mailUser}>`,
             to: CORREO_ALERTA,
             subject: asunto,
             html: `
