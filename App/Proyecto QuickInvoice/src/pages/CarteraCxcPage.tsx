@@ -3,6 +3,7 @@ import { HelpButton } from '../components/help/HelpButton'
 import { useAuth } from '../contexts/AuthContext'
 import {
     carteraCxcService,
+    numeroFacturaCartera,
     type CarteraCxc,
     type CarteraCxcPago,
 } from '../services/carteraCxcService'
@@ -216,7 +217,7 @@ export function CarteraCxcPage() {
         setAccionandoPagoId(pago.id)
         try {
             const comprobanteId = await crearAsientoCobroSeguro(
-                Number(pago.valor), pago.metodo_pago, c.clientes?.nombre ?? '', c.comprobantes?.secuencial,
+                Number(pago.valor), pago.metodo_pago, c.clientes?.nombre ?? '', numeroFacturaCartera(c),
                 undefined, pago.fecha_pago,
             )
             if (comprobanteId) {
@@ -311,7 +312,7 @@ export function CarteraCxcPage() {
 
             // Asiento contable: si se genera, se vincula al pago para trazabilidad/reversa
             const comprobanteId = await crearAsientoCobroSeguro(
-                valor, pagoMetodo, pagoModal.clientes?.nombre ?? '', pagoModal.comprobantes?.secuencial,
+                valor, pagoMetodo, pagoModal.clientes?.nombre ?? '', numeroFacturaCartera(pagoModal),
                 ctaSeleccionada?.cuenta_contable_id ?? undefined,
             )
             if (comprobanteId) await carteraCxcService.actualizarComprobantePago(pagoInsertado.id, comprobanteId)
@@ -435,7 +436,7 @@ export function CarteraCxcPage() {
         const filasA4 = dists.filter(d => d.aplicado > 0).map(d => {
             const saldoNuevo = Math.max(0, Math.round((d.cartera.saldo - d.aplicado) * 100) / 100)
             return `<tr>
-                <td style="padding:4px 6px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:11px">${d.cartera.comprobantes?.secuencial || '—'}</td>
+                <td style="padding:4px 6px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:11px">${numeroFacturaCartera(d.cartera)}</td>
                 <td style="padding:4px 6px;border-bottom:1px solid #e2e8f0;text-align:right">${formatCurrency(d.cartera.valor_original)}</td>
                 <td style="padding:4px 6px;border-bottom:1px solid #e2e8f0;text-align:right;color:#dc2626">${formatCurrency(d.cartera.saldo)}</td>
                 <td style="padding:4px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold;color:#16a34a">${formatCurrency(d.aplicado)}</td>
@@ -446,7 +447,7 @@ export function CarteraCxcPage() {
         const filas80 = dists.filter(d => d.aplicado > 0).map(d => {
             const saldoNuevo = Math.max(0, Math.round((d.cartera.saldo - d.aplicado) * 100) / 100)
             return `<tr>
-                <td style="padding:2px 0;font-size:10px">${(d.cartera.comprobantes?.secuencial || '—').split('-').pop()}</td>
+                <td style="padding:2px 0;font-size:10px">${numeroFacturaCartera(d.cartera).split('-').pop()}</td>
                 <td style="padding:2px 0;font-size:10px;text-align:right">${formatCurrency(d.cartera.saldo)}</td>
                 <td style="padding:2px 0;font-size:10px;text-align:right;font-weight:bold">${formatCurrency(d.aplicado)}</td>
                 <td style="padding:2px 0;font-size:10px;text-align:right">${saldoNuevo === 0 ? 'OK' : formatCurrency(saldoNuevo)}</td>
@@ -608,7 +609,7 @@ export function CarteraCxcPage() {
         const filas = carteraFiltrada.map(c => {
             const vDias = diasVencido(c.fecha_vencimiento)
             return `<tr>
-                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-family:monospace">${c.comprobantes?.secuencial || '—'}</td>
+                <td style="padding:4px 6px;border-bottom:1px solid #eee;font-family:monospace">${numeroFacturaCartera(c)}</td>
                 <td style="padding:4px 6px;border-bottom:1px solid #eee">${c.clientes?.nombre || '—'}</td>
                 <td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:10px;color:#555">${c.clientes?.identificacion || ''}</td>
                 <td style="padding:4px 6px;border-bottom:1px solid #eee">${c.fecha_emision}</td>
@@ -902,7 +903,7 @@ export function CarteraCxcPage() {
                                             className="border-b border-slate-100 hover:bg-red-50/40 cursor-pointer bg-red-50/20"
                                             onClick={() => toggleDetalle(c.id)}
                                         >
-                                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{c.comprobantes?.secuencial || '—'}</td>
+                                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{numeroFacturaCartera(c)}</td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-slate-900 text-sm">{c.clientes?.nombre || '—'}</div>
                                                 <div className="text-xs text-slate-500">{c.clientes?.identificacion}</div>
@@ -1041,7 +1042,7 @@ export function CarteraCxcPage() {
                                             className="border-b border-slate-100 hover:bg-amber-50/40 cursor-pointer"
                                             onClick={() => toggleDetalle(c.id)}
                                         >
-                                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{c.comprobantes?.secuencial || '—'}</td>
+                                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{numeroFacturaCartera(c)}</td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-slate-900 text-sm">{c.clientes?.nombre || '—'}</div>
                                                 <div className="text-xs text-slate-500">{c.clientes?.identificacion}</div>
@@ -1177,7 +1178,7 @@ export function CarteraCxcPage() {
                                             className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer"
                                             onClick={() => toggleDetalle(c.id)}
                                         >
-                                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{c.comprobantes?.secuencial || '—'}</td>
+                                            <td className="px-4 py-3 font-mono text-sm text-slate-700">{numeroFacturaCartera(c)}</td>
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-slate-900 text-sm">{c.clientes?.nombre || '—'}</div>
                                                 <div className="text-xs text-slate-500">{c.clientes?.identificacion}</div>
@@ -1279,7 +1280,7 @@ export function CarteraCxcPage() {
                             <div>
                                 <h2 className="text-xl font-bold text-slate-900">Registrar Abono</h2>
                                 <p className="text-sm text-slate-500 mt-0.5">
-                                    Factura {pagoModal.comprobantes?.secuencial} — {pagoModal.clientes?.nombre}
+                                    Factura {numeroFacturaCartera(pagoModal)} — {pagoModal.clientes?.nombre}
                                 </p>
                             </div>
                             <button onClick={() => setPagoModal(null)} className="p-2 hover:bg-slate-100 rounded-lg">
@@ -1519,7 +1520,7 @@ export function CarteraCxcPage() {
                                                             const dist = distribucion[i]
                                                             return (
                                                                 <tr key={f.id} className={dist?.aplicado > 0 ? 'bg-green-50/50' : ''}>
-                                                                    <td className="px-3 py-2 font-mono text-slate-700">{f.comprobantes?.secuencial}</td>
+                                                                    <td className="px-3 py-2 font-mono text-slate-700">{numeroFacturaCartera(f)}</td>
                                                                     <td className="px-3 py-2 text-slate-500">{f.fecha_emision}</td>
                                                                     <td className="px-3 py-2 text-right text-red-600 font-medium">{formatCurrency(f.saldo)}</td>
                                                                     <td className="px-3 py-2 text-right font-bold text-green-700">

@@ -250,6 +250,12 @@ export function InvoicePrint() {
                         <span className="font-bold">Fecha Vencimiento: </span>
                         <span>{format(new Date(fechaVenc), 'dd/MM/yyyy')}</span>
                     </div>
+                    {factura.vendedores?.nombre && (
+                        <div>
+                            <span className="font-bold">Vendedor: </span>
+                            <span>{factura.vendedores.nombre}</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* ── TABLA DETALLES ── */}

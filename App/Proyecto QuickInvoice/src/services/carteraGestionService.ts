@@ -206,7 +206,7 @@ export const carteraGestionService = {
             .select(`
                 id, empresa_id, cliente_id, comprobante_id,
                 fecha_emision, fecha_vencimiento,
-                valor_original, saldo, estado,
+                valor_original, saldo, estado, numero_documento_externo,
                 estado_gestion, proxima_gestion, ultimo_contacto,
                 clientes(id, nombre, identificacion, email, telefono,
                          limite_credito, bloqueo_credito, score_credito),
@@ -242,7 +242,9 @@ export const carteraGestionService = {
                 cliente_identificacion: c.clientes?.identificacion ?? '',
                 cliente_email:        c.clientes?.email ?? null,
                 cliente_telefono:     c.clientes?.telefono ?? null,
-                secuencial:           c.comprobantes?.secuencial ?? '',
+                // Cartera migrada (sin comprobante_id) no tiene secuencial real —
+                // se cae al número capturado en la migración.
+                secuencial:           c.comprobantes?.secuencial ?? c.numero_documento_externo ?? '—',
                 vendedor_nombre:      c.comprobantes?.vendedores?.nombre ?? null,
                 vendedor_id:          c.comprobantes?.vendedor_id ?? null,
                 dias,

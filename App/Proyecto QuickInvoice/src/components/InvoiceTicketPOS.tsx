@@ -21,9 +21,13 @@ interface InvoiceTicketPOSProps {
     // se lee de factura.empresas.config_sri.impresion_pos (config guardada).
     configOverride?: SriConfig['impresion_pos']
     avisoLopdp?: string | null
+    // Saldo pendiente del cliente ANTES de esta factura (toda su cartera
+    // activa) — solo se usa/imprime cuando esta factura tiene un pago a
+    // crédito. Undefined = no se calculó (ej. reimpresión), no se imprime.
+    saldoAnteriorCliente?: number
 }
 
-export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps>(({ factura, montoRecibido, vuelto, configOverride, avisoLopdp }, ref) => {
+export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps>(({ factura, montoRecibido, vuelto, configOverride, avisoLopdp, saldoAnteriorCliente }, ref) => {
     const reactId = useId()
     const zoomClass = `ticket-zoom-${reactId.replace(/:/g, '')}`
 
@@ -213,6 +217,19 @@ export const InvoiceTicketPOS = forwardRef<HTMLDivElement, InvoiceTicketPOSProps
                     })}
                 </div>
             )}
+
+            {/* ── Saldo de cartera (solo si esta factura tiene crédito) ── */}
+            {saldoAnteriorCliente != null && factura.comprobante_pagos?.some((p: any) => p.metodo_pago === 'credito') && (() => {
+                const estaFactura = factura.comprobante_pagos
+                    .filter((p: any) => p.metodo_pago === 'credito')
+                    .reduce((s: number, p: any) => s + Number(p.valor || 0), 0)
+                const saldoActual = saldoAnteriorCliente + estaFactura
+                return (
+                    <div className="mt-2 border-t border-dashed border-black pt-2 text-[9px] font-bold leading-snug">
+                        Saldo Anterior: {formatCurrency(saldoAnteriorCliente)} + Esta Factura: {formatCurrency(estaFactura)} = Saldo Actual: {formatCurrency(saldoActual)}
+                    </div>
+                )
+            })()}
 
             {montoRecibido != null && montoRecibido > 0 && (
                 <div className="mt-2 border-t border-dashed border-black pt-2">
