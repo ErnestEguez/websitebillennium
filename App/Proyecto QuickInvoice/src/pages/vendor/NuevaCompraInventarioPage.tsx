@@ -611,7 +611,10 @@ export function NuevaCompraInventarioPage() {
             }
         }
 
-        const retsValidas = retenciones.filter(r => r.codigo && r.valor > 0)
+        // No exigir valor > 0: una retención con código real y tarifa 0%
+        // (ej. código 332) da valor 0.00 legítimamente y debe grabarse igual —
+        // lo único que marca una línea vacía es la ausencia de código.
+        const retsValidas = retenciones.filter(r => r.codigo)
         if (retsValidas.length > 0) {
             const totalRetConfirm = retsValidas.reduce((s, r) => s + r.valor, 0)
             const cxpFinal = Math.max(total - totalRetConfirm, 0)
@@ -725,7 +728,7 @@ export function NuevaCompraInventarioPage() {
             })
 
             const retsParaGuardar = retsConBase
-                .filter(r => r.codigo && r.valor > 0)
+                .filter(r => r.codigo)
                 .map(r => ({
                     empresa_id:       empresa!.id,
                     proveedor_id:     proveedorId,
@@ -1376,9 +1379,9 @@ export function NuevaCompraInventarioPage() {
                         className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors">
                         <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Retenciones</span>
-                            {retenciones.filter(r => r.valor > 0).length > 0 && (
+                            {retenciones.filter(r => r.codigo).length > 0 && (
                                 <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                                    {retenciones.filter(r => r.valor > 0).length} ret. — ${totalRet.toFixed(2)}
+                                    {retenciones.filter(r => r.codigo).length} ret. — ${totalRet.toFixed(2)}
                                 </span>
                             )}
                         </div>

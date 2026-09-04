@@ -211,6 +211,11 @@ export function FacturaDirectaPage() {
     const prepId = searchParams.get('prep_id')
     const draftEnVivoId = searchParams.get('draft_en_vivo')
     const { empresa, cajaSesion, profile, permisos, isAdmin } = useAuth()
+    // Por defecto solo el administrador puede cambiar precios al facturar;
+    // la empresa puede activar "permitir_todos_editar_precio" en Ajustes
+    // para que cualquier usuario lo haga (default false — no cambia el
+    // comportamiento de ninguna empresa existente).
+    const puedeEditarPrecio = isAdmin || !!empresa?.permitir_todos_editar_precio
     const { enabled: vozIaHabilitada } = useIaFeatureEnabled('voz')
     const { isOnline } = useNetworkStatus()
     const [offlineSaved, setOfflineSaved] = useState(false)
@@ -1924,7 +1929,7 @@ export function FacturaDirectaPage() {
                                                 precio del catálogo fijo, sin poder editarlo. */}
                                             <div className="col-span-4 md:col-span-3">
                                                 <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">P. Unit. (IVA inc.)</label>
-                                                {isAdmin && !esModoServicio && (() => {
+                                                {puedeEditarPrecio && !esModoServicio && (() => {
                                                     const prod = productos.find(p => p.id === det.producto_id)
                                                     if (!prod || det.subproducto_id) return null
                                                     const niveles = nivelesDisponibles(prod)
@@ -1944,7 +1949,7 @@ export function FacturaDirectaPage() {
                                                         </select>
                                                     )
                                                 })()}
-                                                {isAdmin ? (
+                                                {puedeEditarPrecio ? (
                                                     <div className="relative">
                                                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
                                                         <input type="number" min="0" step="0.01"
