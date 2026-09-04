@@ -551,6 +551,7 @@ export function ConfigurationPage() {
                     tasa_incremento_precio_venta: companyData.tasa_incremento_precio_venta ?? 30,
                     mostrar_facturacion_en_vivo: companyData.mostrar_facturacion_en_vivo ?? false,
                     permitir_venta_sin_stock: companyData.permitir_venta_sin_stock ?? true,
+                    permitir_todos_editar_precio: companyData.permitir_todos_editar_precio ?? false,
                     etiqueta_campo_linea: companyData.etiqueta_campo_linea || 'Talla',
                     etiqueta_campo_subcategoria: companyData.etiqueta_campo_subcategoria || 'Color',
                     // Configuración tributaria — agente de retención
@@ -1356,6 +1357,25 @@ export function ConfigurationPage() {
                                         className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
                                         checked={companyData.permitir_venta_sin_stock ?? true}
                                         onChange={e => setCompanyData({ ...companyData, permitir_venta_sin_stock: e.target.checked })}
+                                    />
+                                </label>
+                            </div>
+
+                            {/* Edición de precio al facturar */}
+                            <div className="space-y-2">
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Permitir a Todos los Usuarios Cambiar el Precio</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Apagado (por defecto): solo el administrador puede cambiar el precio al facturar, el resto ve el precio del catálogo fijo.
+                                            Encendido: cualquier usuario puede editarlo al momento de facturar.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!companyData.permitir_todos_editar_precio}
+                                        onChange={e => setCompanyData({ ...companyData, permitir_todos_editar_precio: e.target.checked })}
                                     />
                                 </label>
                             </div>

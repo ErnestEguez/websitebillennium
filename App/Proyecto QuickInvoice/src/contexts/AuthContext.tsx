@@ -39,6 +39,11 @@ interface Empresa {
     // en cero (o insuficiente). Default true (permitir) para no cambiar el
     // comportamiento de ninguna empresa existente.
     permitir_venta_sin_stock?: boolean
+    // Si está en true, cualquier usuario puede cambiar el precio al
+    // facturar (no solo el administrador). Default false — por defecto
+    // ninguna empresa puede cambiar precios salvo el administrador, igual
+    // que el comportamiento actual.
+    permitir_todos_editar_precio?: boolean
 }
 
 export interface Modules {
