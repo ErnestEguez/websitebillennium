@@ -107,6 +107,11 @@ export function NuevaCompraInventarioPage() {
     const [bodegas, setBodegas]       = useState<Bodega[]>([])
     const [loading, setLoading]       = useState(true)
     const [saving, setSaving]         = useState(false)
+    // Candado síncrono contra doble clic/doble envío: el estado "saving" no
+    // alcanza a re-renderizar (y deshabilitar el botón) antes de que un
+    // segundo clic rapidísimo vuelva a entrar a handleGuardar — esto ya
+    // causó una compra duplicada en producción.
+    const guardandoRef = useRef(false)
     const [ocrLoading, setOcrLoading] = useState(false)
     // "Sin Detalle": al escanear, solo trae cabecera/totales del PDF, sin
     // llenar las líneas de producto — para facturas donde no importa el
@@ -600,6 +605,16 @@ export function NuevaCompraInventarioPage() {
 
     // ── Guardar ───────────────────────────────────────────────────────────────
     async function handleGuardar() {
+        if (guardandoRef.current) return
+        guardandoRef.current = true
+        try {
+            await handleGuardarInterno()
+        } finally {
+            guardandoRef.current = false
+        }
+    }
+
+    async function handleGuardarInterno() {
         if (!proveedorId) { alert('Selecciona un proveedor'); return }
         if (formaPago === 'CREDITO' && !fechaVenc) { alert('Ingresa la fecha de vencimiento'); return }
 

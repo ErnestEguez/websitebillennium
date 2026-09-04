@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { HelpButton } from '../../components/help/HelpButton'
 import { useFormDraft } from '../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
@@ -38,6 +38,7 @@ export function NuevaCompraServicioPage() {
     const [proveedores, setProveedores] = useState<Proveedor[]>([])
     const [loading, setLoading]         = useState(true)
     const [saving, setSaving]           = useState(false)
+    const guardandoRef = useRef(false)
 
     const [proveedorId, setProveedorId]     = useState('')
     const [fechaEmision, setFechaEmision]   = useState(HOY)
@@ -240,6 +241,16 @@ export function NuevaCompraServicioPage() {
     function removeLinea(i: number) { setDetalle(prev => prev.filter((_, j) => j !== i)) }
 
     async function handleGuardar() {
+        if (guardandoRef.current) return
+        guardandoRef.current = true
+        try {
+            await handleGuardarInterno()
+        } finally {
+            guardandoRef.current = false
+        }
+    }
+
+    async function handleGuardarInterno() {
         if (!proveedorId) { alert('Selecciona un proveedor'); return }
         const validas = detalle.filter(d => d.descripcion.trim() && d.precio_unitario > 0)
         if (!validas.length) { alert('Agrega al menos un servicio con descripción y precio'); return }
