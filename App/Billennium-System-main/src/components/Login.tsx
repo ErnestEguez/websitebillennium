@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { LogIn } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -88,11 +88,18 @@ export function Login({ onLoginSuccess }: LoginProps) {
                 Contraseña
               </label>
               <input
-                type="password"
+                // No usamos type="password": Chrome/Edge le agregan su propio
+                // botón nativo de "mostrar contraseña" que no se puede ocultar
+                // con CSS. Con -webkit-text-security el navegador ya no lo
+                // reconoce como campo de contraseña (no aparece el botón, ni
+                // se ofrece guardar/autocompletar), pero sigue viéndose
+                // enmascarado con puntos.
+                type="text"
                 required
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                style={{ WebkitTextSecurity: 'disc' } as CSSProperties}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="••••••••"
               />
