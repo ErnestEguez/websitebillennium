@@ -47,7 +47,8 @@ import { puntoEmisionService } from '../services/puntoEmisionService'
 import type { Bodega } from '../types/vendors'
 import type { PuntoEmision } from '../types/puntosEmision'
 import { cn } from '../lib/utils'
-import { getPuntoEmisionDispositivo, setPuntoEmisionDispositivo } from '../lib/dispositivoPuntoEmision'
+import { getTerminalDispositivo, setTerminalDispositivo } from '../lib/dispositivoPuntoEmision'
+import { terminalService, type Terminal } from '../services/terminalService'
 import { auditService } from '../services/auditoria/auditService'
 import { ConfigImpresionTicketModal } from '../components/ConfigImpresionTicketModal'
 
@@ -168,7 +169,12 @@ export function ConfigurationPage() {
     const [puntosEmision, setPuntosEmision] = useState<PuntoEmision[]>([])
     const [isPuntoEmisionModalOpen, setIsPuntoEmisionModalOpen] = useState(false)
     const [editingPuntoEmision, setEditingPuntoEmision] = useState<Partial<PuntoEmision> | null>(null)
-    const [dispositivoPeId, setDispositivoPeId] = useState<string | null>(null)
+    // Terminales (nombre de máquina ↔ punto de emisión, guardado en servidor)
+    const [terminales, setTerminales] = useState<Terminal[]>([])
+    const [dispositivoTerminalNombre, setDispositivoTerminalNombre] = useState<string | null>(null)
+    const [isTerminalModalOpen, setIsTerminalModalOpen] = useState(false)
+    const [editingTerminal, setEditingTerminal] = useState<Partial<Terminal> | null>(null)
+    const [savingTerminal, setSavingTerminal] = useState(false)
 
     const [isImpresionModalOpen, setIsImpresionModalOpen] = useState(false)
 
@@ -208,7 +214,7 @@ export function ConfigurationPage() {
 
     useEffect(() => {
         if (empresa?.id) {
-            setDispositivoPeId(getPuntoEmisionDispositivo(empresa.id))
+            setDispositivoTerminalNombre(getTerminalDispositivo(empresa.id))
         }
     }, [empresa?.id])
 
@@ -375,6 +381,15 @@ export function ConfigurationPage() {
                 } catch (e) {
                     console.error('Error cargando puntos de emisión:', e)
                     setPuntosEmision([])
+                }
+
+                // ── Cargar terminales (nombre de máquina ↔ punto de emisión) ──
+                try {
+                    const terminalesData = await terminalService.listar(empresa!.id)
+                    setTerminales(terminalesData)
+                } catch (e) {
+                    console.error('Error cargando terminales:', e)
+                    setTerminales([])
                 }
             }
         } catch (error) {
@@ -2413,33 +2428,104 @@ export function ConfigurationPage() {
                     <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-5 flex items-center justify-between gap-4 flex-wrap">
                         <div>
                             <p className="text-sm font-bold text-indigo-900 flex items-center gap-2">
-                                <Printer className="w-4 h-4" /> Punto de emisión de este dispositivo
+                                <Printer className="w-4 h-4" /> Terminal de esta máquina
                             </p>
                             <p className="text-xs text-indigo-500 mt-0.5">
-                                Define con qué serie SRI factura ESTA máquina (Factura Directa y Notas de Crédito). Solo afecta a este navegador.
+                                Elige con qué nombre de terminal factura ESTA máquina (Factura Directa y Notas de Crédito). La asignación real
+                                (a qué serie apunta cada terminal) se gestiona abajo, en el servidor — si se borra el caché de este navegador,
+                                solo hace falta volver a elegir el mismo nombre aquí, sin perder la configuración de la serie.
                             </p>
                         </div>
                         <select
                             className="px-4 py-2.5 rounded-xl border border-indigo-200 bg-white text-sm font-bold text-indigo-900 outline-none focus:ring-2 focus:ring-indigo-400"
-                            value={dispositivoPeId ?? ''}
+                            value={dispositivoTerminalNombre ?? ''}
                             onChange={e => {
                                 const val = e.target.value || null
-                                setDispositivoPeId(val)
-                                setPuntoEmisionDispositivo(empresa!.id, val)
+                                const nuevo = terminales.find(t => t.nombre === val)
+                                const labelNuevo = val
+                                    ? `${val}${nuevo?.punto_emision ? ` (${nuevo.punto_emision.establecimiento}-${nuevo.punto_emision.punto_emision})` : ' (sin serie asignada)'}`
+                                    : 'ninguna (usar el Principal)'
+                                const confirmado = window.confirm(
+                                    `¿Hacer que ESTA máquina se identifique como "${val ?? 'ninguna'}"?\n\n` +
+                                    `Las próximas facturas emitidas desde este navegador usarán la serie de ${labelNuevo}. Confirma solo si estás seguro.`
+                                )
+                                if (!confirmado) return
+                                setDispositivoTerminalNombre(val)
+                                setTerminalDispositivo(empresa!.id, val)
                             }}
                         >
-                            <option value="">
-                                Usar el Principal {(() => {
-                                    const principal = puntosEmision.find(p => p.es_principal)
-                                    return principal ? `(${principal.establecimiento}-${principal.punto_emision})` : ''
-                                })()}
-                            </option>
-                            {puntosEmision.filter(pe => pe.activo && !pe.es_principal).map(pe => (
-                                <option key={pe.id} value={pe.id}>
-                                    {pe.establecimiento}-{pe.punto_emision} · {pe.nombre}
+                            <option value="">— Ninguna (usar Principal) —</option>
+                            {terminales.map(t => (
+                                <option key={t.id} value={t.nombre}>
+                                    {t.nombre}{t.punto_emision ? ` · ${t.punto_emision.establecimiento}-${t.punto_emision.punto_emision}` : ' (sin serie)'}
                                 </option>
                             ))}
                         </select>
+                    </div>
+
+                    <div className="card overflow-hidden">
+                        <div className="flex items-center justify-between p-4 border-b border-slate-100">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-800">Terminales registradas</h3>
+                                <p className="text-xs text-slate-400 mt-0.5">Nombra cada máquina física y asígnale una serie — se gestiona desde cualquier equipo, no hace falta estar sentado en esa máquina.</p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setEditingTerminal({ nombre: '', punto_emision_id: null })
+                                    setIsTerminalModalOpen(true)
+                                }}
+                                className="btn btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5"
+                            >
+                                <Plus className="w-3.5 h-3.5" /> Nueva Terminal
+                            </button>
+                        </div>
+                        {terminales.length === 0 ? (
+                            <div className="py-10 text-center">
+                                <p className="text-slate-400 text-sm">No hay terminales registradas todavía.</p>
+                            </div>
+                        ) : (
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50 text-slate-500">
+                                    <tr>
+                                        <th className="py-2.5 px-4 text-left text-xs font-bold uppercase tracking-wider">Terminal</th>
+                                        <th className="py-2.5 px-4 text-left text-xs font-bold uppercase tracking-wider">Serie asignada</th>
+                                        <th className="py-2.5 px-4 text-right text-xs font-bold uppercase tracking-wider">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {terminales.map(t => (
+                                        <tr key={t.id}>
+                                            <td className="py-2.5 px-4 font-semibold text-slate-800">{t.nombre}</td>
+                                            <td className="py-2.5 px-4 text-slate-500">
+                                                {t.punto_emision ? `${t.punto_emision.establecimiento}-${t.punto_emision.punto_emision} · ${t.punto_emision.nombre}` : '— sin serie asignada —'}
+                                            </td>
+                                            <td className="py-2.5 px-4 text-right">
+                                                <button
+                                                    onClick={() => { setEditingTerminal(t); setIsTerminalModalOpen(true) }}
+                                                    className="text-primary-600 hover:text-primary-800 text-xs font-bold mr-3"
+                                                >
+                                                    Editar
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!window.confirm(`¿Eliminar la terminal "${t.nombre}"? Las máquinas que la tengan seleccionada volverán a facturar por el Principal.`)) return
+                                                        try {
+                                                            await terminalService.eliminar(t.id)
+                                                            setTerminales(prev => prev.filter(x => x.id !== t.id))
+                                                        } catch (e: any) {
+                                                            alert('Error al eliminar terminal: ' + e.message)
+                                                        }
+                                                    }}
+                                                    className="text-red-500 hover:text-red-700 text-xs font-bold"
+                                                >
+                                                    Eliminar
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
 
                     <div className="card overflow-hidden">
@@ -3959,6 +4045,98 @@ export function ConfigurationPage() {
                     empresaNombre={empresa.nombre}
                     onClose={() => setIsImpresionModalOpen(false)}
                 />
+            )}
+
+            {isTerminalModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                                    <Printer className="w-5 h-5" />
+                                </div>
+                                <h2 className="text-lg font-bold text-slate-900">
+                                    {editingTerminal?.id ? 'Editar Terminal' : 'Nueva Terminal'}
+                                </h2>
+                            </div>
+                            <button
+                                onClick={() => { setIsTerminalModalOpen(false); setEditingTerminal(null) }}
+                                className="p-2 hover:bg-slate-100 rounded-full text-slate-400"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4 px-6 py-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Nombre de la terminal *</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Caja 1"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-400 font-bold text-slate-900"
+                                    value={editingTerminal?.nombre || ''}
+                                    onChange={e => setEditingTerminal({ ...editingTerminal, nombre: e.target.value })}
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Serie asignada</label>
+                                <select
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-400 text-slate-900"
+                                    value={editingTerminal?.punto_emision_id || ''}
+                                    onChange={e => setEditingTerminal({ ...editingTerminal, punto_emision_id: e.target.value || null })}
+                                >
+                                    <option value="">— Sin serie (usará el Principal) —</option>
+                                    {puntosEmision.filter(pe => pe.activo).map(pe => (
+                                        <option key={pe.id} value={pe.id}>
+                                            {pe.establecimiento}-{pe.punto_emision} · {pe.nombre}{pe.es_principal ? ' (Principal)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 p-6 pt-2">
+                            <button
+                                onClick={() => { setIsTerminalModalOpen(false); setEditingTerminal(null) }}
+                                className="flex-1 py-3 font-bold bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!editingTerminal?.nombre?.trim()) { alert('Ingresa un nombre para la terminal'); return }
+                                    try {
+                                        setSavingTerminal(true)
+                                        if (editingTerminal.id) {
+                                            const actualizada = await terminalService.actualizar(editingTerminal.id, {
+                                                nombre: editingTerminal.nombre.trim(),
+                                                punto_emision_id: editingTerminal.punto_emision_id || null,
+                                            })
+                                            setTerminales(prev => prev.map(t => t.id === actualizada.id
+                                                ? { ...actualizada, punto_emision: puntosEmision.find(p => p.id === actualizada.punto_emision_id) }
+                                                : t))
+                                        } else {
+                                            const creada = await terminalService.crear(empresa!.id, editingTerminal.nombre.trim(), editingTerminal.punto_emision_id || null)
+                                            setTerminales(prev => [...prev, { ...creada, punto_emision: puntosEmision.find(p => p.id === creada.punto_emision_id) }])
+                                        }
+                                        setIsTerminalModalOpen(false)
+                                        setEditingTerminal(null)
+                                    } catch (e: any) {
+                                        alert('Error al guardar terminal: ' + e.message)
+                                    } finally {
+                                        setSavingTerminal(false)
+                                    }
+                                }}
+                                disabled={savingTerminal || !editingTerminal?.nombre?.trim()}
+                                className="flex-1 py-3 font-bold bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {savingTerminal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div >
     )

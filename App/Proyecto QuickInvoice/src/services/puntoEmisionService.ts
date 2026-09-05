@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import type { PuntoEmision } from '../types/puntosEmision'
-import { getPuntoEmisionDispositivo } from '../lib/dispositivoPuntoEmision'
+import { getPuntoEmisionDispositivo, getTerminalDispositivo } from '../lib/dispositivoPuntoEmision'
+import { terminalService } from './terminalService'
 
 export const puntoEmisionService = {
 
@@ -54,13 +55,41 @@ export const puntoEmisionService = {
         return (data as PuntoEmision) ?? null
     },
 
-    // Punto de emisión con el que factura ESTE dispositivo (asignación guardada
-    // en localStorage desde Configuración). Si no hay asignación, o el punto
-    // guardado ya no es válido/activo, usa el "Principal" de la empresa. Un
-    // error de conexión al consultar NO cae en silencio al "Principal" — se
-    // propaga para que la factura se bloquee y se reintente, en vez de salir
-    // con el punto de emisión (y por lo tanto el secuencial) equivocado.
+    // Punto de emisión con el que factura ESTE dispositivo. Un error de
+    // conexión al consultar NO cae en silencio al "Principal" — se propaga
+    // para que la factura se bloquee y se reintente, en vez de salir con el
+    // punto de emisión (y por lo tanto el secuencial) equivocado.
+    //
+    // Orden de resolución:
+    // 1. Terminal con nombre (tabla facturacion.terminales) — el navegador
+    //    solo recuerda el NOMBRE de esta máquina (ej. "Caja 1"); la
+    //    asignación real vive en el servidor, así un admin puede reasignar
+    //    la serie de una terminal sin tocar la máquina física, y si se borra
+    //    el caché del navegador basta con volver a elegir el mismo nombre.
+    // 2. Asignación legada por localStorage directo (punto_emision_id) —
+    //    compatibilidad con máquinas configuradas antes de que existieran
+    //    las terminales con nombre, para no interrumpirlas.
+    // 3. Principal de la empresa.
     async resolverParaDispositivo(empresaId: string): Promise<PuntoEmision | null> {
+        const nombreTerminal = getTerminalDispositivo(empresaId)
+        if (nombreTerminal) {
+            const terminal = await terminalService.obtenerPorNombre(empresaId, nombreTerminal)
+            if (terminal?.punto_emision_id) {
+                const { data, error } = await supabase
+                    .from('puntos_emision')
+                    .select('*')
+                    .eq('id', terminal.punto_emision_id)
+                    .eq('empresa_id', empresaId)
+                    .eq('activo', true)
+                    .maybeSingle()
+                if (error) throw error
+                if (data) return data as PuntoEmision
+            }
+            // Terminal nombrada pero sin punto de emisión asignado (o el
+            // punto ya no existe/está inactivo) — sigue con el respaldo en
+            // vez de bloquear la facturación de esta máquina.
+        }
+
         const idDispositivo = getPuntoEmisionDispositivo(empresaId)
         if (idDispositivo) {
             const { data, error } = await supabase

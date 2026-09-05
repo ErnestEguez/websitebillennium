@@ -1330,7 +1330,20 @@ export function NuevaCompraInventarioPage() {
                                 <p className="text-xs font-bold text-slate-500 uppercase">Impuestos</p>
                                 <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                                     <input type="checkbox" checked={usarIvaManual}
-                                        onChange={e => setUsarIvaManual(e.target.checked)} />
+                                        onChange={e => {
+                                            const activar = e.target.checked
+                                            setUsarIvaManual(activar)
+                                            // Al activar, precarga las 3 bases con lo ya calculado desde
+                                            // los productos (por su propia tasa) — antes quedaban en 0 si
+                                            // el usuario no las tocaba, y con tasas mixtas (5% y 15% a la
+                                            // vez) el 5% se veía "sin calcular". Así el usuario solo ajusta
+                                            // la que difiera de la factura física del proveedor.
+                                            if (activar) {
+                                                setBaseIva0(baseLineasEnTasa(0))
+                                                setBaseIva5(baseLineasEnTasa(5))
+                                                setBaseIva15(baseLineasEnTasa(15))
+                                            }
+                                        }} />
                                     Ingresar bases manualmente (desde la factura)
                                 </label>
                             </div>

@@ -10,6 +10,7 @@ import { facturacionService } from '../services/facturacionService'
 import { carteraCxcService, type CarteraCxc } from '../services/carteraCxcService'
 import { ventaPaService } from '../services/ventaPaService'
 import { facturaEnVivoService } from '../services/facturaEnVivoService'
+import { proformaService } from '../services/proformaService'
 import {
     facturaDirectaService,
     calcularLinea,
@@ -32,7 +33,7 @@ import {
     Search, UserPlus, Plus, Trash2, X, Save,
     CheckCircle2, Loader2, FilePlus, FileText, CreditCard,
     Package, Printer, User, Briefcase, ChevronDown, ChevronUp,
-    Layers, RotateCw, PaintBucket, Copy, Barcode, Pencil, History,
+    Layers, RotateCw, PaintBucket, Copy, Barcode, Pencil, History, PauseCircle,
 } from 'lucide-react'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { bodegaService } from '../services/bodegaService'
@@ -210,6 +211,7 @@ export function FacturaDirectaPage() {
     const navigate = useNavigate()
     const prepId = searchParams.get('prep_id')
     const draftEnVivoId = searchParams.get('draft_en_vivo')
+    const proformaId = searchParams.get('proforma_id')
     const { empresa, cajaSesion, profile, permisos, isAdmin } = useAuth()
     // Por defecto solo el administrador puede cambiar precios al facturar;
     // la empresa puede activar "permitir_todos_editar_precio" en Ajustes
@@ -359,6 +361,7 @@ export function FacturaDirectaPage() {
 
     // Estado: proceso
     const [saving, setSaving] = useState(false)
+    const [savingProforma, setSavingProforma] = useState(false)
     const [facturaFinal, setFacturaFinal] = useState<any>(null)
     // Capturados en el momento exacto del save para evitar condición de carrera con el ticket
     const [ticketMontoRecibido, setTicketMontoRecibido] = useState<number | undefined>()
@@ -502,6 +505,44 @@ export function FacturaDirectaPage() {
         })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [draftEnVivoId, empresa?.id])
+
+    // Pre-carga desde una Proforma (?proforma_id=<id>) — trae cliente y detalle
+    // aquí mismo, en Nueva Factura, para que la conversión tenga TODAS las
+    // propiedades de una factura normal (retenciones, forma de pago con banco/
+    // cheque, bodega, observación, precios por volumen, etc.) y, sobre todo,
+    // el stock por línea se re-valide contra el inventario actual — no el que
+    // había cuando se creó la proforma. proformaActivaId queda marcado para,
+    // al emitir con éxito, dejar la proforma como "convertida" con referencia
+    // cruzada a la factura resultante.
+    const [proformaActivaId, setProformaActivaId] = useState<string | null>(null)
+    useEffect(() => {
+        if (!proformaId || !empresa?.id) return
+        ;(async () => {
+            try {
+                const prf = await proformaService.getCompleta(proformaId)
+                const cliPrf = clientes.find(c => c.id === prf.cliente_id)
+                    ?? (prf.cliente ? { id: prf.cliente_id, nombre: prf.cliente.nombre, identificacion: prf.cliente.identificacion } : null)
+                if (cliPrf) setSelectedCliente(cliPrf)
+                const detallesPrf: DetalleFacturaDirecta[] = (prf.detalles ?? []).map(d => ({
+                    producto_id:       d.producto_id ?? null,
+                    nombre_producto:   d.nombre_producto,
+                    cantidad:          d.cantidad,
+                    precio_unitario:   d.precio_unitario,
+                    descuento:         d.descuento,
+                    iva_porcentaje:    d.iva_porcentaje,
+                    subproducto_id:    null,
+                    factor_conversion: 1,
+                }))
+                if (detallesPrf.length > 0) setDetalles(detallesPrf)
+                if (prf.vendedor_id) setSelectedVendedorId(prf.vendedor_id)
+                if (prf.observaciones) setObservacionFactura(prf.observaciones)
+                setProformaActivaId(proformaId)
+            } catch (e: any) {
+                alert('No se pudo cargar la proforma: ' + e.message)
+            }
+        })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [proformaId, empresa?.id])
 
     // Búsqueda en servidor con debounce — sin conexión (o si la consulta al
     // servidor falla) busca en el catálogo ya descargado en el dispositivo
@@ -1254,10 +1295,42 @@ export function FacturaDirectaPage() {
                 facturaEnVivoService.marcarEmitida(draftEnVivoActivo, factura.id).catch(console.error)
                 setDraftEnVivoActivo(null)
             }
+            // Si esta factura vino de convertir una Proforma, marcarla como
+            // "convertida" con referencia cruzada a la factura resultante.
+            if (proformaActivaId) {
+                proformaService.marcarConvertida(proformaActivaId, factura.id, factura.secuencial).catch(console.error)
+                setProformaActivaId(null)
+            }
         } catch (e: any) {
             alert('Error al generar factura: ' + e.message)
         } finally {
             setSaving(false)
+        }
+    }
+
+    // ─── DEJAR EN ESPERA: guarda lo ya ingresado como Proforma y limpia el
+    // formulario, para poder atender a otro cliente sin perder los datos del
+    // actual (se retoma después desde /proformas y se convierte a factura). ───
+    const handleGuardarComoProforma = async () => {
+        if (!selectedCliente) return alert('Seleccione un cliente antes de dejarlo en espera')
+        const detallesValidos = detalles.filter(d => d.nombre_producto && d.cantidad > 0 && d.precio_unitario > 0)
+        if (detallesValidos.length === 0) return alert('Agregue al menos un producto o servicio con cantidad y precio')
+
+        try {
+            setSavingProforma(true)
+            const proforma = await proformaService.crear({
+                empresa_id: empresa!.id,
+                cliente_id: selectedCliente.id,
+                detalles: detallesValidos,
+                vendedor_id: selectedVendedorId || null,
+                created_by: profile?.id,
+            })
+            alert(`Guardado como proforma ${proforma.numero}. Puedes retomarlo luego desde "Proforma".`)
+            handleNuevaFactura()
+        } catch (e: any) {
+            alert(`Error al guardar como proforma: ${e.message}`)
+        } finally {
+            setSavingProforma(false)
         }
     }
 
@@ -1371,6 +1444,18 @@ export function FacturaDirectaPage() {
                 </div>
                 <div className="flex items-center gap-2 self-start">
                     <HelpButton pageKey="factura-directa" />
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const hayDatos = !!selectedCliente || detalles.some(d => d.nombre_producto || d.producto_id)
+                            if (hayDatos && !window.confirm('¿Limpiar la factura en pantalla? Se perderá lo que no hayas guardado.')) return
+                            handleNuevaFactura()
+                        }}
+                        title="Limpiar la factura en pantalla (no guarda nada)"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition-colors">
+                        <RotateCw className="w-3.5 h-3.5" />
+                        Limpiar
+                    </button>
                 </div>
 
                 {/* ── Selector Factura / Proforma ── */}
@@ -2373,6 +2458,20 @@ export function FacturaDirectaPage() {
                                 <><Loader2 className="w-5 h-5 animate-spin" /> Procesando...</>
                             ) : (
                                 <><Save className="w-5 h-5" /> Generar Factura</>
+                            )}
+                        </button>
+
+                        {/* Dejar en espera: guarda lo ya ingresado como Proforma y limpia
+                            la pantalla, para atender a otro cliente sin perder estos datos. */}
+                        <button
+                            onClick={handleGuardarComoProforma}
+                            disabled={savingProforma || saving || !selectedCliente || totales.total <= 0}
+                            title="Guarda esta factura como Proforma y limpia la pantalla para atender a otro cliente"
+                            className="w-full bg-white border-2 border-amber-300 text-amber-700 rounded-xl py-3 font-bold text-sm hover:bg-amber-50 flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale transition-all active:scale-95 mt-1">
+                            {savingProforma ? (
+                                <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</>
+                            ) : (
+                                <><PauseCircle className="w-4 h-4" /> Dejar en espera (Proforma)</>
                             )}
                         </button>
                     </div>

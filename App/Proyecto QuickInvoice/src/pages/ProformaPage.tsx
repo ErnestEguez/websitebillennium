@@ -6,26 +6,22 @@ import { preparacionPinturaService } from '../services/preparacionPinturaService
 import { useAuth } from '../contexts/AuthContext'
 import { facturacionService } from '../services/facturacionService'
 import {
-    facturaDirectaService,
     calcularLinea,
     calcularTotalesFactura,
     type DetalleFacturaDirecta,
-    type PagoFactura,
 } from '../services/facturaDirectaService'
 import { proformaService, type Proforma, type EstadoProforma } from '../services/proformaService'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { catalogCacheService } from '../services/catalogCacheService'
 import { supabase } from '../lib/supabase'
-import { cuentasBancariasService } from '../services/finance/bancosService'
 import { precioVolumenService } from '../services/precioVolumenService'
-import type { CuentaBancaria } from '../types/finance'
 import { formatCurrency } from '../lib/utils'
 import { mensajeErrorFuncion } from '../lib/functionsError'
 import {
     FileText, FilePlus, Search, Plus, Trash2, X, Save, Loader2,
     User, Briefcase, Package, ChevronDown, ChevronUp, ArrowLeft,
-    CheckCircle2, RefreshCw, Ban, CreditCard, Eye,
-    FileCheck, AlertCircle, Printer, PaintBucket, Mail,
+    CheckCircle2, RefreshCw, Ban, Eye,
+    FileCheck, Printer, PaintBucket, Mail,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -212,9 +208,9 @@ function generarHtml80mm(
 <meta charset="UTF-8">
 <title>Proforma ${esc(prf.numero)}</title>
 <style>
-  @page{margin:0 2mm 0 10mm;size:80mm auto}
+  @page{margin:0;size:80mm auto}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Courier New',Courier,monospace;font-size:7pt;font-weight:bold;color:#000;width:68mm;padding:0}
+  body{font-family:'Courier New',Courier,monospace;font-size:7pt;font-weight:bold;color:#000;width:76mm;padding:0 2mm}
   .c{text-align:center}
   .r{text-align:right}
   .b{font-weight:bold}
@@ -361,16 +357,6 @@ const DETALLE_VACIO: DetalleFacturaDirecta = {
     factor_conversion: 1,
 }
 
-const METODOS_PAGO: { value: PagoFactura['metodo']; label: string }[] = [
-    { value: 'efectivo',     label: '💵 Efectivo' },
-    { value: 'tarjeta',      label: '💳 Tarjeta D/C' },
-    { value: 'transferencia',label: '🏦 Transferencia' },
-    { value: 'credito',      label: '📄 Crédito' },
-    { value: 'cheque',       label: '✏️ Cheque al día' },
-    { value: 'cheque_fecha', label: '📅 Cheque a fecha' },
-    { value: 'otros',        label: '🔄 Otros' },
-]
-
 const ESTADO_BADGE: Record<EstadoProforma, string> = {
     vigente:    'bg-emerald-50 text-emerald-700 border border-emerald-200',
     convertida: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
@@ -389,7 +375,7 @@ export function ProformaPage() {
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
     const prepId = searchParams.get('prep_id')
-    const { empresa, cajaSesion, permisos } = useAuth()
+    const { empresa, permisos } = useAuth()
 
     // Vista: 'lista' | 'form'
     const [vista, setVista] = useState<'lista' | 'form'>('lista')
@@ -398,7 +384,6 @@ export function ProformaPage() {
     const [clientes, setClientes]       = useState<any[]>([])
     const [_productos, _setProductos]   = useState<any[]>([])
     const [vendedores, setVendedores]   = useState<Vendedor[]>([])
-    const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([])
 
     // ── Lista de proformas ────────────────────────────────────────────────────
     const [proformas, setProformas]     = useState<Proforma[]>([])
@@ -437,14 +422,6 @@ export function ProformaPage() {
     // (solo trae nombre/ruc/logo), se cargan aparte solo para el encabezado
     // del ticket 80mm y el correo.
     const [empresaExtra, setEmpresaExtra] = useState<{ direccion?: string | null; email?: string | null; ciudad?: string | null }>({})
-
-    // ── Modal conversión a factura ────────────────────────────────────────────
-    const [convertModal, setConvertModal] = useState<{ open: boolean; proforma: Proforma | null }>({ open: false, proforma: null })
-    const [pagos,         setPagos]         = useState<PagoFactura[]>([{ metodo: 'efectivo', valor: 0 }])
-    const [montoRecibido, setMontoRecibido] = useState(0)
-    const [diasPlazoCredito, setDiasPlazoCredito] = useState(30)
-    const [converting, setConverting]       = useState(false)
-    const [facturaGenerada, setFacturaGenerada] = useState<{ numero: string; id: string } | null>(null)
 
     // ── Draft — evita perder la digitación al salir a otra área del ERP ────────
     const clearDraft = useFormDraft(
@@ -527,14 +504,10 @@ export function ProformaPage() {
     }, [prepId, empresa?.id])
 
     async function loadDatos() {
-        // Solo carga datos livianos: vendedores y cuentas bancarias.
+        // Solo carga datos livianos: vendedores.
         // Clientes y productos se buscan bajo demanda con BuscadorProducto/buscarClientes.
-        const [vends, cuentas] = await Promise.all([
-            vendedorService.getVendedoresActivos(empresa!.id).catch(() => []),
-            cuentasBancariasService.listar(empresa!.id).catch(() => []),
-        ])
+        const vends = await vendedorService.getVendedoresActivos(empresa!.id).catch(() => [])
         setVendedores(vends)
-        setCuentasBancarias(cuentas.filter((c: CuentaBancaria) => c.estado === 'activa'))
         if (vends.length === 1) setSelectedVendedorId(vends[0].id)
         // Garantizar que el Consumidor Final exista (lo crea si fue eliminado)
         try {
@@ -630,16 +603,6 @@ export function ProformaPage() {
         }
     }
 
-    function handleIniciarConvertir(prf: Proforma) {
-        // Pre-cargar detalles de la proforma
-        const total = prf.total ?? 0
-        setPagos([{ metodo: 'efectivo', valor: total }])
-        setMontoRecibido(total)
-        setDiasPlazoCredito(30)
-        setFacturaGenerada(null)
-        setConvertModal({ open: true, proforma: prf })
-    }
-
     // ─── Formulario: detalles ─────────────────────────────────────────────────
 
     const addLinea    = () => setDetalles(prev => [...prev, { ...DETALLE_VACIO }])
@@ -717,59 +680,6 @@ export function ProformaPage() {
         setVista('form')
     }
 
-    // ─── Modal conversión ─────────────────────────────────────────────────────
-
-    const addPago    = () => setPagos(prev => [...prev, { metodo: 'efectivo', valor: 0 }])
-    const removePago = (i: number) => setPagos(prev => prev.filter((_, j) => j !== i))
-    const updatePago = (i: number, f: keyof PagoFactura, v: any) =>
-        setPagos(prev => prev.map((p, j) => j === i ? { ...p, [f]: v } : p))
-
-    async function handleConvertirAFactura() {
-        const prf = convertModal.proforma
-        if (!prf) return
-        if (!cajaSesion) return alert('No hay caja abierta. Abra caja antes de facturar.')
-
-        const prfCompleta = await proformaService.getCompleta(prf.id)
-        const detallesValidos: DetalleFacturaDirecta[] = (prfCompleta.detalles ?? []).map(d => ({
-            producto_id:      d.producto_id ?? null,
-            nombre_producto:  d.nombre_producto,
-            cantidad:         d.cantidad,
-            precio_unitario:  d.precio_unitario,
-            descuento:        d.descuento,
-            iva_porcentaje:   d.iva_porcentaje,
-            subproducto_id:   null,
-            factor_conversion: 1,
-        }))
-
-        const totales     = calcularTotalesFactura(detallesValidos)
-        const totalPagado = pagos.reduce((s, p) => s + (Number(p.valor) || 0), 0)
-        if (totalPagado < totales.total - 0.01) {
-            return alert(`El monto de pago (${formatCurrency(totalPagado)}) no cubre el total (${formatCurrency(totales.total)}).`)
-        }
-
-        try {
-            setConverting(true)
-            const factura = await facturaDirectaService.generarFacturaDirecta({
-                empresa_id:          empresa!.id,
-                cliente_id:          prf.cliente_id,
-                detalles:            detallesValidos,
-                pagos:               pagos.filter(p => p.valor > 0),
-                caja_sesion_id:      cajaSesion.id,
-                vendedor_id:         prf.vendedor_id ?? null,
-                dias_plazo_credito:  diasPlazoCredito,
-            })
-
-            // Marcar referencia cruzada en ambas tablas
-            await proformaService.marcarConvertida(prf.id, factura.id, factura.secuencial)
-
-            setFacturaGenerada({ id: factura.id, numero: factura.secuencial })
-            await buscarProformas()
-        } catch (e: any) {
-            alert('Error al generar factura: ' + e.message)
-        } finally {
-            setConverting(false)
-        }
-    }
 
     // ─── Impresión ───────────────────────────────────────────────────────────
 
@@ -833,10 +743,6 @@ export function ProformaPage() {
     // ─── Totales del formulario ───────────────────────────────────────────────
 
     const totalesForm    = calcularTotalesFactura(detalles)
-    const totalPagoConv  = pagos.reduce((s, p) => s + (Number(p.valor) || 0), 0)
-    const pendienteConv  = (convertModal.proforma?.total ?? 0) - totalPagoConv
-    const tieneEfectivo  = pagos.some(p => p.metodo === 'efectivo')
-    const vuelto         = tieneEfectivo ? Math.max(0, montoRecibido - (convertModal.proforma?.total ?? 0)) : 0
 
     // filteredClientes reemplazado por clienteResults (server-side)
 
@@ -1005,7 +911,7 @@ export function ProformaPage() {
                                                         {/* Convertir a factura */}
                                                         {prf.estado === 'vigente' && (
                                                             <button
-                                                                onClick={() => handleIniciarConvertir(prf)}
+                                                                onClick={() => navigate(`/nueva-factura?proforma_id=${prf.id}`)}
                                                                 title="Convertir a Factura"
                                                                 className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors">
                                                                 <FileCheck className="w-4 h-4" />
@@ -1072,7 +978,7 @@ export function ProformaPage() {
                             {/* Convertir a Factura (solo si la proforma ya fue guardada y está vigente) */}
                             {proformaEditando?.estado === 'vigente' && (
                                 <button
-                                    onClick={() => handleIniciarConvertir(proformaEditando)}
+                                    onClick={() => navigate(`/nueva-factura?proforma_id=${proformaEditando.id}`)}
                                     className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors">
                                     <FileCheck className="w-4 h-4" />
                                     Convertir a Factura
@@ -1485,7 +1391,7 @@ export function ProformaPage() {
                                     )}
                                     {proformaEditando?.estado === 'vigente' && (
                                         <button
-                                            onClick={() => handleIniciarConvertir(proformaEditando)}
+                                            onClick={() => navigate(`/nueva-factura?proforma_id=${proformaEditando.id}`)}
                                             className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors">
                                             <FileCheck className="w-4 h-4" />
                                             Convertir a Factura
@@ -1592,219 +1498,6 @@ export function ProformaPage() {
                 </div>
             )}
 
-            {/* ══════════════════════════════════════════════════════════ */}
-            {/* MODAL: CONVERTIR A FACTURA                                */}
-            {/* ══════════════════════════════════════════════════════════ */}
-            {convertModal.open && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-                        {/* Header del modal */}
-                        <div className="flex items-center justify-between p-5 border-b border-slate-100">
-                            <div>
-                                <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                                    <FileCheck className="w-5 h-5 text-emerald-600" />
-                                    Convertir a Factura
-                                </h3>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                    Proforma {convertModal.proforma?.numero}  · Total {formatCurrency(convertModal.proforma?.total ?? 0)}
-                                </p>
-                            </div>
-                            {!facturaGenerada && (
-                                <button onClick={() => setConvertModal({ open: false, proforma: null })}
-                                    className="text-slate-400 hover:text-slate-600">
-                                    <X className="w-5 h-5" />
-                                </button>
-                            )}
-                        </div>
-
-                        {facturaGenerada ? (
-                            /* ── Éxito ── */
-                            <div className="p-6 text-center space-y-4">
-                                <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto" />
-                                <div>
-                                    <p className="font-bold text-slate-900 text-lg">¡Factura generada!</p>
-                                    <p className="text-sm text-slate-500 mt-1">
-                                        N.º <span className="font-mono font-bold text-indigo-700">{facturaGenerada.numero}</span>
-                                    </p>
-                                    <p className="text-xs text-slate-400 mt-2">
-                                        La proforma quedó marcada como "Convertida" con referencia a esta factura.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => { setConvertModal({ open: false, proforma: null }); setVista('lista') }}
-                                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm">
-                                    Cerrar y volver a lista
-                                </button>
-                            </div>
-                        ) : (
-                            /* ── Formulario de pago ── */
-                            <div className="p-5 space-y-4">
-                                {!cajaSesion && (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2 text-sm text-amber-700">
-                                        <AlertCircle className="w-4 h-4 shrink-0" />
-                                        No hay caja abierta. Abra caja antes de facturar.
-                                    </div>
-                                )}
-
-                                {/* Pagos */}
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="text-sm font-bold text-slate-700">Forma de pago</h4>
-                                        <button onClick={addPago}
-                                            className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-                                            <Plus className="w-3 h-3" /> Agregar
-                                        </button>
-                                    </div>
-                                    {pagos.map((pago, i) => (
-                                        <div key={i} className="space-y-1.5">
-                                            <div className="flex gap-2 items-center">
-                                                <select
-                                                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-                                                    value={pago.metodo}
-                                                    onChange={e => updatePago(i, 'metodo', e.target.value as any)}>
-                                                    {METODOS_PAGO.map(m => (
-                                                        <option key={m.value} value={m.value}>{m.label}</option>
-                                                    ))}
-                                                </select>
-                                                <input type="number" min="0" step="0.01"
-                                                    className="w-28 px-3 py-2 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-emerald-400"
-                                                    value={pago.valor}
-                                                    onChange={e => updatePago(i, 'valor', parseFloat(e.target.value) || 0)} />
-                                                {pagos.length > 1 && (
-                                                    <button onClick={() => removePago(i)}
-                                                        className="text-slate-300 hover:text-red-500 transition-colors">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {/* Cuenta bancaria destino — solo transferencia */}
-                                            {pago.metodo === 'transferencia' && (
-                                                <select
-                                                    className="w-full px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-xs outline-none focus:ring-2 focus:ring-blue-400 text-blue-900"
-                                                    value={pago.cuenta_bancaria_id ?? ''}
-                                                    onChange={e => {
-                                                        const cb = cuentasBancarias.find(c => c.id === e.target.value)
-                                                        const label = cb ? `${cb.banco?.nombre ?? ''} — ${cb.numero_cuenta}` : ''
-                                                        updatePago(i, 'cuenta_bancaria_id', e.target.value || null)
-                                                        updatePago(i, 'cuenta_bancaria_contable_id', cb?.cuenta_contable_id ?? null)
-                                                        updatePago(i, 'referencia', label || pago.referencia || '')
-                                                    }}
-                                                >
-                                                    <option value="">🏦 Cuenta bancaria destino…</option>
-                                                    {cuentasBancarias.map(cb => (
-                                                        <option key={cb.id} value={cb.id}>
-                                                            {cb.banco?.nombre} — {cb.numero_cuenta}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            )}
-                                            {/* Referencia / N° cheque */}
-                                            {(pago.metodo === 'cheque' || pago.metodo === 'cheque_fecha' || pago.metodo === 'tarjeta') && (
-                                                <input type="text"
-                                                    placeholder={pago.metodo === 'tarjeta' ? 'Últimos 4 dígitos…' : 'N° de cheque…'}
-                                                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-                                                    value={pago.referencia ?? ''}
-                                                    onChange={e => updatePago(i, 'referencia', e.target.value)}
-                                                />
-                                            )}
-                                            {/* Transferencia: N° de comprobante y observaciones */}
-                                            {pago.metodo === 'transferencia' && (
-                                                <div className="grid grid-cols-2 gap-1.5">
-                                                    <input type="text"
-                                                        placeholder="N° comprobante transferencia"
-                                                        className="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-xs outline-none focus:ring-2 focus:ring-blue-400 text-blue-900"
-                                                        value={pago.numero_documento ?? ''}
-                                                        onChange={e => updatePago(i, 'numero_documento', e.target.value || null)}
-                                                    />
-                                                    <input type="text"
-                                                        placeholder="Observaciones"
-                                                        className="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-xs outline-none focus:ring-2 focus:ring-blue-400 text-blue-900"
-                                                        value={pago.observaciones ?? ''}
-                                                        onChange={e => updatePago(i, 'observaciones', e.target.value || null)}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Crédito: plazo */}
-                                {pagos.some(p => p.metodo === 'credito') && (
-                                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
-                                        <CreditCard className="w-4 h-4 text-amber-600 shrink-0" />
-                                        <label className="text-sm font-bold text-amber-800 whitespace-nowrap">Plazo crédito</label>
-                                        <select
-                                            className="flex-1 px-3 py-2 rounded-lg border border-amber-200 text-sm bg-white outline-none focus:ring-2 focus:ring-amber-400"
-                                            value={diasPlazoCredito}
-                                            onChange={e => setDiasPlazoCredito(Number(e.target.value))}>
-                                            {[15, 30, 45, 60, 90, 120].map(d => (
-                                                <option key={d} value={d}>{d} días</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-
-                                {/* Efectivo: monto recibido y vuelto */}
-                                {tieneEfectivo && (
-                                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <label className="text-sm text-slate-600 font-medium whitespace-nowrap">Recibido en efectivo</label>
-                                            <input type="number" min="0" step="0.01"
-                                                className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-right outline-none"
-                                                value={montoRecibido}
-                                                onChange={e => setMontoRecibido(parseFloat(e.target.value) || 0)} />
-                                        </div>
-                                        {vuelto > 0 && (
-                                            <div className="flex justify-between text-sm font-bold text-emerald-700">
-                                                <span>Vuelto</span>
-                                                <span>{formatCurrency(vuelto)}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Resumen totales modal */}
-                                <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 text-sm">
-                                    <div className="flex justify-between text-slate-600">
-                                        <span>Total proforma</span>
-                                        <span className="font-bold">{formatCurrency(convertModal.proforma?.total ?? 0)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-slate-600">
-                                        <span>Total pagado</span>
-                                        <span className={cn('font-bold', pendienteConv > 0.01 ? 'text-red-600' : 'text-emerald-600')}>
-                                            {formatCurrency(totalPagoConv)}
-                                        </span>
-                                    </div>
-                                    {pendienteConv > 0.01 && (
-                                        <div className="flex justify-between text-red-600 font-bold">
-                                            <span>Pendiente</span>
-                                            <span>{formatCurrency(pendienteConv)}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Acciones */}
-                                <div className="flex gap-2 pt-1">
-                                    <button
-                                        onClick={() => setConvertModal({ open: false, proforma: null })}
-                                        className="flex-1 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold hover:bg-slate-50">
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        onClick={handleConvertirAFactura}
-                                        disabled={converting || !cajaSesion || pendienteConv > 0.01}
-                                        className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60">
-                                        {converting
-                                            ? <Loader2 className="w-4 h-4 animate-spin" />
-                                            : <FileCheck className="w-4 h-4" />}
-                                        Generar Factura
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
