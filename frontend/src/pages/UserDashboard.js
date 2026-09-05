@@ -54,7 +54,7 @@ const productConfig = {
     description: 'Protección de datos personales'
   },
   facturacion: {
-    name: 'ERP Billennium',
+    name: 'Corina ERP',
     icon: Building2,
     color: 'bg-blue-50 text-blue-700',
     url: 'https://websitebillennium-quickinvoice.vercel.app/',
