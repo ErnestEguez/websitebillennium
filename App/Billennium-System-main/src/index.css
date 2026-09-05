@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* El "ojito" para revelar la contraseña no es de esta app — es el botón
+   nativo que Edge/Chromium agrega a inputs type="password". Se oculta
+   con estos pseudo-elementos (::-ms-reveal es específico de Edge). */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+    display: none;
+}
