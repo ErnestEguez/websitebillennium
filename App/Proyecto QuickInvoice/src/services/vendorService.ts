@@ -286,9 +286,15 @@ export const compraService = {
         // 3. Kardex ENTRADA — usa kardexService para actualizar stock_bodega correctamente.
         // costo_unitario es el precio bruto de la factura; el costo que entra al
         // Kardex/costo promedio es el NETO (descontado el descuento de la línea).
+        // Preferir d.subtotal (el neto real ya calculado/redondeado en la página,
+        // exacto incluso cuando la línea se digitó por "Total") en vez de volver a
+        // derivarlo de cantidad × costo_unitario: costo_unitario ahí es un valor
+        // redondeado a 4 decimales solo de referencia, y recalcular con él amplifica
+        // el error de redondeo en cantidades grandes (mismo bug ya corregido en la
+        // UI — ver bruto_manual en NuevaCompraInventarioPage.tsx).
         for (const d of detalle) {
             const costoNeto = d.cantidad > 0
-                ? (d.cantidad * d.costo_unitario - (d.descuento ?? 0)) / d.cantidad
+                ? (d.subtotal ?? (d.cantidad * d.costo_unitario - (d.descuento ?? 0))) / d.cantidad
                 : d.costo_unitario
             await kardexService.registrarMovimiento({
                 empresa_id:           cabecera.empresa_id,

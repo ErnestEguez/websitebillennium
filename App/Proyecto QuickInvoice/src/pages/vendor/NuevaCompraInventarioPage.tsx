@@ -47,6 +47,14 @@ interface LineaDetalle {
     nombre: string
     cantidad: number
     costo_unitario: number
+    // Bruto EXACTO (sin redondear) cuando la línea se digitó por "Total" en vez de
+    // por Costo Unitario — ver setCostoDesdeTotal. costo_unitario ahí es un valor
+    // redondeado a 4 decimales solo para mostrar/guardar como referencia; si
+    // lineaNeta() recalculara el bruto como cantidad × costo_unitario redondeado,
+    // el error de redondeo se amplifica con cantidades grandes (millar, docena,
+    // etc.) y el total de la factura deja de cuadrar con el físico. Se limpia
+    // apenas el usuario edita Cantidad o Costo Unitario a mano (ver updLinea).
+    bruto_manual?: number
     descuento_porcentaje?: number
     descuento_valor?: number  // descuento directo en $ — mutuamente excluyente con descuento_porcentaje
     iva_porcentaje?: number
@@ -69,7 +77,7 @@ interface LineaDetalle {
 // descuento_valor (directo en $) y descuento_porcentaje son mutuamente excluyentes:
 // si hay valor directo, tiene prioridad sobre el %.
 function lineaNeta(d: LineaDetalle) {
-    const bruto = d.cantidad * d.costo_unitario
+    const bruto = d.bruto_manual ?? (d.cantidad * d.costo_unitario)
     const valorDirecto = d.descuento_valor ?? 0
     const montoDescuento = valorDirecto > 0
         ? Math.min(Math.round(valorDirecto * 100) / 100, bruto)
@@ -544,6 +552,12 @@ export function NuevaCompraInventarioPage() {
                 next = { ...d, descuento_valor: val as number, descuento_porcentaje: 0 }
             } else {
                 next = { ...d, [campo]: val }
+                // Si el usuario toca Cantidad o Costo Unitario a mano, ya no
+                // confiar en el Total exacto que se había digitado antes —
+                // vuelve a mandar cantidad × costo_unitario (ver lineaNeta).
+                if (campo === 'cantidad' || campo === 'costo_unitario') {
+                    next.bruto_manual = undefined
+                }
             }
             if (empresa?.actualizar_precio_venta_compra && !next.precio_venta_manual
                 && (campo === 'producto_id' || CAMPOS_RECALCULAN_PRECIO.includes(campo))) {
@@ -591,7 +605,10 @@ export function NuevaCompraInventarioPage() {
             const bruto = valDesc > 0
                 ? totalNeto + valDesc
                 : pctDesc > 0 ? totalNeto / (1 - pctDesc / 100) : totalNeto
-            const next = { ...d, costo_unitario: Math.round((bruto / d.cantidad) * 10000) / 10000 }
+            // bruto_manual guarda el valor EXACTO (sin redondear) para que el
+            // subtotal de la línea cuadre siempre con lo digitado, sin importar
+            // cuántos decimales tenga cantidad/costo_unitario de por medio.
+            const next = { ...d, costo_unitario: Math.round((bruto / d.cantidad) * 10000) / 10000, bruto_manual: bruto }
             // Mismo recálculo de precio sugerido que updLinea — esta función cambia
             // costo_unitario por su cuenta (no pasa por updLinea), así que hay que
             // repetirlo aquí o el toggle de precio automático no reacciona al
