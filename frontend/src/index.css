@@ -117,3 +117,13 @@ code {
     border-bottom-color: inherit;
   }
 }
+
+/* El "ojito" para revelar la contraseña no es de esta app — es el botón
+   nativo que Edge/Chromium agrega solo a inputs type="password". El login
+   (Login.js) ya tiene su propio ícono de mostrar/ocultar, así que el nativo
+   queda duplicado encima; se oculta con estos pseudo-elementos
+   (::-ms-reveal es específico de Edge). */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
