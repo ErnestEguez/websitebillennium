@@ -20,7 +20,7 @@ import { mensajeErrorFuncion } from '../lib/functionsError'
 import {
     FileText, FilePlus, Search, Plus, Trash2, X, Save, Loader2,
     User, Briefcase, Package, ChevronDown, ChevronUp, ArrowLeft,
-    CheckCircle2, RefreshCw, Ban, Eye,
+    CheckCircle2, RefreshCw, Ban, Eye, RotateCw,
     FileCheck, Printer, PaintBucket, Mail,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
@@ -210,7 +210,7 @@ function generarHtml80mm(
 <style>
   @page{margin:0;size:80mm auto}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Courier New',Courier,monospace;font-size:7pt;font-weight:bold;color:#000;width:76mm;padding:0 2mm}
+  body{font-family:'Courier New',Courier,monospace;font-size:7pt;font-weight:bold;color:#000;width:64mm;padding:0}
   .c{text-align:center}
   .r{text-align:right}
   .b{font-weight:bold}
@@ -764,6 +764,20 @@ export function ProformaPage() {
                 </div>
                 <div className="flex items-center gap-2 self-start">
                     <HelpButton pageKey="proformas" />
+                    {vista === 'form' && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const hayDatos = !!selectedCliente || detalles.some(d => d.nombre_producto || d.producto_id) || !!proformaEditando
+                                if (hayDatos && !window.confirm('¿Limpiar la proforma en pantalla? Se perderá lo que no hayas guardado.')) return
+                                handleNuevaProforma()
+                            }}
+                            title="Limpiar la proforma en pantalla (no guarda nada)"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition-colors">
+                            <RotateCw className="w-3.5 h-3.5" />
+                            Limpiar
+                        </button>
+                    )}
                 </div>
 
                 {/* Toggle Factura / Proforma */}
