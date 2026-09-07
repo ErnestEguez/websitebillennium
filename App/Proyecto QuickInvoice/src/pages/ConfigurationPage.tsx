@@ -424,10 +424,14 @@ export function ConfigurationPage() {
                 usar_vendor_management: !!editingEmpresa.usar_vendor_management,
                 config_sri: {
                     // Preserva TODOS los campos existentes (mail_host, mail_port, mail_pass,
-                    // mail_ssl, mail_cc, y cualquier campo futuro que este formulario no
-                    // gestione explícitamente) — antes se reconstruía el objeto desde cero
-                    // con una lista fija de campos, borrando silenciosamente el resto.
-                    ...(editingEmpresa.config_sri || {}),
+                    // mail_ssl, mail_cc, impresion_pos, y cualquier campo futuro que este
+                    // formulario no gestione explícitamente) — antes se reconstruía el objeto
+                    // desde cero con una lista fija de campos, borrando silenciosamente el
+                    // resto. Se parte de configSriAntes (lectura fresca de la BD hecha arriba),
+                    // no de editingEmpresa.config_sri (copia en memoria desde que se abrió el
+                    // modal, que puede estar desactualizada si algo más — ej. el modal de
+                    // impresión de ticket — guardó cambios en config_sri mientras tanto).
+                    ...(configSriAntes || {}),
                     ambiente: editingEmpresa.config_sri?.ambiente || 'PRUEBAS',
                     establecimiento: editingEmpresa.config_sri?.establecimiento || '001',
                     punto_emision: editingEmpresa.config_sri?.punto_emision || '001',
@@ -545,7 +549,25 @@ export function ConfigurationPage() {
             const { data: empresaAntes } = await supabase
                 .from('empresas').select('config_sri').eq('id', empresa!.id).single()
             const configSriAntes = empresaAntes?.config_sri ?? null
-            const configSriNuevo = companyData.config_sri || {}
+            // OJO: no reemplazar config_sri entero con companyData.config_sri —
+            // esa es una copia en memoria cargada cuando se abrió la página, y
+            // queda desactualizada si mientras tanto se guardó algo por otro
+            // lado (ej. el modal de "Configurar impresión de ticket", que
+            // escribe config_sri.impresion_pos directo a la BD sin refrescar
+            // este estado). Reemplazarlo entero borraba en silencio esos
+            // campos ajenos a este formulario. Se parte de la lectura fresca
+            // (configSriAntes) y se pisan encima solo los campos que esta
+            // pestaña realmente edita.
+            const configSriNuevo = {
+                ...(configSriAntes || {}),
+                establecimiento:  companyData.config_sri?.establecimiento,
+                punto_emision:    companyData.config_sri?.punto_emision,
+                ambiente:         companyData.config_sri?.ambiente,
+                firma_path:       companyData.config_sri?.firma_path,
+                firma_url:        companyData.config_sri?.firma_url,
+                firma_password:   companyData.config_sri?.firma_password,
+                copias_pos_nc:    companyData.config_sri?.copias_pos_nc,
+            }
 
             const { error } = await supabase
                 .from('empresas')
