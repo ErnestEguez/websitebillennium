@@ -585,10 +585,11 @@ export const retencionService = {
     // texto de las últimas 200 retenciones de compras guardadas — como casi
     // ninguna seguía el formato exacto esperado, sugería números muy por
     // debajo del talonario real (ej. "2" cuando el contador real iba en 3938).
-    // Este número sigue siendo solo una SUGERENCIA editable por el usuario;
-    // nada lo incrementa automáticamente al grabar la compra (a diferencia de
-    // Factura/Nota de Crédito) — el contador en Configuración se sigue
-    // subiendo a mano después de usar cada retención.
+    // Este número es solo una SUGERENCIA para mostrar en pantalla ANTES de
+    // grabar — no reserva nada. Si dos compras se están digitando a la vez
+    // pueden ver la misma sugerencia (pasó en producción: dos compras
+    // mostraron/grabaron "001-001-000003939"). El número que de verdad se
+    // graba se obtiene con confirmarNumero() justo al guardar.
     async siguienteNumero(empresaId: string): Promise<string> {
         const principal = await puntoEmisionService.getPrincipal(empresaId)
         if (principal) {
@@ -612,6 +613,21 @@ export const retencionService = {
             }
         })
         return `001-001-${String(maxSeq + 1).padStart(9, '0')}`
+    },
+
+    // Número REAL — se debe llamar una sola vez, justo al grabar la compra
+    // (nunca antes, para no reservar un número que después no se use). Usa
+    // qi_next_secuencial_punto, el mismo RPC atómico (FOR UPDATE) con el que
+    // Factura/Nota de Crédito/Guía de Remisión generan su secuencial, así que
+    // dos compras grabándose al mismo tiempo nunca pueden recibir el mismo
+    // número de retención.
+    async confirmarNumero(empresaId: string): Promise<string> {
+        const principal = await puntoEmisionService.getPrincipal(empresaId)
+        if (!principal) {
+            throw new Error('No hay un punto de emisión Principal configurado para generar el número de retención.')
+        }
+        const siguiente = await puntoEmisionService.siguienteSecuencial(principal.id, 'RETENCION')
+        return `${principal.establecimiento}-${principal.punto_emision}-${String(siguiente).padStart(9, '0')}`
     },
 }
 

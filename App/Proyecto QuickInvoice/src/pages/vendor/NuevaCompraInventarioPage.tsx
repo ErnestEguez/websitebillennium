@@ -759,12 +759,30 @@ export function NuevaCompraInventarioPage() {
                 return { ...r, base, valor }
             })
 
+            // El número mostrado en pantalla (numeroRetencion) es solo una SUGERENCIA
+            // (retencionService.siguienteNumero) — si dos compras se graban casi al
+            // mismo tiempo, ambas pueden ver la misma sugerencia y duplicar el
+            // número (pasó en producción: dos compras con 001-001-000003939). Justo
+            // antes de grabar, se pide el número REAL de forma atómica (con lock en
+            // la base, qi_next_secuencial_punto) para que esto ya no pueda repetirse.
+            const hayRetenciones = retsConBase.some(r => r.codigo)
+            let numeroRetencionFinal = numeroRetencion || undefined
+            if (hayRetenciones) {
+                try {
+                    numeroRetencionFinal = await retencionService.confirmarNumero(empresa!.id)
+                    setNumeroRetencion(numeroRetencionFinal)
+                } catch (e: any) {
+                    alert(`No se pudo generar el número de retención: ${e.message}`)
+                    return
+                }
+            }
+
             const retsParaGuardar = retsConBase
                 .filter(r => r.codigo)
                 .map(r => ({
                     empresa_id:       empresa!.id,
                     proveedor_id:     proveedorId,
-                    numero_retencion: numeroRetencion || undefined,
+                    numero_retencion: numeroRetencionFinal,
                     fecha_emision:    HOY,
                     tipo:             r.tipo,
                     codigo_retencion: r.codigo,
