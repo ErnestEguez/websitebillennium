@@ -34,13 +34,21 @@ function calcularDetallesNC(items: ItemNC[]): NCDetalle[] {
     return items
         .filter(i => i.incluir && i.cantidadNC > 0)
         .map(i => {
-            const cantidad        = r2(i.cantidadNC)
+            const cantidad          = r2(i.cantidadNC)
+            const cantidadOriginal  = Number(i.detalle.cantidad)
+            // ⚠️ No recalcular desde precio_unitario × cantidad: precio_unitario es un
+            // valor derivado (subtotal/cantidad) redondeado a 2 decimales para mostrar,
+            // no la fuente de verdad — con cantidades grandes ese redondeo se amplifica
+            // en dólares reales (ver caso factura 001-005-000016194). Se escala el
+            // subtotal/iva_valor REALES guardados en la línea original, proporcional a
+            // la cantidad devuelta (proporción = 1 en una devolución total).
+            const proporcion      = cantidadOriginal > 0 ? cantidad / cantidadOriginal : 0
+            const subtotal        = r2(Number(i.detalle.subtotal) * proporcion)
+            const iva_porcentaje  = Number(i.detalle.iva_porcentaje || 0)
+            const iva_valor       = r2(Number(i.detalle.iva_valor) * proporcion)
+            const total_linea     = r2(subtotal + iva_valor)
             const precioUnit      = r2(Number(i.detalle.precio_unitario))
             const descPct         = Number(i.detalle.descuento || 0)
-            const subtotal        = r2(precioUnit * cantidad * (1 - descPct / 100))
-            const iva_porcentaje  = Number(i.detalle.iva_porcentaje || 0)
-            const iva_valor       = r2(subtotal * iva_porcentaje / 100)
-            const total_linea     = r2(subtotal + iva_valor)
             return {
                 producto_id:     i.detalle.producto_id,
                 nombre_producto: i.detalle.nombre_producto,
@@ -481,8 +489,9 @@ ${cuerpoRepetido}
                                         {items.map((item, idx) => {
                                             const cantNC      = item.cantidadNC
                                             const agotado     = item.maxDisponible <= 0
-                                            const sub         = r2(item.detalle.precio_unitario * cantNC * (1 - (item.detalle.descuento || 0) / 100))
-                                            const iva         = r2(sub * (item.detalle.iva_porcentaje || 0) / 100)
+                                            const proporcion  = Number(item.detalle.cantidad) > 0 ? cantNC / Number(item.detalle.cantidad) : 0
+                                            const sub         = r2(Number(item.detalle.subtotal) * proporcion)
+                                            const iva         = r2(Number(item.detalle.iva_valor) * proporcion)
                                             const esParcial   = item.incluir && cantNC > 0 && cantNC < item.maxDisponible
                                             const yaDevuelta  = r2(Number(item.detalle.cantidad) - item.maxDisponible)
                                             return (
