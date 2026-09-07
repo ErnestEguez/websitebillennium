@@ -5,6 +5,7 @@
 import { supabase } from '../lib/supabase'
 import { kardexService } from './kardexService'
 import { auditService } from './auditoria/auditService'
+import { puntoEmisionService } from './puntoEmisionService'
 import type {
     Proveedor, Compra, CompraConDetalle,
     DetalleInventario, DetalleServicio,
@@ -577,7 +578,24 @@ export const ocService = {
 // ── Retenciones ──────────────────────────────────────────────
 
 export const retencionService = {
+    // Sugerencia de siguiente número de retención — se lee del contador real
+    // (puntos_emision.secuenciales.RETENCION del punto de emisión Principal,
+    // visible en Configuración → Terminales como "Sec. Retención"). Antes
+    // ignoraba ese contador y adivinaba el siguiente número escaneando el
+    // texto de las últimas 200 retenciones de compras guardadas — como casi
+    // ninguna seguía el formato exacto esperado, sugería números muy por
+    // debajo del talonario real (ej. "2" cuando el contador real iba en 3938).
+    // Este número sigue siendo solo una SUGERENCIA editable por el usuario;
+    // nada lo incrementa automáticamente al grabar la compra (a diferencia de
+    // Factura/Nota de Crédito) — el contador en Configuración se sigue
+    // subiendo a mano después de usar cada retención.
     async siguienteNumero(empresaId: string): Promise<string> {
+        const principal = await puntoEmisionService.getPrincipal(empresaId)
+        if (principal) {
+            const siguiente = (principal.secuenciales?.RETENCION ?? 0) + 1
+            return `${principal.establecimiento}-${principal.punto_emision}-${String(siguiente).padStart(9, '0')}`
+        }
+        // Fallback (empresa sin punto de emisión Principal configurado) — comportamiento previo.
         const { data } = await supabase
             .from('retenciones_compras')
             .select('numero_retencion')
