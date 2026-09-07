@@ -58,8 +58,10 @@ SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://dummy.supabase.co')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', 'dummy-key')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# JWT Configuration
-JWT_SECRET = os.environ.get('JWT_SECRET', 'billennium-secret-key-2024-ecuador')
+# JWT Configuration — sin valor por defecto: si falta la variable de entorno,
+# la función debe fallar al arrancar, no facturar tokens con un secreto
+# adivinable/commiteado en el repo.
+JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
@@ -1137,19 +1139,6 @@ APP_URLS = {
     "restoflow":        os.environ.get("RESTOFLOW_APP_URL",     "https://websitebillennium-restaurantes.vercel.app/"),
     "finance":          os.environ.get("FINANCE_APP_URL",       "https://websitebillennium-finance.vercel.app/"),
 }
-
-@api_router.get("/debug/env")
-def debug_env():
-    """Endpoint temporal de diagnóstico — eliminar después de verificar."""
-    return {
-        "PEDIDOS_APP_URL": os.environ.get("PEDIDOS_APP_URL", "NO CONFIGURADA"),
-        "PEDIDOS_APP_URL_resolved": APP_URLS.get("sentinel"),
-        "IMPORTACIONES_APP_URL": os.environ.get("IMPORTACIONES_APP_URL", "NO CONFIGURADA - usando fallback"),
-        "IMPORTACIONES_APP_URL_resolved": APP_URLS.get("importaciones"),
-        "SUPABASE_URL_set": bool(os.environ.get("SUPABASE_URL")),
-        "SUPABASE_KEY_set": bool(os.environ.get("SUPABASE_KEY")),
-        "JWT_SECRET_set": bool(os.environ.get("JWT_SECRET")),
-    }
 
 @api_router.get("/auth/app-token")
 def get_app_token(
