@@ -68,10 +68,16 @@ JWT_EXPIRATION_HOURS = 24
 # Create the main app
 app = FastAPI(title="Billennium System API", redirect_slashes=False)
 
-# Configure CORS
+# Configure CORS — restringido al dominio del Portal. Confirmado revisando
+# todas las Apps del repo: ninguna otra llama a esta API cruzando origen
+# (Pedidos Billennium usa su propio proxy de mismo-origen /portal-api).
+PORTAL_ORIGINS = [
+    "https://www.billenniumsystem.com",
+    "https://billenniumsystem.com",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust this to specific domains in production if needed
+    allow_origins=PORTAL_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1646,14 +1652,6 @@ def robots():
 # ============== APP SETUP ==============
 
 app.include_router(api_router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Configure logging
 logging.basicConfig(
