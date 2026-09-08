@@ -603,11 +603,17 @@ export function FacturaDirectaPage() {
                 setSelectedBodegaId(principal.id)
             }
 
-            // Consumidor final: garantizar que exista (lo crea automáticamente si fue eliminado)
+            // Consumidor final: garantizar que exista (lo crea automáticamente si fue eliminado).
+            // Si se viene de una Proforma (?proforma_id=), NO pisar el cliente —
+            // ese otro efecto (más abajo) carga el cliente real de la proforma, y
+            // como ambos son async corriendo en paralelo, cuál termina último es
+            // impredecible: loadData() aquí hace 7 consultas + este await extra,
+            // así que casi siempre terminaba después y reemplazaba en silencio al
+            // cliente real por "Consumidor Final" en la factura resultante.
             const consumidor = isOnline
                 ? await facturacionService.ensureConsumidorFinal(empresa!.id)
                 : (clientsList.find((c: any) => c.identificacion === '9999999999999') ?? null)
-            if (consumidor) setSelectedCliente(consumidor)
+            if (consumidor && !proformaId) setSelectedCliente(consumidor)
         } catch (e) {
             console.error('Error cargando datos:', e)
         }

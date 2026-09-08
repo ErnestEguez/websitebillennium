@@ -4,7 +4,8 @@ import { HelpButton } from '../components/help/HelpButton'
 import { useFormDraft } from '../hooks/useFormDraft'
 import { preparacionPinturaService } from '../services/preparacionPinturaService'
 import { useAuth } from '../contexts/AuthContext'
-import { facturacionService } from '../services/facturacionService'
+import { facturacionService, IMPRESION_POS_DEFAULTS, type SriConfig } from '../services/facturacionService'
+import { ConfigImpresionTicketModal } from '../components/ConfigImpresionTicketModal'
 import {
     calcularLinea,
     calcularTotalesFactura,
@@ -21,7 +22,7 @@ import {
     FileText, FilePlus, Search, Plus, Trash2, X, Save, Loader2,
     User, Briefcase, Package, ChevronDown, ChevronUp, ArrowLeft,
     CheckCircle2, RefreshCw, Ban, Eye, RotateCw,
-    FileCheck, Printer, PaintBucket, Mail,
+    FileCheck, Printer, PaintBucket, Mail, Settings,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -185,7 +186,17 @@ interface EmpresaTicket {
 function generarHtml80mm(
     prf: Proforma,
     emp: EmpresaTicket,
+    configImpresion?: SriConfig['impresion_pos'],
 ): string {
+    // Mismos 4 ajustes que ya existen para Factura (Configuración → ajustes de
+    // impresión de ticket), antes ignorados por completo aquí — el ticket
+    // salía siempre con ancho/margen/escala fijos sin importar qué impresora
+    // física lo recibiera, y por eso variaba de una máquina a otra.
+    const config = { ...IMPRESION_POS_DEFAULTS, ...(configImpresion ?? {}) }
+    const anchoContenido = config.ancho_papel_mm - config.margen_horizontal_mm * 2
+    const lineasFinal = config.lineas_avance_final > 0
+        ? '<p>&nbsp;</p>'.repeat(config.lineas_avance_final)
+        : ''
     const fecha = new Date(prf.created_at).toLocaleDateString('es-EC')
     const detalles = prf.detalles ?? []
     const logoHtml = emp.logo_url
@@ -208,9 +219,10 @@ function generarHtml80mm(
 <meta charset="UTF-8">
 <title>Proforma ${esc(prf.numero)}</title>
 <style>
-  @page{margin:0;size:80mm auto}
+  @page{margin:0;size:${config.ancho_papel_mm}mm auto}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Courier New',Courier,monospace;font-size:7pt;font-weight:bold;color:#000;width:64mm;padding:0}
+  body{font-family:'Courier New',Courier,monospace;font-size:7pt;font-weight:bold;color:#000;width:${anchoContenido}mm;padding:0}
+  @media print{body{zoom:${config.escala_pct}%}}
   .c{text-align:center}
   .r{text-align:right}
   .b{font-weight:bold}
@@ -267,6 +279,7 @@ ${prf.observaciones ? `<hr class="sep"><div style="font-size:6.5pt"><span class=
 <hr class="sep">
 <div class="c" style="font-size:6.5pt">Cotización sin validez tributaria</div>
 <div class="c" style="font-size:6.5pt">${new Date().toLocaleDateString('es-EC')}</div>
+${lineasFinal}
 </body>
 </html>`
 }
@@ -418,10 +431,12 @@ export function ProformaPage() {
     const [printModal, setPrintModal] = useState<{ open: boolean; proforma: Proforma | null }>({ open: false, proforma: null })
     const [printLoading, setPrintLoading] = useState(false)
     const [enviandoCorreoProforma, setEnviandoCorreoProforma] = useState(false)
-    // Dirección/email/ciudad de la empresa — no vienen en el contexto de auth
-    // (solo trae nombre/ruc/logo), se cargan aparte solo para el encabezado
-    // del ticket 80mm y el correo.
-    const [empresaExtra, setEmpresaExtra] = useState<{ direccion?: string | null; email?: string | null; ciudad?: string | null }>({})
+    const [isImpresionModalOpen, setIsImpresionModalOpen] = useState(false)
+    // Dirección/email/ciudad/config_sri de la empresa — no vienen en el
+    // contexto de auth (solo trae nombre/ruc/logo), se cargan aparte para el
+    // encabezado del ticket 80mm, el correo, y los ajustes de impresión
+    // (ancho/margen/escala/líneas finales — los mismos que usa Factura).
+    const [empresaExtra, setEmpresaExtra] = useState<{ direccion?: string | null; email?: string | null; ciudad?: string | null; config_sri?: SriConfig }>({})
 
     // ── Draft — evita perder la digitación al salir a otra área del ERP ────────
     const clearDraft = useFormDraft(
@@ -514,11 +529,13 @@ export function ProformaPage() {
             const cf = await facturacionService.ensureConsumidorFinal(empresa!.id)
             if (cf) setSelectedCliente(cf)
         } catch { /* sin conexión, continuar sin CF */ }
-        supabase.from('empresas').select('direccion, email, ciudad').eq('id', empresa!.id).single()
+        supabase.from('empresas').select('direccion, email, ciudad, config_sri').eq('id', empresa!.id).single()
             .then(({ data }) => { if (data) setEmpresaExtra(data) })
     }
 
-    // Búsqueda de clientes: solo al presionar Enter o botón Buscar
+    // Búsqueda de clientes — Enter/botón la disparan de una; además hay un
+    // debounce más abajo que la dispara sola mientras se escribe (igual que
+    // en Nueva Factura), para no depender de acordarse de presionar Buscar.
     async function buscarClientes() {
         if (!empresa?.id || selectedCliente || !searchCliente.trim()) return
         const q = '%' + searchCliente.trim().replace(/\*/g, '%') + '%'
@@ -531,7 +548,7 @@ export function ProformaPage() {
         setClienteOpen(true)
     }
 
-    // Búsqueda de productos por línea: solo al presionar Enter o botón Buscar
+    // Búsqueda de productos por línea — mismo criterio: Enter/botón + debounce.
     async function buscarProductoLinea(idx: number) {
         const texto = (searchProducto[idx] || '').trim()
         if (!empresa?.id || !texto) { setSearchResults([]); return }
@@ -544,6 +561,26 @@ export function ProformaPage() {
         setSearchResults(data ?? [])
         setProductDropdown(idx)
     }
+
+    // Disparo automático en vivo (sin Enter/botón) mientras se escribe, con
+    // debounce de 300ms — mismo patrón que el buscador de productos de Nueva
+    // Factura. Antes había que presionar Enter o el botón "Buscar" a la
+    // fuerza; ahora ambos siguen funcionando por si acaso, pero ya no hacen falta.
+    useEffect(() => {
+        if (selectedCliente || !searchCliente.trim()) { setClienteResults([]); setClienteOpen(false); return }
+        const t = setTimeout(() => { buscarClientes() }, 300)
+        return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchCliente, selectedCliente, empresa?.id])
+
+    useEffect(() => {
+        if (productDropdown === null || esModoServicio) return
+        const texto = (searchProducto[productDropdown] || '').trim()
+        if (!texto) { setSearchResults([]); return }
+        const t = setTimeout(() => { buscarProductoLinea(productDropdown) }, 300)
+        return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchProducto, productDropdown, empresa?.id])
 
     async function buscarProformas() {
         if (!empresa?.id) return
@@ -606,7 +643,13 @@ export function ProformaPage() {
     // ─── Formulario: detalles ─────────────────────────────────────────────────
 
     const addLinea    = () => setDetalles(prev => [...prev, { ...DETALLE_VACIO }])
-    const removeLinea = (i: number) => setDetalles(prev => prev.filter((_, j) => j !== i))
+    // Si es la única línea, no se elimina (el formulario siempre necesita al
+    // menos una) — se limpia en su lugar, para que el botón de basura sirva
+    // también para vaciar esa línea en vez de quedar deshabilitado sin usar.
+    const removeLinea = (i: number) => {
+        setDetalles(prev => prev.length === 1 ? [{ ...DETALLE_VACIO }] : prev.filter((_, j) => j !== i))
+        setSearchProducto(prev => { const next = { ...prev }; delete next[i]; return next })
+    }
     const updateLinea = (i: number, field: keyof DetalleFacturaDirecta, val: any) =>
         setDetalles(prev => prev.map((d, j) => j === i ? { ...d, [field]: val } : d))
 
@@ -692,7 +735,7 @@ export function ProformaPage() {
                 : await proformaService.getCompleta(prf.id)
             const html = formato === 'a4'
                 ? generarHtmlA4(completa, empresa)
-                : generarHtml80mm(completa, { ...empresa, ...empresaExtra })
+                : generarHtml80mm(completa, { ...empresa, ...empresaExtra }, empresaExtra.config_sri?.impresion_pos)
             const win = window.open('', '_blank', 'width=900,height=700')
             if (win) {
                 win.document.write(html)
@@ -1110,7 +1153,7 @@ export function ProformaPage() {
                                                 <div className="relative">
                                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                                     <input type="text"
-                                                        placeholder="Nombre o RUC — Enter o Buscar (use * como comodín)"
+                                                        placeholder="Nombre o RUC (use * como comodín)"
                                                         className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-violet-400 outline-none text-sm"
                                                         value={searchCliente}
                                                         onChange={e => { setSearchCliente(e.target.value); setClienteOpen(false) }}
@@ -1254,7 +1297,7 @@ export function ProformaPage() {
                                                 <div className={cn('relative', esModoServicio ? 'col-span-5' : 'col-span-2')}>
                                                     <input
                                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-violet-400"
-                                                        placeholder={esModoServicio ? 'Descripción del servicio' : 'Código/nombre + Enter o Buscar (usa *)'}
+                                                        placeholder={esModoServicio ? 'Descripción del servicio' : 'Código o nombre (usa *)'}
                                                         value={esModoServicio ? det.nombre_producto : (searchProducto[idx] ?? det.nombre_producto)}
                                                         onChange={e => {
                                                             if (esModoServicio) {
@@ -1262,6 +1305,7 @@ export function ProformaPage() {
                                                             } else {
                                                                 setSearchProducto(prev => ({ ...prev, [idx]: e.target.value }))
                                                                 setSearchResults([])
+                                                                setProductDropdown(idx)
                                                             }
                                                         }}
                                                         onKeyDown={e => { if (e.key === 'Enter' && !esModoServicio) { e.preventDefault(); buscarProductoLinea(idx) } }}
@@ -1339,8 +1383,8 @@ export function ProformaPage() {
                                                 {/* Eliminar */}
                                                 <div className="col-span-1 flex items-center justify-center">
                                                     <button onClick={() => removeLinea(idx)}
-                                                        disabled={detalles.length === 1}
-                                                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-20 transition-colors">
+                                                        title={detalles.length === 1 ? 'Limpiar esta línea' : 'Eliminar esta línea'}
+                                                        className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 </div>
@@ -1492,6 +1536,17 @@ export function ProformaPage() {
                                 </div>
                             </button>
 
+                            {/* Ajustes de impresión del ticket 80mm — mismo modal/config que ya
+                                usa Factura (ancho de papel, margen, escala, líneas finales). Si
+                                el ticket sale distorsionado en una impresora en particular, se
+                                ajusta aquí, sin tocar código. */}
+                            <button
+                                onClick={() => setIsImpresionModalOpen(true)}
+                                className="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-slate-400 hover:text-violet-600 transition-colors">
+                                <Settings className="w-3.5 h-3.5" />
+                                Ajustar impresión del ticket 80mm
+                            </button>
+
                             {/* Opción enviar por correo */}
                             <button
                                 onClick={() => enviarProformaPorCorreo(printModal.proforma!)}
@@ -1510,6 +1565,20 @@ export function ProformaPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {isImpresionModalOpen && empresa?.id && (
+                <ConfigImpresionTicketModal
+                    empresaId={empresa.id}
+                    empresaNombre={empresa.nombre}
+                    onClose={() => {
+                        setIsImpresionModalOpen(false)
+                        // Refrescar config_sri para que el próximo ticket ya use lo
+                        // recién guardado, sin tener que recargar la página.
+                        supabase.from('empresas').select('direccion, email, ciudad, config_sri').eq('id', empresa.id).single()
+                            .then(({ data }) => { if (data) setEmpresaExtra(data) })
+                    }}
+                />
             )}
 
         </div>
