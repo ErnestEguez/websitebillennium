@@ -290,9 +290,12 @@ export const facturacionService = {
                     cantidad: d.cantidad,
                     precio_unitario: d.precio_unitario,
                     subtotal: d.precio_unitario * d.cantidad,
-                    iva_porcentaje: d.productos?.iva_porcentaje || 15,
-                    iva_valor: (d.precio_unitario * d.cantidad) * ((d.productos?.iva_porcentaje || 15) / 100),
-                    total: (d.precio_unitario * d.cantidad) * (1 + (d.productos?.iva_porcentaje || 15) / 100)
+                    // ?? en vez de || — un producto con IVA 0% legítimo (ej. exento) no
+                    // debe forzarse a 15% solo porque 0 es falsy en JS. El 15 de respaldo
+                    // solo debe aplicar si el producto no vino en el join (null/undefined).
+                    iva_porcentaje: d.productos?.iva_porcentaje ?? 15,
+                    iva_valor: (d.precio_unitario * d.cantidad) * ((d.productos?.iva_porcentaje ?? 15) / 100),
+                    total: (d.precio_unitario * d.cantidad) * (1 + (d.productos?.iva_porcentaje ?? 15) / 100)
                 }))
                 const { error: errorDet } = await supabase.from('comprobante_detalles').insert(detalles)
                 if (errorDet) console.error('Error inserting details:', errorDet)

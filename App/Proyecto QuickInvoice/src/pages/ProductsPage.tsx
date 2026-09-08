@@ -817,13 +817,13 @@ export function ProductsPage() {
                                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">IVA (%)</label>
                                     <select
                                         className="w-full px-4 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary-500"
-                                        value={editingProduct?.iva_porcentaje || 15}
+                                        value={editingProduct?.iva_porcentaje ?? 15}
                                         onChange={(e) => setEditingProduct({ ...editingProduct, iva_porcentaje: parseInt(e.target.value) })}
                                     >
                                         <option value={0}>0%</option>
                                         <option value={5}>5%</option>
                                         <option value={8}>8%</option>
-                                        <option value={15}>15% (Actual)</option>
+                                        <option value={15}>15%</option>
                                     </select>
                                 </div>
                             </div>
