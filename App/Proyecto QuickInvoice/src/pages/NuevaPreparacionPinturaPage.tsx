@@ -599,6 +599,19 @@ export function NuevaPreparacionPinturaPage() {
                                     : <span className="text-slate-400 italic">No configurado</span>
                                 }
                             </div>
+                            {/* El % de IVA que se usa aquí (y en la factura final) es el que
+                                tenga configurado este artículo en Productos — no es editable
+                                desde este formulario. Un 0% casi siempre es un error de
+                                catálogo (el artículo quedó creado sin IVA por descuido), así
+                                que se avisa antes de que termine grabando la factura mal. */}
+                            {productoRef && productoRef.iva_porcentaje === 0 && (
+                                <p className="text-xs text-red-600 font-semibold mt-1.5">
+                                    ⚠ Este artículo tiene 0% de IVA configurado en Productos — la
+                                    factura saldrá sin IVA. Si el precio ingresado arriba SÍ incluye
+                                    IVA, corrija el % de IVA de "{codigoPrep}" en Productos antes de
+                                    grabar esta preparación.
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
