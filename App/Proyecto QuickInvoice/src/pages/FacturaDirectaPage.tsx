@@ -895,7 +895,13 @@ export function FacturaDirectaPage() {
 
     // ─── DETALLES ─────────────────────────────────────────
     const addLinea = () => setDetalles(prev => [...prev, { ...DETALLE_VACIO }])
-    const removeLinea = (idx: number) => setDetalles(prev => prev.filter((_, i) => i !== idx))
+    // Si es la única línea, no se elimina (el formulario siempre necesita al
+    // menos una) — se limpia en su lugar, para que el botón de basura sirva
+    // también para vaciar esa línea en vez de quedar deshabilitado sin usar.
+    const removeLinea = (idx: number) => {
+        setDetalles(prev => prev.length === 1 ? [{ ...DETALLE_VACIO }] : prev.filter((_, i) => i !== idx))
+        setSearchProducto(prev => { const next = { ...prev }; delete next[idx]; return next })
+    }
     const updateLinea = (idx: number, field: keyof DetalleFacturaDirecta, value: any) => {
         setDetalles(prev => prev.map((d, i) => i === idx ? { ...d, [field]: value } : d))
     }
@@ -1953,8 +1959,9 @@ export function FacturaDirectaPage() {
                                                     <History className="w-4 h-4" />
                                                 </button>
                                             )}
-                                            <button onClick={() => removeLinea(idx)} disabled={detalles.length === 1}
-                                                className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-20 shrink-0 self-start">
+                                            <button onClick={() => removeLinea(idx)}
+                                                title={detalles.length === 1 ? 'Limpiar esta línea' : 'Eliminar esta línea'}
+                                                className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0 self-start">
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
