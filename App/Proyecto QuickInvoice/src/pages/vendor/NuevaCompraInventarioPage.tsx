@@ -1332,7 +1332,7 @@ export function NuevaCompraInventarioPage() {
                                                             {tasaEfectiva(d) != null && (
                                                                 <span
                                                                     title="Tasa real sobre el costo, según el precio de venta actual de esta línea"
-                                                                    className="text-[10px] font-semibold text-slate-400 shrink-0 whitespace-nowrap">
+                                                                    className="text-[10px] font-bold text-blue-600 shrink-0 whitespace-nowrap">
                                                                     {tasaEfectiva(d)! >= 0 ? '+' : ''}{tasaEfectiva(d)}%
                                                                 </span>
                                                             )}
