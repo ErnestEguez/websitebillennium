@@ -70,7 +70,30 @@ serve(async (req) => {
             .lt("ultimo_intento_sri", dosHorasAtras);
         if (errLentos) throw errLentos;
 
-        const pendientes = [...(rapidos ?? []), ...(lentos ?? [])];
+        // 2026-09-08: RECHAZADO también se reintenta cada 2h, no solo se
+        // alerta y se abandona. El supuesto original ("un rechazo firme no
+        // se arregla reintentando solo, el motivo no cambia") es cierto para
+        // un rechazo real del SRI por contenido, pero NO para el caso real
+        // que se detectó en producción: una caída/certificado inválido del
+        // SRI (cel.sri.gob.ec) hace que sri-signer reciba una respuesta que
+        // no matchea "RECIBIDA" ni "CLAVE ACCESO REGISTRADA", y ese `else`
+        // clasifica cualquier respuesta rara como RECHAZADO firme — aunque
+        // haya sido un problema transitorio de conexión, no del comprobante.
+        // Como RECHAZADO no entraba nunca más en las consultas de arriba,
+        // esas facturas quedaban huérfanas del barrido para siempre después
+        // de la única alerta por correo, aunque el cron siguiera corriendo
+        // cada 15 min sin ningún error. Se sigue mandando la alerta una sola
+        // vez (ver más abajo), pero ahora también se reintenta indefinidamente.
+        const { data: rechazadasRetry, error: errRechazadasRetry } = await supabase
+            .from("comprobantes")
+            .select(SELECT_COLS)
+            .eq("tipo_comprobante", "FACTURA")
+            .eq("estado_sri", "RECHAZADO")
+            .neq("estado_sistema", "ANULADA")
+            .or(`ultimo_intento_sri.is.null,ultimo_intento_sri.lt.${dosHorasAtras}`);
+        if (errRechazadasRetry) throw errRechazadasRetry;
+
+        const pendientes = [...(rapidos ?? []), ...(lentos ?? []), ...(rechazadasRetry ?? [])];
         resumen.revisadas = pendientes.length;
 
         for (const comp of pendientes ?? []) {
