@@ -1,9 +1,10 @@
 /**
  * BuscadorProducto — busca artículos por código o nombre con ILIKE.
- * Solo ejecuta la búsqueda cuando el usuario presiona Enter o el botón Buscar.
+ * Busca en vivo mientras se escribe (debounce 300ms); Enter/botón Buscar
+ * siguen funcionando por si acaso, pero ya no hacen falta.
  * Soporta wildcard * → %
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Search, Loader2, X } from 'lucide-react'
 import { cn } from '../lib/utils'
@@ -31,7 +32,7 @@ interface Props {
     conSubproductos?: boolean
 }
 
-export function BuscadorProducto({ empresaId, onSelect, placeholder = 'Código o nombre (Enter para buscar)…', className, conSubproductos }: Props) {
+export function BuscadorProducto({ empresaId, onSelect, placeholder = 'Código o nombre…', className, conSubproductos }: Props) {
     const [texto, setTexto]         = useState('')
     const [resultados, setResultados] = useState<ProductoResultado[]>([])
     const [buscando, setBuscando]   = useState(false)
@@ -56,6 +57,16 @@ export function BuscadorProducto({ empresaId, onSelect, placeholder = 'Código o
             setOpen(true)
         } finally { setBuscando(false) }
     }
+
+    // Disparo automático mientras se escribe, con debounce de 300ms — mismo
+    // patrón que el resto de buscadores en vivo de la app (Nueva Factura,
+    // Proformas). Se limpia el resultado si el texto queda vacío.
+    useEffect(() => {
+        if (!texto.trim()) { setResultados([]); setOpen(false); return }
+        const t = setTimeout(() => { buscar() }, 300)
+        return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [texto, empresaId])
 
     function seleccionar(p: ProductoResultado) {
         onSelect(p)

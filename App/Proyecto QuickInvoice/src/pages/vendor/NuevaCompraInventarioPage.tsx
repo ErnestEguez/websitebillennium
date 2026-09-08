@@ -92,6 +92,17 @@ function precioVentaSugerido(d: LineaDetalle, tasaPct: number): number {
     return Math.round(costoNeto * (1 + tasaPct / 100) * 100) / 100
 }
 
+// Tasa REAL implícita en precio_venta_sugerido (sin IVA) frente al costo neto
+// — inversa de precioVentaSugerido(). Se recalcula en vivo con el precio que
+// haya en la línea, editado a mano o no, para mostrar la tasa que en verdad
+// va a quedar (no la tasa configurada de la empresa, que solo aplica al
+// sugerir el precio la primera vez).
+function tasaEfectiva(d: LineaDetalle): number | null {
+    const costoNeto = d.cantidad > 0 ? lineaNeta(d).neto / d.cantidad : d.costo_unitario
+    if (costoNeto <= 0 || d.precio_venta_sugerido == null) return null
+    return Math.round(((d.precio_venta_sugerido / costoNeto) - 1) * 1000) / 10
+}
+
 // Similitud por palabras para matching de descripción
 function wordSimilarity(a: string, b: string): number {
     const words = (s: string) => s.toLowerCase().trim().split(/\s+/).filter(w => w.length > 2)
@@ -1303,16 +1314,29 @@ export function NuevaCompraInventarioPage() {
                                                         onBlur={() => numBlur(`total_${i}`, v => setCostoDesdeTotal(i, v))} />
                                                 </td>
 
-                                                {/* Precio de venta sugerido (con IVA) — solo si el toggle está activo */}
+                                                {/* Precio de venta sugerido (con IVA) — solo si el toggle está activo.
+                                                    Al lado se muestra la tasa REAL que queda (recalculada desde el
+                                                    precio que haya en pantalla, corregido a mano o no) — no la tasa
+                                                    configurada de la empresa, que solo se usó para la sugerencia
+                                                    inicial y deja de reflejar la realidad en cuanto se corrige el precio. */}
                                                 {empresa?.actualizar_precio_venta_compra && (
                                                     <td className="py-1.5 px-2">
-                                                        <input type="text" inputMode="decimal"
-                                                            title={d.precio_venta_manual ? 'Editado a mano' : 'Sugerido automáticamente — editable'}
-                                                            className={cn(inpSm, 'text-right', d.precio_venta_manual ? 'border-amber-300 bg-amber-50' : 'border-emerald-200')}
-                                                            value={numVal(`pvta_${i}`, precioVentaConIva(d))}
-                                                            onFocus={e => e.target.select()}
-                                                            onChange={e => numChange(`pvta_${i}`, e.target.value, v => setPrecioVentaConIva(i, v))}
-                                                            onBlur={() => numBlur(`pvta_${i}`, v => setPrecioVentaConIva(i, v))} />
+                                                        <div className="flex items-center gap-1 justify-end">
+                                                            <input type="text" inputMode="decimal"
+                                                                title={d.precio_venta_manual ? 'Editado a mano' : 'Sugerido automáticamente — editable'}
+                                                                className={cn(inpSm, 'text-right w-20', d.precio_venta_manual ? 'border-amber-300 bg-amber-50' : 'border-emerald-200')}
+                                                                value={numVal(`pvta_${i}`, precioVentaConIva(d))}
+                                                                onFocus={e => e.target.select()}
+                                                                onChange={e => numChange(`pvta_${i}`, e.target.value, v => setPrecioVentaConIva(i, v))}
+                                                                onBlur={() => numBlur(`pvta_${i}`, v => setPrecioVentaConIva(i, v))} />
+                                                            {tasaEfectiva(d) != null && (
+                                                                <span
+                                                                    title="Tasa real sobre el costo, según el precio de venta actual de esta línea"
+                                                                    className="text-[10px] font-semibold text-slate-400 shrink-0 whitespace-nowrap">
+                                                                    {tasaEfectiva(d)! >= 0 ? '+' : ''}{tasaEfectiva(d)}%
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 )}
 
