@@ -40,6 +40,7 @@ const CambioCodigoArticulosPage    = lz(() => import('./pages/CambioCodigoArticu
 const TransferenciaBodegaPage      = lz(() => import('./pages/TransferenciaBodegaPage'), 'TransferenciaBodegaPage')
 const CodigosRetencionPage         = lz(() => import('./pages/CodigosRetencionPage'), 'CodigosRetencionPage')
 const VendedoresPage               = lz(() => import('./pages/VendedoresPage'), 'VendedoresPage')
+const CobradoresPage               = lz(() => import('./pages/CobradoresPage'), 'CobradoresPage')
 const CarteraCxcPage               = lz(() => import('./pages/CarteraCxcPage'), 'CarteraCxcPage')
 const CarteraPaPage                = lz(() => import('./pages/CarteraPaPage'), 'CarteraPaPage')
 const ConsultaVentasPage           = lz(() => import('./pages/ConsultaVentasPage'), 'ConsultaVentasPage')
@@ -526,6 +527,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <VendedoresPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/cobradores" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <CobradoresPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

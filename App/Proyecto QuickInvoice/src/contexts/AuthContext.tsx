@@ -44,6 +44,10 @@ interface Empresa {
     // ninguna empresa puede cambiar precios salvo el administrador, igual
     // que el comportamiento actual.
     permitir_todos_editar_precio?: boolean
+    // Ventas a Crédito de Electrodomésticos — módulo nuevo, apagado por
+    // defecto. Solo admin_plataforma puede cambiarlo (ver
+    // trg_bloquear_toggle_credito_electrodomesticos en la migración).
+    habilita_ventas_electrodomesticos_credito?: boolean
 }
 
 export interface Modules {
@@ -105,6 +109,15 @@ export interface Permisos {
     perm_migracion_cartera:     boolean
     perm_migracion_cxp:         boolean
     perm_eliminar_compra:       boolean
+    // Ventas a Crédito de Electrodomésticos
+    perm_cobradores:                     boolean
+    perm_credito_electrodomesticos:      boolean
+    perm_credito_tasas:                  boolean
+    perm_credito_cobros:                 boolean
+    perm_credito_documentos:             boolean
+    perm_aprobar_excepcion_credito:      boolean
+    perm_reversar_pago_credito:          boolean
+    perm_anular_credito_electrodomesticos: boolean
 }
 
 interface AuthContextType {
@@ -193,6 +206,17 @@ export const DEFAULT_PERMISOS: Permisos = {
     // false por defecto a propósito (a diferencia de todos los demás
     // perm_*): borrado permanente de compras, debe concederse explícito.
     perm_eliminar_compra:       false,
+    // Ventas a Crédito de Electrodomésticos — operativos en true, los
+    // sensibles/irreversibles (aprobar excepción, reversar pago, anular)
+    // en false a propósito, mismo criterio que perm_eliminar_compra.
+    perm_cobradores:                     true,
+    perm_credito_electrodomesticos:      true,
+    perm_credito_tasas:                  true,
+    perm_credito_cobros:                 true,
+    perm_credito_documentos:             true,
+    perm_aprobar_excepcion_credito:      false,
+    perm_reversar_pago_credito:          false,
+    perm_anular_credito_electrodomesticos: false,
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -446,6 +470,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_migracion_cartera:     permData.perm_migracion_cartera     ?? true,
                     perm_migracion_cxp:         permData.perm_migracion_cxp         ?? true,
                     perm_eliminar_compra:       permData.perm_eliminar_compra       ?? false,
+                    perm_cobradores:                     permData.perm_cobradores                     ?? true,
+                    perm_credito_electrodomesticos:      permData.perm_credito_electrodomesticos      ?? true,
+                    perm_credito_tasas:                  permData.perm_credito_tasas                  ?? true,
+                    perm_credito_cobros:                 permData.perm_credito_cobros                 ?? true,
+                    perm_credito_documentos:             permData.perm_credito_documentos             ?? true,
+                    perm_aprobar_excepcion_credito:      permData.perm_aprobar_excepcion_credito      ?? false,
+                    perm_reversar_pago_credito:          permData.perm_reversar_pago_credito          ?? false,
+                    perm_anular_credito_electrodomesticos: permData.perm_anular_credito_electrodomesticos ?? false,
                 } : DEFAULT_PERMISOS)
             }
         } catch {

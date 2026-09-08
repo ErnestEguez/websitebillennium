@@ -408,10 +408,12 @@ export function ConfigurationPage() {
             // credenciales sensibles (nunca se guarda el valor en texto plano
             // en el log de auditoría, solo la bandera de que cambió).
             let configSriAntes: Record<string, any> | null = null
+            let creditoElectroAntes = false
             if (editingEmpresa.id) {
                 const { data: empresaAntes } = await supabase
-                    .from('empresas').select('config_sri').eq('id', editingEmpresa.id).single()
+                    .from('empresas').select('config_sri, habilita_ventas_electrodomesticos_credito').eq('id', editingEmpresa.id).single()
                 configSriAntes = empresaAntes?.config_sri ?? null
+                creditoElectroAntes = !!empresaAntes?.habilita_ventas_electrodomesticos_credito
             }
 
             // ✅ Solo campos que existen en la tabla empresas del schema real
@@ -422,6 +424,7 @@ export function ConfigurationPage() {
                 telefono: editingEmpresa.telefono || null,
                 logo_url: editingEmpresa.logo_url || null,
                 usar_vendor_management: !!editingEmpresa.usar_vendor_management,
+                habilita_ventas_electrodomesticos_credito: !!editingEmpresa.habilita_ventas_electrodomesticos_credito,
                 config_sri: {
                     // Preserva TODOS los campos existentes (mail_host, mail_port, mail_pass,
                     // mail_ssl, mail_cc, impresion_pos, y cualquier campo futuro que este
@@ -509,6 +512,12 @@ export function ConfigurationPage() {
                 if ((configSriAntes?.mail_pass || null) !== (payload.config_sri.mail_pass || null)) {
                     cambios.mail_pass = { antes: configSriAntes?.mail_pass ? 'configurada' : 'vacía', despues: payload.config_sri.mail_pass ? 'configurada' : 'vacía' }
                 }
+                // Ventas a Crédito de Electrodomésticos — toggle exclusivo de
+                // superadmin (ver trg_bloquear_toggle_credito_electrodomesticos):
+                // se audita con antes/después reales, no solo el valor final.
+                if (creditoElectroAntes !== !!editingEmpresa.habilita_ventas_electrodomesticos_credito) {
+                    cambios.habilita_ventas_electrodomesticos_credito = { antes: creditoElectroAntes, despues: !!editingEmpresa.habilita_ventas_electrodomesticos_credito }
+                }
                 auditService.logEvent({
                     empresaId,
                     modulo: 'configuracion',
@@ -524,6 +533,7 @@ export function ConfigurationPage() {
                         ia_voz_enabled: !!editingEmpresa.ia_voz_enabled,
                         ia_cv_enabled: !!editingEmpresa.ia_cv_enabled,
                         facturacion_masiva_enabled: !!editingEmpresa.facturacion_masiva_enabled,
+                        habilita_ventas_electrodomesticos_credito: !!editingEmpresa.habilita_ventas_electrodomesticos_credito,
                     },
                     nivel: 'compliance',
                 })
@@ -3351,6 +3361,20 @@ export function ConfigurationPage() {
                                         className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
                                         checked={!!editingEmpresa?.facturacion_masiva_enabled}
                                         onChange={e => setEditingEmpresa({ ...editingEmpresa, facturacion_masiva_enabled: e.target.checked })}
+                                    />
+                                </label>
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Ventas a Crédito de Electrodomésticos</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Habilita entrada + cuotas fijas + cobrador + garante en Nueva Factura, para empresas que venden electrodomésticos a crédito.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingEmpresa?.habilita_ventas_electrodomesticos_credito}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, habilita_ventas_electrodomesticos_credito: e.target.checked })}
                                     />
                                 </label>
                             </div>
