@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { auditService } from './auditoria/auditService'
 import {
     calcularCreditoElectrodomesticos,
     type ParametrosCredito,
@@ -70,6 +71,23 @@ export interface CuotaCredito {
     estado: EstadoCuota
 }
 
+export type MetodoPagoCredito = 'efectivo' | 'transferencia' | 'cheque' | 'tarjeta' | 'nota_credito' | 'otros'
+
+export interface PagoCuotaCredito {
+    id: string
+    cuota_id: string
+    credito_id: string
+    empresa_id: string
+    fecha_pago: string
+    valor: number
+    metodo_pago: MetodoPagoCredito
+    referencia: string | null
+    estado: 'activo' | 'reversado'
+    reversado_at: string | null
+    motivo_reversa: string | null
+    created_at: string
+}
+
 export interface CreditoElectrodomesticos {
     id: string
     empresa_id: string
@@ -102,6 +120,7 @@ export interface CreditoElectrodomesticos {
     clientes?: { nombre: string; identificacion: string }
     garante?: { nombre: string; identificacion: string } | null
     cobradores?: { nombres: string; codigo: string | null }
+    comprobantes?: { secuencial: string } | null
     cuotas?: CuotaCredito[]
 }
 
@@ -227,6 +246,7 @@ export const creditoElectrodomesticosService = {
                 clientes:cliente_id (nombre, identificacion),
                 garante:garante_cliente_id (nombre, identificacion),
                 cobradores (nombres, codigo),
+                comprobantes:factura_id (secuencial),
                 cuotas:creditos_electrodomesticos_cuotas (*)
             `)
             .eq('id', id)
@@ -243,7 +263,8 @@ export const creditoElectrodomesticosService = {
             .select(`
                 *,
                 clientes:cliente_id (nombre, identificacion),
-                cobradores (nombres, codigo)
+                cobradores (nombres, codigo),
+                comprobantes:factura_id (secuencial)
             `)
             .eq('empresa_id', empresaId)
             .order('created_at', { ascending: false })
@@ -273,5 +294,94 @@ export const creditoElectrodomesticosService = {
             .eq('id', id)
             .eq('estado', 'CALCULADO')
         if (error) throw error
+    },
+
+    // ── Pagos de cuota ───────────────────────────────────────────────────
+    // v1 (Fase 5, alcance reducido): un pago se aplica completo contra UNA
+    // cuota (capital+interés juntos, sin desglose) — el orden mora→interés→
+    // capital y el pago repartido entre varias cuotas de una vez quedan
+    // para cuando se defina la política de mora (ver plan de Fase 5).
+
+    async getPagosDeCuota(cuotaId: string): Promise<PagoCuotaCredito[]> {
+        const { data, error } = await supabase
+            .from('creditos_electrodomesticos_pagos')
+            .select('*')
+            .eq('cuota_id', cuotaId)
+            .order('fecha_pago', { ascending: false })
+        if (error) throw error
+        return (data || []) as PagoCuotaCredito[]
+    },
+
+    async registrarPago(input: {
+        cuotaId: string
+        creditoId: string
+        empresaId: string
+        valor: number
+        metodoPago: MetodoPagoCredito
+        referencia?: string
+    }): Promise<PagoCuotaCredito> {
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data, error } = await supabase
+            .from('creditos_electrodomesticos_pagos')
+            .insert({
+                cuota_id: input.cuotaId,
+                credito_id: input.creditoId,
+                empresa_id: input.empresaId,
+                fecha_pago: new Date().toISOString().slice(0, 10),
+                valor: input.valor,
+                metodo_pago: input.metodoPago,
+                referencia: input.referencia || null,
+                usuario_id: user?.id || null,
+            })
+            .select()
+            .single()
+        if (error) throw error
+        // El trigger fn_actualizar_saldo_cuota_credito_electro (y en cascada
+        // fn_actualizar_credito_electro_desde_cuotas) recalculan saldo/estado.
+
+        auditService.logEvent({
+            empresaId: input.empresaId,
+            modulo: 'credito_electrodomesticos',
+            accion: 'crear',
+            entidad: 'credito_electrodomesticos_pago',
+            entidadId: (data as any).id,
+            resumen: `Pago de cuota de crédito por ${input.valor}`,
+            detalle: { cuota_id: input.cuotaId, credito_id: input.creditoId, metodo_pago: input.metodoPago, valor: input.valor },
+        })
+
+        return data as PagoCuotaCredito
+    },
+
+    async reversarPago(pagoId: string, motivo?: string): Promise<void> {
+        const { data: pago, error: errPago } = await supabase
+            .from('creditos_electrodomesticos_pagos')
+            .select('id, estado, empresa_id, cuota_id, credito_id')
+            .eq('id', pagoId)
+            .single()
+        if (errPago) throw errPago
+        if (pago.estado === 'reversado') throw new Error('Este pago ya fue reversado')
+
+        const { data: { user } } = await supabase.auth.getUser()
+        const { error } = await supabase
+            .from('creditos_electrodomesticos_pagos')
+            .update({
+                estado: 'reversado',
+                reversado_at: new Date().toISOString(),
+                reversado_por: user?.id || null,
+                motivo_reversa: motivo || null,
+            })
+            .eq('id', pagoId)
+        if (error) throw error
+
+        auditService.logEvent({
+            empresaId: pago.empresa_id,
+            modulo: 'credito_electrodomesticos',
+            accion: 'reversar',
+            entidad: 'credito_electrodomesticos_pago',
+            entidadId: pagoId,
+            resumen: 'Reversión de pago de cuota de crédito',
+            detalle: { motivo, cuota_id: pago.cuota_id, credito_id: pago.credito_id },
+            nivel: 'sensible',
+        })
     },
 }

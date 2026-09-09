@@ -53,6 +53,7 @@ import {
     AlertOctagon,
     Wrench,
     History,
+    Home,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -389,6 +390,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/clientes"                    icon={Users}      label="Clientes"         active={location.pathname === '/clientes'} sub disabled={!p.perm_clientes} sentinelId="nav-clientes" />
                             <SidebarItem to="/cartera-cxc"                 icon={CreditCard} label="Cartera / Abonos" active={location.pathname === '/cartera-cxc'} sub disabled={!p.perm_cartera_cxc} />
                             <SidebarItem to="/cartera-pa"                  icon={Wallet}     label="Cartera Plan Acumulativo" active={location.pathname === '/cartera-pa'} sub disabled={!p.perm_cartera_pa} />
+                            {empresa?.habilita_ventas_electrodomesticos_credito && <SidebarItem to="/creditos-electrodomesticos" icon={Home} label="Créditos Electrodomésticos" active={location.pathname === '/creditos-electrodomesticos'} sub disabled={!p.perm_credito_electrodomesticos} />}
                             <SidebarItem to="/clientes/gestion-cartera"    icon={ClipboardList} label="Gestión de Cartera" active={location.pathname === '/clientes/gestion-cartera'} sub disabled={!p.perm_gestion_cartera} />
                             <SidebarItem to="/consultas/cartera-clientes"  icon={FileSearch} label="Consulta Cartera" active={location.pathname === '/consultas/cartera-clientes'} sub disabled={!p.perm_consulta_cartera} />
                             <SidebarItem to="/cartera/estado-cuenta"       icon={BarChart3}  label="Estado de Cuenta" active={location.pathname.startsWith('/cartera/estado-cuenta')} sub disabled={!p.perm_estado_cuenta} />
