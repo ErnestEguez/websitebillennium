@@ -428,7 +428,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                             )}
                                             <SidebarItem to="/creditos-electrodomesticos" icon={Home} label="Créditos Electrodomésticos" active={location.pathname === '/creditos-electrodomesticos'} sub disabled={!p.perm_credito_electrodomesticos} />
                                             <SidebarItem to="/cancelacion-oficina" icon={Receipt} label="Cancelación Oficina" active={location.pathname === '/cancelacion-oficina'} sub disabled={!p.perm_credito_cobros} />
-                                            <SidebarItemPendiente icon={Truck} label="Cancelación Móvil" disabled={!p.perm_credito_cobros_movil} />
+                                            <SidebarItem to="/cancelacion-movil" icon={Truck} label="Cancelación Móvil" active={location.pathname === '/cancelacion-movil'} sub disabled={!p.perm_credito_cobros_movil} />
                                             <SidebarItemPendiente icon={FileSearch} label="Consulta General de Cartera" disabled={!p.perm_credito_consulta_cartera} />
                                             <SidebarItemPendiente icon={BarChart3} label="Estado de Cuenta por Cliente" disabled={!p.perm_credito_estado_cuenta} />
                                         </div>

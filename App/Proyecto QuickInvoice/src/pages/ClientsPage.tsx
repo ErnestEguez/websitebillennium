@@ -22,6 +22,7 @@ import {
     Camera,
     Download,
     ImageOff,
+    MapPin,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { validateIdentificacion } from '../lib/utils'
@@ -495,6 +496,24 @@ export function ClientsPage() {
                                 <div className="pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-400">
                                     <ImageOff className="w-4 h-4 shrink-0" />
                                     Guarda el cliente primero para poder capturar las imágenes de su cédula.
+                                </div>
+                            )}
+
+                            {editingCliente?.id && (
+                                <div className="pt-3 border-t border-slate-100">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">Ubicación geográfica</p>
+                                    {editingCliente.geo_latitud != null ? (
+                                        <a href={`https://www.google.com/maps?q=${editingCliente.geo_latitud},${editingCliente.geo_longitud}`}
+                                            target="_blank" rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1.5 text-sm text-primary-600 font-semibold underline">
+                                            <MapPin className="w-4 h-4" /> Ver ubicación en el mapa
+                                        </a>
+                                    ) : (
+                                        <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                                            <MapPin className="w-4 h-4 shrink-0" /> Sin ubicación capturada
+                                        </p>
+                                    )}
+                                    <p className="text-[11px] text-slate-400 mt-1">Solo lectura — la ubicación se captura desde Cobros Móvil, al visitar al cliente.</p>
                                 </div>
                             )}
 

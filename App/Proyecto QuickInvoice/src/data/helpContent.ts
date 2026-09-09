@@ -126,6 +126,21 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    'cancelacion-movil': {
+        titulo: 'Cobros Móvil',
+        subtitulo: 'Cobro de cuotas de crédito de electrodomésticos en terreno',
+        secciones: [
+            {
+                titulo: '¿Cómo funciona?',
+                texto: 'Misma lógica que Cancelación Oficina (mora → interés → capital, cascada entre cuotas), pero en una pantalla pensada para el celular del cobrador: busca al cliente, elige el crédito si tiene más de uno, y registra el cobro directo en el domicilio.',
+                tips: [
+                    'Muestra la foto de cédula del cliente (si fue capturada desde Clientes) para confirmar identidad antes de cobrar.',
+                    'El botón "Capturar aquí" guarda la ubicación GPS actual del cliente — útil para actualizar direcciones difíciles de ubicar en visitas futuras.',
+                ],
+            },
+        ],
+    },
+
     // ─── COMPROBANTES ───────────────────────────────────────────────────────
     'comprobantes': {
         titulo: 'Comprobantes',
