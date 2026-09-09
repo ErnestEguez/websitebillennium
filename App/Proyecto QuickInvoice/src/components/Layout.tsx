@@ -111,6 +111,17 @@ const SidebarItem = ({ to, icon: Icon, label, active, sub, disabled, sentinelId 
 
 import { CierreCajaModal } from './CierreCajaModal'
 
+// Ítem de submenú "por construir" — visible (para mostrar el mapa completo
+// del módulo) pero no clickeable, a diferencia de SidebarItem.disabled que
+// se OCULTA por completo (ese es para permisos, no para "todavía no existe").
+const SidebarItemPendiente = ({ icon: Icon, label }: { icon: React.ElementType; label: string }) => (
+    <div title="Todavía no está construido" className="flex items-center gap-3 pl-8 py-2 rounded-lg text-sm text-slate-300 cursor-not-allowed select-none">
+        <Icon className="w-4 h-4 shrink-0 text-slate-200" />
+        <span className="flex-1">{label}</span>
+        <span className="text-[9px] font-bold uppercase tracking-wide bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded shrink-0">Pronto</span>
+    </div>
+)
+
 // Sección expandible de módulo principal
 function ModuleSection({ label, icon: Icon, colorClass, isOpen, onToggle, isSidebarOpen, anyActive, children }: {
     label: string
@@ -390,7 +401,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/clientes"                    icon={Users}      label="Clientes"         active={location.pathname === '/clientes'} sub disabled={!p.perm_clientes} sentinelId="nav-clientes" />
                             <SidebarItem to="/cartera-cxc"                 icon={CreditCard} label="Cartera / Abonos" active={location.pathname === '/cartera-cxc'} sub disabled={!p.perm_cartera_cxc} />
                             <SidebarItem to="/cartera-pa"                  icon={Wallet}     label="Cartera Plan Acumulativo" active={location.pathname === '/cartera-pa'} sub disabled={!p.perm_cartera_pa} />
-                            {empresa?.habilita_ventas_electrodomesticos_credito && <SidebarItem to="/creditos-electrodomesticos" icon={Home} label="Créditos Electrodomésticos" active={location.pathname === '/creditos-electrodomesticos'} sub disabled={!p.perm_credito_electrodomesticos} />}
+                            {empresa?.habilita_ventas_electrodomesticos_credito && (
+                                <div>
+                                    <button
+                                        onClick={() => toggleGroup('ventas-credito')}
+                                        className={cn(
+                                            'w-full flex items-center gap-3 pl-6 pr-2 py-2 rounded-lg text-sm transition-colors',
+                                            location.pathname.startsWith('/creditos-electrodomesticos') ? 'bg-primary-50 text-primary-700 font-medium' : 'text-slate-600 hover:bg-slate-100'
+                                        )}
+                                    >
+                                        <Home className="w-4 h-4 shrink-0 text-slate-400" />
+                                        {isSidebarOpen && <span className="flex-1 text-left">Ventas a Crédito</span>}
+                                        {isSidebarOpen && <ChevronDown className={cn('w-3.5 h-3.5 text-slate-400 transition-transform', openGroups.includes('ventas-credito') && 'rotate-180')} />}
+                                    </button>
+                                    {openGroups.includes('ventas-credito') && isSidebarOpen && (
+                                        <div className="ml-3 border-l-2 border-slate-100 pl-2 space-y-0.5">
+                                            <SidebarItemPendiente icon={FilePlus} label="Solicitud de Crédito" />
+                                            <SidebarItem to="/creditos-electrodomesticos" icon={Home} label="Créditos Electrodomésticos" active={location.pathname === '/creditos-electrodomesticos'} sub disabled={!p.perm_credito_electrodomesticos} />
+                                            <SidebarItemPendiente icon={Receipt} label="Cancelación Oficina" />
+                                            <SidebarItemPendiente icon={Truck} label="Cancelación Móvil" />
+                                            <SidebarItemPendiente icon={FileSearch} label="Consulta General de Cartera" />
+                                            <SidebarItemPendiente icon={BarChart3} label="Estado de Cuenta por Cliente" />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             <SidebarItem to="/clientes/gestion-cartera"    icon={ClipboardList} label="Gestión de Cartera" active={location.pathname === '/clientes/gestion-cartera'} sub disabled={!p.perm_gestion_cartera} />
                             <SidebarItem to="/consultas/cartera-clientes"  icon={FileSearch} label="Consulta Cartera" active={location.pathname === '/consultas/cartera-clientes'} sub disabled={!p.perm_consulta_cartera} />
                             <SidebarItem to="/cartera/estado-cuenta"       icon={BarChart3}  label="Estado de Cuenta" active={location.pathname.startsWith('/cartera/estado-cuenta')} sub disabled={!p.perm_estado_cuenta} />

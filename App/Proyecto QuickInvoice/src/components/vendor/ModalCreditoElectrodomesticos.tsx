@@ -68,6 +68,7 @@ export function ModalCreditoElectrodomesticos({ empresaId, totalFactura, onCance
     useEffect(() => {
         creditoElectrodomesticosService.getConfig(empresaId)
             .then(setConfig)
+            .catch(e => console.error('[ModalCreditoElectrodomesticos] No se pudo cargar config_credito_electrodomesticos, uso valores por defecto:', e))
             .finally(() => setCargandoConfig(false))
     }, [empresaId])
 
@@ -489,8 +490,10 @@ export function ModalCreditoElectrodomesticos({ empresaId, totalFactura, onCance
                     ) : (
                         <button
                             onClick={handleConfirmar}
-                            disabled={!confirmado}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-bold disabled:opacity-40 hover:bg-emerald-700"
+                            title={!confirmado ? 'Marca la casilla de verificación de arriba primero' : undefined}
+                            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-colors ${
+                                confirmado ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-emerald-100 text-emerald-400'
+                            }`}
                         >
                             <CheckCircle2 className="w-4 h-4" /> Confirmar crédito
                         </button>
