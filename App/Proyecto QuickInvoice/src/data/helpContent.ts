@@ -61,6 +61,51 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    // ─── COBRADORES ─────────────────────────────────────────────────────────
+    'cobradores': {
+        titulo: 'Cobradores',
+        subtitulo: 'Equipo de cobro para Ventas a Crédito de Electrodomésticos',
+        secciones: [
+            {
+                titulo: '¿Qué es un cobrador?',
+                texto: 'La persona responsable de recaudar las cuotas de un crédito de electrodomésticos. Cada crédito se asigna a un cobrador; el reporte de "Recaudación por cobrador" (Cuentas por Cobrar) se arma con esta asignación.',
+                tips: [
+                    'La "Zona" es un campo libre e informativo (ej. "Norte", "Ruta 3") — no restringe qué créditos puede cobrar.',
+                    'Dar de baja no borra el historial: los créditos que ese cobrador ya tenía asignados lo conservan.',
+                ],
+            },
+            {
+                titulo: 'Reasignar cobrador',
+                texto: 'Para cambiar el cobrador de un crédito ya creado, hazlo desde el detalle de ese crédito (Cuentas por Cobrar → Créditos de Electrodomésticos), no desde aquí — esta pantalla solo administra el catálogo de personas.',
+            },
+        ],
+    },
+
+    // ─── CRÉDITO ELECTRODOMÉSTICOS ──────────────────────────────────────────
+    'credito-electrodomesticos': {
+        titulo: 'Venta a Crédito de Electrodomésticos',
+        subtitulo: 'Entrada + cuotas fijas + cobrador + garante, sin alterar la factura electrónica',
+        secciones: [
+            {
+                titulo: '¿Cómo funciona?',
+                texto: 'Se abre desde Nueva Factura, después de ingresar cliente y artículos. La factura electrónica sigue emitiéndose con el precio de lista y el IVA normal de cada artículo — el interés y las cuotas se administran aparte, en Cuentas por Cobrar → Créditos de Electrodomésticos, nunca dentro del XML de la factura.',
+                tips: [
+                    'El garante es opcional. El cobrador es obligatorio.',
+                    'La entrada se registra como un pago real de la factura (efectivo/transferencia/tarjeta/cheque), igual que cualquier venta normal.',
+                ],
+                alerta: 'Debes presionar "Calcular" cada vez que cambies entrada, tasa, periodicidad, cuotas o fecha — la tabla se invalida sola con cualquier cambio, para que nunca confirmes una tabla desactualizada.',
+            },
+            {
+                titulo: 'Base del interés',
+                texto: 'Cada empresa tiene configurado si el interés se calcula sobre el saldo DESPUÉS de la entrada (lo normal) o sobre el TOTAL de la venta completo (la entrada no reduce la base) — esto se ve como una advertencia amarilla en el paso de Cálculo cuando aplica. Se configura en Ajustes, no en este wizard.',
+            },
+            {
+                titulo: 'Si algo sale mal después de emitir',
+                texto: 'Si la factura se emite pero el crédito no se pudo registrar (error de conexión, etc.), la app te avisa con el número de factura para que se registre el crédito manualmente — la factura ya emitida NUNCA se revierte por un fallo en este segundo paso.',
+            },
+        ],
+    },
+
     // ─── COMPROBANTES ───────────────────────────────────────────────────────
     'comprobantes': {
         titulo: 'Comprobantes',

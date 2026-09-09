@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { cobradorService, type Cobrador } from '../services/cobradorService'
 import { UserCheck, Plus, Edit2, UserX, Save, X, Truck } from 'lucide-react'
+import { HelpButton } from '../components/help/HelpButton'
 
 export function CobradoresPage() {
     const { empresa } = useAuth()
@@ -105,13 +106,16 @@ export function CobradoresPage() {
                     <h1 className="text-3xl font-bold text-slate-900">Cobradores</h1>
                     <p className="text-slate-600 mt-1">Gestiona el equipo de cobro de créditos de electrodomésticos</p>
                 </div>
-                <button
-                    onClick={() => { setEditing({}); setIsModalOpen(true) }}
-                    className="btn btn-primary flex items-center gap-2"
-                >
-                    <Plus className="w-5 h-5" />
-                    Nuevo Cobrador
-                </button>
+                <div className="flex items-center gap-2">
+                    <HelpButton pageKey="cobradores" />
+                    <button
+                        onClick={() => { setEditing({}); setIsModalOpen(true) }}
+                        className="btn btn-primary flex items-center gap-2"
+                    >
+                        <Plus className="w-5 h-5" />
+                        Nuevo Cobrador
+                    </button>
+                </div>
             </div>
 
             {/* Filtros */}

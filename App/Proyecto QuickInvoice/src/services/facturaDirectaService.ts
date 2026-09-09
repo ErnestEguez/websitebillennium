@@ -26,7 +26,13 @@ export interface DetalleFacturaDirecta {
 }
 
 export interface PagoFactura {
-    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'cheque_fecha' | 'otros' | 'tarjeta' | 'nota_credito' | 'plan_acumulativo'
+    // 'credito_electrodomesticos' NO aparece en el dropdown normal de forma
+    // de pago (METODOS_PAGO en FacturaDirectaPage.tsx) — solo lo genera el
+    // wizard de Crédito Electrodomésticos al confirmar. Al ser un método
+    // distinto de 'credito', no dispara la creación de cartera_cxc (esa
+    // rama solo mira metodo==='credito'): el saldo financiado con cuotas
+    // vive exclusivamente en creditos_electrodomesticos_cuotas.
+    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'cheque_fecha' | 'otros' | 'tarjeta' | 'nota_credito' | 'plan_acumulativo' | 'credito_electrodomesticos'
     valor: number
     referencia?: string
     cuenta_bancaria_id?: string | null           // solo para transferencia

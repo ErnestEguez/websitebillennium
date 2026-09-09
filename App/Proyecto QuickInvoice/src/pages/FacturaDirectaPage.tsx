@@ -26,6 +26,8 @@ import {
 } from '../services/facturaDirectaService'
 import { RetencionesEditor } from '../components/vendor/RetencionesEditor'
 import type { RetLine } from '../components/vendor/RetencionesEditor'
+import { ModalCreditoElectrodomesticos, type CreditoElectroConfirmado } from '../components/vendor/ModalCreditoElectrodomesticos'
+import { creditoElectrodomesticosService } from '../services/creditoElectrodomesticosService'
 import { codigoRetencionService, type CodigoRetencion } from '../services/codigoRetencionService'
 import { InvoiceTicketPOS } from '../components/InvoiceTicketPOS'
 import { formatCurrency } from '../lib/utils'
@@ -350,6 +352,15 @@ export function FacturaDirectaPage() {
     const [montoRecibido, setMontoRecibido] = useState<number>(0)
     const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([])
     const [notasCredito, setNotasCredito] = useState<any[]>([])
+
+    // Crédito Electrodomésticos — wizard secundario (Decisión 1 de
+    // arquitectura, Fase 0): esta página no calcula nada de amortización,
+    // solo guarda el resultado ya calculado y arma `pagos` para que encaje
+    // en la validación normal (línea con metodo:'credito_electrodomesticos'
+    // por el saldo financiado, que NO dispara la creación de cartera_cxc
+    // — eso vive aparte en creditos_electrodomesticos_cuotas).
+    const [showModalCreditoElectro, setShowModalCreditoElectro] = useState(false)
+    const [creditoElectroResultado, setCreditoElectroResultado] = useState<CreditoElectroConfirmado | null>(null)
 
     // Estado: retenciones que el CLIENTE le practica a la empresa (inverso de
     // retenciones a proveedores) + observación libre del comprobante
@@ -1057,6 +1068,26 @@ export function FacturaDirectaPage() {
     const updatePago = (idx: number, field: keyof PagoFactura, value: any) =>
         setPagos(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p))
 
+    // Al confirmar el wizard: reemplaza TODA la sección de pagos por la
+    // entrada real (si hay) + el saldo financiado, para que la validación
+    // normal de "formas de pago deben cubrir el total" (más abajo) se
+    // cumpla sola, sin tocar esa lógica.
+    function handleConfirmarCreditoElectro(r: CreditoElectroConfirmado) {
+        const nuevosPagos: PagoFactura[] = []
+        if (r.valorEntrada > 0) {
+            nuevosPagos.push({ metodo: r.metodoEntrada, valor: r.valorEntrada, referencia: '' })
+        }
+        nuevosPagos.push({ metodo: 'credito_electrodomesticos', valor: totales.total - r.valorEntrada, referencia: '' })
+        setPagos(nuevosPagos)
+        setCreditoElectroResultado(r)
+        setShowModalCreditoElectro(false)
+    }
+
+    function quitarCreditoElectro() {
+        setCreditoElectroResultado(null)
+        setPagos([{ metodo: 'efectivo', valor: 0, referencia: '' }])
+    }
+
     // ─── TOTALES ──────────────────────────────────────────
     const totales = calcularTotalesFactura(detalles)
     const configRentabilidad: ConfigRentabilidad = (empresa as any)?.config_rentabilidad ?? DEFAULT_CONFIG_RENTABILIDAD
@@ -1290,6 +1321,46 @@ export function FacturaDirectaPage() {
                 created_by: profile?.id ?? null,
             })
 
+            // Crédito Electrodomésticos: se crea DESPUÉS de la factura (ya con
+            // factura_id real), nunca antes — evita el escenario "crédito sin
+            // factura" del requerimiento. Si esto falla, la factura YA quedó
+            // grabada (con la SRI real) — se avisa con el secuencial para que
+            // alguien lo resuelva a mano, no se revierte la factura.
+            if (creditoElectroResultado) {
+                try {
+                    const credito = await creditoElectrodomesticosService.crear({
+                        empresaId: empresa!.id,
+                        facturaId: factura.id,
+                        clienteId: selectedCliente.id,
+                        garanteClienteId: creditoElectroResultado.garanteClienteId,
+                        cobradorId: creditoElectroResultado.cobradorId,
+                        totalFactura: totales.total,
+                        valorEntrada: creditoElectroResultado.valorEntrada,
+                        baseCalculoInteres: creditoElectroResultado.baseCalculoInteres,
+                        tipoTasa: creditoElectroResultado.tipoTasa,
+                        tasaValor: creditoElectroResultado.tasaValor,
+                        periodicidad: creditoElectroResultado.periodicidad,
+                        numeroCuotas: creditoElectroResultado.numeroCuotas,
+                        fechaPrimerVencimiento: creditoElectroResultado.fechaPrimerVencimiento,
+                        observaciones: creditoElectroResultado.observaciones || undefined,
+                        createdBy: profile?.id ?? undefined,
+                    })
+                    // Si el SRI ya autorizó en esta misma llamada síncrona (lo usual),
+                    // el crédito pasa a VIGENTE de una. Si no, queda en CALCULADO —
+                    // todavía no hay un job que lo pase a VIGENTE cuando el reintento
+                    // automático autorice más tarde (pendiente para una fase futura).
+                    if ((factura as any).estado_sri === 'AUTORIZADO') {
+                        await creditoElectrodomesticosService.marcarVigente(credito.id)
+                    }
+                    setCreditoElectroResultado(null)
+                } catch (eCredito: any) {
+                    alert(
+                        `La factura ${factura.secuencial} se emitió correctamente, pero el crédito de electrodomésticos NO se pudo registrar:\n\n${eCredito.message}\n\n` +
+                        `Anota este número de factura y avisa para registrar el crédito manualmente.`
+                    )
+                }
+            }
+
             const facturaCompleta = await facturaDirectaService.getComprobanteCompleto(factura.id)
             clearDraft()
             setTicketMontoRecibido(_mRecibido)
@@ -1354,6 +1425,7 @@ export function FacturaDirectaPage() {
         setDetalles([{ ...DETALLE_VACIO }])
         setPagos([{ metodo: 'efectivo', valor: 0, referencia: '' }])
         setMontoRecibido(0)
+        setCreditoElectroResultado(null)
         setRetenciones([])
         setNumeroRetencion('')
         setRetSeccion(false)
@@ -2167,6 +2239,31 @@ export function FacturaDirectaPage() {
                             </button>
                         </div>
 
+                        {/* Crédito Electrodomésticos — botón separado del selector normal de
+                            forma de pago (Decisión 1): solo visible con el toggle de empresa
+                            activo, y nunca para Consumidor Final. */}
+                        {empresa?.habilita_ventas_electrodomesticos_credito && selectedCliente && selectedCliente.identificacion !== '9999999999999' && (
+                            creditoElectroResultado ? (
+                                <div className="flex items-center justify-between gap-3 bg-violet-50 border border-violet-200 rounded-xl p-3">
+                                    <div className="text-sm text-violet-800">
+                                        <span className="font-bold">🏠 Crédito Electrodomésticos configurado</span>
+                                        <span className="block text-xs text-violet-600 mt-0.5">
+                                            {creditoElectroResultado.numeroCuotas} cuotas · {creditoElectroResultado.periodicidad.toLowerCase()} · entrada {formatCurrency(creditoElectroResultado.valorEntrada)}
+                                        </span>
+                                    </div>
+                                    <button onClick={quitarCreditoElectro} className="text-xs font-bold text-violet-600 hover:text-violet-800 shrink-0">
+                                        Quitar
+                                    </button>
+                                </div>
+                            ) : (
+                                <button onClick={() => setShowModalCreditoElectro(true)}
+                                    disabled={detalles.every(d => !d.nombre_producto)}
+                                    className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-violet-200 rounded-xl text-violet-600 hover:border-violet-400 hover:bg-violet-50 text-sm font-bold transition-colors disabled:opacity-40">
+                                    🏠 Vender a Crédito de Electrodomésticos
+                                </button>
+                            )
+                        )}
+
                         {pagos.some(p => p.metodo === 'credito') && (
                             <div className="flex flex-wrap items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl p-3">
                                 <CreditCard className="w-5 h-5 text-amber-600 shrink-0" />
@@ -2201,6 +2298,15 @@ export function FacturaDirectaPage() {
 
                         <div className="space-y-3">
                             {pagos.map((p, i) => (
+                                p.metodo === 'credito_electrodomesticos' ? (
+                                    // Línea generada por el wizard — de solo lectura aquí, se
+                                    // edita quitando/rehaciendo el crédito, no esta fila (no
+                                    // aparece en METODOS_PAGO a propósito, ver PagoFactura).
+                                    <div key={i} className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg bg-violet-50 border border-violet-100 text-sm">
+                                        <span className="font-semibold text-violet-700">🏠 Crédito Electrodomésticos (saldo financiado)</span>
+                                        <span className="font-bold text-violet-900">{formatCurrency(p.valor)}</span>
+                                    </div>
+                                ) : (
                                 <div key={i} className="space-y-1.5 animate-in fade-in">
                                     <div className="flex gap-2 items-center flex-wrap">
                                         <select
@@ -2315,6 +2421,7 @@ export function FacturaDirectaPage() {
                                         </div>
                                     )}
                                 </div>
+                                )
                             ))}
                         </div>
                     </div>
@@ -2690,6 +2797,15 @@ export function FacturaDirectaPage() {
                 servicios={productos}
                 onApply={handleVoiceApply}
                 empresaId={empresa!.id}
+            />
+        )}
+
+        {showModalCreditoElectro && empresa?.id && (
+            <ModalCreditoElectrodomesticos
+                empresaId={empresa.id}
+                totalFactura={totales.total}
+                onCancel={() => setShowModalCreditoElectro(false)}
+                onConfirm={handleConfirmarCreditoElectro}
             />
         )}
         </>
