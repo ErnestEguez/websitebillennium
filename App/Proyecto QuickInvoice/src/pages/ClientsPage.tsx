@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { HelpButton } from '../components/help/HelpButton'
 import { facturacionService, BASE_LEGAL_TRATAMIENTO_LABELS } from '../services/facturacionService'
 import type { Cliente, BaseLegalTratamiento } from '../services/facturacionService'
+import { clienteCedulaService } from '../services/clienteCedulaService'
 import { useAuth } from '../contexts/AuthContext'
 import { useLopdpEnabled } from '../hooks/useLopdpEnabled'
 import {
@@ -18,6 +19,9 @@ import {
     EyeOff,
     ChevronDown,
     ChevronUp,
+    Camera,
+    Download,
+    ImageOff,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { validateIdentificacion } from '../lib/utils'
@@ -33,6 +37,10 @@ export function ClientsPage() {
     const [isSearchingSRI, setIsSearchingSRI] = useState(false)
     const [showBaja, setShowBaja] = useState(false)
     const [restorandoId, setRestorandoId] = useState<string | null>(null)
+
+    // Cédula del cliente/garante — 2 imágenes, URLs firmadas (bucket privado)
+    const [cedulaUrls, setCedulaUrls] = useState<{ 1?: string; 2?: string }>({})
+    const [subiendoCedula, setSubiendoCedula] = useState<1 | 2 | null>(null)
 
     // Búsqueda con filtro activo (modo normal)
     async function buscarClientes() {
@@ -150,6 +158,48 @@ export function ClientsPage() {
         }
     }
 
+    async function cargarUrlsCedula(cliente: Partial<Cliente>) {
+        const urls: { 1?: string; 2?: string } = {}
+        try {
+            if (cliente.cedula_imagen1_path) urls[1] = await clienteCedulaService.urlFirmada(cliente.cedula_imagen1_path)
+            if (cliente.cedula_imagen2_path) urls[2] = await clienteCedulaService.urlFirmada(cliente.cedula_imagen2_path)
+        } catch (e) {
+            console.error('Error cargando imágenes de cédula:', e)
+        }
+        setCedulaUrls(urls)
+    }
+
+    async function handleSubirCedula(slot: 1 | 2, file: File) {
+        if (!editingCliente?.id || !empresa?.id) return
+        setSubiendoCedula(slot)
+        try {
+            const path = await clienteCedulaService.subirImagen(empresa.id, editingCliente.id, slot, file)
+            const campo = slot === 1 ? 'cedula_imagen1_path' : 'cedula_imagen2_path'
+            setEditingCliente(prev => ({ ...prev!, [campo]: path }))
+            const url = await clienteCedulaService.urlFirmada(path)
+            setCedulaUrls(prev => ({ ...prev, [slot]: url }))
+        } catch (e: any) {
+            alert('Error al subir la imagen: ' + e.message)
+        } finally {
+            setSubiendoCedula(null)
+        }
+    }
+
+    async function handleEliminarCedula(slot: 1 | 2) {
+        if (!editingCliente?.id) return
+        const path = slot === 1 ? editingCliente.cedula_imagen1_path : editingCliente.cedula_imagen2_path
+        if (!path) return
+        if (!confirm('¿Eliminar esta imagen de la cédula?')) return
+        try {
+            await clienteCedulaService.eliminarImagen(editingCliente.id, slot, path)
+            const campo = slot === 1 ? 'cedula_imagen1_path' : 'cedula_imagen2_path'
+            setEditingCliente(prev => ({ ...prev!, [campo]: null }))
+            setCedulaUrls(prev => ({ ...prev, [slot]: undefined }))
+        } catch (e: any) {
+            alert('Error al eliminar la imagen: ' + e.message)
+        }
+    }
+
     async function handleDelete(id: string, identificacion: string) {
         if (identificacion === '9999999999999') {
             alert('El Consumidor Final no puede darse de baja.')
@@ -199,6 +249,7 @@ export function ClientsPage() {
                         data-sentinel="btn-nuevo-cliente"
                         onClick={() => {
                             setEditingCliente({ identificacion: '', nombre: '', email: '', direccion: '' })
+                            setCedulaUrls({})
                             setIsModalOpen(true)
                         }}
                         className="btn btn-primary flex items-center gap-2"
@@ -284,7 +335,7 @@ export function ClientsPage() {
                                                 ) : (
                                                     <>
                                                         <button
-                                                            onClick={() => { setEditingCliente(cliente); setIsModalOpen(true) }}
+                                                            onClick={() => { setEditingCliente(cliente); setIsModalOpen(true); cargarUrlsCedula(cliente) }}
                                                             className="p-2 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg text-slate-400 hover:text-primary-600 transition-all"
                                                         >
                                                             <Edit2 className="w-4 h-4" />
@@ -395,6 +446,57 @@ export function ClientsPage() {
                                     onChange={(e) => setEditingCliente({ ...editingCliente, telefono: e.target.value })}
                                 />
                             </div>
+
+                            {editingCliente?.id ? (
+                                <div className="pt-3 border-t border-slate-100 space-y-3">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Cédula / Identificación (2 imágenes)</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {([1, 2] as const).map(slot => {
+                                            const url = cedulaUrls[slot]
+                                            const subiendo = subiendoCedula === slot
+                                            return (
+                                                <div key={slot} className="border border-slate-200 rounded-lg p-2 space-y-2">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Imagen {slot}</p>
+                                                    {url ? (
+                                                        <>
+                                                            <img src={url} alt={`Cédula ${slot}`} className="w-full h-24 object-cover rounded" />
+                                                            <div className="flex gap-1">
+                                                                <a href={url} download={`cedula_${slot}.jpg`}
+                                                                    className="flex-1 flex items-center justify-center gap-1 py-1 text-[11px] font-bold bg-slate-100 text-slate-600 rounded hover:bg-slate-200">
+                                                                    <Download className="w-3 h-3" /> Descargar
+                                                                </a>
+                                                                <button type="button" onClick={() => handleEliminarCedula(slot)}
+                                                                    className="px-2 py-1 text-[11px] font-bold bg-red-50 text-red-600 rounded hover:bg-red-100">
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <label className="flex flex-col items-center justify-center gap-1 h-24 border-2 border-dashed border-slate-200 rounded cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+                                                            {subiendo ? (
+                                                                <Loader2 className="w-5 h-5 text-primary-500 animate-spin" />
+                                                            ) : (
+                                                                <>
+                                                                    <Camera className="w-5 h-5 text-slate-300" />
+                                                                    <span className="text-[10px] text-slate-400 font-semibold">Capturar / Subir</span>
+                                                                </>
+                                                            )}
+                                                            <input type="file" accept="image/*" capture="environment" className="hidden"
+                                                                disabled={subiendo}
+                                                                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleSubirCedula(slot, f); e.target.value = '' }} />
+                                                        </label>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-400">
+                                    <ImageOff className="w-4 h-4 shrink-0" />
+                                    Guarda el cliente primero para poder capturar las imágenes de su cédula.
+                                </div>
+                            )}
 
                             <div className="pt-3 border-t border-slate-100 space-y-3">
                                 <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Facturación Masiva</p>

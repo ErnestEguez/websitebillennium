@@ -37,6 +37,17 @@ const MODULOS = [
         ],
     },
     {
+        key: 'credito', label: 'Ventas a Crédito',
+        items: [
+            { field: 'perm_credito_solicitud',         label: 'Solicitud de Crédito' },
+            { field: 'perm_credito_electrodomesticos', label: 'Créditos Electrodomésticos' },
+            { field: 'perm_credito_cobros',            label: 'Cancelación Oficina' },
+            { field: 'perm_credito_cobros_movil',      label: 'Cancelación Móvil' },
+            { field: 'perm_credito_consulta_cartera',  label: 'Consulta General de Cartera' },
+            { field: 'perm_credito_estado_cuenta',     label: 'Estado de Cuenta por Cliente' },
+        ],
+    },
+    {
         key: 'inventario', label: 'Inventarios',
         items: [
             { field: 'perm_productos',             label: 'Artículos' },

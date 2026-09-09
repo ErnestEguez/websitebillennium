@@ -114,13 +114,16 @@ import { CierreCajaModal } from './CierreCajaModal'
 // Ítem de submenú "por construir" — visible (para mostrar el mapa completo
 // del módulo) pero no clickeable, a diferencia de SidebarItem.disabled que
 // se OCULTA por completo (ese es para permisos, no para "todavía no existe").
-const SidebarItemPendiente = ({ icon: Icon, label }: { icon: React.ElementType; label: string }) => (
+const SidebarItemPendiente = ({ icon: Icon, label, disabled }: { icon: React.ElementType; label: string; disabled?: boolean }) => {
+    if (disabled) return null  // ocultar completamente cuando no tiene permiso, igual que SidebarItem
+    return (
     <div title="Todavía no está construido" className="flex items-center gap-3 pl-8 py-2 rounded-lg text-sm text-slate-300 cursor-not-allowed select-none">
         <Icon className="w-4 h-4 shrink-0 text-slate-200" />
         <span className="flex-1">{label}</span>
         <span className="text-[9px] font-bold uppercase tracking-wide bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded shrink-0">Pronto</span>
     </div>
-)
+    )
+}
 
 // Sección expandible de módulo principal
 function ModuleSection({ label, icon: Icon, colorClass, isOpen, onToggle, isSidebarOpen, anyActive, children }: {
@@ -416,16 +419,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     </button>
                                     {openGroups.includes('ventas-credito') && isSidebarOpen && (
                                         <div className="ml-3 border-l-2 border-slate-100 pl-2 space-y-0.5">
-                                            <a href="/documentos/solicitud-credito-electrodomesticos.pdf" target="_blank" rel="noopener noreferrer"
-                                                className="flex items-center gap-3 pl-8 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900">
-                                                <FilePlus className="w-4 h-4 shrink-0 text-slate-400" />
-                                                <span className="flex-1">Solicitud de Crédito</span>
-                                            </a>
+                                            {p.perm_credito_solicitud && (
+                                                <a href="/documentos/solicitud-credito-electrodomesticos.pdf" target="_blank" rel="noopener noreferrer"
+                                                    className="flex items-center gap-3 pl-8 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+                                                    <FilePlus className="w-4 h-4 shrink-0 text-slate-400" />
+                                                    <span className="flex-1">Solicitud de Crédito</span>
+                                                </a>
+                                            )}
                                             <SidebarItem to="/creditos-electrodomesticos" icon={Home} label="Créditos Electrodomésticos" active={location.pathname === '/creditos-electrodomesticos'} sub disabled={!p.perm_credito_electrodomesticos} />
                                             <SidebarItem to="/cancelacion-oficina" icon={Receipt} label="Cancelación Oficina" active={location.pathname === '/cancelacion-oficina'} sub disabled={!p.perm_credito_cobros} />
-                                            <SidebarItemPendiente icon={Truck} label="Cancelación Móvil" />
-                                            <SidebarItemPendiente icon={FileSearch} label="Consulta General de Cartera" />
-                                            <SidebarItemPendiente icon={BarChart3} label="Estado de Cuenta por Cliente" />
+                                            <SidebarItemPendiente icon={Truck} label="Cancelación Móvil" disabled={!p.perm_credito_cobros_movil} />
+                                            <SidebarItemPendiente icon={FileSearch} label="Consulta General de Cartera" disabled={!p.perm_credito_consulta_cartera} />
+                                            <SidebarItemPendiente icon={BarChart3} label="Estado de Cuenta por Cliente" disabled={!p.perm_credito_estado_cuenta} />
                                         </div>
                                     )}
                                 </div>

@@ -23,6 +23,169 @@ const METODOS: { value: MetodoPagoCredito; label: string }[] = [
     { value: 'otros', label: '🔄 Otros' },
 ]
 
+const METODO_LABEL_PLANO: Record<MetodoPagoCredito, string> = {
+    efectivo: 'Efectivo',
+    transferencia: 'Depósito / Transferencia',
+    tarjeta: 'Tarjeta',
+    cheque: 'Cheque',
+    nota_credito: 'Nota de Crédito',
+    otros: 'Otros',
+}
+
+// ─── Comprobante de cobro A4 ────────────────────────────────────────────────
+// Mismo patrón que generarHtmlA4 en ProformaPage.tsx: HTML en memoria,
+// ventana nueva + print(), nunca se persiste el PDF en ningún lado.
+
+function esc(s: string | null | undefined): string {
+    if (!s) return ''
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+function n2(n: number): string { return n.toFixed(2) }
+
+function generarComprobanteCobroA4(input: {
+    empresa: { nombre: string; ruc: string; logo_url?: string | null }
+    credito: CreditoElectrodomesticos
+    reciboInterno: number
+    reciboExterno: string | null
+    fecha: string
+    metodoPago: MetodoPagoCredito
+    cuentaBancariaLabel: string | null
+    papeletaDeposito: string | null
+    aplicaciones: { numeroCuota: number; moraAplicada: number; interesAplicado: number; capitalAplicado: number; totalAplicado: number; quedaSaldoEnCuota: boolean }[]
+    montoCobrado: number
+    saldoRestante: number
+}): string {
+    const { empresa: emp, credito, reciboInterno, reciboExterno, fecha, metodoPago, cuentaBancariaLabel, papeletaDeposito, aplicaciones, montoCobrado, saldoRestante } = input
+    const fechaFormat = new Date(fecha + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })
+    const logoHtml = emp.logo_url
+        ? `<img src="${esc(emp.logo_url)}" alt="Logo" style="max-height:65px;max-width:150px;object-fit:contain;margin-bottom:6px;">`
+        : ''
+
+    const filas = aplicaciones.map(a => `
+        <tr>
+          <td class="c">${a.numeroCuota}</td>
+          <td class="r">${a.moraAplicada > 0 ? n2(a.moraAplicada) : '—'}</td>
+          <td class="r">${n2(a.interesAplicado)}</td>
+          <td class="r">${n2(a.capitalAplicado)}</td>
+          <td class="r bold">${n2(a.totalAplicado)}</td>
+          <td class="c">${a.quedaSaldoEnCuota ? 'Parcial' : 'Saldada'}</td>
+        </tr>`).join('')
+
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Recibo ${reciboInterno}</title>
+<style>
+  @page { margin: 14mm 14mm 18mm 14mm; size: A4; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,Helvetica,sans-serif;font-size:9.5pt;color:#1a1a2e}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;
+          padding-bottom:12px;margin-bottom:14px;border-bottom:3px solid #059669}
+  .emp h1{font-size:14pt;font-weight:900;color:#059669;margin-bottom:3px}
+  .emp p{font-size:8.5pt;color:#555;line-height:1.6}
+  .doc-box{text-align:right}
+  .doc-box .titulo{font-size:14pt;font-weight:900;color:#059669;letter-spacing:.5px}
+  .doc-box .numero{font-family:monospace;font-size:10pt;font-weight:bold;color:#1a1a2e}
+  .doc-box .fec{font-size:8.5pt;color:#555;margin-top:3px}
+  .cli-box{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:7px;
+           padding:10px 14px;margin-bottom:14px}
+  .cli-box h4{font-size:7pt;font-weight:900;text-transform:uppercase;letter-spacing:1px;
+              color:#059669;margin-bottom:6px}
+  .cli-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 20px}
+  .lbl{font-size:8pt;color:#888}
+  .val{font-size:9pt;font-weight:bold;color:#1a1a2e}
+  table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:8.5pt}
+  thead tr{background:#059669;color:#fff}
+  thead th{padding:6px 8px;text-align:left;font-size:7.5pt;font-weight:bold}
+  tbody tr:nth-child(even){background:#f0fdf4}
+  tbody td{padding:5px 8px;border-bottom:1px solid #d1fae5}
+  .c{text-align:center}
+  .r{text-align:right}
+  .bold{font-weight:bold}
+  .totbox{width:280px;margin-left:auto;border:1px solid #a7f3d0;border-radius:7px;overflow:hidden}
+  .totbox table{margin-bottom:0}
+  .totbox tr td{padding:5px 10px;border-bottom:1px solid #d1fae5;font-size:9pt}
+  .totbox tr:last-child td{background:#059669;color:#fff;font-size:11pt;font-weight:900;border-bottom:none}
+  .totbox td:last-child{text-align:right;font-weight:bold}
+  .footer{margin-top:18px;border-top:1px solid #d1fae5;padding-top:8px;
+          text-align:center;font-size:7.5pt;color:#aaa}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="emp">
+    ${logoHtml}
+    <h1>${esc(emp.nombre)}</h1>
+    <p>RUC: <strong>${esc(emp.ruc)}</strong></p>
+  </div>
+  <div class="doc-box">
+    <div class="titulo">RECIBO DE COBRO</div>
+    <div class="numero">N.º ${reciboInterno}</div>
+    ${reciboExterno ? `<div class="numero" style="font-size:8.5pt;color:#555">Externo: ${esc(reciboExterno)}</div>` : ''}
+    <div class="fec">Fecha: ${fechaFormat}</div>
+  </div>
+</div>
+
+<div class="cli-box">
+  <h4>Datos del crédito</h4>
+  <div class="cli-grid">
+    <div>
+      <div class="lbl">Cliente</div>
+      <div class="val">${esc(credito.clientes?.nombre)}</div>
+    </div>
+    <div>
+      <div class="lbl">Identificación</div>
+      <div class="val">${esc(credito.clientes?.identificacion)}</div>
+    </div>
+    <div>
+      <div class="lbl">Factura</div>
+      <div class="val">${esc(credito.comprobantes?.secuencial)}</div>
+    </div>
+    <div>
+      <div class="lbl">Cobrador</div>
+      <div class="val">${esc(credito.cobradores?.nombres)}</div>
+    </div>
+    <div>
+      <div class="lbl">Forma de pago</div>
+      <div class="val">${esc(METODO_LABEL_PLANO[metodoPago])}</div>
+    </div>
+    ${cuentaBancariaLabel ? `<div><div class="lbl">Cuenta bancaria</div><div class="val">${esc(cuentaBancariaLabel)}</div></div>` : ''}
+    ${papeletaDeposito ? `<div><div class="lbl"># Papeleta de depósito</div><div class="val">${esc(papeletaDeposito)}</div></div>` : ''}
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th class="c" style="width:60px">Cuota</th>
+      <th class="r">Mora</th>
+      <th class="r">Interés</th>
+      <th class="r">Capital</th>
+      <th class="r">Total</th>
+      <th class="c" style="width:70px">Estado</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${filas || '<tr><td colspan="6" style="text-align:center;color:#aaa;padding:14px">Sin cuotas aplicadas</td></tr>'}
+  </tbody>
+</table>
+
+<div class="totbox">
+  <table>
+    <tr><td>Saldo restante del crédito</td><td>$ ${n2(saldoRestante)}</td></tr>
+    <tr><td>TOTAL COBRADO</td><td>$ ${n2(montoCobrado)}</td></tr>
+  </table>
+</div>
+
+<div class="footer">
+  Recibo de cobro interno — Corina ERP &nbsp;·&nbsp; ${new Date().toLocaleDateString('es-EC')}
+</div>
+</body>
+</html>`
+}
+
 type Paso = 'cliente' | 'credito' | 'cobro'
 
 export function CancelacionOficinaPage() {
@@ -145,6 +308,29 @@ export function CancelacionOficinaPage() {
             setReciboConfirmado(r.reciboInterno)
             const actualizado = await creditoElectrodomesticosService.getCompleto(credito.id)
             setCredito(actualizado)
+
+            const cuentaSeleccionada = cuentaBancariaId ? cuentas.find(c => c.id === cuentaBancariaId) : null
+            const html = generarComprobanteCobroA4({
+                empresa: empresa!,
+                credito: actualizado,
+                reciboInterno: r.reciboInterno,
+                reciboExterno: reciboExterno || null,
+                fecha: HOY,
+                metodoPago,
+                cuentaBancariaLabel: cuentaSeleccionada ? `${cuentaSeleccionada.banco?.nombre ?? ''} — ${cuentaSeleccionada.numero_cuenta}` : null,
+                papeletaDeposito: metodoPago === 'transferencia' ? (papeletaDeposito || null) : null,
+                aplicaciones: r.distribucion.aplicaciones,
+                montoCobrado: montoCobrar,
+                saldoRestante: actualizado.saldo_pendiente,
+            })
+            const win = window.open('', '_blank', 'width=900,height=700')
+            if (win) {
+                win.document.write(html)
+                win.document.close()
+                win.focus()
+                setTimeout(() => { win.print() }, 450)
+            }
+
             setMontoCobrar(0)
         } catch (e: any) {
             alert('Error al registrar el cobro: ' + e.message)

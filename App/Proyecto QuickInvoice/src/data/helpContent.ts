@@ -238,6 +238,14 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                 texto: 'Haz clic en el ícono de edición (lápiz) en la fila del cliente para modificar sus datos. Para desactivar un cliente (dado de baja) usa el ícono de papelera: el cliente deja de aparecer en búsquedas pero sus facturas históricas se conservan intactas. Para restaurar un cliente desactivado, activa el filtro "Ver dados de baja".',
                 alerta: 'No se puede eliminar un cliente que tenga facturas emitidas. Solo se puede desactivar.',
             },
+            {
+                titulo: 'Cédula / Identificación',
+                texto: 'Dentro de "Editar Cliente" puedes capturar o subir hasta 2 imágenes de la cédula (o cualquier documento de identidad) — útil para clientes y garantes de créditos de electrodomésticos, ya que el garante es también un registro de este mismo catálogo. Solo está disponible después de guardar el cliente por primera vez.',
+                tips: [
+                    'En celular, el botón abre directamente la cámara.',
+                    'Las imágenes se guardan en un bucket privado — no son accesibles por URL pública, solo descargables desde este formulario.',
+                ],
+            },
         ],
     },
 

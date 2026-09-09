@@ -118,6 +118,12 @@ export interface Permisos {
     perm_aprobar_excepcion_credito:      boolean
     perm_reversar_pago_credito:          boolean
     perm_anular_credito_electrodomesticos: boolean
+    // Ítems del submenú "Ventas a Crédito" — uno por cada entrada del
+    // sidebar, para poder darle a un cobrador acceso a una sola opción.
+    perm_credito_solicitud:              boolean
+    perm_credito_cobros_movil:           boolean
+    perm_credito_consulta_cartera:       boolean
+    perm_credito_estado_cuenta:          boolean
 }
 
 interface AuthContextType {
@@ -217,6 +223,10 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_aprobar_excepcion_credito:      false,
     perm_reversar_pago_credito:          false,
     perm_anular_credito_electrodomesticos: false,
+    perm_credito_solicitud:              true,
+    perm_credito_cobros_movil:           true,
+    perm_credito_consulta_cartera:       true,
+    perm_credito_estado_cuenta:          true,
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -478,6 +488,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_aprobar_excepcion_credito:      permData.perm_aprobar_excepcion_credito      ?? false,
                     perm_reversar_pago_credito:          permData.perm_reversar_pago_credito          ?? false,
                     perm_anular_credito_electrodomesticos: permData.perm_anular_credito_electrodomesticos ?? false,
+                    perm_credito_solicitud:              permData.perm_credito_solicitud              ?? true,
+                    perm_credito_cobros_movil:           permData.perm_credito_cobros_movil           ?? true,
+                    perm_credito_consulta_cartera:       permData.perm_credito_consulta_cartera       ?? true,
+                    perm_credito_estado_cuenta:          permData.perm_credito_estado_cuenta          ?? true,
                 } : DEFAULT_PERMISOS)
             }
         } catch {
