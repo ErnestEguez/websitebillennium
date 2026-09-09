@@ -42,6 +42,7 @@ const CodigosRetencionPage         = lz(() => import('./pages/CodigosRetencionPa
 const VendedoresPage               = lz(() => import('./pages/VendedoresPage'), 'VendedoresPage')
 const CobradoresPage               = lz(() => import('./pages/CobradoresPage'), 'CobradoresPage')
 const CreditosElectrodomesticosPage = lz(() => import('./pages/vendor/CreditosElectrodomesticosPage'), 'CreditosElectrodomesticosPage')
+const CancelacionOficinaPage = lz(() => import('./pages/vendor/CancelacionOficinaPage'), 'CancelacionOficinaPage')
 const CarteraCxcPage               = lz(() => import('./pages/CarteraCxcPage'), 'CarteraCxcPage')
 const CarteraPaPage                = lz(() => import('./pages/CarteraPaPage'), 'CarteraPaPage')
 const ConsultaVentasPage           = lz(() => import('./pages/ConsultaVentasPage'), 'ConsultaVentasPage')
@@ -548,6 +549,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <CreditosElectrodomesticosPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/cancelacion-oficina" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <CancelacionOficinaPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

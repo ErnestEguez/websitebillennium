@@ -416,9 +416,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     </button>
                                     {openGroups.includes('ventas-credito') && isSidebarOpen && (
                                         <div className="ml-3 border-l-2 border-slate-100 pl-2 space-y-0.5">
-                                            <SidebarItemPendiente icon={FilePlus} label="Solicitud de Crédito" />
+                                            <a href="/documentos/solicitud-credito-electrodomesticos.pdf" target="_blank" rel="noopener noreferrer"
+                                                className="flex items-center gap-3 pl-8 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+                                                <FilePlus className="w-4 h-4 shrink-0 text-slate-400" />
+                                                <span className="flex-1">Solicitud de Crédito</span>
+                                            </a>
                                             <SidebarItem to="/creditos-electrodomesticos" icon={Home} label="Créditos Electrodomésticos" active={location.pathname === '/creditos-electrodomesticos'} sub disabled={!p.perm_credito_electrodomesticos} />
-                                            <SidebarItemPendiente icon={Receipt} label="Cancelación Oficina" />
+                                            <SidebarItem to="/cancelacion-oficina" icon={Receipt} label="Cancelación Oficina" active={location.pathname === '/cancelacion-oficina'} sub disabled={!p.perm_credito_cobros} />
                                             <SidebarItemPendiente icon={Truck} label="Cancelación Móvil" />
                                             <SidebarItemPendiente icon={FileSearch} label="Consulta General de Cartera" />
                                             <SidebarItemPendiente icon={BarChart3} label="Estado de Cuenta por Cliente" />

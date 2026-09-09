@@ -106,6 +106,26 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    'cancelacion-oficina': {
+        titulo: 'Cancelación Oficina',
+        subtitulo: 'Cobro de cuotas de crédito de electrodomésticos en ventanilla',
+        secciones: [
+            {
+                titulo: '¿Cómo funciona?',
+                texto: 'Busca al cliente con deuda, elige el crédito (si tiene más de uno con saldo) y registra el cobro. Un mismo pago puede cubrir varias cuotas: si el valor ingresado alcanza para saldar una cuota, el excedente pasa automáticamente a la siguiente. También se permite grabar un pago menor a una cuota completa (abono parcial).',
+                tips: [
+                    'Dentro de cada cuota, el pago se aplica en este orden: mora → interés → capital.',
+                    'Puedes cambiar el cobrador asignado al crédito desde el mismo dropdown, sin salir de la pantalla.',
+                ],
+                alerta: 'Recibo interno = consecutivo automático del sistema (no se puede editar). Recibo externo = el número que escribes a mano desde el talonario físico — el sistema no lo valida, solo lo guarda como referencia.',
+            },
+            {
+                titulo: 'Depósitos/transferencias',
+                texto: 'Si eliges esa forma de pago, debes indicar la cuenta bancaria (viene del catálogo de Finance) y el número de papeleta de depósito.',
+            },
+        ],
+    },
+
     // ─── COMPROBANTES ───────────────────────────────────────────────────────
     'comprobantes': {
         titulo: 'Comprobantes',
