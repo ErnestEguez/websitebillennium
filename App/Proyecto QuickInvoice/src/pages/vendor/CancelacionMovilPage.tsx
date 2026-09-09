@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { HelpButton } from '../../components/help/HelpButton'
 import { supabase } from '../../lib/supabase'
-import { facturacionService, type Cliente } from '../../services/facturacionService'
+import { facturacionService, type Cliente, type SriConfig } from '../../services/facturacionService'
 import { clienteCedulaService } from '../../services/clienteCedulaService'
 import {
     creditoElectrodomesticosService,
@@ -14,7 +14,7 @@ import { cobradorService, type Cobrador } from '../../services/cobradorService'
 import { cuentasBancariasService } from '../../services/finance/bancosService'
 import type { CuentaBancaria } from '../../types/finance'
 import { formatCurrency } from '../../lib/utils'
-import { ArrowLeft, Search, Loader2, MapPin, User, CheckCircle2, DollarSign, Printer } from 'lucide-react'
+import { ArrowLeft, Search, Loader2, MapPin, User, CheckCircle2, DollarSign, Printer, MessageCircle, Mail } from 'lucide-react'
 
 const HOY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guayaquil' })
 
@@ -43,9 +43,10 @@ function esc(s: string | null | undefined): string {
 function n2(n: number): string { return n.toFixed(2) }
 
 interface DatosUltimoCobro {
-    empresa: { nombre: string; ruc: string }
+    empresa: { nombre: string; ruc: string; logo_url?: string | null }
     clienteNombre: string
     clienteIdentificacion: string
+    clienteTelefono: string | null
     facturaSecuencial: string
     cobradorNombre: string
     reciboInterno: number
@@ -55,6 +56,99 @@ interface DatosUltimoCobro {
     aplicaciones: { numeroCuota: number; moraAplicada: number; interesAplicado: number; capitalAplicado: number; totalAplicado: number }[]
     montoCobrado: number
     saldoRestante: number
+}
+
+// Texto plano para WhatsApp (wa.me solo soporta texto pre-llenado, no
+// adjuntos) — se usa como respaldo cuando el navegador no soporta Web
+// Share API con archivos (navigator.share con files).
+function construirTextoWhatsApp(d: DatosUltimoCobro): string {
+    const fecha = new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-EC')
+    const lineasCuotas = d.aplicaciones
+        .map(a => `  • Cuota #${a.numeroCuota}: ${formatCurrency(a.totalAplicado)}`)
+        .join('\n')
+    return [
+        `*${d.empresa.nombre}*`,
+        `RECIBO DE COBRO N.º ${d.reciboInterno}`,
+        `Fecha: ${fecha}`,
+        '',
+        `Cliente: ${d.clienteNombre}`,
+        `Factura: ${d.facturaSecuencial}`,
+        `Cobrador: ${d.cobradorNombre}`,
+        '',
+        'Cuotas aplicadas:',
+        lineasCuotas || '  (ninguna)',
+        '',
+        `*TOTAL COBRADO: ${formatCurrency(d.montoCobrado)}*`,
+        `Saldo restante: ${formatCurrency(d.saldoRestante)}`,
+    ].join('\n')
+}
+
+// Convierte un teléfono local ecuatoriano (ej. "0991234567") a formato
+// internacional para wa.me (ej. "593991234567") — si ya viene con +593 o
+// con otro formato reconocible, lo deja tal cual (solo dígitos).
+function telefonoWhatsApp(telefono: string | null | undefined): string {
+    if (!telefono) return ''
+    const digitos = telefono.replace(/\D/g, '')
+    if (digitos.startsWith('593')) return digitos
+    if (digitos.startsWith('0')) return '593' + digitos.slice(1)
+    return digitos
+}
+
+function construirHtmlCorreoCobroMovil(d: DatosUltimoCobro): string {
+    const fecha = new Date(d.fecha + 'T12:00:00').toLocaleDateString('es-EC')
+    const filas = d.aplicaciones.map(a => `
+        <tr>
+          <td style="padding:6px 4px;border-bottom:1px solid #f3f4f6;text-align:center;font-size:12px">#${a.numeroCuota}</td>
+          <td style="padding:6px 4px;border-bottom:1px solid #f3f4f6;text-align:right;font-size:12px;color:#dc2626">${a.moraAplicada > 0 ? formatCurrency(a.moraAplicada) : '—'}</td>
+          <td style="padding:6px 4px;border-bottom:1px solid #f3f4f6;text-align:right;font-size:12px">${formatCurrency(a.interesAplicado)}</td>
+          <td style="padding:6px 4px;border-bottom:1px solid #f3f4f6;text-align:right;font-size:12px">${formatCurrency(a.capitalAplicado)}</td>
+          <td style="padding:6px 4px;border-bottom:1px solid #f3f4f6;text-align:right;font-size:12px;font-weight:700">${formatCurrency(a.totalAplicado)}</td>
+        </tr>`).join('')
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:24px 0;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.14);">
+<tr><td style="background:linear-gradient(135deg,#059669 0%,#047857 100%);padding:20px 28px;text-align:center">
+  <p style="margin:0;color:#fff;font-size:14px;font-weight:700;">${esc(d.empresa.nombre)}</p>
+  <p style="margin:2px 0 0;color:rgba(255,255,255,0.85);font-size:11px;">RUC: ${esc(d.empresa.ruc)}</p>
+</td></tr>
+<tr><td style="padding:20px 28px 8px;text-align:center">
+  <p style="margin:0;color:#111827;font-size:17px;font-weight:700;">Cobro registrado vía Cobros Móvil</p>
+  <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">Recibo N.º ${d.reciboInterno} · ${fecha}</p>
+</td></tr>
+<tr><td style="padding:8px 28px;color:#374151;font-size:13px;">
+  <b>Cliente:</b> ${esc(d.clienteNombre)} (${esc(d.clienteIdentificacion)})<br>
+  <b>Factura:</b> ${esc(d.facturaSecuencial)}<br>
+  <b>Cobrador:</b> ${esc(d.cobradorNombre)}<br>
+  <b>Forma de pago:</b> ${esc(METODO_LABEL_PLANO[d.metodoPago])}
+</td></tr>
+<tr><td style="padding:12px 28px;">
+  <table width="100%" style="border-collapse:collapse;">
+    <tr>
+      <th style="text-align:center;font-size:11px;color:#9ca3af;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Cuota</th>
+      <th style="text-align:right;font-size:11px;color:#9ca3af;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Mora</th>
+      <th style="text-align:right;font-size:11px;color:#9ca3af;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Interés</th>
+      <th style="text-align:right;font-size:11px;color:#9ca3af;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Capital</th>
+      <th style="text-align:right;font-size:11px;color:#9ca3af;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">Total</th>
+    </tr>
+    ${filas || '<tr><td colspan="5" style="color:#9ca3af;font-size:12px;padding:8px 4px">Sin cuotas aplicadas</td></tr>'}
+  </table>
+</td></tr>
+<tr><td style="padding:16px 28px;background:#f0fdf4;border-top:2px solid #d1fae5;">
+  <table width="100%" style="border-collapse:collapse;font-size:13px;">
+    <tr><td style="padding:4px 0;color:#374151">Saldo restante</td><td style="padding:4px 0;text-align:right">${formatCurrency(d.saldoRestante)}</td></tr>
+    <tr><td style="padding:4px 0;color:#374151;font-weight:700">TOTAL COBRADO</td><td style="padding:4px 0;text-align:right;font-weight:700">${formatCurrency(d.montoCobrado)}</td></tr>
+  </table>
+</td></tr>
+<tr><td style="background:#065f46;padding:14px 28px;text-align:center;">
+  <p style="margin:0;color:rgba(255,255,255,0.55);font-size:10px;">Corina ERP · Notificación automática de cobranza móvil</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`
 }
 
 // Ticket térmico de cobro — mismo patrón que generarHtml80mm en ProformaPage
@@ -155,6 +249,15 @@ function imprimirTicketCobroMovil(d: DatosUltimoCobro, anchoMm: 56 | 80) {
 export function CancelacionMovilPage() {
     const { empresa } = useAuth()
     const [paso, setPaso] = useState<Paso>('cliente')
+
+    // config_sri (mail_cc para la notificación interna de cada cobro) — no
+    // viene en el contexto de auth, se carga aparte igual que en ProformaPage.
+    const [configSri, setConfigSri] = useState<SriConfig | undefined>(undefined)
+    useEffect(() => {
+        if (!empresa?.id) return
+        supabase.from('empresas').select('config_sri').eq('id', empresa.id).single()
+            .then(({ data }) => { if (data) setConfigSri((data as any).config_sri) })
+    }, [empresa?.id])
 
     // Paso 1: cliente
     const [busqueda, setBusqueda] = useState('')
@@ -268,6 +371,8 @@ export function CancelacionMovilPage() {
     const [guardando, setGuardando] = useState(false)
     const [reciboConfirmado, setReciboConfirmado] = useState<number | null>(null)
     const [ultimoCobro, setUltimoCobro] = useState<DatosUltimoCobro | null>(null)
+    const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false)
+    const reciboVisualRef = useRef<HTMLDivElement>(null)
 
     const previa: ResultadoDistribucionPago | null = credito && montoCobrar > 0
         ? distribuirPagoCuotas(cuotasParaCobro, montoCobrar, HOY, 0, 0)
@@ -305,10 +410,11 @@ export function CancelacionMovilPage() {
             setReciboConfirmado(r.reciboInterno)
             const actualizado = await creditoElectrodomesticosService.getCompleto(credito.id)
             setCredito(actualizado)
-            setUltimoCobro({
-                empresa: { nombre: empresa!.nombre, ruc: empresa!.ruc },
+            const datosCobro: DatosUltimoCobro = {
+                empresa: { nombre: empresa!.nombre, ruc: empresa!.ruc, logo_url: empresa!.logo_url },
                 clienteNombre: actualizado.clientes?.nombre ?? '',
                 clienteIdentificacion: actualizado.clientes?.identificacion ?? '',
+                clienteTelefono: clienteFull?.telefono ?? null,
                 facturaSecuencial: actualizado.comprobantes?.secuencial ?? '',
                 cobradorNombre: actualizado.cobradores?.nombres ?? '',
                 reciboInterno: r.reciboInterno,
@@ -318,12 +424,72 @@ export function CancelacionMovilPage() {
                 aplicaciones: r.distribucion.aplicaciones,
                 montoCobrado: montoCobrar,
                 saldoRestante: actualizado.saldo_pendiente,
-            })
+            }
+            setUltimoCobro(datosCobro)
             setMontoCobrar(0)
+
+            // Notificación interna: cada cobro hecho por esta vía se envía al
+            // correo configurado como copia en Configuración SRI → Servidor de
+            // correo — sin bloquear la UI, y sin avisar si falla (secundario).
+            if (configSri?.mail_cc) {
+                supabase.functions.invoke('enviar-reporte-interno', {
+                    body: {
+                        empresa_id: empresa!.id,
+                        destinatario: configSri.mail_cc,
+                        asunto: `Cobro móvil registrado — recibo #${r.reciboInterno}`,
+                        html: construirHtmlCorreoCobroMovil(datosCobro),
+                    },
+                }).catch(e => console.error('Error notificando cobro móvil por correo:', e))
+            }
         } catch (e: any) {
             alert('Error al registrar el cobro: ' + e.message)
         } finally {
             setGuardando(false)
+        }
+    }
+
+    // Envía el ticket al cliente por WhatsApp: intenta compartir la imagen
+    // del recibo (Web Share API con archivos — soportado en navegadores
+    // móviles modernos); si el dispositivo no lo soporta, cae a un enlace
+    // wa.me con el mismo contenido en texto (wa.me no acepta adjuntos).
+    async function handleEnviarWhatsApp() {
+        if (!ultimoCobro) return
+        setEnviandoWhatsApp(true)
+        try {
+            const telefono = telefonoWhatsApp(ultimoCobro.clienteTelefono)
+            let imagenCompartida = false
+
+            if (reciboVisualRef.current && navigator.canShare) {
+                try {
+                    const html2canvas = (await import('html2canvas')).default
+                    const canvas = await html2canvas(reciboVisualRef.current, { backgroundColor: '#ffffff', scale: 2 })
+                    const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+                    if (blob) {
+                        const file = new File([blob], `recibo_${ultimoCobro.reciboInterno}.png`, { type: 'image/png' })
+                        if (navigator.canShare({ files: [file] })) {
+                            await navigator.share({
+                                files: [file],
+                                title: `Recibo de cobro #${ultimoCobro.reciboInterno}`,
+                                text: `Recibo de cobro #${ultimoCobro.reciboInterno} — ${ultimoCobro.empresa.nombre}`,
+                            })
+                            imagenCompartida = true
+                        }
+                    }
+                } catch (e: any) {
+                    if (e?.name !== 'AbortError') console.error('Error compartiendo imagen del recibo:', e)
+                    else imagenCompartida = true // el usuario canceló el share sheet, no es un error
+                }
+            }
+
+            if (!imagenCompartida) {
+                const texto = construirTextoWhatsApp(ultimoCobro)
+                const url = telefono
+                    ? `https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`
+                    : `https://wa.me/?text=${encodeURIComponent(texto)}`
+                window.open(url, '_blank')
+            }
+        } finally {
+            setEnviandoWhatsApp(false)
         }
     }
 
@@ -544,11 +710,64 @@ export function CancelacionMovilPage() {
                                         <Printer className="w-3.5 h-3.5" /> Ticket 80mm
                                     </button>
                                 </div>
+                                <button type="button" onClick={handleEnviarWhatsApp} disabled={enviandoWhatsApp}
+                                    className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-[#25D366] text-white rounded-lg text-xs font-bold disabled:opacity-50">
+                                    {enviandoWhatsApp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MessageCircle className="w-3.5 h-3.5" />}
+                                    Enviar recibo por WhatsApp
+                                </button>
+                                {configSri?.mail_cc && (
+                                    <p className="text-[10px] text-primary-500 flex items-center justify-center gap-1">
+                                        <Mail className="w-3 h-3" /> Notificado a {configSri.mail_cc}
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>
                 </div>
                 )
+            )}
+
+            {/* Nodo oculto — html2canvas lo captura para compartir el recibo
+                como imagen por WhatsApp; nunca visible en pantalla. */}
+            {ultimoCobro && (
+                <div className="fixed -left-[9999px] top-0" aria-hidden="true">
+                    <div ref={reciboVisualRef} className="w-[380px] bg-white p-6 font-sans">
+                        <p className="text-center text-lg font-black text-emerald-700">{ultimoCobro.empresa.nombre}</p>
+                        <p className="text-center text-xs text-slate-500 mb-3">RUC: {ultimoCobro.empresa.ruc}</p>
+                        <div className="border-t-2 border-emerald-600 pt-3 text-center mb-3">
+                            <p className="text-sm font-black text-emerald-700 tracking-widest">RECIBO DE COBRO</p>
+                            <p className="text-lg font-mono font-bold text-slate-900">N.º {ultimoCobro.reciboInterno}</p>
+                            <p className="text-xs text-slate-500">{new Date(ultimoCobro.fecha + 'T12:00:00').toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                        </div>
+                        <div className="bg-emerald-50 rounded-lg p-3 text-xs space-y-1 mb-3">
+                            <p><span className="text-slate-500">Cliente:</span> <span className="font-bold text-slate-900">{ultimoCobro.clienteNombre}</span></p>
+                            <p><span className="text-slate-500">Factura:</span> <span className="font-bold text-slate-900">{ultimoCobro.facturaSecuencial}</span></p>
+                            <p><span className="text-slate-500">Cobrador:</span> <span className="font-bold text-slate-900">{ultimoCobro.cobradorNombre}</span></p>
+                            <p><span className="text-slate-500">Forma de pago:</span> <span className="font-bold text-slate-900">{METODO_LABEL_PLANO[ultimoCobro.metodoPago]}</span></p>
+                        </div>
+                        <table className="w-full text-xs mb-3">
+                            <thead>
+                                <tr className="border-b border-emerald-200 text-slate-400">
+                                    <th className="text-left py-1">Cuota</th>
+                                    <th className="text-right py-1">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {ultimoCobro.aplicaciones.map(a => (
+                                    <tr key={a.numeroCuota} className="border-b border-emerald-50">
+                                        <td className="py-1">#{a.numeroCuota}</td>
+                                        <td className="text-right py-1 font-bold">{formatCurrency(a.totalAplicado)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <div className="border-t border-emerald-200 pt-2 text-sm">
+                            <div className="flex justify-between text-slate-500"><span>Saldo restante</span><span>{formatCurrency(ultimoCobro.saldoRestante)}</span></div>
+                            <div className="flex justify-between text-emerald-700 font-black text-base mt-1"><span>TOTAL COBRADO</span><span>{formatCurrency(ultimoCobro.montoCobrado)}</span></div>
+                        </div>
+                        <p className="text-center text-[10px] text-slate-400 mt-4">Corina ERP</p>
+                    </div>
+                </div>
             )}
         </div>
     )
