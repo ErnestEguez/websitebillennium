@@ -42,6 +42,9 @@ export function CancelacionOficinaPage() {
             try {
                 const r = await creditoElectrodomesticosService.buscarClientesConDeuda(empresa.id, busqueda.trim())
                 setClientesConDeuda(r)
+            } catch (e: any) {
+                console.error('Error buscando clientes con deuda:', e)
+                setClientesConDeuda([])
             } finally { setBuscando(false) }
         }, 300)
         return () => clearTimeout(t)

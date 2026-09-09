@@ -420,13 +420,17 @@ export const creditoElectrodomesticosService = {
     /** Clientes con al menos un crédito de electrodomésticos con saldo pendiente > 0 (paso 1 de Cancelación Oficina). */
     async buscarClientesConDeuda(empresaId: string, texto: string): Promise<{ id: string; nombre: string; identificacion: string; saldoTotal: number }[]> {
         const q = '%' + texto.trim() + '%'
+        // El filtro sobre una tabla embebida NO acepta notación "tabla.columna"
+        // dentro de .or() — PostgREST exige la opción referencedTable, y sin
+        // "!inner" en el embed el filtro solo afecta qué viene en `clientes`
+        // (lo deja en null) pero no descarta la fila de crédito en sí.
         const { data, error } = await supabase
             .from('creditos_electrodomesticos')
-            .select('cliente_id, saldo_pendiente, clientes:cliente_id (nombre, identificacion)')
+            .select('cliente_id, saldo_pendiente, clientes:cliente_id!inner (nombre, identificacion)')
             .eq('empresa_id', empresaId)
             .gt('saldo_pendiente', 0)
             .neq('estado', 'ANULADO')
-            .or(`clientes.nombre.ilike.${q},clientes.identificacion.ilike.${q}`)
+            .or(`nombre.ilike.${q},identificacion.ilike.${q}`, { referencedTable: 'clientes' })
         if (error) throw error
 
         const porCliente = new Map<string, { id: string; nombre: string; identificacion: string; saldoTotal: number }>()
