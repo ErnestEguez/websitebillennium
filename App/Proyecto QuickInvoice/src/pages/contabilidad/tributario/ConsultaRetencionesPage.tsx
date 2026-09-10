@@ -54,6 +54,12 @@ export function ConsultaRetencionesPage() {
     const [datos, setDatos]       = useState<RetencionRow[]>([])
     const [cargando, setCargando] = useState(false)
     const [error, setError]       = useState('')
+    // IDs de ingresos_stock (compras) que se terminaron pagando con Tarjeta
+    // de Crédito (comprobantes_egreso.forma_pago = 'tarjeta_credito') — cruza
+    // ingresos_stock -> cuentas_por_pagar -> egreso_pagos_cxp ->
+    // comprobantes_egreso, porque la forma de pago real vive en el egreso,
+    // no en la compra. Se usa para el KPI "Total Retención Renta por T/C".
+    const [idsPagadosTC, setIdsPagadosTC] = useState<Set<string>>(new Set())
 
     const printRef = useRef<HTMLDivElement>(null)
 
@@ -125,6 +131,20 @@ export function ConsultaRetencionesPage() {
 
         setDatos(rows)
         setCargando(false)
+
+        // KPI "Total Retención Renta por T/C" — consulta aparte porque cruza
+        // con comprobantes_egreso, que no viene embebido en la carga principal.
+        const idsConRenta = rows.filter(r => r.rets.some(rt => rt.tipo === 'FUENTE')).map(r => r.id)
+        if (idsConRenta.length === 0) { setIdsPagadosTC(new Set()); return }
+
+        const { data: cxps, error: errCxp } = await supabase
+            .from('cuentas_por_pagar')
+            .select('compra_id, egreso_pagos_cxp!inner(comprobantes_egreso!inner(forma_pago))')
+            .in('compra_id', idsConRenta)
+            .eq('egreso_pagos_cxp.comprobantes_egreso.forma_pago', 'tarjeta_credito')
+        if (errCxp) { console.error('Error calculando retención renta por T/C:', errCxp); setIdsPagadosTC(new Set()); return }
+
+        setIdsPagadosTC(new Set((cxps ?? []).map((c: any) => c.compra_id)))
     }
 
     const filtradas = datos.filter(r => {
@@ -151,6 +171,10 @@ export function ConsultaRetencionesPage() {
     }
     const resumen = Object.values(resumenMap).sort((a, b) => a.tipo.localeCompare(b.tipo) || a.codigo.localeCompare(b.codigo))
     const grandTotalRet = resumen.reduce((s, r) => s + r.totalValor, 0)
+
+    const totalRentaTC = filtradas
+        .filter(r => idsPagadosTC.has(r.id))
+        .reduce((s, r) => s + r.rets.filter(rt => rt.tipo === 'FUENTE').reduce((s2, rt) => s2 + rt.valor, 0), 0)
 
     // ── Excel ──────────────────────────────────────────────────────────────
 
@@ -271,7 +295,7 @@ export function ConsultaRetencionesPage() {
             </div>
 
             {/* Resumen KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 no-print">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 no-print">
                 <div className="card p-4">
                     <p className="text-xl font-bold text-purple-600">{filtradas.length}</p>
                     <p className="text-xs text-slate-500 mt-0.5">Facturas con retención</p>
@@ -289,6 +313,10 @@ export function ConsultaRetencionesPage() {
                 <div className="card p-4">
                     <p className="text-xl font-bold text-slate-700">{resumen.length}</p>
                     <p className="text-xs text-slate-500 mt-0.5">Tipos de retención</p>
+                </div>
+                <div className="card p-4">
+                    <p className="text-xl font-bold text-amber-600">{formatMoneda(totalRentaTC)}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Total Retención Renta por T/C</p>
                 </div>
             </div>
 

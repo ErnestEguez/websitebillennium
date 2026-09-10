@@ -104,7 +104,7 @@ export function InvoicingPage() {
     const [showDiagnostic, setShowDiagnostic] = useState(false)
     const hoy = new Date().toLocaleDateString('en-CA')
     const primerDiaMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString('en-CA')
-    const [fechaDesde, setFechaDesde] = useState(primerDiaMes)
+    const [fechaDesde, setFechaDesde] = useState(hoy)
     const [fechaHasta, setFechaHasta] = useState(hoy)
 
     function aplicarAtajo(desde: string, hasta: string) { setFechaDesde(desde); setFechaHasta(hasta) }
