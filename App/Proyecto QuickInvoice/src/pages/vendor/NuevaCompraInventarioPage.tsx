@@ -321,9 +321,10 @@ export function NuevaCompraInventarioPage() {
             if (ocr.pto_emi)       setPtoEmi(ocr.pto_emi)
             if (ocr.secuencial)    setSecuencial(ocr.secuencial)
             if (ocr.clave_acceso)  setClaveAcceso(ocr.clave_acceso)
-            if (ocr.valor_iva > 0 || ocr.base_iva_0 > 0) {
+            if (ocr.valor_iva > 0 || ocr.base_iva_0 > 0 || ocr.base_iva_5 > 0) {
                 setUsarIvaManual(true)
                 setBaseIva0(ocr.base_iva_0 ?? 0)
+                setBaseIva5(ocr.base_iva_5 ?? 0)
                 setBaseIva15(ocr.base_iva_15 ?? 0)
             }
 
