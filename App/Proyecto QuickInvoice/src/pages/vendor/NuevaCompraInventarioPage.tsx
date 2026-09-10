@@ -579,10 +579,14 @@ export function NuevaCompraInventarioPage() {
     }
 
     // IVA% de la línea: el de la propia línea (productos nuevos/OCR) o, si no
-    // hay, el del producto ya existente en el catálogo.
+    // hay, el del producto ya existente en el catálogo. Number(...) es
+    // obligatorio: productos.iva_porcentaje es NUMERIC en la base, y
+    // PostgREST lo entrega como STRING ("5.00") para no perder precisión —
+    // sin el cast, "5.00" === 5 siempre da false y ninguna línea calzaba
+    // con el bucket 0%/5%/15% (todo terminaba cayendo al default de 15%).
     function ivaPctLinea(d: LineaDetalle): number {
-        if (d.iva_porcentaje !== undefined && d.iva_porcentaje !== null) return d.iva_porcentaje
-        return productosCompletos.find(p => p.id === d.producto_id)?.iva_porcentaje ?? 15
+        if (d.iva_porcentaje !== undefined && d.iva_porcentaje !== null) return Number(d.iva_porcentaje)
+        return Number(productosCompletos.find(p => p.id === d.producto_id)?.iva_porcentaje ?? 15)
     }
 
     // precio_venta_sugerido se guarda SIN IVA (igual que productos.precio_venta);
@@ -722,7 +726,7 @@ export function NuevaCompraInventarioPage() {
                         precio_venta:   precioVentaNuevo,
                         categoria_id:   catId,
                         unidad_id:      d.unidad_id ?? null,
-                        iva_porcentaje: d.iva_porcentaje ?? 15,
+                        iva_porcentaje: d.iva_porcentaje != null ? Number(d.iva_porcentaje) : 15,
                         maneja_stock:   true,
                         costo_promedio: costoUnitNeto,
                         activo:         true,
