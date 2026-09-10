@@ -555,7 +555,8 @@ export function NuevaCompraInventarioPage() {
             let next: LineaDetalle
             if (campo === 'producto_id') {
                 const prod = productosSimple.find(p => p.id === val)
-                next = { ...d, producto_id: val as string, nombre: prod?.nombre ?? '', precio_venta_manual: false }
+                const prodCompleto = productosCompletos.find(p => p.id === val)
+                next = { ...d, producto_id: val as string, nombre: prod?.nombre ?? '', iva_porcentaje: prodCompleto?.iva_porcentaje, precio_venta_manual: false }
             } else if (campo === 'descuento_porcentaje') {
                 // Descuento por % y descuento directo en $ son mutuamente excluyentes:
                 // al ingresar uno, se limpia el otro.
@@ -1224,7 +1225,7 @@ export function NuevaCompraInventarioPage() {
                                                                 placeholder="Buscar (Enter o Buscar)…"
                                                                 onSelect={(p: ProductoResultado) => {
                                                                     setDetalle(prev => prev.map((d2, j) => j !== i ? d2
-                                                                        : { ...d2, producto_id: p.id, nombre: p.nombre, codigo: p.codigo ?? '', unidad_id: p.unidad_id ?? null, categoria_id: p.categoria_id ?? null, status: 'found' as LineaStatus }))
+                                                                        : { ...d2, producto_id: p.id, nombre: p.nombre, codigo: p.codigo ?? '', unidad_id: p.unidad_id ?? null, categoria_id: p.categoria_id ?? null, iva_porcentaje: p.iva_porcentaje, status: 'found' as LineaStatus }))
                                                                 }}
                                                             />
                                                         </div>
