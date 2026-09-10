@@ -482,7 +482,7 @@ export function NuevaCompraInventarioPage() {
     // desglose y los totales reflejan lo ingresado desde el primer producto, sin
     // necesidad de tocar el checklist de "Ingresar bases manualmente".
     const baseLineasEnTasa = (pct: number) =>
-        Math.round(detalle.reduce((s, d) => s + ((d.iva_porcentaje ?? 15) === pct ? lineaNeta(d).neto : 0), 0) * 100) / 100
+        Math.round(detalle.reduce((s, d) => s + (ivaPctLinea(d) === pct ? lineaNeta(d).neto : 0), 0) * 100) / 100
 
     const b0  = usarIvaManual ? baseIva0  : baseLineasEnTasa(0)
     const b5  = usarIvaManual ? baseIva5  : baseLineasEnTasa(5)
