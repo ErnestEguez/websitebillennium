@@ -1332,7 +1332,10 @@ export function ProformaPage() {
                                                                         <p className="font-semibold text-slate-800">{prod.nombre}</p>
                                                                         <p className="text-[10px] text-slate-400">{prod.codigo} · IVA {prod.iva_porcentaje}%</p>
                                                                     </div>
-                                                                    <span className="text-xs font-bold text-violet-700 shrink-0 ml-2">{formatCurrency(prod.precio_venta)}</span>
+                                                                    <span className="flex flex-col items-end shrink-0 ml-2">
+                                                                        <span className="text-blue-700 font-bold text-xs">{formatCurrency(prod.precio_venta * (1 + (prod.iva_porcentaje ?? 0) / 100))} <span className="font-normal text-blue-700">con IVA</span></span>
+                                                                        <span className="text-slate-900 text-xs">{formatCurrency(prod.precio_venta)} <span className="text-slate-900">sin IVA</span></span>
+                                                                    </span>
                                                                 </button>
                                                             ))}
                                                         </div>
