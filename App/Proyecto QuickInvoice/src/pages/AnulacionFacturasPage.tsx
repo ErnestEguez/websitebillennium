@@ -90,6 +90,11 @@ export function AnulacionFacturasPage() {
 
     // Reparar stock de facturas anuladas cuya reversión de Kardex nunca se creó
     const [reparandoId, setReparandoId] = useState<string | null>(null)
+    // Reparar cartera de facturas anuladas por el "Anular" rápido de
+    // Comprobantes (sriService.anularComprobante), que hasta antes de este
+    // arreglo no marcaba cartera_cxc como anulada — quedaba cobrándose
+    // pendiente una factura que ya no existe.
+    const [reparandoCarteraId, setReparandoCarteraId] = useState<string | null>(null)
 
     function cambiarPeriodo(p: Periodo) {
         setPeriodo(p)
@@ -355,6 +360,48 @@ export function AnulacionFacturasPage() {
         }
     }
 
+    // Repara la cartera de una factura YA anulada cuyo cartera_cxc nunca se
+    // marcó como anulada (ej. se anuló con el "Anular" rápido de
+    // Comprobantes, antes de que ese camino tuviera esta cascada). Bloquea
+    // si tiene pagos registrados — primero hay que revertirlos.
+    async function repararCartera(f: Factura) {
+        setReparandoCarteraId(f.id)
+        try {
+            if (!f.cartera?.id) {
+                alert('Esta factura no tiene un registro de cartera asociado — no hay nada que reparar.')
+                return
+            }
+            if (f.cartera.estado === 'anulada') {
+                alert('La cartera de esta factura ya está marcada como anulada. No se hizo ningún cambio.')
+                return
+            }
+            if (f.cartera.pagos.length > 0) {
+                alert('Esta cartera tiene pagos registrados — revierta los pagos primero (arriba, en el detalle de la factura) antes de reparar.')
+                return
+            }
+
+            const { error } = await supabase
+                .from('cartera_cxc')
+                .update({ estado: 'anulada', updated_at: new Date().toISOString() })
+                .eq('id', f.cartera.id)
+            if (error) throw error
+
+            auditService.logEvent({
+                empresaId: empresa!.id, modulo: 'facturacion', accion: 'actualizar', entidad: 'cartera_cxc',
+                entidadId: f.cartera.id, numeroDocumento: f.secuencial,
+                resumen: `Reparación: cartera marcada anulada para factura ya anulada ${f.secuencial}`,
+                nivel: 'sensible',
+            })
+
+            alert('Cartera reparada: se marcó como anulada.')
+            await cargar()
+        } catch (e: any) {
+            alert('Error al reparar cartera: ' + e.message)
+        } finally {
+            setReparandoCarteraId(null)
+        }
+    }
+
     const facturasFiltradas = busqueda.trim()
         ? facturas.filter(f =>
             f.secuencial?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -548,6 +595,17 @@ export function AnulacionFacturasPage() {
                                                         >
                                                             <Wrench className="w-3.5 h-3.5" />
                                                             {reparandoId === f.id ? 'Reparando...' : 'Reparar Stock'}
+                                                        </button>
+                                                    )}
+                                                    {esAnulada && f.cartera && f.cartera.estado !== 'anulada' && (
+                                                        <button
+                                                            onClick={() => repararCartera(f)}
+                                                            disabled={reparandoCarteraId === f.id}
+                                                            title="Marca la cartera de esta factura ya anulada como anulada — corrige el caso en que quedó pendiente de cobro por error"
+                                                            className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 text-white text-xs rounded-lg hover:bg-amber-600 font-medium disabled:opacity-50"
+                                                        >
+                                                            <Wrench className="w-3.5 h-3.5" />
+                                                            {reparandoCarteraId === f.id ? 'Reparando...' : 'Reparar Cartera'}
                                                         </button>
                                                     )}
                                                     <button className="p-1.5 text-slate-400">

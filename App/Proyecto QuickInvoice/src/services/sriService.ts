@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
 import { auditService } from './auditoria/auditService'
+import { kardexService } from './kardexService'
 
 export interface Comprobante {
     id: string
@@ -131,7 +132,40 @@ export const sriService = {
         }
     },
 
+    /**
+     * Anula un comprobante — usada por el "Anular" rápido de Comprobantes.
+     * Antes solo marcaba comprobantes.estado_sistema='ANULADA' y dejaba la
+     * cartera_cxc y el stock de Kardex sin tocar (huérfanos): la factura
+     * desaparecía de Facturación pero seguía cobrándose en Cartera y el
+     * stock nunca se restauraba. AnulacionFacturasPage.tsx sí hacía esta
+     * cascada completa, pero este era un segundo camino para anular que no
+     * la tenía — ahora ambos quedan con el mismo comportamiento.
+     */
     async anularComprobante(id: string, motivo: string, usuarioId: string, empresaId?: string, secuencial?: string): Promise<void> {
+        const { data: cartera } = await supabase
+            .from('cartera_cxc')
+            .select('id')
+            .eq('comprobante_id', id)
+            .maybeSingle()
+
+        if (cartera?.id) {
+            const { data: pagos } = await supabase
+                .from('cartera_cxc_pagos')
+                .select('id')
+                .eq('cartera_id', cartera.id)
+                .limit(1)
+            if (pagos && pagos.length > 0) {
+                throw new Error('Esta factura tiene pagos registrados en cartera. Revierta los pagos antes de anularla (desde Anulación de Facturas).')
+            }
+        }
+
+        const { data: comprobante, error: errComp } = await supabase
+            .from('comprobantes')
+            .select('bodega_id, empresa_id')
+            .eq('id', id)
+            .single()
+        if (errComp) throw errComp
+
         const { error } = await supabase
             .from('comprobantes')
             .update({
@@ -143,6 +177,44 @@ export const sriService = {
             .eq('id', id)
 
         if (error) throw error
+
+        // Cascada — cartera_cxc anulada (evita que la factura anulada
+        // siga apareciendo pendiente de cobro).
+        if (cartera?.id) {
+            await supabase
+                .from('cartera_cxc')
+                .update({ estado: 'anulada', updated_at: new Date().toISOString() })
+                .eq('id', cartera.id)
+        }
+
+        // Cascada — revertir Kardex: ENTRADA por cada producto que controla
+        // stock, para restaurar lo que la venta había descontado.
+        const empresaIdFinal = empresaId || comprobante?.empresa_id
+        const { data: detalles } = await supabase
+            .from('comprobante_detalles')
+            .select('producto_id, cantidad')
+            .eq('comprobante_id', id)
+        const hoy = new Date().toISOString().split('T')[0]
+        for (const det of (detalles ?? [])) {
+            if (!det.producto_id || Number(det.cantidad) <= 0) continue
+            const { data: prod } = await supabase
+                .from('productos')
+                .select('maneja_stock')
+                .eq('id', det.producto_id)
+                .single()
+            if (!prod?.maneja_stock) continue
+
+            await kardexService.registrarMovimiento({
+                empresa_id: empresaIdFinal,
+                producto_id: det.producto_id,
+                bodega_id: comprobante?.bodega_id ?? undefined,
+                tipo_movimiento: 'ENTRADA',
+                motivo: `Reversión anulación factura ${secuencial || id}`,
+                documento_referencia: id,
+                cantidad: Number(det.cantidad),
+                fecha: hoy,
+            })
+        }
 
         if (empresaId) {
             auditService.logEvent({
