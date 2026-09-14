@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Download, Loader2, RefreshCw } from 'lucide-react'
-import { PrintButton } from '../../../components/contabilidad/PrintButton'
+import { Download, Loader2, Printer, RefreshCw } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
+import { imprimirReporte, generarTablaHtml } from '../../../lib/printUtils'
 import type { LpPeriodo } from '../../../types/conta'
 
 interface CuentaOpc {
@@ -186,6 +186,43 @@ export function EstadoCuentaPage() {
         ? movimientos[movimientos.length - 1].saldo
         : saldoInicial
 
+    function imprimir() {
+        const subtitulo = cuenta && periodo
+            ? `${cuenta.codigo} — ${cuenta.nombre} · ${modo === 'acumulado' ? `Acumulado al ` : ''}${periodo.mes ? `${mesNombre(periodo.mes)} ${periodo.año}` : `Año ${periodo.año}`}`
+            : undefined
+        const cols = [
+            { label: 'Fecha', key: 'fecha', width: '10%' },
+            { label: 'Tipo', key: 'tipo', width: '10%' },
+            { label: 'N°', key: 'numero', width: '12%' },
+            { label: 'Descripción', key: 'descripcion' },
+            { label: 'Debe', key: 'debe', align: 'right' as const, width: '13%' },
+            { label: 'Haber', key: 'haber', align: 'right' as const, width: '13%' },
+            { label: 'Saldo', key: 'saldo', align: 'right' as const, width: '13%' },
+        ]
+        const filaInicial = {
+            fecha: '—', tipo: '', numero: '', descripcion: '<strong>Saldo Inicial del Período</strong>',
+            debe: '', haber: '', saldo: `<strong>${formatMoneda(saldoInicial, sym)}</strong>`,
+        }
+        const filasMov = movimientos.map(m => ({
+            fecha: m.fecha, tipo: m.tipo.toUpperCase(), numero: m.numero, descripcion: m.descripcion,
+            debe: m.debe > 0 ? formatMoneda(m.debe, sym) : '',
+            haber: m.haber > 0 ? formatMoneda(m.haber, sym) : '',
+            saldo: m.saldo >= 0 ? formatMoneda(m.saldo, sym) : `(${formatMoneda(Math.abs(m.saldo), sym)})`,
+        }))
+        const html = generarTablaHtml(cols, [filaInicial, ...filasMov], {
+            descripcion: '<strong>SALDO FINAL</strong>',
+            debe: `<strong>${formatMoneda(movimientos.reduce((s, m) => s + m.debe, 0), sym)}</strong>`,
+            haber: `<strong>${formatMoneda(movimientos.reduce((s, m) => s + m.haber, 0), sym)}</strong>`,
+            saldo: `<strong>${saldoFinal >= 0 ? formatMoneda(saldoFinal, sym) : `(${formatMoneda(Math.abs(saldoFinal), sym)})`}</strong>`,
+        })
+        imprimirReporte({
+            empresa: { nombre: empresaActiva?.razon_social ?? '', ruc: empresaActiva?.ruc ?? '' },
+            titulo: 'Estado de Cuenta',
+            periodo: subtitulo,
+            html,
+        })
+    }
+
     return (
         <div className="space-y-5 max-w-5xl">
             <div className="flex items-center justify-between">
@@ -203,13 +240,9 @@ export function EstadoCuentaPage() {
                 </div>
                 {generado && (
                     <div className="flex gap-2 no-print">
-                        <PrintButton
-                            titulo="Estado de Cuenta"
-                            empresa={empresaActiva?.razon_social}
-                            subtitulo={cuenta && periodo
-                                ? `${cuenta.codigo} — ${cuenta.nombre} · ${modo === 'acumulado' ? `Acumulado al ` : ''}${periodo.mes ? `${mesNombre(periodo.mes)} ${periodo.año}` : `Año ${periodo.año}`}`
-                                : undefined}
-                        />
+                        <button onClick={imprimir} className="btn btn-secondary gap-2 text-sm">
+                            <Printer className="w-4 h-4" /> Imprimir
+                        </button>
                         <button onClick={exportarCSV} className="btn btn-secondary gap-2 text-sm">
                             <Download className="w-4 h-4" /> Exportar CSV
                         </button>

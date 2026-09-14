@@ -1,26 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Download, Loader2, RefreshCw } from 'lucide-react'
+import { Download, Loader2, Printer, RefreshCw } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
-import { PrintButton } from '../../../components/contabilidad/PrintButton'
+import { imprimirReporte, generarTablaHtml } from '../../../lib/printUtils'
+import { construirJerarquia, type FilaJerarquica } from '../../../lib/contaJerarquia'
 import type { LpPeriodo } from '../../../types/conta'
 
 type Modo = 'mes' | 'acumulado'
-
-interface FilaBalance {
-    cuenta_id: string; codigo: string; nombre: string; nivel: number; tipo: string
-    saldo_inicial_debe: number; saldo_inicial_haber: number
-    movimientos_debe: number; movimientos_haber: number
-    saldo_final_debe: number; saldo_final_haber: number
-}
 
 export function BalanceComprobacionPage() {
     const { empresaActiva } = useAuth()
     const [periodos, setPeriodos] = useState<LpPeriodo[]>([])
     const [periodoId, setPeriodoId] = useState('')
     const [modo, setModo] = useState<Modo>('mes')
-    const [filas, setFilas] = useState<FilaBalance[]>([])
+    const [filas, setFilas] = useState<FilaJerarquica[]>([])
     const [loading, setLoading] = useState(false)
     const [generado, setGenerado] = useState(false)
 
@@ -50,18 +44,21 @@ export function BalanceComprobacionPage() {
 
         const ids = modo === 'acumulado' ? periodosHasta(periodoId) : [periodoId]
 
-        const { data } = await supabase
-            .from('lp_saldos_cuenta')
-            .select(`cuenta_id, saldo_inicial_debe, saldo_inicial_haber,
-                     movimientos_debe, movimientos_haber,
-                     cuenta:lp_cuentas(codigo, nombre, nivel, tipo, acepta_movimientos)`)
-            .eq('empresa_id', empresaActiva.id)
-            .in('periodo_id', ids)
+        const [{ data }, { data: todasLasCuentas }] = await Promise.all([
+            supabase
+                .from('lp_saldos_cuenta')
+                .select(`cuenta_id, saldo_inicial_debe, saldo_inicial_haber,
+                         movimientos_debe, movimientos_haber,
+                         cuenta:lp_cuentas(codigo, nombre, nivel, tipo, acepta_movimientos)`)
+                .eq('empresa_id', empresaActiva.id)
+                .in('periodo_id', ids),
+            supabase.from('lp_cuentas').select('codigo, nombre').eq('empresa_id', empresaActiva.id),
+        ])
 
         if (!data) { setLoading(false); return }
 
         // Agrupar por cuenta cuando son múltiples períodos
-        const mapa = new Map<string, FilaBalance>()
+        const mapa = new Map<string, any>()
         for (const r of data as any[]) {
             if (!r.cuenta?.acepta_movimientos) continue
             const ex = mapa.get(r.cuenta_id)
@@ -72,30 +69,36 @@ export function BalanceComprobacionPage() {
                 ex.movimientos_haber   += r.movimientos_haber
             } else {
                 mapa.set(r.cuenta_id, {
-                    cuenta_id: r.cuenta_id, codigo: r.cuenta.codigo,
-                    nombre: r.cuenta.nombre, nivel: r.cuenta.nivel, tipo: r.cuenta.tipo,
+                    cuenta_id: r.cuenta_id, codigo: r.cuenta.codigo, nombre: r.cuenta.nombre, tipo: r.cuenta.tipo,
                     saldo_inicial_debe: r.saldo_inicial_debe, saldo_inicial_haber: r.saldo_inicial_haber,
                     movimientos_debe: r.movimientos_debe, movimientos_haber: r.movimientos_haber,
-                    saldo_final_debe: 0, saldo_final_haber: 0,
                 })
             }
         }
 
-        const resultado: FilaBalance[] = Array.from(mapa.values()).map(f => ({
-            ...f,
-            saldo_final_debe:  Math.max(0, (f.saldo_inicial_debe  + f.movimientos_debe)  - (f.saldo_inicial_haber + f.movimientos_haber)),
-            saldo_final_haber: Math.max(0, (f.saldo_inicial_haber + f.movimientos_haber) - (f.saldo_inicial_debe  + f.movimientos_debe)),
-        })).sort((a, b) => a.codigo.localeCompare(b.codigo))
+        const hojas = Array.from(mapa.values()).map(f => {
+            const saldo_final_debe  = Math.max(0, (f.saldo_inicial_debe  + f.movimientos_debe)  - (f.saldo_inicial_haber + f.movimientos_haber))
+            const saldo_final_haber = Math.max(0, (f.saldo_inicial_haber + f.movimientos_haber) - (f.saldo_inicial_debe  + f.movimientos_debe))
+            return {
+                codigo: f.codigo, nombre: f.nombre, tipo: f.tipo,
+                valores: {
+                    si_debe: f.saldo_inicial_debe, si_haber: f.saldo_inicial_haber,
+                    mov_debe: f.movimientos_debe, mov_haber: f.movimientos_haber,
+                    sf_debe: saldo_final_debe, sf_haber: saldo_final_haber,
+                },
+            }
+        })
 
+        const resultado = construirJerarquia(hojas, todasLasCuentas ?? [])
         setFilas(resultado)
         setGenerado(true)
         setLoading(false)
     }
 
     function exportarCSV() {
-        const header = 'Código,Nombre,Tipo,SI Debe,SI Haber,Mov Debe,Mov Haber,SF Debe,SF Haber'
+        const header = 'Código,Nombre,SI Debe,SI Haber,Mov Debe,Mov Haber,SF Debe,SF Haber'
         const rows = filas.map(f =>
-            `"${f.codigo}","${f.nombre}",${f.tipo},${f.saldo_inicial_debe},${f.saldo_inicial_haber},${f.movimientos_debe},${f.movimientos_haber},${f.saldo_final_debe},${f.saldo_final_haber}`)
+            `"${f.codigo}","${f.nombre}",${f.valores.si_debe},${f.valores.si_haber},${f.valores.mov_debe},${f.valores.mov_haber},${f.valores.sf_debe},${f.valores.sf_haber}`)
         const csv = [header, ...rows].join('\n')
         const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
         const url = URL.createObjectURL(blob)
@@ -103,21 +106,56 @@ export function BalanceComprobacionPage() {
         URL.revokeObjectURL(url)
     }
 
+    function imprimir() {
+        const fmt = (v: number) => v > 0 ? formatMoneda(v, sym) : '—'
+        const cols = [
+            { label: 'Código', key: 'codigo', width: '12%' },
+            { label: 'Nombre', key: 'nombre' },
+            { label: 'SI Debe', key: 'si_debe', align: 'right' as const, width: '11%' },
+            { label: 'SI Haber', key: 'si_haber', align: 'right' as const, width: '11%' },
+            { label: 'Mov. Debe', key: 'mov_debe', align: 'right' as const, width: '11%' },
+            { label: 'Mov. Haber', key: 'mov_haber', align: 'right' as const, width: '11%' },
+            { label: 'SF Debe', key: 'sf_debe', align: 'right' as const, width: '11%' },
+            { label: 'SF Haber', key: 'sf_haber', align: 'right' as const, width: '11%' },
+        ]
+        const rows = filas.map(f => ({
+            codigo: f.esSubtotal ? `<strong>${f.codigo}</strong>` : f.codigo,
+            nombre: `${'&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(f.nivel - 1)}${f.esSubtotal ? `<strong>${f.nombre}</strong>` : f.nombre}`,
+            si_debe: f.esSubtotal ? `<strong>${fmt(f.valores.si_debe)}</strong>` : fmt(f.valores.si_debe),
+            si_haber: f.esSubtotal ? `<strong>${fmt(f.valores.si_haber)}</strong>` : fmt(f.valores.si_haber),
+            mov_debe: f.esSubtotal ? `<strong>${fmt(f.valores.mov_debe)}</strong>` : fmt(f.valores.mov_debe),
+            mov_haber: f.esSubtotal ? `<strong>${fmt(f.valores.mov_haber)}</strong>` : fmt(f.valores.mov_haber),
+            sf_debe: f.esSubtotal ? `<strong>${fmt(f.valores.sf_debe)}</strong>` : fmt(f.valores.sf_debe),
+            sf_haber: f.esSubtotal ? `<strong>${fmt(f.valores.sf_haber)}</strong>` : fmt(f.valores.sf_haber),
+        }))
+        const html = generarTablaHtml(cols, rows, {
+            nombre: '<strong>TOTALES</strong>',
+            si_debe: `<strong>${formatMoneda(totales.si_debe, sym)}</strong>`,
+            si_haber: `<strong>${formatMoneda(totales.si_haber, sym)}</strong>`,
+            mov_debe: `<strong>${formatMoneda(totales.mov_debe, sym)}</strong>`,
+            mov_haber: `<strong>${formatMoneda(totales.mov_haber, sym)}</strong>`,
+            sf_debe: `<strong>${formatMoneda(totales.sf_debe, sym)}</strong>`,
+            sf_haber: `<strong>${formatMoneda(totales.sf_haber, sym)}</strong>`,
+        })
+        imprimirReporte({
+            empresa: { nombre: empresaActiva?.razon_social ?? '', ruc: empresaActiva?.ruc ?? '' },
+            titulo: 'Balance de Comprobación',
+            periodo: subtitulo,
+            html,
+        })
+    }
+
     const periodo = periodos.find(p => p.id === periodoId)
     const sym = empresaActiva?.moneda?.simbolo ?? '$'
     const periodoLabel = periodo ? (periodo.mes ? `${mesNombre(periodo.mes)} ${periodo.año}` : `Año ${periodo.año}`) : ''
-    const subtitulo = generado ? `${modo === 'acumulado' ? `Acumulado al ${periodoLabel}` : periodoLabel} · ${filas.length} cuentas` : ''
+    // Solo se cuentan las hojas para el conteo de cuentas del subtítulo (los subtotales no son "cuentas")
+    const subtitulo = generado ? `${modo === 'acumulado' ? `Acumulado al ${periodoLabel}` : periodoLabel} · ${filas.filter(f => !f.esSubtotal).length} cuentas` : ''
 
-    const totales = filas.reduce((acc, f) => ({
-        si_debe:  acc.si_debe  + f.saldo_inicial_debe,  si_haber:  acc.si_haber  + f.saldo_inicial_haber,
-        mov_debe: acc.mov_debe + f.movimientos_debe,     mov_haber: acc.mov_haber + f.movimientos_haber,
-        sf_debe:  acc.sf_debe  + f.saldo_final_debe,     sf_haber:  acc.sf_haber  + f.saldo_final_haber,
+    const totales = filas.filter(f => f.nivel === 1).reduce((acc, f) => ({
+        si_debe:  acc.si_debe  + f.valores.si_debe,  si_haber:  acc.si_haber  + f.valores.si_haber,
+        mov_debe: acc.mov_debe + f.valores.mov_debe, mov_haber: acc.mov_haber + f.valores.mov_haber,
+        sf_debe:  acc.sf_debe  + f.valores.sf_debe,  sf_haber:  acc.sf_haber  + f.valores.sf_haber,
     }), { si_debe:0, si_haber:0, mov_debe:0, mov_haber:0, sf_debe:0, sf_haber:0 })
-
-    const TIPO_COLOR: Record<string, string> = {
-        activo:'text-blue-600', pasivo:'text-red-600',
-        patrimonio:'text-purple-600', ingreso:'text-green-600', gasto:'text-amber-600',
-    }
 
     return (
         <div className="space-y-5">
@@ -128,7 +166,9 @@ export function BalanceComprobacionPage() {
                 </div>
                 {generado && (
                     <div className="flex gap-2 no-print">
-                        <PrintButton titulo="Balance de Comprobación" empresa={empresaActiva?.razon_social} subtitulo={subtitulo} />
+                        <button onClick={imprimir} className="btn btn-secondary gap-2 text-sm">
+                            <Printer className="w-4 h-4" /> Imprimir
+                        </button>
                         <button onClick={exportarCSV} className="btn btn-secondary gap-2 text-sm">
                             <Download className="w-4 h-4" /> Exportar CSV
                         </button>
@@ -188,15 +228,15 @@ export function BalanceComprobacionPage() {
                             </thead>
                             <tbody>
                                 {filas.map(f => (
-                                    <tr key={f.cuenta_id} className="border-b border-slate-100 hover:bg-slate-50">
-                                        <td className={cn('py-2 px-4 font-mono text-xs', TIPO_COLOR[f.tipo])}>{f.codigo}</td>
-                                        <td className="py-2 px-4 text-slate-700">{f.nombre}</td>
-                                        <td className="py-2 px-4 text-right font-mono text-slate-600 border-l border-slate-100">{f.saldo_inicial_debe > 0 ? formatMoneda(f.saldo_inicial_debe,sym) : '—'}</td>
-                                        <td className="py-2 px-4 text-right font-mono text-slate-600">{f.saldo_inicial_haber > 0 ? formatMoneda(f.saldo_inicial_haber,sym) : '—'}</td>
-                                        <td className="py-2 px-4 text-right font-mono text-slate-700 border-l border-slate-100">{f.movimientos_debe > 0 ? formatMoneda(f.movimientos_debe,sym) : '—'}</td>
-                                        <td className="py-2 px-4 text-right font-mono text-slate-700">{f.movimientos_haber > 0 ? formatMoneda(f.movimientos_haber,sym) : '—'}</td>
-                                        <td className={cn('py-2 px-4 text-right font-mono font-semibold border-l border-slate-100', f.saldo_final_debe > 0 ? 'text-slate-900' : 'text-slate-300')}>{f.saldo_final_debe > 0 ? formatMoneda(f.saldo_final_debe,sym) : '—'}</td>
-                                        <td className={cn('py-2 px-4 text-right font-mono font-semibold', f.saldo_final_haber > 0 ? 'text-slate-900' : 'text-slate-300')}>{f.saldo_final_haber > 0 ? formatMoneda(f.saldo_final_haber,sym) : '—'}</td>
+                                    <tr key={f.codigo} className={cn('border-b border-slate-100', f.esSubtotal ? 'bg-slate-50 font-semibold' : 'hover:bg-slate-50')}>
+                                        <td className="py-2 px-4 font-mono text-xs text-slate-600">{f.codigo}</td>
+                                        <td className="py-2 px-4 text-slate-700" style={{ paddingLeft: `${(f.nivel - 1) * 14 + 16}px` }}>{f.nombre}</td>
+                                        <td className="py-2 px-4 text-right font-mono text-slate-600 border-l border-slate-100">{f.valores.si_debe > 0 ? formatMoneda(f.valores.si_debe,sym) : '—'}</td>
+                                        <td className="py-2 px-4 text-right font-mono text-slate-600">{f.valores.si_haber > 0 ? formatMoneda(f.valores.si_haber,sym) : '—'}</td>
+                                        <td className="py-2 px-4 text-right font-mono text-slate-700 border-l border-slate-100">{f.valores.mov_debe > 0 ? formatMoneda(f.valores.mov_debe,sym) : '—'}</td>
+                                        <td className="py-2 px-4 text-right font-mono text-slate-700">{f.valores.mov_haber > 0 ? formatMoneda(f.valores.mov_haber,sym) : '—'}</td>
+                                        <td className={cn('py-2 px-4 text-right font-mono font-semibold border-l border-slate-100', f.valores.sf_debe > 0 ? 'text-slate-900' : 'text-slate-300')}>{f.valores.sf_debe > 0 ? formatMoneda(f.valores.sf_debe,sym) : '—'}</td>
+                                        <td className={cn('py-2 px-4 text-right font-mono font-semibold', f.valores.sf_haber > 0 ? 'text-slate-900' : 'text-slate-300')}>{f.valores.sf_haber > 0 ? formatMoneda(f.valores.sf_haber,sym) : '—'}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -228,8 +268,3 @@ export function BalanceComprobacionPage() {
         </div>
     )
 }
-
-
-
-
-

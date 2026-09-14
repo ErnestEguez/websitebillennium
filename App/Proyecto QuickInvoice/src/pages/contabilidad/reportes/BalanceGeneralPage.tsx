@@ -1,23 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Download, Loader2, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Download, Loader2, Printer, RefreshCw } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
-import { PrintButton } from '../../../components/contabilidad/PrintButton'
+import { imprimirReporte, generarTablaHtml } from '../../../lib/printUtils'
+import { construirJerarquia, agruparPorCodigoAlterno, type FilaJerarquica } from '../../../lib/contaJerarquia'
 import type { LpPeriodo } from '../../../types/conta'
 
-interface FilaBG {
-    cuenta_id: string
-    codigo: string
-    nombre: string
-    nivel: number
-    tipo: string
-    balance: number
+type ModeloCuenta = 'propia' | 'sri' | 'supe'
+
+const MODELO_LABEL: Record<ModeloCuenta, string> = {
+    propia: 'Cta. Propia', sri: 'SRI', supe: 'Superintendencia',
 }
 
 function Seccion({ titulo, filas, total, sym, headerColor }: {
     titulo: string
-    filas: FilaBG[]
+    filas: FilaJerarquica[]
     total: number
     sym: string
     headerColor: string
@@ -30,11 +28,11 @@ function Seccion({ titulo, filas, total, sym, headerColor }: {
             <table className="w-full text-sm">
                 <tbody>
                     {filas.map(f => (
-                        <tr key={f.cuenta_id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <tr key={f.codigo} className={cn('border-b border-slate-100', f.esSubtotal ? 'bg-slate-50 font-semibold' : 'hover:bg-slate-50')}>
                             <td className="py-2 px-5 font-mono text-xs text-slate-500 w-28">{f.codigo}</td>
-                            <td className="py-2 px-3 text-slate-700">{f.nombre}</td>
-                            <td className="py-2 px-5 text-right font-mono text-slate-800 w-36">
-                                {formatMoneda(f.balance, sym)}
+                            <td className="py-2 px-3 text-slate-700" style={{ paddingLeft: `${(f.nivel - 1) * 14 + 12}px` }}>{f.nombre}</td>
+                            <td className={cn('py-2 px-5 text-right font-mono w-36', f.esSubtotal ? 'text-slate-900' : 'text-slate-800')}>
+                                {formatMoneda(f.valores.balance, sym)}
                             </td>
                         </tr>
                     ))}
@@ -65,12 +63,17 @@ export function BalanceGeneralPage() {
     const { empresaActiva } = useAuth()
     const [periodos, setPeriodos] = useState<LpPeriodo[]>([])
     const [periodoId, setPeriodoId] = useState('')
-    const [activos, setActivos] = useState<FilaBG[]>([])
-    const [pasivos, setPasivos] = useState<FilaBG[]>([])
-    const [patrimonio, setPatrimonio] = useState<FilaBG[]>([])
+    const [modeloCuenta, setModeloCuenta] = useState<ModeloCuenta>('propia')
+    const [activos, setActivos] = useState<FilaJerarquica[]>([])
+    const [pasivos, setPasivos] = useState<FilaJerarquica[]>([])
+    const [patrimonio, setPatrimonio] = useState<FilaJerarquica[]>([])
+    const [totalActivos, setTotalActivos] = useState(0)
+    const [totalPasivos, setTotalPasivos] = useState(0)
+    const [totalPatrimonioCuentas, setTotalPatrimonioCuentas] = useState(0)
     const [utilidad, setUtilidad] = useState(0)
     const [loading, setLoading] = useState(false)
     const [generado, setGenerado] = useState(false)
+    const [sinMapear, setSinMapear] = useState<{ codigo: string; nombre: string }[] | null>(null)
 
     useEffect(() => { if (empresaActiva) cargarPeriodos() }, [empresaActiva])
 
@@ -86,6 +89,7 @@ export function BalanceGeneralPage() {
         if (!empresaActiva || !periodoId) return
         setLoading(true)
         setGenerado(false)
+        setSinMapear(null)
 
         // Estado de Situación Financiera = saldo ACUMULADO hasta el período seleccionado (no solo ese mes)
         const seleccionado = periodos.find(p => p.id === periodoId)!
@@ -94,18 +98,21 @@ export function BalanceGeneralPage() {
                 (p.año === seleccionado.año && ((seleccionado.mes == null) || (p.mes ?? 0) <= (seleccionado.mes ?? 12))))
             .map(p => p.id)
 
-        const { data } = await supabase
-            .from('lp_saldos_cuenta')
-            .select(`
-                cuenta_id,
-                saldo_inicial_debe,
-                saldo_inicial_haber,
-                movimientos_debe,
-                movimientos_haber,
-                cuenta:lp_cuentas(codigo, nombre, nivel, tipo, naturaleza, acepta_movimientos)
-            `)
-            .eq('empresa_id', empresaActiva.id)
-            .in('periodo_id', periodosHasta)
+        const [{ data }, { data: todasLasCuentas }] = await Promise.all([
+            supabase
+                .from('lp_saldos_cuenta')
+                .select(`
+                    cuenta_id,
+                    saldo_inicial_debe,
+                    saldo_inicial_haber,
+                    movimientos_debe,
+                    movimientos_haber,
+                    cuenta:lp_cuentas(codigo, nombre, nivel, tipo, naturaleza, acepta_movimientos, codigo_sri, codigo_supe)
+                `)
+                .eq('empresa_id', empresaActiva.id)
+                .in('periodo_id', periodosHasta),
+            supabase.from('lp_cuentas').select('codigo, nombre').eq('empresa_id', empresaActiva.id),
+        ])
 
         if (!data) { setLoading(false); return }
 
@@ -136,21 +143,48 @@ export function BalanceGeneralPage() {
             const saldoDebe  = Math.max(0, totalDebe  - totalHaber)
             const saldoHaber = Math.max(0, totalHaber - totalDebe)
             const balance = r.cuenta.naturaleza === 'deudora' ? saldoDebe : saldoHaber
-            return { cuenta_id: r.cuenta_id, codigo: r.cuenta.codigo, nombre: r.cuenta.nombre,
-                     nivel: r.cuenta.nivel, tipo: r.cuenta.tipo as string, balance }
+            return {
+                cuenta_id: r.cuenta_id, codigo: r.cuenta.codigo, nombre: r.cuenta.nombre,
+                tipo: r.cuenta.tipo as string, balance,
+                codigo_sri: r.cuenta.codigo_sri as string | null,
+                codigo_supe: r.cuenta.codigo_supe as string | null,
+            }
         })
 
-        const filasBG = saldos
-            .filter(f => ['activo', 'pasivo', 'patrimonio'].includes(f.tipo) && f.balance > 0)
-            .sort((a, b) => a.codigo.localeCompare(b.codigo))
+        const hojasBG = saldos.filter(f => ['activo', 'pasivo', 'patrimonio'].includes(f.tipo) && f.balance > 0)
 
         const totalIngresos = saldos.filter(f => f.tipo === 'ingreso').reduce((s, f) => s + f.balance, 0)
         const totalGastos   = saldos.filter(f => f.tipo === 'gasto').reduce((s, f) => s + f.balance, 0)
+        const utilidadPeriodo = totalIngresos - totalGastos
 
-        setActivos(filasBG.filter(f => f.tipo === 'activo'))
-        setPasivos(filasBG.filter(f => f.tipo === 'pasivo'))
-        setPatrimonio(filasBG.filter(f => f.tipo === 'patrimonio'))
-        setUtilidad(totalIngresos - totalGastos)
+        function seccion(tipo: string) {
+            const hojas = hojasBG.filter(f => f.tipo === tipo)
+            if (modeloCuenta === 'propia') {
+                return { filas: construirJerarquia(hojas.map(h => ({ codigo: h.codigo, nombre: h.nombre, valores: { balance: h.balance } })), todasLasCuentas ?? []), sinMapear: [] as { codigo: string; nombre: string }[] }
+            }
+            const codigoField = modeloCuenta === 'sri' ? 'codigo_sri' : 'codigo_supe'
+            const r = agruparPorCodigoAlterno(hojas.map(h => ({ codigo: h.codigo, nombre: h.nombre, valores: { balance: h.balance }, codigoAlterno: h[codigoField] })))
+            return { filas: r.filas, sinMapear: r.sinMapear }
+        }
+
+        const secActivos = seccion('activo')
+        const secPasivos = seccion('pasivo')
+        const secPatrimonio = seccion('patrimonio')
+        const faltantes = [...secActivos.sinMapear, ...secPasivos.sinMapear, ...secPatrimonio.sinMapear]
+
+        if (faltantes.length > 0) {
+            setSinMapear(faltantes)
+            setLoading(false)
+            return
+        }
+
+        setActivos(secActivos.filas)
+        setPasivos(secPasivos.filas)
+        setPatrimonio(secPatrimonio.filas)
+        setTotalActivos(hojasBG.filter(f => f.tipo === 'activo').reduce((s, f) => s + f.balance, 0))
+        setTotalPasivos(hojasBG.filter(f => f.tipo === 'pasivo').reduce((s, f) => s + f.balance, 0))
+        setTotalPatrimonioCuentas(hojasBG.filter(f => f.tipo === 'patrimonio').reduce((s, f) => s + f.balance, 0))
+        setUtilidad(utilidadPeriodo)
         setGenerado(true)
         setLoading(false)
     }
@@ -158,10 +192,11 @@ export function BalanceGeneralPage() {
     function exportarCSV() {
         const header = 'Tipo,Código,Nombre,Saldo'
         const resultadoLabel = utilidad >= 0 ? 'Utilidad del Período' : 'Pérdida del Período'
+        const filaCsv = (tipo: string) => (f: FilaJerarquica) => `${tipo},"${f.codigo}","${f.nombre}",${f.valores.balance}`
         const rows = [
-            ...activos.map(f => `Activo,"${f.codigo}","${f.nombre}",${f.balance}`),
-            ...pasivos.map(f => `Pasivo,"${f.codigo}","${f.nombre}",${f.balance}`),
-            ...patrimonio.map(f => `Patrimonio,"${f.codigo}","${f.nombre}",${f.balance}`),
+            ...activos.map(filaCsv('Activo')),
+            ...pasivos.map(filaCsv('Pasivo')),
+            ...patrimonio.map(filaCsv('Patrimonio')),
             `Patrimonio,"—","${resultadoLabel}",${utilidad}`,
         ]
         const csv = [header, ...rows].join('\n')
@@ -171,11 +206,47 @@ export function BalanceGeneralPage() {
         URL.revokeObjectURL(url)
     }
 
+    function imprimir() {
+        const filaImp = (f: FilaJerarquica) => ({
+            codigo: f.esSubtotal ? `<strong>${f.codigo}</strong>` : f.codigo,
+            nombre: `${'&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(f.nivel - 1)}${f.esSubtotal ? `<strong>${f.nombre}</strong>` : f.nombre}`,
+            saldo: f.esSubtotal ? `<strong>${formatMoneda(f.valores.balance, sym)}</strong>` : formatMoneda(f.valores.balance, sym),
+        })
+        const cols = [
+            { label: 'Código', key: 'codigo', width: '18%' },
+            { label: 'Cuenta', key: 'nombre' },
+            { label: 'Saldo', key: 'saldo', align: 'right' as const, width: '20%' },
+        ]
+        const htmlActivos = generarTablaHtml(cols, activos.map(filaImp), { nombre: '<strong>TOTAL ACTIVOS</strong>', saldo: `<strong>${formatMoneda(totalActivos, sym)}</strong>` })
+        const htmlPasivos = generarTablaHtml(cols, pasivos.map(filaImp), { nombre: '<strong>TOTAL PASIVOS</strong>', saldo: `<strong>${formatMoneda(totalPasivos, sym)}</strong>` })
+        const filasPatrimonio = [
+            ...patrimonio.map(filaImp),
+            { codigo: '—', nombre: utilidad >= 0 ? 'Utilidad del Período' : 'Pérdida del Período', saldo: formatMoneda(Math.abs(utilidad), sym) },
+        ]
+        const htmlPatrimonio = generarTablaHtml(cols, filasPatrimonio, { nombre: '<strong>TOTAL PATRIMONIO</strong>', saldo: `<strong>${formatMoneda(totalPatrimonio, sym)}</strong>` })
+        const htmlCuadre = `<table><tbody>
+            <tr><td>TOTAL ACTIVOS</td><td style="text-align:right">${formatMoneda(totalActivos, sym)}</td></tr>
+            <tr><td>TOTAL PASIVOS + PATRIMONIO</td><td style="text-align:right">${formatMoneda(totalPasivoPatrimonio, sym)}</td></tr>
+            <tr><td colspan="2" style="text-align:center;font-weight:bold;padding-top:6px">${cuadra ? '✓ El balance cuadra' : '✗ El balance NO cuadra — revisar'}</td></tr>
+        </tbody></table>`
+
+        imprimirReporte({
+            empresa: { nombre: empresaActiva?.razon_social ?? '', ruc: empresaActiva?.ruc ?? '' },
+            titulo: 'Estado de Situación Financiera',
+            periodo: `${periodoLabel}${modeloCuenta !== 'propia' ? ` · Modelo: ${MODELO_LABEL[modeloCuenta]}` : ''}`,
+            html: htmlActivos,
+            subtablas: [
+                { titulo: 'Pasivos', html: htmlPasivos },
+                { titulo: 'Patrimonio', html: htmlPatrimonio },
+                { titulo: 'Verificación', html: htmlCuadre },
+            ],
+        })
+    }
+
     const sym = empresaActiva?.moneda?.simbolo ?? '$'
     const periodo = periodos.find(p => p.id === periodoId)
-    const totalActivos    = activos.reduce((s, f) => s + f.balance, 0)
-    const totalPasivos    = pasivos.reduce((s, f) => s + f.balance, 0)
-    const totalPatrimonio = patrimonio.reduce((s, f) => s + f.balance, 0) + utilidad
+    const periodoLabel = periodo ? (periodo.mes ? `${mesNombre(periodo.mes)} ${periodo.año}` : `Año ${periodo.año}`) : ''
+    const totalPatrimonio = totalPatrimonioCuentas + utilidad
     const totalPasivoPatrimonio = totalPasivos + totalPatrimonio
     const cuadra = Math.abs(totalActivos - totalPasivoPatrimonio) < 0.01
 
@@ -186,17 +257,15 @@ export function BalanceGeneralPage() {
                     <h1 className="text-2xl font-bold text-slate-900">Estado de Situación Financiera</h1>
                     {generado && periodo && (
                         <p className="text-slate-500 text-sm mt-0.5">
-                            Al {periodo.mes ? `${mesNombre(periodo.mes)} ${periodo.año}` : `Año ${periodo.año}`}
+                            Al {periodoLabel}{modeloCuenta !== 'propia' && ` · Modelo: ${MODELO_LABEL[modeloCuenta]}`}
                         </p>
                     )}
                 </div>
                 {generado && (
                     <div className="flex gap-2 no-print">
-                        <PrintButton
-                            titulo="Estado de Situación Financiera"
-                            empresa={empresaActiva?.razon_social}
-                            subtitulo={periodo ? `Al ${periodo.mes ? `${mesNombre(periodo.mes)} ${periodo.año}` : `Año ${periodo.año}`}` : undefined}
-                        />
+                        <button onClick={imprimir} className="btn btn-secondary gap-2 text-sm">
+                            <Printer className="w-4 h-4" /> Imprimir
+                        </button>
                         <button onClick={exportarCSV} className="btn btn-secondary gap-2 text-sm">
                             <Download className="w-4 h-4" /> Exportar CSV
                         </button>
@@ -217,6 +286,18 @@ export function BalanceGeneralPage() {
                         ))}
                     </select>
                 </div>
+                <div>
+                    <label className="label">Modelo de cuenta</label>
+                    <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
+                        {(['propia', 'sri', 'supe'] as ModeloCuenta[]).map(m => (
+                            <button key={m} type="button" onClick={() => setModeloCuenta(m)}
+                                className={cn('px-4 py-2', m !== 'propia' && 'border-l border-slate-200',
+                                    modeloCuenta === m ? 'bg-primary-600 text-white font-medium' : 'bg-white text-slate-600 hover:bg-slate-50')}>
+                                {MODELO_LABEL[m]}
+                            </button>
+                        ))}
+                    </div>
+                </div>
                 <button
                     onClick={generar}
                     disabled={!periodoId || loading}
@@ -226,6 +307,29 @@ export function BalanceGeneralPage() {
                     Generar
                 </button>
             </div>
+
+            {/* Cuentas sin mapear al modelo SRI / Superintendencia */}
+            {sinMapear && (
+                <div className="card px-6 py-5 border border-red-200 bg-red-50">
+                    <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold text-red-800">
+                                No se puede generar el reporte en modelo {MODELO_LABEL[modeloCuenta]}
+                            </p>
+                            <p className="text-sm text-red-700 mt-1">
+                                Las siguientes cuentas tienen saldo en este período pero no tienen código {modeloCuenta === 'sri' ? 'SRI' : 'de Superintendencia'} asignado.
+                                Asígnalo en Plan de Cuentas y vuelve a generar:
+                            </p>
+                            <ul className="mt-2 space-y-0.5 text-sm text-red-800 font-mono">
+                                {sinMapear.map(c => (
+                                    <li key={c.codigo}>• {c.codigo} — {c.nombre}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Dos columnas: Activos | Pasivos + Patrimonio */}
             {generado && (
@@ -241,11 +345,11 @@ export function BalanceGeneralPage() {
                             <table className="w-full text-sm">
                                 <tbody>
                                     {patrimonio.map(f => (
-                                        <tr key={f.cuenta_id} className="border-b border-slate-100 hover:bg-slate-50">
+                                        <tr key={f.codigo} className={cn('border-b border-slate-100', f.esSubtotal ? 'bg-slate-50 font-semibold' : 'hover:bg-slate-50')}>
                                             <td className="py-2 px-5 font-mono text-xs text-slate-500 w-28">{f.codigo}</td>
-                                            <td className="py-2 px-3 text-slate-700">{f.nombre}</td>
+                                            <td className="py-2 px-3 text-slate-700" style={{ paddingLeft: `${(f.nivel - 1) * 14 + 12}px` }}>{f.nombre}</td>
                                             <td className="py-2 px-5 text-right font-mono text-slate-800 w-36">
-                                                {formatMoneda(f.balance, sym)}
+                                                {formatMoneda(f.valores.balance, sym)}
                                             </td>
                                         </tr>
                                     ))}
@@ -293,7 +397,7 @@ export function BalanceGeneralPage() {
 
             {/* Verificación de cuadre */}
             {generado && (
-                <div className="card px-6 py-4">
+                <div className="card px-6 py-4 no-print">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-8 text-sm">
                             <div>
@@ -325,8 +429,3 @@ export function BalanceGeneralPage() {
         </div>
     )
 }
-
-
-
-
-

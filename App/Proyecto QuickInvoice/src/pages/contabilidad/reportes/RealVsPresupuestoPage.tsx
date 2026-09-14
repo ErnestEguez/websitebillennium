@@ -1,19 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Download, Loader2, RefreshCw } from 'lucide-react'
-import { PrintButton } from '../../../components/contabilidad/PrintButton'
+import { Download, Loader2, Printer, RefreshCw } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseContabilidad'
 import { useAuth } from '../../../contexts/contabilidad/ContabilidadContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
+import { imprimirReporte, generarTablaHtml } from '../../../lib/printUtils'
+import { construirJerarquia, type FilaJerarquica } from '../../../lib/contaJerarquia'
 import type { LpPeriodo, LpPresupuesto } from '../../../types/conta'
-
-interface FilaRVP {
-    cuenta_id: string
-    codigo: string
-    nombre: string
-    tipo: string
-    presupuesto: number
-    real: number
-}
 
 export function RealVsPresupuestoPage() {
     const { empresaActiva } = useAuth()
@@ -21,7 +13,8 @@ export function RealVsPresupuestoPage() {
     const [presupuestos, setPresupuestos] = useState<LpPresupuesto[]>([])
     const [periodoId, setPeriodoId]       = useState('')
     const [presupuestoId, setPresupuestoId] = useState('')
-    const [filas, setFilas]               = useState<FilaRVP[]>([])
+    const [ingresos, setIngresos]         = useState<FilaJerarquica[]>([])
+    const [gastos, setGastos]             = useState<FilaJerarquica[]>([])
     const [loading, setLoading]           = useState(false)
     const [generado, setGenerado]         = useState(false)
 
@@ -47,23 +40,24 @@ export function RealVsPresupuestoPage() {
         setGenerado(false)
 
         // Real: saldos del período
-        const { data: saldos } = await supabase
-            .from('lp_saldos_cuenta')
-            .select(`
-                cuenta_id,
-                saldo_inicial_debe, saldo_inicial_haber,
-                movimientos_debe, movimientos_haber,
-                cuenta:lp_cuentas(codigo, nombre, tipo, naturaleza, acepta_movimientos)
-            `)
-            .eq('empresa_id', empresaActiva.id)
-            .eq('periodo_id', periodoId)
-
-        // Presupuesto del período
-        const { data: detalle } = await supabase
-            .from('lp_presupuesto_detalle')
-            .select('cuenta_id, valor_presupuestado')
-            .eq('presupuesto_id', presupuestoId)
-            .eq('periodo_id', periodoId)
+        const [{ data: saldos }, { data: detalle }, { data: todasLasCuentas }] = await Promise.all([
+            supabase
+                .from('lp_saldos_cuenta')
+                .select(`
+                    cuenta_id,
+                    saldo_inicial_debe, saldo_inicial_haber,
+                    movimientos_debe, movimientos_haber,
+                    cuenta:lp_cuentas(codigo, nombre, tipo, naturaleza, acepta_movimientos)
+                `)
+                .eq('empresa_id', empresaActiva.id)
+                .eq('periodo_id', periodoId),
+            supabase
+                .from('lp_presupuesto_detalle')
+                .select('cuenta_id, valor_presupuestado')
+                .eq('presupuesto_id', presupuestoId)
+                .eq('periodo_id', periodoId),
+            supabase.from('lp_cuentas').select('codigo, nombre').eq('empresa_id', empresaActiva.id),
+        ])
 
         const mapPresu: Record<string, number> = {}
         for (const d of (detalle ?? []) as any[]) {
@@ -91,7 +85,7 @@ export function RealVsPresupuestoPage() {
             extraCuentas = ec ?? []
         }
 
-        const resultado: FilaRVP[] = []
+        const hojas: { codigo: string; nombre: string; tipo: string; valores: { real: number; presupuesto: number } }[] = []
         for (const cuentaId of cuentasConDatos) {
             const s = mapSaldos[cuentaId]
             const cuenta = s?.cuenta ?? extraCuentas.find(c => c.id === cuentaId)
@@ -107,29 +101,23 @@ export function RealVsPresupuestoPage() {
                 real = cuenta.naturaleza === 'deudora' ? saldoDebe : saldoHaber
             }
 
-            resultado.push({
-                cuenta_id:   cuentaId,
-                codigo:      cuenta.codigo,
-                nombre:      cuenta.nombre,
-                tipo:        cuenta.tipo,
-                presupuesto: mapPresu[cuentaId] ?? 0,
-                real,
-            })
+            hojas.push({ codigo: cuenta.codigo, nombre: cuenta.nombre, tipo: cuenta.tipo, valores: { real, presupuesto: mapPresu[cuentaId] ?? 0 } })
         }
 
-        resultado.sort((a, b) => a.codigo.localeCompare(b.codigo))
-        setFilas(resultado)
+        setIngresos(construirJerarquia(hojas.filter(h => h.tipo === 'ingreso'), todasLasCuentas ?? []))
+        setGastos(construirJerarquia(hojas.filter(h => h.tipo === 'gasto'), todasLasCuentas ?? []))
         setGenerado(true)
         setLoading(false)
     }
 
     function exportarCSV() {
         const header = 'Tipo,Código,Nombre,Presupuesto,Real,Variación,% Cumplimiento'
-        const rows = filas.map(f => {
-            const variacion = f.real - f.presupuesto
-            const pct = f.presupuesto !== 0 ? ((f.real / f.presupuesto) * 100).toFixed(1) : '—'
-            return `${f.tipo},"${f.codigo}","${f.nombre}",${f.presupuesto},${f.real},${variacion},${pct}`
-        })
+        const filaCsv = (tipo: string) => (f: FilaJerarquica) => {
+            const variacion = f.valores.real - f.valores.presupuesto
+            const pct = f.valores.presupuesto !== 0 ? ((f.valores.real / f.valores.presupuesto) * 100).toFixed(1) : '—'
+            return `${tipo},"${f.codigo}","${f.nombre}",${f.valores.presupuesto},${f.valores.real},${variacion},${pct}`
+        }
+        const rows = [...ingresos.map(filaCsv('Ingreso')), ...gastos.map(filaCsv('Gasto'))]
         const csv = ['sep=,', header, ...rows].join('\n')
         const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
         const url = URL.createObjectURL(blob)
@@ -138,26 +126,65 @@ export function RealVsPresupuestoPage() {
         URL.revokeObjectURL(url)
     }
 
+    function imprimir() {
+        const cols = [
+            { label: 'Código', key: 'codigo', width: '12%' },
+            { label: 'Cuenta', key: 'nombre' },
+            { label: 'Presupuesto', key: 'presupuesto', align: 'right' as const, width: '16%' },
+            { label: 'Real', key: 'real', align: 'right' as const, width: '16%' },
+            { label: 'Variación', key: 'variacion', align: 'right' as const, width: '16%' },
+            { label: '% Cumpl.', key: 'pct', align: 'right' as const, width: '10%' },
+        ]
+        const filaImp = (f: FilaJerarquica) => {
+            const variacion = f.valores.real - f.valores.presupuesto
+            const pct = f.valores.presupuesto !== 0 ? `${((f.valores.real / f.valores.presupuesto) * 100).toFixed(1)}%` : '—'
+            const b = (s: string) => f.esSubtotal ? `<strong>${s}</strong>` : s
+            return {
+                codigo: b(f.codigo),
+                nombre: `${'&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(f.nivel - 1)}${b(f.nombre)}`,
+                presupuesto: b(formatMoneda(f.valores.presupuesto, sym)),
+                real: b(formatMoneda(f.valores.real, sym)),
+                variacion: b(`${variacion >= 0 ? '+' : ''}${formatMoneda(variacion, sym)}`),
+                pct: b(pct),
+            }
+        }
+        const totalFila = (lista: FilaJerarquica[]) => {
+            const raiz = lista.filter(f => f.nivel === 1)
+            const presupuesto = raiz.reduce((s, f) => s + f.valores.presupuesto, 0)
+            const real = raiz.reduce((s, f) => s + f.valores.real, 0)
+            const pct = presupuesto !== 0 ? `${((real / presupuesto) * 100).toFixed(1)}%` : '—'
+            return {
+                nombre: '<strong>TOTAL</strong>',
+                presupuesto: `<strong>${formatMoneda(presupuesto, sym)}</strong>`,
+                real: `<strong>${formatMoneda(real, sym)}</strong>`,
+                variacion: `<strong>${real - presupuesto >= 0 ? '+' : ''}${formatMoneda(real - presupuesto, sym)}</strong>`,
+                pct: `<strong>${pct}</strong>`,
+            }
+        }
+        const htmlIngresos = generarTablaHtml(cols, ingresos.map(filaImp), totalFila(ingresos))
+        const htmlGastos = generarTablaHtml(cols, gastos.map(filaImp), totalFila(gastos))
+        imprimirReporte({
+            empresa: { nombre: empresaActiva?.razon_social ?? '', ruc: empresaActiva?.ruc ?? '' },
+            titulo: 'Real vs Presupuesto',
+            periodo: periodo ? (periodo.mes ? `${mesNombre(periodo.mes)} ${periodo.año}` : `Año ${periodo.año}`) : undefined,
+            html: htmlIngresos,
+            subtablas: [{ titulo: 'Gastos', html: htmlGastos }],
+        })
+    }
+
     const sym      = empresaActiva?.moneda?.simbolo ?? '$'
     const periodo  = periodos.find(p => p.id === periodoId)
-    const ingresos = filas.filter(f => f.tipo === 'ingreso')
-    const gastos   = filas.filter(f => f.tipo === 'gasto')
 
-    const totales = (lista: FilaRVP[]) => ({
-        presupuesto: lista.reduce((s, f) => s + f.presupuesto, 0),
-        real:        lista.reduce((s, f) => s + f.real, 0),
-    })
-
-    function FilaTabla({ f }: { f: FilaRVP }) {
-        const variacion = f.real - f.presupuesto
-        const pct = f.presupuesto !== 0 ? (f.real / f.presupuesto) * 100 : null
+    function FilaTabla({ f }: { f: FilaJerarquica }) {
+        const variacion = f.valores.real - f.valores.presupuesto
+        const pct = f.valores.presupuesto !== 0 ? (f.valores.real / f.valores.presupuesto) * 100 : null
         const cumple = pct !== null && pct >= 80
         return (
-            <tr className="border-b border-slate-100 hover:bg-slate-50">
+            <tr className={cn('border-b border-slate-100', f.esSubtotal ? 'bg-slate-50 font-semibold' : 'hover:bg-slate-50')}>
                 <td className="py-2.5 px-4 font-mono text-xs text-slate-500 w-24">{f.codigo}</td>
-                <td className="py-2.5 px-3 text-slate-700">{f.nombre}</td>
-                <td className="py-2.5 px-4 text-right font-mono text-slate-600 w-32">{formatMoneda(f.presupuesto, sym)}</td>
-                <td className="py-2.5 px-4 text-right font-mono text-slate-800 w-32">{formatMoneda(f.real, sym)}</td>
+                <td className="py-2.5 px-3 text-slate-700" style={{ paddingLeft: `${(f.nivel - 1) * 14 + 12}px` }}>{f.nombre}</td>
+                <td className="py-2.5 px-4 text-right font-mono text-slate-600 w-32">{formatMoneda(f.valores.presupuesto, sym)}</td>
+                <td className="py-2.5 px-4 text-right font-mono text-slate-800 w-32">{formatMoneda(f.valores.real, sym)}</td>
                 <td className={cn('py-2.5 px-4 text-right font-mono w-32', variacion >= 0 ? 'text-green-700' : 'text-red-700')}>
                     {variacion >= 0 ? '+' : ''}{formatMoneda(variacion, sym)}
                 </td>
@@ -180,8 +207,12 @@ export function RealVsPresupuestoPage() {
         )
     }
 
-    function SeccionRVP({ titulo, lista, headerColor }: { titulo: string; lista: FilaRVP[]; headerColor: string }) {
-        const tot = totales(lista)
+    function SeccionRVP({ titulo, lista, headerColor }: { titulo: string; lista: FilaJerarquica[]; headerColor: string }) {
+        const raiz = lista.filter(f => f.nivel === 1)
+        const tot = {
+            presupuesto: raiz.reduce((s, f) => s + f.valores.presupuesto, 0),
+            real: raiz.reduce((s, f) => s + f.valores.real, 0),
+        }
         const pct = tot.presupuesto !== 0 ? (tot.real / tot.presupuesto) * 100 : null
         return (
             <div className="card overflow-hidden">
@@ -200,7 +231,7 @@ export function RealVsPresupuestoPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {lista.map(f => <FilaTabla key={f.cuenta_id} f={f} />)}
+                        {lista.map(f => <FilaTabla key={f.codigo} f={f} />)}
                         {lista.length === 0 && (
                             <tr><td colSpan={6} className="py-6 text-center text-slate-400 text-xs">Sin datos</td></tr>
                         )}
@@ -236,11 +267,9 @@ export function RealVsPresupuestoPage() {
                 </div>
                 {generado && (
                     <div className="flex gap-2 no-print">
-                        <PrintButton
-                            titulo="Real vs Presupuesto"
-                            empresa={empresaActiva?.razon_social}
-                            subtitulo={periodo ? (periodo.mes ? `${mesNombre(periodo.mes)} ${periodo.año}` : `Año ${periodo.año}`) : undefined}
-                        />
+                        <button onClick={imprimir} className="btn btn-secondary gap-2 text-sm">
+                            <Printer className="w-4 h-4" /> Imprimir
+                        </button>
                         <button onClick={exportarCSV} className="btn btn-secondary gap-2 text-sm">
                             <Download className="w-4 h-4" /> Exportar CSV
                         </button>
@@ -292,8 +321,3 @@ export function RealVsPresupuestoPage() {
         </div>
     )
 }
-
-
-
-
-
