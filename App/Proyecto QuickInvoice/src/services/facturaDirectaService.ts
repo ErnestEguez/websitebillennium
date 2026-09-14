@@ -23,10 +23,20 @@ export interface DetalleFacturaDirecta {
     // Plan Acumulativo. Opcionales; la mayoría de facturas no los usan.
     talla?: string | null
     color?: string | null
+    // Número de serie digitado en la línea — solo se usa en ventas a
+    // crédito de electrodomésticos, opcional. Se guarda tal cual en
+    // comprobante_detalles.serial (y de ahí se replica a producto_seriales).
+    serial?: string | null
 }
 
 export interface PagoFactura {
-    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'cheque_fecha' | 'otros' | 'tarjeta' | 'nota_credito' | 'plan_acumulativo'
+    // 'credito_electrodomesticos' NO aparece en el dropdown normal de forma
+    // de pago (METODOS_PAGO en FacturaDirectaPage.tsx) — solo lo genera el
+    // wizard de Crédito Electrodomésticos al confirmar. Al ser un método
+    // distinto de 'credito', no dispara la creación de cartera_cxc (esa
+    // rama solo mira metodo==='credito'): el saldo financiado con cuotas
+    // vive exclusivamente en creditos_electrodomesticos_cuotas.
+    metodo: 'efectivo' | 'transferencia' | 'credito' | 'cheque' | 'cheque_fecha' | 'otros' | 'tarjeta' | 'nota_credito' | 'plan_acumulativo' | 'credito_electrodomesticos'
     valor: number
     referencia?: string
     cuenta_bancaria_id?: string | null           // solo para transferencia
@@ -332,6 +342,7 @@ export const facturaDirectaService = {
                     subproducto_id: d.subproducto_id || null,
                     talla: d.talla || null,
                     color: d.color || null,
+                    serial: d.serial || null,
                 }
             })
 

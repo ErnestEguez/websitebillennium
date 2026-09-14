@@ -61,6 +61,111 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    // ─── COBRADORES ─────────────────────────────────────────────────────────
+    'cobradores': {
+        titulo: 'Cobradores',
+        subtitulo: 'Equipo de cobro para Ventas a Crédito de Electrodomésticos',
+        secciones: [
+            {
+                titulo: '¿Qué es un cobrador?',
+                texto: 'La persona responsable de recaudar las cuotas de un crédito de electrodomésticos. Cada crédito se asigna a un cobrador; el reporte de "Recaudación por cobrador" (Cuentas por Cobrar) se arma con esta asignación.',
+                tips: [
+                    'La "Zona" es un campo libre e informativo (ej. "Norte", "Ruta 3") — no restringe qué créditos puede cobrar.',
+                    'Dar de baja no borra el historial: los créditos que ese cobrador ya tenía asignados lo conservan.',
+                ],
+            },
+            {
+                titulo: 'Reasignar cobrador',
+                texto: 'Para cambiar el cobrador de un crédito ya creado, hazlo desde el detalle de ese crédito (Cuentas por Cobrar → Créditos de Electrodomésticos), no desde aquí — esta pantalla solo administra el catálogo de personas.',
+            },
+        ],
+    },
+
+    // ─── CRÉDITO ELECTRODOMÉSTICOS ──────────────────────────────────────────
+    'credito-electrodomesticos': {
+        titulo: 'Venta a Crédito de Electrodomésticos',
+        subtitulo: 'Entrada + cuotas fijas + cobrador + garante, sin alterar la factura electrónica',
+        secciones: [
+            {
+                titulo: '¿Cómo funciona?',
+                texto: 'Se abre desde Nueva Factura, después de ingresar cliente y artículos. La factura electrónica sigue emitiéndose con el precio de lista y el IVA normal de cada artículo — el interés y las cuotas se administran aparte, en Cuentas por Cobrar → Créditos de Electrodomésticos, nunca dentro del XML de la factura.',
+                tips: [
+                    'El garante es opcional. El cobrador es obligatorio.',
+                    'La entrada se registra como un pago real de la factura (efectivo/transferencia/tarjeta/cheque), igual que cualquier venta normal.',
+                ],
+                alerta: 'Debes presionar "Calcular" cada vez que cambies entrada, tasa, periodicidad, cuotas o fecha — la tabla se invalida sola con cualquier cambio, para que nunca confirmes una tabla desactualizada.',
+            },
+            {
+                titulo: 'Base del interés',
+                texto: 'Cada empresa tiene configurado si el interés se calcula sobre el saldo DESPUÉS de la entrada (lo normal) o sobre el TOTAL de la venta completo (la entrada no reduce la base) — esto se ve como una advertencia amarilla en el paso de Cálculo cuando aplica. Se configura en Ajustes, no en este wizard.',
+            },
+            {
+                titulo: 'Si algo sale mal después de emitir',
+                texto: 'Si la factura se emite pero el crédito no se pudo registrar (error de conexión, etc.), la app te avisa con el número de factura para que se registre el crédito manualmente — la factura ya emitida NUNCA se revierte por un fallo en este segundo paso.',
+            },
+        ],
+    },
+
+    'generar-ruta-cobro': {
+        titulo: 'Generar Ruta de Cobro',
+        subtitulo: 'Arma la ruta del día de un cobrador — vencidos + vencen hoy, ordenados por cercanía',
+        secciones: [
+            {
+                titulo: '¿Cómo funciona?',
+                texto: 'Elige un cobrador y la app trae automáticamente todos sus clientes con cuotas vencidas o que vencen hoy, sumadas por cliente. Desmarca del checklist a quien no vayas a visitar hoy y presiona "Generar Ruta" — el resultado queda guardado y el cobrador ya lo puede ver en "Mi Ruta de Hoy" dentro de Cobros Móvil.',
+                tips: [
+                    'El orden de visita se calcula por cercanía geográfica, empezando desde la ubicación del local (si aún no la capturaste, un aviso amarillo te deja hacerlo con un botón antes de generar).',
+                    'Clientes sin ubicación capturada aparecen al final de la ruta, sin orden calculado — hay que ubicarlos manualmente.',
+                    'Volver a generar la ruta del mismo cobrador el mismo día reemplaza las paradas anteriores, no las duplica.',
+                    'El botón "Abrir ruta en Google Maps" arma un solo link con todas las paradas en orden, para navegación turno a turno.',
+                ],
+            },
+        ],
+    },
+
+    'cancelacion-oficina': {
+        titulo: 'Cancelación Oficina',
+        subtitulo: 'Cobro de cuotas de crédito de electrodomésticos en ventanilla',
+        secciones: [
+            {
+                titulo: '¿Cómo funciona?',
+                texto: 'Busca al cliente con deuda, elige el crédito (si tiene más de uno con saldo) y registra el cobro. Un mismo pago puede cubrir varias cuotas: si el valor ingresado alcanza para saldar una cuota, el excedente pasa automáticamente a la siguiente. También se permite grabar un pago menor a una cuota completa (abono parcial).',
+                tips: [
+                    'Dentro de cada cuota, el pago se aplica en este orden: mora → interés → capital.',
+                    'Puedes cambiar el cobrador asignado al crédito desde el mismo dropdown, sin salir de la pantalla.',
+                ],
+                alerta: 'Recibo interno = consecutivo automático del sistema (no se puede editar). Recibo externo = el número que escribes a mano desde el talonario físico — el sistema no lo valida, solo lo guarda como referencia.',
+            },
+            {
+                titulo: 'Depósitos/transferencias',
+                texto: 'Si eliges esa forma de pago, debes indicar la cuenta bancaria (viene del catálogo de Finance) y el número de papeleta de depósito.',
+            },
+        ],
+    },
+
+    'cancelacion-movil': {
+        titulo: 'Cobros Móvil',
+        subtitulo: 'Cobro de cuotas de crédito de electrodomésticos en terreno',
+        secciones: [
+            {
+                titulo: '¿Cómo funciona?',
+                texto: 'Misma lógica que Cancelación Oficina (mora → interés → capital, cascada entre cuotas), pero en una pantalla pensada para el celular del cobrador: busca al cliente, elige el crédito si tiene más de uno, y registra el cobro directo en el domicilio.',
+                tips: [
+                    'Muestra la foto de cédula del cliente (si fue capturada desde Clientes) para confirmar identidad antes de cobrar.',
+                    'El botón "Capturar aquí" guarda la ubicación GPS actual del cliente — útil para actualizar direcciones difíciles de ubicar en visitas futuras.',
+                ],
+            },
+            {
+                titulo: 'Mi Ruta de Hoy',
+                texto: 'Botón arriba de la búsqueda de cliente: elige el cobrador y ves la ruta que oficina armó para hoy (vencidos + vencen hoy, en orden de visita). Toca un cliente de la lista para ir directo a su cobro, o el círculo con el número para marcarlo como visitado sin cobrar todavía.',
+                tips: [
+                    'El botón "Abrir ruta en Google Maps" arma un solo link con todas las paradas en orden, para navegación turno a turno.',
+                    'Si la ruta no aparece, pídele a oficina que la genere desde Créditos de Electrodomésticos → "Generar Ruta".',
+                ],
+            },
+        ],
+    },
+
     // ─── COMPROBANTES ───────────────────────────────────────────────────────
     'comprobantes': {
         titulo: 'Comprobantes',
@@ -173,6 +278,15 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                 texto: 'Haz clic en el ícono de edición (lápiz) en la fila del cliente para modificar sus datos. Para desactivar un cliente (dado de baja) usa el ícono de papelera: el cliente deja de aparecer en búsquedas pero sus facturas históricas se conservan intactas. Para restaurar un cliente desactivado, activa el filtro "Ver dados de baja".',
                 alerta: 'No se puede eliminar un cliente que tenga facturas emitidas. Solo se puede desactivar.',
             },
+            {
+                titulo: 'Cédula / Identificación',
+                texto: 'Dentro de "Editar Cliente" puedes capturar o subir hasta 2 imágenes de la cédula (o cualquier documento de identidad) — útil para clientes y garantes de créditos de electrodomésticos, ya que el garante es también un registro de este mismo catálogo. Solo está disponible después de guardar el cliente por primera vez.',
+                tips: [
+                    'En celular, el botón abre directamente la cámara.',
+                    'Las imágenes se guardan en un bucket privado — no son accesibles por URL pública, solo descargables desde este formulario.',
+                    'Esta sección solo aparece si el administrador de plataforma activó el toggle "Ingreso de Imágenes" para tu empresa (apagado por defecto) — si no la ves, pide que lo activen desde Configuración.',
+                ],
+            },
         ],
     },
 
@@ -200,7 +314,32 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
             {
                 titulo: 'Subproductos y precios por volumen',
-                texto: 'Los subproductos permiten agrupar artículos en combos o kits (ej: "Combo Pizza + Bebida"). Los precios por volumen permiten definir descuentos automáticos según la cantidad comprada.',
+                texto: 'Los subproductos son presentaciones o fracciones de UN MISMO artículo maestro (ej: un tanque de diluyente vendido por galón o litro) — no confundir con Combos, que agrupan VARIOS artículos distintos. Los precios por volumen permiten definir descuentos automáticos según la cantidad comprada.',
+            },
+        ],
+    },
+
+    // ─── COMBOS ─────────────────────────────────────────────────────────────
+    'combos': {
+        titulo: 'Combos',
+        subtitulo: 'Paquetes de varios artículos reales a un precio promocional',
+        secciones: [
+            {
+                titulo: '¿Qué es un combo?',
+                texto: 'Un combo agrupa varios artículos reales del catálogo (ej. 1 Cocina + 1 Refrigeradora) para venderlos juntos a un precio de promoción, distinto de la suma de sus precios de lista. El combo en sí NUNCA se vende ni se descuenta del inventario — es solo una forma de armar la venta. Al facturarlo, la app lo descompone en sus artículos reales, y esos sí impactan Kardex y contabilidad, cada uno con su propio producto, cantidad y precio.',
+                tips: [
+                    'Sirve para cualquier empresa, no solo electrodomésticos — cualquier combinación de artículos con precio promocional.',
+                    'Puedes editar o dar de baja un combo sin afectar las facturas donde ya se usó.',
+                ],
+            },
+            {
+                titulo: 'Armar el combo',
+                texto: 'Por cada artículo del combo: búscalo por código o nombre, indica la cantidad y el precio CON IVA incluido que le corresponde dentro de esta promoción (no tiene que ser su precio de lista). Al final, indica el "Total del combo" (también con IVA) — el sistema no te deja guardar si la suma de los artículos no cuadra exactamente con ese total.',
+                alerta: 'Todos los precios que digitas aquí (por artículo y el total) van CON IVA incluido — la app calcula el desglose base/IVA de cada artículo automáticamente al momento de facturar, usando la tarifa de IVA real de cada producto.',
+            },
+            {
+                titulo: 'Al vender un combo',
+                texto: 'Búscalo igual que un producto normal en Nueva Factura — se distingue con una etiqueta "COMBO". Al seleccionarlo, la línea se reemplaza por todas las líneas de sus artículos componentes, ya con cantidad y precio (sin IVA) calculados. Desde ahí se pueden editar como cualquier otra línea de la factura.',
             },
         ],
     },

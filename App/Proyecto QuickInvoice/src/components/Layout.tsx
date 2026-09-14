@@ -53,6 +53,9 @@ import {
     AlertOctagon,
     Wrench,
     History,
+    Home,
+    Route as RouteIcon,
+    PackagePlus,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -76,7 +79,7 @@ interface SidebarItemProps {
 const MODULE_ACTIVE_TESTS: [string, (p: string) => boolean][] = [
     ['gerencia',     p => p === '/dashboard' || p.startsWith('/gerencia')],
     ['facturacion',  p => ['/nueva-factura', '/proformas', '/facturacion-en-vivo', '/facturacion', '/facturacion-masiva', '/vendedores', '/notas-credito', '/anulacion-facturas', '/guias-remision', '/cierres', '/consultas/ventas', '/consultas/talla-color'].some(x => p.startsWith(x))],
-    ['inventario',   p => ['/productos', '/compras/ordenes', '/compras/nueva-inventario', '/inventario-valorizado', '/kardex', '/ajuste-inventario', '/transferencia-bodega', '/cambio-codigo-articulos'].some(x => p.startsWith(x))],
+    ['inventario',   p => ['/productos', '/combos', '/compras/ordenes', '/compras/nueva-inventario', '/inventario-valorizado', '/kardex', '/ajuste-inventario', '/transferencia-bodega', '/cambio-codigo-articulos'].some(x => p.startsWith(x))],
     ['clientes',     p => ['/clientes', '/cartera', '/consultas/cartera'].some(x => p.startsWith(x))],
     ['cxp',          p => ['/proveedores', '/compras', '/cxp', '/reportes/compras', '/reportes/cxp', '/reportes/estado-cuenta', '/ajustes', '/retenciones', '/liquidaciones'].some(x => p.startsWith(x))],
     ['tesoreria',    p => p.startsWith('/teso/')],
@@ -364,9 +367,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('inventario')}
                             onToggle={() => toggleGroup('inventario')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega','/cambio-codigo-articulos'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/productos','/combos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega','/cambio-codigo-articulos'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub sentinelId="nav-productos" disabled={!p.perm_productos} />
+                            <SidebarItem to="/combos"                  icon={PackagePlus}       label="Combos"                active={location.pathname === '/combos'} sub disabled={!p.perm_combos} />
                             <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub disabled={!p.perm_ordenes_compra} />
                             <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub disabled={!p.perm_compras_inventario} />
                             <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub disabled={!p.perm_ajuste_inventario} />
@@ -389,6 +393,38 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/clientes"                    icon={Users}      label="Clientes"         active={location.pathname === '/clientes'} sub disabled={!p.perm_clientes} sentinelId="nav-clientes" />
                             <SidebarItem to="/cartera-cxc"                 icon={CreditCard} label="Cartera / Abonos" active={location.pathname === '/cartera-cxc'} sub disabled={!p.perm_cartera_cxc} />
                             <SidebarItem to="/cartera-pa"                  icon={Wallet}     label="Cartera Plan Acumulativo" active={location.pathname === '/cartera-pa'} sub disabled={!p.perm_cartera_pa} />
+                            {empresa?.habilita_ventas_electrodomesticos_credito && (
+                                <div>
+                                    <button
+                                        onClick={() => toggleGroup('ventas-credito')}
+                                        className={cn(
+                                            'w-full flex items-center gap-3 pl-6 pr-2 py-2 rounded-lg text-sm transition-colors',
+                                            location.pathname.startsWith('/creditos-electrodomesticos') ? 'bg-primary-50 text-primary-700 font-medium' : 'text-slate-600 hover:bg-slate-100'
+                                        )}
+                                    >
+                                        <Home className="w-4 h-4 shrink-0 text-slate-400" />
+                                        {isSidebarOpen && <span className="flex-1 text-left">Ventas a Crédito</span>}
+                                        {isSidebarOpen && <ChevronDown className={cn('w-3.5 h-3.5 text-slate-400 transition-transform', openGroups.includes('ventas-credito') && 'rotate-180')} />}
+                                    </button>
+                                    {openGroups.includes('ventas-credito') && isSidebarOpen && (
+                                        <div className="ml-3 border-l-2 border-slate-100 pl-2 space-y-0.5">
+                                            {p.perm_credito_solicitud && (
+                                                <a href="/documentos/Solicitud_Credito.pdf" target="_blank" rel="noopener noreferrer"
+                                                    className="flex items-center gap-3 pl-8 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+                                                    <FilePlus className="w-4 h-4 shrink-0 text-slate-400" />
+                                                    <span className="flex-1">Solicitud de Crédito</span>
+                                                </a>
+                                            )}
+                                            <SidebarItem to="/creditos-electrodomesticos" icon={Home} label="Créditos Electrodomésticos" active={location.pathname === '/creditos-electrodomesticos'} sub disabled={!p.perm_credito_electrodomesticos} />
+                                            <SidebarItem to="/creditos-electrodomesticos?ruta=1" icon={RouteIcon} label="Generar Ruta de Cobro" active={false} sub disabled={!p.perm_credito_electrodomesticos} />
+                                            <SidebarItem to="/cancelacion-oficina" icon={Receipt} label="Cancelación Oficina" active={location.pathname === '/cancelacion-oficina'} sub disabled={!p.perm_credito_cobros} />
+                                            <SidebarItem to="/cancelacion-movil" icon={Truck} label="Cancelación Móvil" active={location.pathname === '/cancelacion-movil'} sub disabled={!p.perm_credito_cobros_movil} />
+                                            <SidebarItem to="/creditos-electrodomesticos/consulta-cartera" icon={FileSearch} label="Consulta General de Cartera" active={location.pathname === '/creditos-electrodomesticos/consulta-cartera'} sub disabled={!p.perm_credito_consulta_cartera} />
+                                            <SidebarItem to="/creditos-electrodomesticos/estado-cuenta" icon={BarChart3} label="Estado de Cuenta por Cliente" active={location.pathname === '/creditos-electrodomesticos/estado-cuenta'} sub disabled={!p.perm_credito_estado_cuenta} />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             <SidebarItem to="/clientes/gestion-cartera"    icon={ClipboardList} label="Gestión de Cartera" active={location.pathname === '/clientes/gestion-cartera'} sub disabled={!p.perm_gestion_cartera} />
                             <SidebarItem to="/consultas/cartera-clientes"  icon={FileSearch} label="Consulta Cartera" active={location.pathname === '/consultas/cartera-clientes'} sub disabled={!p.perm_consulta_cartera} />
                             <SidebarItem to="/cartera/estado-cuenta"       icon={BarChart3}  label="Estado de Cuenta" active={location.pathname.startsWith('/cartera/estado-cuenta')} sub disabled={!p.perm_estado_cuenta} />
@@ -665,6 +701,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     {esOficina && <SidebarItem to="/ajustes/auditoria" icon={ShieldCheck} label="Auditoría" active={location.pathname === '/ajustes/auditoria'} sub />}
                                     {(isAdmin || profile?.rol === 'admin_plataforma' || permisos?.perm_eliminar_compra) && <SidebarItem to="/ajustes/eliminar-compra" icon={Trash2} label="Eliminar compra" active={location.pathname === '/ajustes/eliminar-compra'} sub />}
                                     {esOficina && <SidebarItem to="/vendedores" icon={UserCheck} label="Vendedores" active={location.pathname === '/vendedores'} sub disabled={!p.perm_vendedores} />}
+                                    {esOficina && empresa?.habilita_ventas_electrodomesticos_credito && <SidebarItem to="/cobradores" icon={Truck} label="Cobradores" active={location.pathname === '/cobradores'} sub disabled={!p.perm_cobradores} />}
                                     {esOficina && <SidebarItem to="/importar-articulos" icon={Upload} label="Importar Artículos" active={location.pathname === '/importar-articulos'} sub disabled={!p.perm_importar_articulos} />}
                                     {esOficina && <SidebarItem to="/importar-clientes"  icon={Users}  label="Clientes (Import/Export)" active={location.pathname === '/importar-clientes'} sub disabled={!p.perm_importar_clientes} />}
                                     {esOficina && <SidebarItem to="/migrar-cartera"     icon={Wallet} label="Migración Cartera"         active={location.pathname === '/migrar-cartera'} sub disabled={!p.perm_migracion_cartera} />}

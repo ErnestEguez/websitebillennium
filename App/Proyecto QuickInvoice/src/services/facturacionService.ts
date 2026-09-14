@@ -42,6 +42,14 @@ export interface Cliente {
     base_legal_tratamiento?:   BaseLegalTratamiento | null
     consentimiento_explicito?: boolean
     consentimiento_fecha?:     string | null
+    // Captura de cédula (cliente y/o garante — garante reusa esta misma
+    // tabla) — path en el bucket privado "cedulas_clientes", no URL pública.
+    cedula_imagen1_path?: string | null
+    cedula_imagen2_path?: string | null
+    // Geo-ubicación capturada por el cobrador en Cobros Móvil
+    geo_latitud?: number | null
+    geo_longitud?: number | null
+    geo_capturada_at?: string | null
 }
 
 export interface SriConfig {

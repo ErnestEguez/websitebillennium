@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { kardexService } from '../services/kardexService'
 import { auditService } from '../services/auditoria/auditService'
+import { creditoElectrodomesticosService } from '../services/creditoElectrodomesticosService'
 import { formatCurrency } from '../lib/utils'
 import {
     Search, AlertTriangle, CheckCircle2, Copy, Check,
@@ -208,6 +209,15 @@ export function AnulacionFacturasPage() {
             return
         }
 
+        // Si esta factura generó un crédito de electrodomésticos, no se puede
+        // anular mientras tenga pagos de cuotas registrados — hay que
+        // reversarlos primero (mismo criterio que la cartera de arriba).
+        const creditoAsociado = await creditoElectrodomesticosService.getPorFactura(anulandoId)
+        if (creditoAsociado && Number(creditoAsociado.total_pagado) > 0) {
+            alert('Esta factura tiene un crédito de electrodomésticos con pagos registrados — reviértalos antes de anular la factura.')
+            return
+        }
+
         setSavingAnul(true)
         try {
             const { data: { user } } = await supabase.auth.getUser()
@@ -239,6 +249,28 @@ export function AnulacionFacturasPage() {
                     .update({ estado: 'anulada', updated_at: new Date().toISOString() })
                     .eq('id', f.cartera.id)
             }
+
+            // 2b. Si tiene crédito de electrodomésticos (sin pagos, ya
+            //     validado arriba), anularlo junto con todas sus cuotas.
+            if (creditoAsociado) {
+                await supabase
+                    .from('creditos_electrodomesticos')
+                    .update({ estado: 'ANULADO', updated_at: new Date().toISOString() })
+                    .eq('id', creditoAsociado.id)
+                await supabase
+                    .from('creditos_electrodomesticos_cuotas')
+                    .update({ estado: 'ANULADA', updated_at: new Date().toISOString() })
+                    .eq('credito_id', creditoAsociado.id)
+            }
+
+            // 2c. Liberar los números de serie vendidos en esta factura —
+            //     pasan a 'devuelto' para que el índice único los deje
+            //     vender de nuevo si corresponde.
+            await supabase
+                .from('producto_seriales')
+                .update({ estado: 'devuelto' })
+                .eq('comprobante_id', anulandoId)
+                .eq('estado', 'vendido')
 
             // 3. Revertir el kardex: crear ENTRADA por cada producto de la factura
             //    para restaurar el stock que la venta descontó.

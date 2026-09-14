@@ -13,6 +13,7 @@ export type AuditoriaModulo =
     | 'talento_humano'
     | 'lopdp'
     | 'configuracion'
+    | 'credito_electrodomesticos'
 
 export type AuditoriaAccion =
     | 'crear'
