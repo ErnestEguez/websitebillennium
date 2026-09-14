@@ -435,10 +435,8 @@ export function ProductsPage() {
             ubicacion:                 editingProduct.ubicacion                 ?? null,
             cuenta_ingreso_id:         editingProduct.cuenta_ingreso_id         ?? null,
             cuenta_ingreso_codigo:     editingProduct.cuenta_ingreso_codigo     ?? null,
-            cuenta_ingreso_nombre:     editingProduct.cuenta_ingreso_nombre     ?? null,
             cuenta_costo_id:           editingProduct.cuenta_costo_id           ?? null,
             cuenta_costo_codigo:       editingProduct.cuenta_costo_codigo       ?? null,
-            cuenta_costo_nombre:       editingProduct.cuenta_costo_nombre       ?? null,
         }
 
         try {
@@ -508,10 +506,8 @@ export function ProductsPage() {
                                 maneja_stock: true,
                                 cuenta_ingreso_id: cuentasLP[0]?.id || null,
                                 cuenta_ingreso_codigo: cuentasLP[0]?.codigo || null,
-                                cuenta_ingreso_nombre: cuentasLP[0]?.nombre || null,
                                 cuenta_costo_id: cuentasLP[0]?.id || null,
                                 cuenta_costo_codigo: cuentasLP[0]?.codigo || null,
-                                cuenta_costo_nombre: cuentasLP[0]?.nombre || null,
                             })
                             setIsModalOpen(true)
                         }}
@@ -979,7 +975,6 @@ export function ProductsPage() {
                                                 ...editingProduct,
                                                 cuenta_ingreso_id: e.target.value || null,
                                                 cuenta_ingreso_codigo: cuenta?.codigo || null,
-                                                cuenta_ingreso_nombre: cuenta?.nombre || null,
                                             })
                                         }}
                                     >
@@ -1001,7 +996,6 @@ export function ProductsPage() {
                                                 ...editingProduct,
                                                 cuenta_costo_id: e.target.value || null,
                                                 cuenta_costo_codigo: cuenta?.codigo || null,
-                                                cuenta_costo_nombre: cuenta?.nombre || null,
                                             })
                                         }}
                                     >

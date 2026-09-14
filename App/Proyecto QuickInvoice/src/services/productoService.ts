@@ -25,10 +25,8 @@ export interface Producto {
     // Cuentas contables
     cuenta_ingreso_id?: string | null
     cuenta_ingreso_codigo?: string | null
-    cuenta_ingreso_nombre?: string | null
     cuenta_costo_id?: string | null
     cuenta_costo_codigo?: string | null
-    cuenta_costo_nombre?: string | null
 }
 
 export interface Categoria {

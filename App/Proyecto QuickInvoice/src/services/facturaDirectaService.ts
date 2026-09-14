@@ -23,6 +23,10 @@ export interface DetalleFacturaDirecta {
     // Plan Acumulativo. Opcionales; la mayoría de facturas no los usan.
     talla?: string | null
     color?: string | null
+    // Número de serie digitado en la línea — solo se usa en ventas a
+    // crédito de electrodomésticos, opcional. Se guarda tal cual en
+    // comprobante_detalles.serial (y de ahí se replica a producto_seriales).
+    serial?: string | null
 }
 
 export interface PagoFactura {
@@ -338,6 +342,7 @@ export const facturaDirectaService = {
                     subproducto_id: d.subproducto_id || null,
                     talla: d.talla || null,
                     color: d.color || null,
+                    serial: d.serial || null,
                 }
             })
 
