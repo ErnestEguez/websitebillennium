@@ -409,11 +409,13 @@ export function ConfigurationPage() {
             // en el log de auditoría, solo la bandera de que cambió).
             let configSriAntes: Record<string, any> | null = null
             let creditoElectroAntes = false
+            let imagenesAntes = false
             if (editingEmpresa.id) {
                 const { data: empresaAntes } = await supabase
-                    .from('empresas').select('config_sri, habilita_ventas_electrodomesticos_credito').eq('id', editingEmpresa.id).single()
+                    .from('empresas').select('config_sri, habilita_ventas_electrodomesticos_credito, permite_imagenes_cedulas_productos').eq('id', editingEmpresa.id).single()
                 configSriAntes = empresaAntes?.config_sri ?? null
                 creditoElectroAntes = !!empresaAntes?.habilita_ventas_electrodomesticos_credito
+                imagenesAntes = !!empresaAntes?.permite_imagenes_cedulas_productos
             }
 
             // ✅ Solo campos que existen en la tabla empresas del schema real
@@ -425,6 +427,7 @@ export function ConfigurationPage() {
                 logo_url: editingEmpresa.logo_url || null,
                 usar_vendor_management: !!editingEmpresa.usar_vendor_management,
                 habilita_ventas_electrodomesticos_credito: !!editingEmpresa.habilita_ventas_electrodomesticos_credito,
+                permite_imagenes_cedulas_productos: !!editingEmpresa.permite_imagenes_cedulas_productos,
                 config_sri: {
                     // Preserva TODOS los campos existentes (mail_host, mail_port, mail_pass,
                     // mail_ssl, mail_cc, impresion_pos, y cualquier campo futuro que este
@@ -518,6 +521,9 @@ export function ConfigurationPage() {
                 if (creditoElectroAntes !== !!editingEmpresa.habilita_ventas_electrodomesticos_credito) {
                     cambios.habilita_ventas_electrodomesticos_credito = { antes: creditoElectroAntes, despues: !!editingEmpresa.habilita_ventas_electrodomesticos_credito }
                 }
+                if (imagenesAntes !== !!editingEmpresa.permite_imagenes_cedulas_productos) {
+                    cambios.permite_imagenes_cedulas_productos = { antes: imagenesAntes, despues: !!editingEmpresa.permite_imagenes_cedulas_productos }
+                }
                 auditService.logEvent({
                     empresaId,
                     modulo: 'configuracion',
@@ -534,6 +540,7 @@ export function ConfigurationPage() {
                         ia_cv_enabled: !!editingEmpresa.ia_cv_enabled,
                         facturacion_masiva_enabled: !!editingEmpresa.facturacion_masiva_enabled,
                         habilita_ventas_electrodomesticos_credito: !!editingEmpresa.habilita_ventas_electrodomesticos_credito,
+                        permite_imagenes_cedulas_productos: !!editingEmpresa.permite_imagenes_cedulas_productos,
                     },
                     nivel: 'compliance',
                 })
@@ -3375,6 +3382,20 @@ export function ConfigurationPage() {
                                         className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
                                         checked={!!editingEmpresa?.habilita_ventas_electrodomesticos_credito}
                                         onChange={e => setEditingEmpresa({ ...editingEmpresa, habilita_ventas_electrodomesticos_credito: e.target.checked })}
+                                    />
+                                </label>
+                                <label className="flex items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Ingreso de Imágenes (Cédulas / Productos)</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Habilita la carga de foto de cédula en Clientes. Apagado por defecto.
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                        checked={!!editingEmpresa?.permite_imagenes_cedulas_productos}
+                                        onChange={e => setEditingEmpresa({ ...editingEmpresa, permite_imagenes_cedulas_productos: e.target.checked })}
                                     />
                                 </label>
                             </div>

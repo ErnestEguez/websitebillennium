@@ -448,7 +448,7 @@ export function ClientsPage() {
                                 />
                             </div>
 
-                            {editingCliente?.id ? (
+                            {empresa?.permite_imagenes_cedulas_productos && (editingCliente?.id ? (
                                 <div className="pt-3 border-t border-slate-100 space-y-3">
                                     <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Cédula / Identificación (2 imágenes)</p>
                                     <div className="grid grid-cols-2 gap-3">
@@ -497,7 +497,7 @@ export function ClientsPage() {
                                     <ImageOff className="w-4 h-4 shrink-0" />
                                     Guarda el cliente primero para poder capturar las imágenes de su cédula.
                                 </div>
-                            )}
+                            ))}
 
                             {editingCliente?.id && (
                                 <div className="pt-3 border-t border-slate-100">

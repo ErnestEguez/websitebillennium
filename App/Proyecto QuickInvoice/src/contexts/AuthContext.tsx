@@ -48,6 +48,10 @@ interface Empresa {
     // defecto. Solo admin_plataforma puede cambiarlo (ver
     // trg_bloquear_toggle_credito_electrodomesticos en la migración).
     habilita_ventas_electrodomesticos_credito?: boolean
+    // Ingreso de imágenes (cédulas de clientes, a futuro productos) —
+    // apagado por defecto. Solo admin_plataforma puede cambiarlo (ver
+    // trg_bloquear_toggle_imagenes_cedulas_productos en la migración).
+    permite_imagenes_cedulas_productos?: boolean
 }
 
 export interface Modules {
@@ -93,6 +97,7 @@ export interface Permisos {
     perm_guias_remision:        boolean
     perm_preparaciones_pintura: boolean
     perm_productos:             boolean
+    perm_combos:                boolean
     perm_ordenes_compra:        boolean
     perm_compras_inventario:    boolean
     perm_nc_proveedores:        boolean
@@ -194,6 +199,7 @@ export const DEFAULT_PERMISOS: Permisos = {
     perm_guias_remision:        true,
     perm_preparaciones_pintura: true,
     perm_productos:             true,
+    perm_combos:                true,
     perm_ordenes_compra:        true,
     perm_compras_inventario:    true,
     perm_nc_proveedores:        true,
@@ -464,6 +470,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     perm_guias_remision:        permData.perm_guias_remision        ?? true,
                     perm_preparaciones_pintura: permData.perm_preparaciones_pintura ?? true,
                     perm_productos:             permData.perm_productos             ?? true,
+                    perm_combos:                permData.perm_combos                ?? true,
                     perm_ordenes_compra:        permData.perm_ordenes_compra        ?? true,
                     perm_compras_inventario:    permData.perm_compras_inventario    ?? true,
                     perm_nc_proveedores:        permData.perm_nc_proveedores        ?? true,
