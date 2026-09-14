@@ -196,7 +196,7 @@ export function CancelacionOficinaPage() {
     const [busqueda, setBusqueda] = useState('')
     const [clientesConDeuda, setClientesConDeuda] = useState<{ id: string; nombre: string; identificacion: string; saldoTotal: number }[]>([])
     const [buscando, setBuscando] = useState(false)
-    const [clienteId, setClienteId] = useState<string | null>(null)
+    const [, setClienteId] = useState<string | null>(null)
 
     useEffect(() => {
         if (!busqueda.trim() || !empresa?.id) { setClientesConDeuda([]); return }

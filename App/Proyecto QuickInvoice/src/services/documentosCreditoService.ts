@@ -218,7 +218,6 @@ function dibujarTablaCuotas(
         const gx = box.x + g * anchoGrupo
         const colNumero = anchoGrupo * 0.14
         const colFecha = anchoGrupo * 0.46
-        const colValor = anchoGrupo * 0.40
 
         // Encabezado del grupo
         page.drawRectangle({ x: gx, y: box.yTop - altoHeader, width: anchoGrupo, height: altoHeader, borderColor: rgb(0, 0, 0), borderWidth: 0.6 })

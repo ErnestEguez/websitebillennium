@@ -219,6 +219,18 @@ export function AdminPermisosPage() {
                     perm_migracion_cartera:     r.perm_migracion_cartera     ?? def.perm_migracion_cartera,
                     perm_migracion_cxp:         r.perm_migracion_cxp         ?? def.perm_migracion_cxp,
                     perm_eliminar_compra:       r.perm_eliminar_compra       ?? def.perm_eliminar_compra,
+                    perm_cobradores:                       r.perm_cobradores                       ?? def.perm_cobradores,
+                    perm_credito_electrodomesticos:        r.perm_credito_electrodomesticos        ?? def.perm_credito_electrodomesticos,
+                    perm_credito_tasas:                    r.perm_credito_tasas                    ?? def.perm_credito_tasas,
+                    perm_credito_cobros:                   r.perm_credito_cobros                   ?? def.perm_credito_cobros,
+                    perm_credito_documentos:               r.perm_credito_documentos               ?? def.perm_credito_documentos,
+                    perm_aprobar_excepcion_credito:        r.perm_aprobar_excepcion_credito         ?? def.perm_aprobar_excepcion_credito,
+                    perm_reversar_pago_credito:            r.perm_reversar_pago_credito             ?? def.perm_reversar_pago_credito,
+                    perm_anular_credito_electrodomesticos: r.perm_anular_credito_electrodomesticos  ?? def.perm_anular_credito_electrodomesticos,
+                    perm_credito_solicitud:                r.perm_credito_solicitud                ?? def.perm_credito_solicitud,
+                    perm_credito_cobros_movil:             r.perm_credito_cobros_movil              ?? def.perm_credito_cobros_movil,
+                    perm_credito_consulta_cartera:         r.perm_credito_consulta_cartera          ?? def.perm_credito_consulta_cartera,
+                    perm_credito_estado_cuenta:            r.perm_credito_estado_cuenta             ?? def.perm_credito_estado_cuenta,
                 }
             })
 
