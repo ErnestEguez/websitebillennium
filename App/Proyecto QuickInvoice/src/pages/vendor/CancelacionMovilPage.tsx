@@ -11,18 +11,18 @@ import {
 } from '../../services/creditoElectrodomesticosService'
 import { distribuirPagoCuotas, calcularMoraCuota, type CuotaParaCobro, type ResultadoDistribucionPago } from '../../services/creditoElectrodomesticosCobro'
 import { cobradorService, type Cobrador } from '../../services/cobradorService'
+import { rutaCobroService, type RutaCobro } from '../../services/rutaCobroService'
 import { cuentasBancariasService } from '../../services/finance/bancosService'
 import type { CuentaBancaria } from '../../types/finance'
 import { formatCurrency } from '../../lib/utils'
-import { ArrowLeft, Search, Loader2, MapPin, User, CheckCircle2, DollarSign, Printer, MessageCircle, Mail } from 'lucide-react'
+import { ArrowLeft, Search, Loader2, MapPin, User, CheckCircle2, DollarSign, Printer, MessageCircle, Mail, Route, ExternalLink } from 'lucide-react'
 
 const HOY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Guayaquil' })
 
 const METODOS: { value: MetodoPagoCredito; label: string }[] = [
     { value: 'efectivo', label: '💵 Efectivo' },
+    { value: 'cheque', label: '✏️ Cheque' },
     { value: 'transferencia', label: '🏦 Depósito' },
-    { value: 'tarjeta', label: '💳 Tarjeta' },
-    { value: 'otros', label: '🔄 Otros' },
 ]
 
 const METODO_LABEL_PLANO: Record<MetodoPagoCredito, string> = {
@@ -263,9 +263,11 @@ export function CancelacionMovilPage() {
     const [busqueda, setBusqueda] = useState('')
     const [clientesConDeuda, setClientesConDeuda] = useState<{ id: string; nombre: string; identificacion: string; saldoTotal: number }[]>([])
     const [buscando, setBuscando] = useState(false)
+    const [mostrarTodosClientes, setMostrarTodosClientes] = useState(false)
 
     useEffect(() => {
         if (!busqueda.trim() || !empresa?.id) { setClientesConDeuda([]); return }
+        setMostrarTodosClientes(false)
         const t = setTimeout(async () => {
             setBuscando(true)
             try {
@@ -278,6 +280,46 @@ export function CancelacionMovilPage() {
         }, 300)
         return () => clearTimeout(t)
     }, [busqueda, empresa?.id])
+
+    // "Mi Ruta de Hoy" — ruta que oficina armó para un cobrador (ver GenerarRutaModal)
+    const [mostrarRuta, setMostrarRuta] = useState(false)
+    const [cobradoresRuta, setCobradoresRuta] = useState<Cobrador[]>([])
+    const [cobradorRutaId, setCobradorRutaId] = useState('')
+    const [ruta, setRuta] = useState<RutaCobro | null>(null)
+    const [cargandoRuta, setCargandoRuta] = useState(false)
+    const [origenEmpresaRuta, setOrigenEmpresaRuta] = useState<{ lat: number; lng: number } | null>(null)
+
+    useEffect(() => {
+        if (!mostrarRuta || !empresa?.id) return
+        if (cobradoresRuta.length === 0) cobradorService.getCobradoresActivos(empresa.id).then(setCobradoresRuta)
+        if (!origenEmpresaRuta) rutaCobroService.getOrigenEmpresa(empresa.id).then(setOrigenEmpresaRuta)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mostrarRuta, empresa?.id])
+
+    async function verRutaDeCobrador(id: string) {
+        setCobradorRutaId(id)
+        setRuta(null)
+        if (!id || !empresa?.id) return
+        setCargandoRuta(true)
+        try {
+            const r = await rutaCobroService.obtenerRutaDelDia(empresa.id, id, HOY)
+            setRuta(r)
+        } catch (e: any) {
+            alert('Error al cargar la ruta: ' + e.message)
+        } finally {
+            setCargandoRuta(false)
+        }
+    }
+
+    async function toggleParadaVisitada(paradaId: string, actual: 'pendiente' | 'visitado') {
+        const nuevo = actual === 'pendiente' ? 'visitado' : 'pendiente'
+        setRuta(prev => prev ? { ...prev, paradas: prev.paradas.map(p => p.id === paradaId ? { ...p, estado: nuevo } : p) } : prev)
+        try {
+            await rutaCobroService.marcarParada(paradaId, nuevo)
+        } catch (e: any) {
+            alert('Error al actualizar la parada: ' + e.message)
+        }
+    }
 
     // Paso 2: créditos del cliente
     const [creditos, setCreditos] = useState<CreditoElectrodomesticos[]>([])
@@ -521,6 +563,64 @@ export function CancelacionMovilPage() {
                 </button>
             )}
 
+            {paso === 'cliente' && (
+                <button onClick={() => setMostrarRuta(v => !v)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-primary-200 bg-primary-50 text-primary-700 text-sm font-bold">
+                    <Route className="w-4 h-4" /> {mostrarRuta ? 'Ocultar Mi Ruta de Hoy' : 'Mi Ruta de Hoy'}
+                </button>
+            )}
+
+            {paso === 'cliente' && mostrarRuta && (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
+                    <select value={cobradorRutaId} onChange={e => verRutaDeCobrador(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-400">
+                        <option value="">Selecciona el cobrador…</option>
+                        {cobradoresRuta.map(c => <option key={c.id} value={c.id}>{c.nombres}</option>)}
+                    </select>
+
+                    {cargandoRuta && <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>}
+
+                    {!cargandoRuta && cobradorRutaId && !ruta && (
+                        <p className="text-sm text-slate-400 text-center py-6">Oficina aún no ha generado la ruta de hoy para este cobrador.</p>
+                    )}
+
+                    {ruta && (
+                        <div className="space-y-3">
+                            <div className="border border-slate-200 rounded-xl divide-y divide-slate-50">
+                                {ruta.paradas.map(p => (
+                                    <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${p.estado === 'visitado' ? 'opacity-50' : ''}`}>
+                                        <button onClick={() => toggleParadaVisitada(p.id, p.estado)}
+                                            className="w-6 h-6 rounded-full border-2 border-primary-400 flex items-center justify-center shrink-0">
+                                            {p.estado === 'visitado' ? <CheckCircle2 className="w-4 h-4 text-primary-600" /> : <span className="text-[10px] font-black text-primary-600">{p.orden}</span>}
+                                        </button>
+                                        <button onClick={() => elegirCliente(p.cliente_id)} className="flex-1 min-w-0 text-left">
+                                            <p className={`font-bold text-slate-900 text-sm truncate ${p.estado === 'visitado' ? 'line-through' : ''}`}>{p.cliente_nombre}</p>
+                                            <p className="text-xs text-slate-400 truncate">{p.direccion || 'Sin dirección'}</p>
+                                        </button>
+                                        <p className="font-black text-primary-700 text-sm shrink-0">{formatCurrency(p.monto_pendiente)}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex items-center justify-between px-1">
+                                <p className="text-sm text-slate-500">
+                                    {ruta.paradas.filter(p => p.estado === 'visitado').length} de {ruta.paradas.length} visitados
+                                </p>
+                                <p className="font-black text-slate-900">Total del día: {formatCurrency(ruta.total_estimado)}</p>
+                            </div>
+                            {(() => {
+                                const link = rutaCobroService.linkGoogleMaps(origenEmpresaRuta, ruta.paradas)
+                                return link ? (
+                                    <a href={link} target="_blank" rel="noopener noreferrer"
+                                        className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-slate-900 text-white text-sm font-bold">
+                                        <ExternalLink className="w-4 h-4" /> Abrir ruta en Google Maps
+                                    </a>
+                                ) : null
+                            })()}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Paso 1: cliente */}
             {paso === 'cliente' && (
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
@@ -537,7 +637,7 @@ export function CancelacionMovilPage() {
                     </div>
                     {clientesConDeuda.length > 0 && (
                         <div className="border border-slate-200 rounded-xl divide-y divide-slate-50">
-                            {clientesConDeuda.map(c => (
+                            {(mostrarTodosClientes ? clientesConDeuda : clientesConDeuda.slice(0, 5)).map(c => (
                                 <button key={c.id} onClick={() => elegirCliente(c.id)}
                                     className="w-full text-left px-4 py-3.5 active:bg-slate-100 flex items-center justify-between">
                                     <div>
@@ -547,6 +647,12 @@ export function CancelacionMovilPage() {
                                     <p className="font-black text-primary-700">{formatCurrency(c.saldoTotal)}</p>
                                 </button>
                             ))}
+                            {!mostrarTodosClientes && clientesConDeuda.length > 5 && (
+                                <button onClick={() => setMostrarTodosClientes(true)}
+                                    className="w-full text-center px-4 py-2.5 text-xs font-bold text-primary-600 active:bg-slate-100">
+                                    Mostrar todo ({clientesConDeuda.length})
+                                </button>
+                            )}
                         </div>
                     )}
                     {busqueda.trim() && !buscando && clientesConDeuda.length === 0 && (
@@ -666,7 +772,7 @@ export function CancelacionMovilPage() {
                                 className="w-full px-4 py-3 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-primary-500 text-right font-black text-2xl" />
                         </div>
 
-                        <div className="grid grid-cols-4 gap-1.5">
+                        <div className="grid grid-cols-3 gap-1.5">
                             {METODOS.map(m => (
                                 <button key={m.value} type="button" onClick={() => setMetodoPago(m.value)}
                                     className={`py-2.5 rounded-lg text-xs font-bold border ${metodoPago === m.value ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-500 border-slate-200'}`}>

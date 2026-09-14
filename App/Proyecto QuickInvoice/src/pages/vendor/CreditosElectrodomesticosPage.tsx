@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { HelpButton } from '../../components/help/HelpButton'
 import {
@@ -8,8 +9,10 @@ import {
     type EstadoCredito,
     type MetodoPagoCredito,
 } from '../../services/creditoElectrodomesticosService'
+import { documentosCreditoService, abrirPdfParaImprimir } from '../../services/documentosCreditoService'
+import { GenerarRutaModal } from '../../components/GenerarRutaModal'
 import { formatCurrency } from '../../lib/utils'
-import { ArrowLeft, DollarSign, Loader2, RotateCcw, Home } from 'lucide-react'
+import { ArrowLeft, DollarSign, Loader2, RotateCcw, Home, FileSignature } from 'lucide-react'
 
 const ESTADO_BADGE: Record<EstadoCredito, string> = {
     CALCULADO: 'bg-slate-100 text-slate-600',
@@ -37,11 +40,21 @@ const METODOS_PAGO_CUOTA: { value: MetodoPagoCredito; label: string }[] = [
 
 export function CreditosElectrodomesticosPage() {
     const { empresa } = useAuth()
+    const [searchParams, setSearchParams] = useSearchParams()
     const [creditos, setCreditos] = useState<CreditoElectrodomesticos[]>([])
     const [loading, setLoading] = useState(true)
     const [filtro, setFiltro] = useState<EstadoCredito | ''>('')
     const [seleccionado, setSeleccionado] = useState<CreditoElectrodomesticos | null>(null)
     const [cargandoDetalle, setCargandoDetalle] = useState(false)
+    const [mostrarGenerarRuta, setMostrarGenerarRuta] = useState(searchParams.get('ruta') === '1')
+
+    useEffect(() => {
+        if (searchParams.get('ruta') === '1') {
+            setMostrarGenerarRuta(true)
+            setSearchParams(prev => { prev.delete('ruta'); return prev }, { replace: true })
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams])
 
     useEffect(() => {
         if (empresa?.id) cargar()
@@ -100,6 +113,10 @@ export function CreditosElectrodomesticosPage() {
                 </div>
                 <HelpButton pageKey="credito-electrodomesticos" />
             </div>
+
+            {mostrarGenerarRuta && (
+                <GenerarRutaModal empresaId={empresa!.id} onClose={() => setMostrarGenerarRuta(false)} />
+            )}
 
             <div className="flex gap-2">
                 {(['', 'CALCULADO', 'VIGENTE', 'EN_MORA', 'LIQUIDADO', 'ANULADO'] as const).map(f => (
@@ -160,11 +177,31 @@ function DetalleCredito({ credito, onVolver, onRefrescar }: {
     onVolver: () => void
     onRefrescar: () => void
 }) {
+    const { empresa } = useAuth()
     const [cuotaPagando, setCuotaPagando] = useState<CuotaCredito | null>(null)
     const [valorPago, setValorPago] = useState(0)
     const [metodoPago, setMetodoPago] = useState<MetodoPagoCredito>('efectivo')
     const [referencia, setReferencia] = useState('')
     const [guardando, setGuardando] = useState(false)
+    const [generandoDoc, setGenerandoDoc] = useState<'contrato' | 'pagare' | null>(null)
+
+    async function handleReimprimir(tipo: 'contrato' | 'pagare') {
+        if (!empresa) return
+        setGenerandoDoc(tipo)
+        try {
+            if (tipo === 'contrato') {
+                const bytes = await documentosCreditoService.generarContrato(credito, empresa)
+                abrirPdfParaImprimir(bytes, `Contrato_${credito.comprobantes?.secuencial ?? credito.id}.pdf`)
+            } else {
+                const { bytes } = await documentosCreditoService.generarPagare(credito, empresa, empresa.id)
+                abrirPdfParaImprimir(bytes, `Pagare_${credito.comprobantes?.secuencial ?? credito.id}.pdf`)
+            }
+        } catch (e: any) {
+            alert(`Error al generar el ${tipo === 'contrato' ? 'contrato' : 'pagaré'}: ${e.message}`)
+        } finally {
+            setGenerandoDoc(null)
+        }
+    }
 
     function abrirPago(cuota: CuotaCredito) {
         setCuotaPagando(cuota)
@@ -226,7 +263,22 @@ function DetalleCredito({ credito, onVolver, onRefrescar }: {
                         <p className="text-sm text-slate-500">Factura {credito.comprobantes?.secuencial || '—'} · Cobrador: {credito.cobradores?.nombres}</p>
                         {credito.garante && <p className="text-sm text-slate-500">Garante: {credito.garante.nombre} ({credito.garante.identificacion})</p>}
                     </div>
-                    <span className={`inline-flex px-3 py-1 rounded-full text-sm font-bold ${ESTADO_BADGE[credito.estado]}`}>{credito.estado}</span>
+                    <div className="flex items-center gap-2">
+                        <span className={`inline-flex px-3 py-1 rounded-full text-sm font-bold ${ESTADO_BADGE[credito.estado]}`}>{credito.estado}</span>
+                    </div>
+                </div>
+
+                <div className="flex gap-2 mb-4">
+                    <button onClick={() => handleReimprimir('contrato')} disabled={generandoDoc !== null}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-lg text-xs font-bold hover:bg-violet-100 disabled:opacity-50">
+                        {generandoDoc === 'contrato' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSignature className="w-3.5 h-3.5" />}
+                        Reimprimir Contrato
+                    </button>
+                    <button onClick={() => handleReimprimir('pagare')} disabled={generandoDoc !== null}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 text-violet-700 border border-violet-200 rounded-lg text-xs font-bold hover:bg-violet-100 disabled:opacity-50">
+                        {generandoDoc === 'pagare' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSignature className="w-3.5 h-3.5" />}
+                        Reimprimir Pagaré
+                    </button>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
