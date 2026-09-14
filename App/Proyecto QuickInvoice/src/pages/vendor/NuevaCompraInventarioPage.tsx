@@ -321,9 +321,10 @@ export function NuevaCompraInventarioPage() {
             if (ocr.pto_emi)       setPtoEmi(ocr.pto_emi)
             if (ocr.secuencial)    setSecuencial(ocr.secuencial)
             if (ocr.clave_acceso)  setClaveAcceso(ocr.clave_acceso)
-            if (ocr.valor_iva > 0 || ocr.base_iva_0 > 0) {
+            if (ocr.valor_iva > 0 || ocr.base_iva_0 > 0 || ocr.base_iva_5 > 0) {
                 setUsarIvaManual(true)
                 setBaseIva0(ocr.base_iva_0 ?? 0)
+                setBaseIva5(ocr.base_iva_5 ?? 0)
                 setBaseIva15(ocr.base_iva_15 ?? 0)
             }
 
@@ -482,7 +483,7 @@ export function NuevaCompraInventarioPage() {
     // desglose y los totales reflejan lo ingresado desde el primer producto, sin
     // necesidad de tocar el checklist de "Ingresar bases manualmente".
     const baseLineasEnTasa = (pct: number) =>
-        Math.round(detalle.reduce((s, d) => s + ((d.iva_porcentaje ?? 15) === pct ? lineaNeta(d).neto : 0), 0) * 100) / 100
+        Math.round(detalle.reduce((s, d) => s + (ivaPctLinea(d) === pct ? lineaNeta(d).neto : 0), 0) * 100) / 100
 
     const b0  = usarIvaManual ? baseIva0  : baseLineasEnTasa(0)
     const b5  = usarIvaManual ? baseIva5  : baseLineasEnTasa(5)
@@ -554,7 +555,8 @@ export function NuevaCompraInventarioPage() {
             let next: LineaDetalle
             if (campo === 'producto_id') {
                 const prod = productosSimple.find(p => p.id === val)
-                next = { ...d, producto_id: val as string, nombre: prod?.nombre ?? '', precio_venta_manual: false }
+                const prodCompleto = productosCompletos.find(p => p.id === val)
+                next = { ...d, producto_id: val as string, nombre: prod?.nombre ?? '', iva_porcentaje: prodCompleto?.iva_porcentaje, precio_venta_manual: false }
             } else if (campo === 'descuento_porcentaje') {
                 // Descuento por % y descuento directo en $ son mutuamente excluyentes:
                 // al ingresar uno, se limpia el otro.
@@ -579,10 +581,14 @@ export function NuevaCompraInventarioPage() {
     }
 
     // IVA% de la línea: el de la propia línea (productos nuevos/OCR) o, si no
-    // hay, el del producto ya existente en el catálogo.
+    // hay, el del producto ya existente en el catálogo. Number(...) es
+    // obligatorio: productos.iva_porcentaje es NUMERIC en la base, y
+    // PostgREST lo entrega como STRING ("5.00") para no perder precisión —
+    // sin el cast, "5.00" === 5 siempre da false y ninguna línea calzaba
+    // con el bucket 0%/5%/15% (todo terminaba cayendo al default de 15%).
     function ivaPctLinea(d: LineaDetalle): number {
-        if (d.iva_porcentaje !== undefined && d.iva_porcentaje !== null) return d.iva_porcentaje
-        return productosCompletos.find(p => p.id === d.producto_id)?.iva_porcentaje ?? 15
+        if (d.iva_porcentaje !== undefined && d.iva_porcentaje !== null) return Number(d.iva_porcentaje)
+        return Number(productosCompletos.find(p => p.id === d.producto_id)?.iva_porcentaje ?? 15)
     }
 
     // precio_venta_sugerido se guarda SIN IVA (igual que productos.precio_venta);
@@ -722,7 +728,7 @@ export function NuevaCompraInventarioPage() {
                         precio_venta:   precioVentaNuevo,
                         categoria_id:   catId,
                         unidad_id:      d.unidad_id ?? null,
-                        iva_porcentaje: d.iva_porcentaje ?? 15,
+                        iva_porcentaje: d.iva_porcentaje != null ? Number(d.iva_porcentaje) : 15,
                         maneja_stock:   true,
                         costo_promedio: costoUnitNeto,
                         activo:         true,
@@ -1219,7 +1225,7 @@ export function NuevaCompraInventarioPage() {
                                                                 placeholder="Buscar (Enter o Buscar)…"
                                                                 onSelect={(p: ProductoResultado) => {
                                                                     setDetalle(prev => prev.map((d2, j) => j !== i ? d2
-                                                                        : { ...d2, producto_id: p.id, nombre: p.nombre, codigo: p.codigo ?? '', unidad_id: p.unidad_id ?? null, categoria_id: p.categoria_id ?? null, status: 'found' as LineaStatus }))
+                                                                        : { ...d2, producto_id: p.id, nombre: p.nombre, codigo: p.codigo ?? '', unidad_id: p.unidad_id ?? null, categoria_id: p.categoria_id ?? null, iva_porcentaje: p.iva_porcentaje, status: 'found' as LineaStatus }))
                                                                 }}
                                                             />
                                                         </div>

@@ -209,8 +209,8 @@ function generarHtml80mm(
         <tr>
           <td class="c" style="padding:2px 1px">${n2(d.cantidad)}</td>
           <td style="padding:2px 4px;word-break:break-word">${esc(d.nombre_producto)}${d.descuento > 0 ? ` (-${d.descuento}%)` : ''}</td>
-          <td class="r" style="padding:2px 1px;white-space:nowrap">$${n2(d.precio_unitario)}</td>
-          <td class="r" style="padding:2px 1px;white-space:nowrap">$${n2(d.subtotal)}</td>
+          <td class="r" style="padding:2px 1px;white-space:nowrap">${n2(d.precio_unitario)}</td>
+          <td class="r" style="padding:2px 1px;white-space:nowrap">${n2(d.subtotal)}</td>
         </tr>`).join('')
 
     return `<!DOCTYPE html>
@@ -221,7 +221,7 @@ function generarHtml80mm(
 <style>
   @page{margin:0;size:${config.ancho_papel_mm}mm auto}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Courier New',Courier,monospace;font-size:7pt;font-weight:bold;color:#000;width:${anchoContenido}mm;padding:0}
+  body{font-family:'Courier New',Courier,monospace;font-size:7pt;font-weight:bold;color:#000;width:${anchoContenido}mm;margin:0 auto;padding:0}
   @media print{body{zoom:${config.escala_pct}%}}
   .c{text-align:center}
   .r{text-align:right}
@@ -1332,7 +1332,10 @@ export function ProformaPage() {
                                                                         <p className="font-semibold text-slate-800">{prod.nombre}</p>
                                                                         <p className="text-[10px] text-slate-400">{prod.codigo} · IVA {prod.iva_porcentaje}%</p>
                                                                     </div>
-                                                                    <span className="text-xs font-bold text-violet-700 shrink-0 ml-2">{formatCurrency(prod.precio_venta)}</span>
+                                                                    <span className="flex flex-col items-end shrink-0 ml-2">
+                                                                        <span className="text-blue-700 font-bold text-xs">{formatCurrency(prod.precio_venta * (1 + (prod.iva_porcentaje ?? 0) / 100))} <span className="font-normal text-blue-700">con IVA</span></span>
+                                                                        <span className="text-slate-900 text-xs">{formatCurrency(prod.precio_venta)} <span className="text-slate-900">sin IVA</span></span>
+                                                                    </span>
                                                                 </button>
                                                             ))}
                                                         </div>

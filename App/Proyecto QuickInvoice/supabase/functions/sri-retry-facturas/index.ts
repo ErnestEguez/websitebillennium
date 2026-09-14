@@ -1,21 +1,28 @@
 // ============================================================
 // EDGE FUNCTION: sri-retry-facturas — QuickInvoice
 // Barrido automático (llamado por pg_cron cada 15 min) de facturas
-// no autorizadas: reintenta sri-signer cada 15 min hasta MAX_INTENTOS
-// veces (~2h); al agotarse, avisa por correo UNA vez (SMTP de la
-// empresa Billennium System, RUC 0907388268001) pero SIGUE
-// reintentando indefinidamente cada 2 horas — antes se abandonaba la
-// factura para siempre tras el aviso, y si nadie revisaba ese correo
-// (llega a una casilla personal, no a la empresa) quedaba sin
-// autorizar para siempre sin que nadie se enterara.
+// no autorizadas. Cadencia (2026-09-10, ajustada para bajar el costo
+// de invocaciones en Supabase — antes eran 8 intentos cada 15 min,
+// ~2h de reintentos rápidos):
+//   Fase rápida (0-1h desde created_at): 4 intentos, cada 15 min.
+//   Fase media  (1h-24h desde created_at): 1 intento cada 2 horas.
+//   Pasadas 24h desde created_at: se DEJA de reintentar automático —
+//   queda solo el botón manual de "Reintentar" en Comprobantes.
+// Alerta por correo (SMTP de la empresa Billennium System, RUC
+// 0907388268001): se dispara UNA vez por factura cuando pasan 4 horas
+// desde created_at sin lograr autorizarse — ya no depende de un
+// conteo de intentos, es puramente por tiempo transcurrido, para que
+// avise igual aunque el SRI esté tan caído que ni siquiera se pueda
+// reintentar seguido.
 //
 // 2026-08-03: se agregó el caso RECHAZADO (rechazo firme del SRI, no
 // solo "sigue pendiente"). Antes solo se barrían PENDIENTE/ENVIADO,
 // así que una factura rechazada de una vez nunca entraba a este
 // barrido y NUNCA disparaba la alerta — se detectó porque una
 // rechazada real no avisó. Un rechazo firme no se arregla reintentando
-// solo (el motivo no cambia), así que se alerta de inmediato, sin
-// esperar los MAX_INTENTOS que sí aplican al caso pendiente/enviado.
+// solo (el motivo no cambia), así que se alerta de inmediato. Este
+// camino (RECHAZADO) NO se tocó en el ajuste de cadencia de arriba —
+// sigue reintentando cada 2h indefinidamente, sin tope de 24h.
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
@@ -26,7 +33,7 @@ const corsHeaders = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MAX_INTENTOS = 8;
+const INTENTOS_FASE_RAPIDA = 4;
 const RUC_ALERTA = "0907388268001"; // Billennium System — cuyo SMTP se reutiliza para la alerta
 const CORREO_ALERTA = "e_eguez@hotmail.com";
 
@@ -42,31 +49,36 @@ serve(async (req) => {
     const resumen = { revisadas: 0, autorizadas: 0, siguen_pendientes: 0, rechazadas_alertadas: 0, alertas_enviadas: 0, errores: [] as string[] };
 
     try {
-        const quinceMinAtras = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-        const dosHorasAtras  = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-        const SELECT_COLS = "id, secuencial, empresa_id, estado_sri, estado_sistema, intentos_sri, alerta_enviada, observaciones_sri, empresas(nombre, razon_social, ruc)";
+        const quinceMinAtras       = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        const dosHorasAtras        = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+        const cuatroHorasAtras     = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+        const veinticuatroHorasAtras = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const SELECT_COLS = "id, secuencial, empresa_id, estado_sri, estado_sistema, intentos_sri, alerta_enviada, observaciones_sri, created_at, empresas(nombre, razon_social, ruc)";
 
-        // Fase rápida (intentos_sri < MAX_INTENTOS): cada 15 min, igual que antes.
+        // Fase rápida (0-1h desde created_at, intentos_sri < 4): cada 15 min.
         const { data: rapidos, error: errRapidos } = await supabase
             .from("comprobantes")
             .select(SELECT_COLS)
             .eq("tipo_comprobante", "FACTURA")
             .in("estado_sri", ["PENDIENTE", "ENVIADO"])
             .neq("estado_sistema", "ANULADA")
-            .lt("intentos_sri", MAX_INTENTOS)
+            .lt("intentos_sri", INTENTOS_FASE_RAPIDA)
             .or(`ultimo_intento_sri.is.null,ultimo_intento_sri.lt.${quinceMinAtras}`);
         if (errRapidos) throw errRapidos;
 
-        // Fase lenta (intentos_sri >= MAX_INTENTOS): ya se avisó una vez por
-        // correo, pero NO se deja de reintentar — sigue cada 2 horas
-        // indefinidamente en vez de abandonarla para siempre.
+        // Fase media (1h-24h desde created_at, intentos_sri >= 4): cada 2h.
+        // Pasadas 24h desde created_at, deja de aparecer aquí — el tope de
+        // created_at >= veinticuatroHorasAtras es lo que corta el
+        // reintento automático para siempre (antes era indefinido). De ahí
+        // en adelante, solo el botón manual "Reintentar" en Comprobantes.
         const { data: lentos, error: errLentos } = await supabase
             .from("comprobantes")
             .select(SELECT_COLS)
             .eq("tipo_comprobante", "FACTURA")
             .in("estado_sri", ["PENDIENTE", "ENVIADO"])
             .neq("estado_sistema", "ANULADA")
-            .gte("intentos_sri", MAX_INTENTOS)
+            .gte("intentos_sri", INTENTOS_FASE_RAPIDA)
+            .gte("created_at", veinticuatroHorasAtras)
             .lt("ultimo_intento_sri", dosHorasAtras);
         if (errLentos) throw errLentos;
 
@@ -123,20 +135,37 @@ serve(async (req) => {
                 }
 
                 resumen.siguen_pendientes++;
+            } catch (e: any) {
+                resumen.errores.push(`${comp.secuencial}: ${e.message}`);
+            }
+        }
 
-                // 2. Se agotaron los intentos sin autorizar → avisar (una sola vez)
-                if (nuevosIntentos >= MAX_INTENTOS && !comp.alerta_enviada) {
-                    const enviado = await enviarAlerta(supabase, {
-                        secuencial: comp.secuencial,
-                        empresaNombre: (comp.empresas as any)?.razon_social || (comp.empresas as any)?.nombre || "Empresa desconocida",
-                        empresaRuc: (comp.empresas as any)?.ruc || "",
-                        motivo: signerData?.error || signerData?.message || comp.observaciones_sri || "Sin detalle disponible",
-                        contexto: "reintentos_agotados",
-                    });
-                    if (enviado) {
-                        await supabase.from("comprobantes").update({ alerta_enviada: true }).eq("id", comp.id);
-                        resumen.alertas_enviadas++;
-                    }
+        // 2. Facturas PENDIENTE/ENVIADO que llevan más de 4 horas desde
+        //    created_at sin autorizarse → avisar (una sola vez), sin
+        //    importar cuántos intentos alcanzó a hacer — así avisa aunque
+        //    el SRI esté tan caído que ni siquiera haya podido reintentar.
+        const { data: sinAutorizar4h, error: err4h } = await supabase
+            .from("comprobantes")
+            .select("id, secuencial, empresa_id, observaciones_sri, empresas(nombre, razon_social, ruc)")
+            .eq("tipo_comprobante", "FACTURA")
+            .in("estado_sri", ["PENDIENTE", "ENVIADO"])
+            .neq("estado_sistema", "ANULADA")
+            .eq("alerta_enviada", false)
+            .lt("created_at", cuatroHorasAtras);
+        if (err4h) throw err4h;
+
+        for (const comp of sinAutorizar4h ?? []) {
+            try {
+                const enviado = await enviarAlerta(supabase, {
+                    secuencial: comp.secuencial,
+                    empresaNombre: (comp.empresas as any)?.razon_social || (comp.empresas as any)?.nombre || "Empresa desconocida",
+                    empresaRuc: (comp.empresas as any)?.ruc || "",
+                    motivo: comp.observaciones_sri || "Sin detalle disponible",
+                    contexto: "no_autorizada_4h",
+                });
+                if (enviado) {
+                    await supabase.from("comprobantes").update({ alerta_enviada: true }).eq("id", comp.id);
+                    resumen.alertas_enviadas++;
                 }
             } catch (e: any) {
                 resumen.errores.push(`${comp.secuencial}: ${e.message}`);
@@ -189,7 +218,7 @@ serve(async (req) => {
 
 async function enviarAlerta(
     supabase: ReturnType<typeof createClient>,
-    info: { secuencial: string; empresaNombre: string; empresaRuc: string; motivo: string; contexto: "reintentos_agotados" | "rechazado" }
+    info: { secuencial: string; empresaNombre: string; empresaRuc: string; motivo: string; contexto: "no_autorizada_4h" | "rechazado" }
 ): Promise<boolean> {
     try {
         const { data: empresaAlerta } = await supabase
@@ -220,10 +249,10 @@ async function enviarAlerta(
         const esRechazo = info.contexto === "rechazado";
         const asunto = esRechazo
             ? `⚠️ Factura RECHAZADA por el SRI — ${info.empresaNombre}`
-            : `⚠️ Factura NO autorizada tras ${MAX_INTENTOS} intentos — ${info.empresaNombre}`;
+            : `⚠️ Factura sin autorizar tras 4 horas — ${info.empresaNombre}`;
         const parrafoIntro = esRechazo
             ? "El SRI rechazó esta factura directamente (no quedó pendiente, no se reintenta automáticamente):"
-            : `Después de ${MAX_INTENTOS} intentos automáticos, esta factura no logró autorizarse:`;
+            : "Han pasado más de 4 horas desde que se emitió esta factura y todavía no logra autorizarse en el SRI (el sistema la sigue reintentando automáticamente hasta las 24 horas; después de eso, solo con el botón manual):";
 
         await transporter.sendMail({
             from: `Alertas Corina ERP <${mailUser}>`,

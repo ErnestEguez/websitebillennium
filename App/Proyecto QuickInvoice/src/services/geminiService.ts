@@ -34,6 +34,7 @@ export interface FacturaOcr {
     clave_acceso: string | null
     subtotal: number
     base_iva_0: number
+    base_iva_5: number
     base_iva_15: number
     valor_iva: number
     total: number
@@ -83,6 +84,7 @@ Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional.
   "clave_acceso": "clave de acceso de 49 dígitos o null si no aparece",
   "subtotal": 0.00,
   "base_iva_0": 0.00,
+  "base_iva_5": 0.00,
   "base_iva_15": 0.00,
   "valor_iva": 0.00,
   "total": 0.00,
@@ -93,14 +95,16 @@ Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional.
       "cantidad": 1,
       "precio_unitario": 0.00,
       "descuento": 0.00,
-      "iva_porcentaje": 15,
+      "iva_porcentaje": 0,
       "subtotal": 0.00,
       "categoria_sugerida": "la categoría más apropiada de la lista disponible"
     }
   ]
 }
 
-IMPORTANTE sobre precio_unitario y subtotal: usa EXACTAMENTE la columna "Precio Unitario"/"P. Unitario" y la columna de total de línea ("Precio Total"/"Subtotal") de la tabla de detalle. Algunas facturas tienen columnas adicionales (ej. "Detalle Adicional", códigos de empaque, factores de conversión) con varios números apilados en una sola celda — NUNCA tomes esos valores como precio_unitario. Si tienes dudas, prioriza que subtotal sea el valor real de la columna de total de línea, ya que cantidad × precio_unitario debe coincidir con subtotal.`
+IMPORTANTE sobre precio_unitario y subtotal: usa EXACTAMENTE la columna "Precio Unitario"/"P. Unitario" y la columna de total de línea ("Precio Total"/"Subtotal") de la tabla de detalle. Algunas facturas tienen columnas adicionales (ej. "Detalle Adicional", códigos de empaque, factores de conversión) con varios números apilados en una sola celda — NUNCA tomes esos valores como precio_unitario. Si tienes dudas, prioriza que subtotal sea el valor real de la columna de total de línea, ya que cantidad × precio_unitario debe coincidir con subtotal.
+
+IMPORTANTE sobre iva_porcentaje: en Ecuador existen TRES tarifas de IVA vigentes — 0%, 5% (tarifa reducida, aplica por ejemplo a varios materiales de construcción como cemento, varilla, bloques, empastes/masillas, pinturas de construcción, etc.) y 15% (tarifa general). NO asumas 15% por defecto — lee la tarifa real de CADA línea de la factura (la mayoría de facturas ecuatorianas la indican explícitamente en una columna "IVA", "Tarifa" o con las bases separadas 0%/5%/15% al pie). Si la factura solo trae una columna de IVA global (no por línea), usa esa misma tarifa para todas las líneas — pero si trae bases separadas por tarifa, cada línea debe llevar la tarifa que le corresponde según en cuál base esté incluida. base_iva_0, base_iva_5 y base_iva_15 deben sumar el subtotal total de la factura, y cada uno debe coincidir con la suma de los subtotales de las líneas que tengan esa tarifa.`
         const raw = await callGemini(
             [{ inline_data: { mime_type: mimeType, data: base64 } }, { text: prompt }],
             empresaId,

@@ -599,6 +599,21 @@ serve(async (req) => {
 
         console.log("[sri-retencion] claveAcceso:", claveAcceso);
 
+        // Helper para actualizar todas las filas de este comprobante (una por
+        // línea FUENTE/IVA) — se usa dos veces: apenas se firma (para que un
+        // corte a mitad del envío no pierda la clave de acceso, ver más abajo)
+        // y al final con el resultado definitivo.
+        const actualizarFilasRetencion = async (payload: Record<string, any>) => {
+            let q = supabase
+                .from("retenciones_compras")
+                .update(payload)
+                .eq("empresa_id", empresa_id)
+                .neq("estado", "ANULADO");
+            q = esLC ? q.eq("liquidacion_id", liquidacion_id) : q.eq("compra_id", compra_id);
+            const { error } = await q;
+            if (error) console.error("[sri-retencion] Update error:", error.message);
+        };
+
         // ── 7. Consult SRI first (might already be authorized) ─
         const soapAut = `<?xml version="1.0" encoding="UTF-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ns2:autorizacionComprobante xmlns:ns2="http://ec.gob.sri.ws.autorizacion"><claveAccesoComprobante>${claveAcceso}</claveAccesoComprobante></ns2:autorizacionComprobante></soap:Body></soap:Envelope>`;
 
@@ -685,6 +700,23 @@ serve(async (req) => {
                     configSri.firma_password || ""
                 );
 
+                // Guardar clave de acceso + XML firmado + número YA, ANTES de
+                // enviarlos al SRI — si la función se corta a mitad del envío
+                // (timeout, corte de red) entre aquí y el paso 9, el SRI puede
+                // haber recibido y registrado el secuencial aunque nunca nos
+                // enteremos. Sin este guardado temprano, el próximo reintento
+                // no encuentra clave_acceso guardada, genera una ALEATORIA
+                // nueva y reenvía con el MISMO secuencial → el SRI la rechaza
+                // con "ERROR SECUENCIAL REGISTRADO" porque en realidad ya
+                // estaba registrado, solo que bajo la clave que perdimos. Con
+                // la clave persistida, el reintento la reutiliza y el paso 7
+                // ("consultar primero") sí puede detectar el estado real.
+                await actualizarFilasRetencion({
+                    clave_acceso: claveAcceso,
+                    xml_firmado:  xmlFirmado,
+                    ...(numRet && numRet !== primera.numero_retencion ? { numero_retencion: numRet } : {}),
+                });
+
                 const xmlB64     = btoa(unescape(encodeURIComponent(xmlFirmado)));
                 const soapRecep  = `<?xml version="1.0" encoding="UTF-8"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><ns2:validarComprobante xmlns:ns2="http://ec.gob.sri.ws.recepcion"><xml>${xmlB64}</xml></ns2:validarComprobante></soap:Body></soap:Envelope>`;
 
@@ -753,18 +785,7 @@ serve(async (req) => {
             updatePayload.origen = "SRI";
         }
 
-        let upd = supabase
-            .from("retenciones_compras")
-            .update(updatePayload)
-            .eq("empresa_id", empresa_id)
-            .neq("estado", "ANULADO");
-
-        upd = esLC
-            ? upd.eq("liquidacion_id", liquidacion_id)
-            : upd.eq("compra_id", compra_id);
-
-        const { error: updErr } = await upd;
-        if (updErr) console.error("[sri-retencion] Update error:", updErr.message);
+        await actualizarFilasRetencion(updatePayload);
 
         // ── 10. Email al proveedor (background) ───────────────
         const emailTask = (async () => {
