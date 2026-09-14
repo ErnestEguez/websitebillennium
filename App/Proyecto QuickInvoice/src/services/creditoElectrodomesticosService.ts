@@ -132,6 +132,19 @@ export interface CreditoElectrodomesticos {
     cobradores?: { nombres: string; codigo: string | null }
     comprobantes?: { secuencial: string } | null
     cuotas?: CuotaCredito[]
+    pagos?: PagoCuotaCredito[]
+}
+
+export interface FilaCarteraCredito {
+    credito_id: string
+    factura: string
+    cobrador: string
+    cliente: string
+    identificacion: string
+    numero_cuota: number
+    fecha_vencimiento: string
+    cuota_programada: number
+    saldo_pendiente: number
 }
 
 export interface CrearCreditoInput {
@@ -322,6 +335,16 @@ export const creditoElectrodomesticosService = {
         return (data || []) as PagoCuotaCredito[]
     },
 
+    async getPagosDeCredito(creditoId: string): Promise<PagoCuotaCredito[]> {
+        const { data, error } = await supabase
+            .from('creditos_electrodomesticos_pagos')
+            .select('*')
+            .eq('credito_id', creditoId)
+            .order('fecha_pago', { ascending: false })
+        if (error) throw error
+        return (data || []) as PagoCuotaCredito[]
+    },
+
     async registrarPago(input: {
         cuotaId: string
         creditoId: string
@@ -468,6 +491,71 @@ export const creditoElectrodomesticosService = {
             .order('fecha_venta', { ascending: true })
         if (error) throw error
         return (data || []) as CreditoElectrodomesticos[]
+    },
+
+    // ── Reportería ───────────────────────────────────────────────────────
+
+    /** Todas las cuotas vencidas o por vencer con saldo, agrupables por cobrador (Consulta General de Cartera). */
+    async consultaGeneralCartera(empresaId: string, cobradorId?: string): Promise<FilaCarteraCredito[]> {
+        let query = supabase
+            .from('creditos_electrodomesticos_cuotas')
+            .select(`
+                numero_cuota, fecha_vencimiento, cuota_programada, saldo_pendiente, estado,
+                creditos_electrodomesticos!inner (
+                    id, empresa_id, estado, cobrador_id,
+                    clientes:cliente_id (nombre, identificacion),
+                    cobradores (nombres),
+                    comprobantes:factura_id (secuencial)
+                )
+            `)
+            .eq('creditos_electrodomesticos.empresa_id', empresaId)
+            .neq('creditos_electrodomesticos.estado', 'ANULADO')
+            .in('estado', ['PENDIENTE', 'PARCIAL', 'VENCIDA'])
+            .gt('saldo_pendiente', 0)
+        if (cobradorId) query = query.eq('creditos_electrodomesticos.cobrador_id', cobradorId)
+
+        const { data, error } = await query
+        if (error) throw error
+
+        return (data || []).map((row: any) => {
+            const cred = row.creditos_electrodomesticos
+            return {
+                credito_id: cred.id,
+                factura: cred.comprobantes?.secuencial || '—',
+                cobrador: cred.cobradores?.nombres || '— Sin cobrador —',
+                cliente: cred.clientes?.nombre || '—',
+                identificacion: cred.clientes?.identificacion || '—',
+                numero_cuota: row.numero_cuota,
+                fecha_vencimiento: row.fecha_vencimiento,
+                cuota_programada: Number(row.cuota_programada),
+                saldo_pendiente: Number(row.saldo_pendiente),
+            }
+        })
+    },
+
+    /** Historial completo (todos los créditos, no solo con saldo) de un cliente, con cuotas y pagos — Estado de Cuenta por Cliente. */
+    async getEstadoCuentaPorCliente(empresaId: string, clienteId: string): Promise<CreditoElectrodomesticos[]> {
+        const { data, error } = await supabase
+            .from('creditos_electrodomesticos')
+            .select(`
+                *,
+                clientes:cliente_id (nombre, identificacion),
+                cobradores (nombres, codigo),
+                comprobantes:factura_id (secuencial),
+                cuotas:creditos_electrodomesticos_cuotas (*),
+                pagos:creditos_electrodomesticos_pagos (*)
+            `)
+            .eq('empresa_id', empresaId)
+            .eq('cliente_id', clienteId)
+            .order('fecha_venta', { ascending: false })
+        if (error) throw error
+
+        const creditos = (data || []) as any[]
+        for (const c of creditos) {
+            if (c.cuotas) c.cuotas.sort((a: CuotaCredito, b: CuotaCredito) => a.numero_cuota - b.numero_cuota)
+            if (c.pagos) c.pagos.sort((a: PagoCuotaCredito, b: PagoCuotaCredito) => b.fecha_pago.localeCompare(a.fecha_pago))
+        }
+        return creditos as CreditoElectrodomesticos[]
     },
 
     /**
