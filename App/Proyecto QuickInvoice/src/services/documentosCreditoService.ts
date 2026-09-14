@@ -270,6 +270,57 @@ function dibujarAnexoAmortizacion(
     }
 }
 
+// ── Anexo de artículos — el recuadro fijo de la plantilla (página 1)
+// solo tiene espacio real para 3 filas sin invadir el texto de la
+// cláusula QUINTA (medido con PyMuPDF). Si la venta tiene más de 3
+// artículos (frecuente con Combos, que se descomponen en varias líneas),
+// el detalle completo se imprime aquí en vez de perderse — mismo
+// criterio de "nunca truncar" ya aplicado a la tabla de cuotas.
+interface FilaItem { cantidad: string; descripcion: string; serial: string }
+
+function dibujarTablaItems(page: PDFPage, font: PDFFont, fontBold: PDFFont, filas: FilaItem[], box: { x: number; yTop: number; width: number; height: number }): number {
+    const altoHeader = 14
+    const altoFila = 16
+    const filasQueCaben = Math.max(1, Math.floor((box.height - altoHeader) / altoFila))
+    const aMostrar = Math.min(filas.length, filasQueCaben)
+    const colCantidad = box.width * 0.10
+    const colDescripcion = box.width * 0.62
+
+    page.drawRectangle({ x: box.x, y: box.yTop - altoHeader, width: box.width, height: altoHeader, borderColor: rgb(0, 0, 0), borderWidth: 0.6 })
+    dibujar(page, fontBold, 'Cant.', box.x + 3, box.yTop - altoHeader + 4, 8)
+    dibujar(page, fontBold, 'Descripción', box.x + colCantidad + 3, box.yTop - altoHeader + 4, 8)
+    dibujar(page, fontBold, 'Serie', box.x + colCantidad + colDescripcion + 3, box.yTop - altoHeader + 4, 8)
+    page.drawLine({ start: { x: box.x + colCantidad, y: box.yTop }, end: { x: box.x + colCantidad, y: box.yTop - altoHeader }, thickness: 0.6, color: rgb(0, 0, 0) })
+    page.drawLine({ start: { x: box.x + colCantidad + colDescripcion, y: box.yTop }, end: { x: box.x + colCantidad + colDescripcion, y: box.yTop - altoHeader }, thickness: 0.6, color: rgb(0, 0, 0) })
+
+    for (let r = 0; r < aMostrar; r++) {
+        const yTopFila = box.yTop - altoHeader - r * altoFila
+        const yBotFila = yTopFila - altoFila
+        page.drawRectangle({ x: box.x, y: yBotFila, width: box.width, height: altoFila, borderColor: rgb(0, 0, 0), borderWidth: 0.4 })
+        page.drawLine({ start: { x: box.x + colCantidad, y: yTopFila }, end: { x: box.x + colCantidad, y: yBotFila }, thickness: 0.4, color: rgb(0, 0, 0) })
+        page.drawLine({ start: { x: box.x + colCantidad + colDescripcion, y: yTopFila }, end: { x: box.x + colCantidad + colDescripcion, y: yBotFila }, thickness: 0.4, color: rgb(0, 0, 0) })
+        const f = filas[r]
+        dibujar(page, font, f.cantidad, box.x + 3, yBotFila + 4, 8)
+        dibujar(page, font, f.descripcion.slice(0, 75), box.x + colCantidad + 3, yBotFila + 4, 8)
+        if (f.serial) dibujar(page, font, f.serial.slice(0, 40), box.x + colCantidad + colDescripcion + 3, yBotFila + 4, 7)
+    }
+    return aMostrar
+}
+
+function dibujarAnexoArticulos(doc: PDFDocument, font: PDFFont, fontBold: PDFFont, filas: FilaItem[], titulo: string) {
+    let restante = filas
+    let pagina = 1
+    while (restante.length > 0) {
+        const page = doc.addPage([595.28, 841.89])
+        const tituloPagina = pagina === 1 ? titulo : `${titulo} (continuación, página ${pagina})`
+        dibujarCentrado(page, fontBold, tituloPagina, 297.64, 800, 11)
+        const box = { x: 24, yTop: 770, width: 547, height: 730 }
+        const mostradas = dibujarTablaItems(page, font, fontBold, restante, box)
+        restante = restante.slice(mostradas)
+        pagina++
+    }
+}
+
 // ── Coordenadas (puntos PDF, origen abajo-izquierda, A4 595x842) ──────
 // Medidas con PyMuPDF (texto real + posiciones) sobre las plantillas
 // entregadas el 2026-09-13 — versión sin la rejilla de cuotas impresa
@@ -298,7 +349,14 @@ const COORD_CONTRATO = {
         itemsColDescripcion: 162,
         itemsColSerie: 446,
         itemsLineHeight: 15,
-        itemsMax: 2,
+        // Medido con PyMuPDF sobre la plantilla real: el bloque de artículos
+        // tiene espacio libre entre el encabezado de la tabla (Cantidad /
+        // Descripción / Serie) y el inicio del siguiente párrafo de la
+        // cláusula QUINTA — cabe hasta 3 filas sin invadirlo; una 4ta fila
+        // ya se encima con ese texto. Si hay más de 3 artículos, el resto
+        // se lista completo en su propio anexo (ver dibujarAnexoArticulos)
+        // en vez de truncarse — mismo criterio que la tabla de cuotas.
+        itemsMax: 3,
         fechaImpresion: [496, 778.6, 7] as const,
         horaImpresion: [489, 764.9, 7] as const,
         // C.I. Comprador/Garante/Vendedor — antes vivían en una página 2
@@ -390,6 +448,18 @@ export const documentosCreditoService = {
         dibujar(p1, font, cliente.identificacion, ...C.p1.ciComprador)
         if (garante) dibujar(p1, font, garante.identificacion, ...C.p1.ciGarante)
         dibujar(p1, font, empresa.ruc, ...C.p1.ciVendedor)
+
+        // Si hubo más artículos de los que caben en el recuadro fijo de la
+        // página 1 (ej. una venta con varios Combos, cada uno se
+        // descompone en varias líneas), el detalle completo se imprime en
+        // su propio anexo — nunca se pierde el resto silenciosamente.
+        if (items.length > C.p1.itemsMax) {
+            dibujarAnexoArticulos(
+                doc, font, fontBold,
+                items.map(it => ({ cantidad: String(it.cantidad), descripcion: it.nombre_producto ?? '', serial: it.serial ?? '' })),
+                `ANEXO — DETALLE DE ARTÍCULOS — CONTRATO No. ${credito.comprobantes?.secuencial ?? ''}`,
+            )
+        }
 
         // La tabla de cuotas completa va solo en el Anexo, al final — la
         // plantilla ya trae su propia remisión impresa ("Los Valores a
