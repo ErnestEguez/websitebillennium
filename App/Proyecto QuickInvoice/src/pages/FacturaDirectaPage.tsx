@@ -27,7 +27,10 @@ import {
 import { RetencionesEditor } from '../components/vendor/RetencionesEditor'
 import type { RetLine } from '../components/vendor/RetencionesEditor'
 import { ModalCreditoElectrodomesticos, type CreditoElectroConfirmado } from '../components/vendor/ModalCreditoElectrodomesticos'
-import { creditoElectrodomesticosService } from '../services/creditoElectrodomesticosService'
+import { creditoElectrodomesticosService, type CreditoElectrodomesticos } from '../services/creditoElectrodomesticosService'
+import { documentosCreditoService, abrirPdfParaImprimir } from '../services/documentosCreditoService'
+import { productoSerialesService } from '../services/productoSerialesService'
+import { combosService, type Combo } from '../services/combosService'
 import { codigoRetencionService, type CodigoRetencion } from '../services/codigoRetencionService'
 import { InvoiceTicketPOS } from '../components/InvoiceTicketPOS'
 import { formatCurrency } from '../lib/utils'
@@ -36,6 +39,7 @@ import {
     CheckCircle2, Loader2, FilePlus, FileText, CreditCard,
     Package, Printer, User, Briefcase, ChevronDown, ChevronUp,
     Layers, RotateCw, PaintBucket, Copy, Barcode, Pencil, History, PauseCircle,
+    FileSignature,
 } from 'lucide-react'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { bodegaService } from '../services/bodegaService'
@@ -293,6 +297,12 @@ export function FacturaDirectaPage() {
     // precio por volumen si aplica). Al elegir 2/3/4 se fija ese precio y
     // deja de recalcularse automáticamente al cambiar la cantidad.
     const [precioNivel, setPrecioNivel] = useState<Record<number, 1 | 2 | 3 | 4>>({})
+    // Serie por línea — un campo de texto opcional por línea, solo visible
+    // cuando esta venta es a crédito de electrodomésticos. Se guarda tanto
+    // en comprobante_detalles.serial como en producto_seriales, DESPUÉS de
+    // grabar la factura (mismo criterio que el crédito: la factura nunca
+    // se revierte si esto falla).
+    const [serialesPorLinea, setSerialesPorLinea] = useState<Record<number, string>>({})
     // Stock EXACTO consultado en vivo al seleccionar el producto — el catálogo
     // local (productos state) puede estar cacheado/desactualizado, y este
     // valor es solo para que el vendedor sepa cuánto había en ese momento
@@ -374,6 +384,11 @@ export function FacturaDirectaPage() {
     const [saving, setSaving] = useState(false)
     const [savingProforma, setSavingProforma] = useState(false)
     const [facturaFinal, setFacturaFinal] = useState<any>(null)
+    // Crédito de electrodomésticos recién creado (si esta factura lo generó)
+    // — habilita los botones "Imprimir Contrato"/"Imprimir Pagaré" en el modal
+    // de éxito. null si esta factura no tuvo crédito asociado.
+    const [creditoCreadoParaImprimir, setCreditoCreadoParaImprimir] = useState<CreditoElectrodomesticos | null>(null)
+    const [generandoDocCredito, setGenerandoDocCredito] = useState<'contrato' | 'pagare' | null>(null)
     // Capturados en el momento exacto del save para evitar condición de carrera con el ticket
     const [ticketMontoRecibido, setTicketMontoRecibido] = useState<number | undefined>()
     const [ticketVuelto, setTicketVuelto] = useState<number | undefined>()
@@ -572,15 +587,20 @@ export function FacturaDirectaPage() {
             }
             try {
                 const pattern = '%' + texto.split(/[*]+/).filter(Boolean).join('%') + '%'
-                const { data } = await supabase
-                    .from('productos')
-                    .select('*, subproductos(*)')
-                    .eq('empresa_id', empresa!.id)
-                    .eq('activo', true)
-                    .or(`nombre.ilike.${pattern},codigo.ilike.${pattern}`)
-                    .order('nombre')
-                    .limit(50)
-                setSearchResults(data ?? [])
+                const [{ data }, combos] = await Promise.all([
+                    supabase
+                        .from('productos')
+                        .select('*, subproductos(*)')
+                        .eq('empresa_id', empresa!.id)
+                        .eq('activo', true)
+                        .or(`nombre.ilike.${pattern},codigo.ilike.${pattern}`)
+                        .order('nombre')
+                        .limit(50),
+                    combosService.buscar(empresa!.id, texto).catch(() => []),
+                ])
+                // Los combos aparecen primero — son la promoción, se quiere que
+                // resalten sobre el catálogo normal en la misma búsqueda.
+                setSearchResults([...combos.map(c => ({ _esCombo: true as const, _combo: c })), ...(data ?? [])])
             } catch {
                 setSearchResults(filtrarProductosLocal(productos, texto))
             }
@@ -912,6 +932,7 @@ export function FacturaDirectaPage() {
     const removeLinea = (idx: number) => {
         setDetalles(prev => prev.length === 1 ? [{ ...DETALLE_VACIO }] : prev.filter((_, i) => i !== idx))
         setSearchProducto(prev => { const next = { ...prev }; delete next[idx]; return next })
+        setSerialesPorLinea(prev => { const next = { ...prev }; delete next[idx]; return next })
     }
     const updateLinea = (idx: number, field: keyof DetalleFacturaDirecta, value: any) => {
         setDetalles(prev => prev.map((d, i) => i === idx ? { ...d, [field]: value } : d))
@@ -970,6 +991,47 @@ export function FacturaDirectaPage() {
                 .catch(() => {})
         }
     }
+
+    // El combo NUNCA se factura como tal — se descompone en sus artículos
+    // reales al momento de seleccionarlo. La cantidad ya escrita en esta
+    // línea (por defecto 1) es "cuántos combos" se están vendiendo, no la
+    // cantidad de cada artículo. El primer componente reemplaza la línea
+    // actual; el resto se agrega al final (evita reindexar las líneas de
+    // en medio, que tienen su propio estado por índice — búsqueda, nivel
+    // de precio, etc.).
+    const selectCombo = (idx: number, combo: Combo) => {
+        const cantidadCombos = detalles[idx]?.cantidad > 0 ? detalles[idx].cantidad : 1
+        const lineas = combosService.expandirParaVenta(combo, cantidadCombos)
+        if (lineas.length === 0) return
+        const [primera, ...resto] = lineas
+
+        setDetalles(prev => {
+            const next = prev.map((d, i) => i !== idx ? d : {
+                ...d,
+                producto_id: primera.producto_id,
+                nombre_producto: primera.nombre_producto,
+                cantidad: primera.cantidad,
+                precio_unitario: primera.precio_unitario,
+                descuento: primera.descuento,
+                iva_porcentaje: primera.iva_porcentaje,
+                subproducto_id: null,
+                factor_conversion: 1,
+            })
+            return [...next, ...resto.map(r => ({
+                ...DETALLE_VACIO,
+                producto_id: r.producto_id,
+                nombre_producto: r.nombre_producto,
+                cantidad: r.cantidad,
+                precio_unitario: r.precio_unitario,
+                descuento: r.descuento,
+                iva_porcentaje: r.iva_porcentaje,
+            }))]
+        })
+        setPrecioNivel(prev => { const next = { ...prev }; delete next[idx]; return next })
+        setSearchProducto(prev => ({ ...prev, [idx]: primera.nombre_producto }))
+        limpiarPrecioRaw(idx)
+    }
+
     // Cambiar el nivel de precio elegido para una línea — fija precio_unitario
     // al valor de ese nivel y deja de recalcularlo por cantidad/volumen
     // (salvo que vuelva a elegir Precio 1).
@@ -1150,7 +1212,16 @@ export function FacturaDirectaPage() {
             )
         }
 
-        const detallesValidos = detalles.filter(d => d.nombre_producto && d.cantidad > 0 && d.precio_unitario > 0)
+        // Series — opcional, solo tiene sentido cuando esta venta es a
+        // crédito de electrodomésticos (creditoElectroResultado confirmado).
+        // Un campo por línea, nunca bloquea el guardado si viene vacío — se
+        // adjunta aquí mismo para que viaje junto con cada línea hasta
+        // comprobante_detalles.serial (generarFacturaDirecta la inserta tal
+        // cual; producto_seriales se llena después, leyendo de esa misma
+        // columna, ver más abajo).
+        const detallesValidos = detalles
+            .map((d, idx) => (creditoElectroResultado ? { ...d, serial: (serialesPorLinea[idx] ?? '').trim() || null } : d))
+            .filter(d => d.nombre_producto && d.cantidad > 0 && d.precio_unitario > 0)
         if (detallesValidos.length === 0) return alert('Agregue al menos un producto o servicio con cantidad y precio')
 
         // Fuera de modo Servicio, todos los ítems deben venir del catálogo
@@ -1321,6 +1392,23 @@ export function FacturaDirectaPage() {
                 created_by: profile?.id ?? null,
             })
 
+            // Series — comprobante_detalles.serial ya quedó grabado como parte
+            // de la factura (viene en detallesValidos). Acá solo se replica
+            // hacia producto_seriales (candado anti-doble-venta + historial).
+            // Si falla, la factura NO se revierte — se avisa para revisión
+            // manual, mismo criterio que el crédito de abajo.
+            if (detallesValidos.some(d => (d as any).serial)) {
+                try {
+                    await productoSerialesService.registrarSerialesDeFactura(empresa!.id, factura.id)
+                    setSerialesPorLinea({})
+                } catch (eSerial: any) {
+                    alert(
+                        `La factura ${factura.secuencial} se emitió correctamente, pero los números de serie NO se pudieron registrar en el historial:\n\n${eSerial.message}\n\n` +
+                        `Anota este número de factura y avisa para revisar las series manualmente.`
+                    )
+                }
+            }
+
             // Crédito Electrodomésticos: se crea DESPUÉS de la factura (ya con
             // factura_id real), nunca antes — evita el escenario "crédito sin
             // factura" del requerimiento. Si esto falla, la factura YA quedó
@@ -1353,6 +1441,7 @@ export function FacturaDirectaPage() {
                         await creditoElectrodomesticosService.marcarVigente(credito.id)
                     }
                     setCreditoElectroResultado(null)
+                    setCreditoCreadoParaImprimir(credito)
                 } catch (eCredito: any) {
                     alert(
                         `La factura ${factura.secuencial} se emitió correctamente, pero el crédito de electrodomésticos NO se pudo registrar:\n\n${eCredito.message}\n\n` +
@@ -1417,8 +1506,30 @@ export function FacturaDirectaPage() {
         }
     }
 
+    // Contrato/Pagaré del crédito recién creado — primera vez que se imprimen,
+    // desde el modal de éxito de la factura. Reimpresiones posteriores se
+    // hacen desde Créditos Electrodomésticos (el crédito ya existe ahí).
+    async function handleImprimirDocCredito(tipo: 'contrato' | 'pagare') {
+        if (!creditoCreadoParaImprimir || !empresa) return
+        setGenerandoDocCredito(tipo)
+        try {
+            if (tipo === 'contrato') {
+                const bytes = await documentosCreditoService.generarContrato(creditoCreadoParaImprimir, empresa)
+                abrirPdfParaImprimir(bytes, `Contrato_${creditoCreadoParaImprimir.comprobantes?.secuencial ?? creditoCreadoParaImprimir.id}.pdf`)
+            } else {
+                const { bytes } = await documentosCreditoService.generarPagare(creditoCreadoParaImprimir, empresa, empresa.id)
+                abrirPdfParaImprimir(bytes, `Pagare_${creditoCreadoParaImprimir.comprobantes?.secuencial ?? creditoCreadoParaImprimir.id}.pdf`)
+            }
+        } catch (e: any) {
+            alert(`Error al generar el ${tipo === 'contrato' ? 'contrato' : 'pagaré'}: ${e.message}`)
+        } finally {
+            setGenerandoDocCredito(null)
+        }
+    }
+
     const handleNuevaFactura = () => {
         setFacturaFinal(null)
+        setCreditoCreadoParaImprimir(null)
         setTicketMontoRecibido(undefined)
         setTicketVuelto(undefined)
         setOfflineSaved(false)
@@ -1434,6 +1545,7 @@ export function FacturaDirectaPage() {
         setSearchProducto({})
         setPrecioNivel({})
         setStockLinea({})
+        setSerialesPorLinea({})
         setEditandoCliente(false)
         setSaldoAnteriorCliente(0)
         sessionStorage.removeItem(PREP_IDS_KEY)
@@ -2004,7 +2116,22 @@ export function FacturaDirectaPage() {
                                                             <div className="sticky top-0 bg-slate-50 px-3 py-1 text-[10px] text-slate-400 font-bold border-b">
                                                                 {filtProd.length} resultado{filtProd.length !== 1 ? 's' : ''}
                                                             </div>
-                                                            {filtProd.map(p => (
+                                                            {filtProd.map(p => p._esCombo ? (
+                                                                <button key={'combo-' + p._combo.id} type="button"
+                                                                    className="w-full px-4 py-2 text-left hover:bg-violet-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0 bg-violet-50/40"
+                                                                    onMouseDown={e => { e.preventDefault(); selectCombo(idx, p._combo); setProductDropdown(null) }}>
+                                                                    <div className="flex-1 min-w-0 mr-3">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="text-[9px] font-bold uppercase tracking-wide bg-violet-600 text-white px-1.5 py-0.5 rounded shrink-0">Combo</span>
+                                                                            <span className="font-medium text-slate-800 truncate">{p._combo.descripcion}</span>
+                                                                        </div>
+                                                                        <div className="text-xs text-slate-400">{p._combo.componentes.length} artículo(s){p._combo.codigo ? ` · ${p._combo.codigo}` : ''}</div>
+                                                                    </div>
+                                                                    <span className="flex flex-col items-end shrink-0">
+                                                                        <span className="text-violet-700 font-bold text-xs">{formatCurrency(p._combo.precio_total)} <span className="font-normal text-slate-400">con IVA</span></span>
+                                                                    </span>
+                                                                </button>
+                                                            ) : (
                                                                 <button key={p.id} type="button"
                                                                     className="w-full px-4 py-2 text-left hover:bg-primary-50 flex justify-between items-center text-sm border-b border-slate-50 last:border-0"
                                                                     onMouseDown={e => { e.preventDefault(); selectProducto(idx, p); setProductDropdown(null) }}>
@@ -2064,6 +2191,21 @@ export function FacturaDirectaPage() {
                                                 </div>
                                             )
                                         })()}
+
+                                        {/* Número de serie — opcional, solo aparece cuando esta venta se está
+                                            haciendo a crédito de electrodomésticos (no depende de un flag del
+                                            producto). Un solo campo por línea. */}
+                                        {!esModoServicio && creditoElectroResultado && (
+                                            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                                                <Barcode className="w-4 h-4 text-blue-400 shrink-0" />
+                                                <span className="text-xs font-bold text-blue-700 shrink-0">N.º de serie (opcional):</span>
+                                                <input type="text"
+                                                    placeholder="Número de serie del artículo"
+                                                    value={serialesPorLinea[idx] ?? ''}
+                                                    onChange={e => setSerialesPorLinea(prev => ({ ...prev, [idx]: e.target.value }))}
+                                                    className="flex-1 min-w-0 px-2 py-1 rounded-md border border-blue-200 text-xs font-mono bg-white outline-none focus:ring-2 focus:ring-blue-400" />
+                                            </div>
+                                        )}
 
                                         {/* FILA 2: Cantidad | Precio | Desc% | IVA% | Total */}
                                         <div className="grid grid-cols-12 gap-2 items-center">
@@ -2712,6 +2854,24 @@ export function FacturaDirectaPage() {
                                 </div>
                             )}
                         </div>
+
+                        {creditoCreadoParaImprimir && (
+                            <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 space-y-2">
+                                <p className="text-xs font-bold text-violet-700 uppercase tracking-widest">Documentos del crédito</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => handleImprimirDocCredito('contrato')} disabled={generandoDocCredito !== null}
+                                        className="flex items-center justify-center gap-2 bg-violet-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-violet-700 disabled:opacity-50">
+                                        {generandoDocCredito === 'contrato' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSignature className="w-4 h-4" />}
+                                        Imprimir Contrato
+                                    </button>
+                                    <button onClick={() => handleImprimirDocCredito('pagare')} disabled={generandoDocCredito !== null}
+                                        className="flex items-center justify-center gap-2 bg-violet-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-violet-700 disabled:opacity-50">
+                                        {generandoDocCredito === 'pagare' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSignature className="w-4 h-4" />}
+                                        Imprimir Pagaré
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <button onClick={handlePrint}

@@ -106,6 +106,23 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    'generar-ruta-cobro': {
+        titulo: 'Generar Ruta de Cobro',
+        subtitulo: 'Arma la ruta del día de un cobrador — vencidos + vencen hoy, ordenados por cercanía',
+        secciones: [
+            {
+                titulo: '¿Cómo funciona?',
+                texto: 'Elige un cobrador y la app trae automáticamente todos sus clientes con cuotas vencidas o que vencen hoy, sumadas por cliente. Desmarca del checklist a quien no vayas a visitar hoy y presiona "Generar Ruta" — el resultado queda guardado y el cobrador ya lo puede ver en "Mi Ruta de Hoy" dentro de Cobros Móvil.',
+                tips: [
+                    'El orden de visita se calcula por cercanía geográfica, empezando desde la ubicación del local (si aún no la capturaste, un aviso amarillo te deja hacerlo con un botón antes de generar).',
+                    'Clientes sin ubicación capturada aparecen al final de la ruta, sin orden calculado — hay que ubicarlos manualmente.',
+                    'Volver a generar la ruta del mismo cobrador el mismo día reemplaza las paradas anteriores, no las duplica.',
+                    'El botón "Abrir ruta en Google Maps" arma un solo link con todas las paradas en orden, para navegación turno a turno.',
+                ],
+            },
+        ],
+    },
+
     'cancelacion-oficina': {
         titulo: 'Cancelación Oficina',
         subtitulo: 'Cobro de cuotas de crédito de electrodomésticos en ventanilla',
@@ -136,6 +153,14 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                 tips: [
                     'Muestra la foto de cédula del cliente (si fue capturada desde Clientes) para confirmar identidad antes de cobrar.',
                     'El botón "Capturar aquí" guarda la ubicación GPS actual del cliente — útil para actualizar direcciones difíciles de ubicar en visitas futuras.',
+                ],
+            },
+            {
+                titulo: 'Mi Ruta de Hoy',
+                texto: 'Botón arriba de la búsqueda de cliente: elige el cobrador y ves la ruta que oficina armó para hoy (vencidos + vencen hoy, en orden de visita). Toca un cliente de la lista para ir directo a su cobro, o el círculo con el número para marcarlo como visitado sin cobrar todavía.',
+                tips: [
+                    'El botón "Abrir ruta en Google Maps" arma un solo link con todas las paradas en orden, para navegación turno a turno.',
+                    'Si la ruta no aparece, pídele a oficina que la genere desde Créditos de Electrodomésticos → "Generar Ruta".',
                 ],
             },
         ],
@@ -259,6 +284,7 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                 tips: [
                     'En celular, el botón abre directamente la cámara.',
                     'Las imágenes se guardan en un bucket privado — no son accesibles por URL pública, solo descargables desde este formulario.',
+                    'Esta sección solo aparece si el administrador de plataforma activó el toggle "Ingreso de Imágenes" para tu empresa (apagado por defecto) — si no la ves, pide que lo activen desde Configuración.',
                 ],
             },
         ],
@@ -288,7 +314,32 @@ export const AYUDA: Record<string, PaginaAyuda> = {
             },
             {
                 titulo: 'Subproductos y precios por volumen',
-                texto: 'Los subproductos permiten agrupar artículos en combos o kits (ej: "Combo Pizza + Bebida"). Los precios por volumen permiten definir descuentos automáticos según la cantidad comprada.',
+                texto: 'Los subproductos son presentaciones o fracciones de UN MISMO artículo maestro (ej: un tanque de diluyente vendido por galón o litro) — no confundir con Combos, que agrupan VARIOS artículos distintos. Los precios por volumen permiten definir descuentos automáticos según la cantidad comprada.',
+            },
+        ],
+    },
+
+    // ─── COMBOS ─────────────────────────────────────────────────────────────
+    'combos': {
+        titulo: 'Combos',
+        subtitulo: 'Paquetes de varios artículos reales a un precio promocional',
+        secciones: [
+            {
+                titulo: '¿Qué es un combo?',
+                texto: 'Un combo agrupa varios artículos reales del catálogo (ej. 1 Cocina + 1 Refrigeradora) para venderlos juntos a un precio de promoción, distinto de la suma de sus precios de lista. El combo en sí NUNCA se vende ni se descuenta del inventario — es solo una forma de armar la venta. Al facturarlo, la app lo descompone en sus artículos reales, y esos sí impactan Kardex y contabilidad, cada uno con su propio producto, cantidad y precio.',
+                tips: [
+                    'Sirve para cualquier empresa, no solo electrodomésticos — cualquier combinación de artículos con precio promocional.',
+                    'Puedes editar o dar de baja un combo sin afectar las facturas donde ya se usó.',
+                ],
+            },
+            {
+                titulo: 'Armar el combo',
+                texto: 'Por cada artículo del combo: búscalo por código o nombre, indica la cantidad y el precio CON IVA incluido que le corresponde dentro de esta promoción (no tiene que ser su precio de lista). Al final, indica el "Total del combo" (también con IVA) — el sistema no te deja guardar si la suma de los artículos no cuadra exactamente con ese total.',
+                alerta: 'Todos los precios que digitas aquí (por artículo y el total) van CON IVA incluido — la app calcula el desglose base/IVA de cada artículo automáticamente al momento de facturar, usando la tarifa de IVA real de cada producto.',
+            },
+            {
+                titulo: 'Al vender un combo',
+                texto: 'Búscalo igual que un producto normal en Nueva Factura — se distingue con una etiqueta "COMBO". Al seleccionarlo, la línea se reemplaza por todas las líneas de sus artículos componentes, ya con cantidad y precio (sin IVA) calculados. Desde ahí se pueden editar como cualquier otra línea de la factura.',
             },
         ],
     },

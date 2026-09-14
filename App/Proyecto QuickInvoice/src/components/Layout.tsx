@@ -54,6 +54,8 @@ import {
     Wrench,
     History,
     Home,
+    Route as RouteIcon,
+    PackagePlus,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import type { Modules } from '../contexts/AuthContext'
@@ -77,7 +79,7 @@ interface SidebarItemProps {
 const MODULE_ACTIVE_TESTS: [string, (p: string) => boolean][] = [
     ['gerencia',     p => p === '/dashboard' || p.startsWith('/gerencia')],
     ['facturacion',  p => ['/nueva-factura', '/proformas', '/facturacion-en-vivo', '/facturacion', '/facturacion-masiva', '/vendedores', '/notas-credito', '/anulacion-facturas', '/guias-remision', '/cierres', '/consultas/ventas', '/consultas/talla-color'].some(x => p.startsWith(x))],
-    ['inventario',   p => ['/productos', '/compras/ordenes', '/compras/nueva-inventario', '/inventario-valorizado', '/kardex', '/ajuste-inventario', '/transferencia-bodega', '/cambio-codigo-articulos'].some(x => p.startsWith(x))],
+    ['inventario',   p => ['/productos', '/combos', '/compras/ordenes', '/compras/nueva-inventario', '/inventario-valorizado', '/kardex', '/ajuste-inventario', '/transferencia-bodega', '/cambio-codigo-articulos'].some(x => p.startsWith(x))],
     ['clientes',     p => ['/clientes', '/cartera', '/consultas/cartera'].some(x => p.startsWith(x))],
     ['cxp',          p => ['/proveedores', '/compras', '/cxp', '/reportes/compras', '/reportes/cxp', '/reportes/estado-cuenta', '/ajustes', '/retenciones', '/liquidaciones'].some(x => p.startsWith(x))],
     ['tesoreria',    p => p.startsWith('/teso/')],
@@ -110,20 +112,6 @@ const SidebarItem = ({ to, icon: Icon, label, active, sub, disabled, sentinelId 
 }
 
 import { CierreCajaModal } from './CierreCajaModal'
-
-// Ítem de submenú "por construir" — visible (para mostrar el mapa completo
-// del módulo) pero no clickeable, a diferencia de SidebarItem.disabled que
-// se OCULTA por completo (ese es para permisos, no para "todavía no existe").
-const SidebarItemPendiente = ({ icon: Icon, label, disabled }: { icon: React.ElementType; label: string; disabled?: boolean }) => {
-    if (disabled) return null  // ocultar completamente cuando no tiene permiso, igual que SidebarItem
-    return (
-    <div title="Todavía no está construido" className="flex items-center gap-3 pl-8 py-2 rounded-lg text-sm text-slate-300 cursor-not-allowed select-none">
-        <Icon className="w-4 h-4 shrink-0 text-slate-200" />
-        <span className="flex-1">{label}</span>
-        <span className="text-[9px] font-bold uppercase tracking-wide bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded shrink-0">Pronto</span>
-    </div>
-    )
-}
 
 // Sección expandible de módulo principal
 function ModuleSection({ label, icon: Icon, colorClass, isOpen, onToggle, isSidebarOpen, anyActive, children }: {
@@ -379,9 +367,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('inventario')}
                             onToggle={() => toggleGroup('inventario')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/productos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega','/cambio-codigo-articulos'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/productos','/combos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega','/cambio-codigo-articulos'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub sentinelId="nav-productos" disabled={!p.perm_productos} />
+                            <SidebarItem to="/combos"                  icon={PackagePlus}       label="Combos"                active={location.pathname === '/combos'} sub disabled={!p.perm_combos} />
                             <SidebarItem to="/compras/ordenes"          icon={CheckSquare}       label="Órdenes de Compra"     active={location.pathname.startsWith('/compras/ordenes')} sub disabled={!p.perm_ordenes_compra} />
                             <SidebarItem to="/compras/nueva-inventario" icon={ShoppingCart}      label="Compras Inventario"    active={location.pathname === '/compras/nueva-inventario'} sub disabled={!p.perm_compras_inventario} />
                             <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub disabled={!p.perm_ajuste_inventario} />
@@ -420,17 +409,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                     {openGroups.includes('ventas-credito') && isSidebarOpen && (
                                         <div className="ml-3 border-l-2 border-slate-100 pl-2 space-y-0.5">
                                             {p.perm_credito_solicitud && (
-                                                <a href="/documentos/solicitud-credito-electrodomesticos.pdf" target="_blank" rel="noopener noreferrer"
+                                                <a href="/documentos/Solicitud_Credito.pdf" target="_blank" rel="noopener noreferrer"
                                                     className="flex items-center gap-3 pl-8 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900">
                                                     <FilePlus className="w-4 h-4 shrink-0 text-slate-400" />
                                                     <span className="flex-1">Solicitud de Crédito</span>
                                                 </a>
                                             )}
                                             <SidebarItem to="/creditos-electrodomesticos" icon={Home} label="Créditos Electrodomésticos" active={location.pathname === '/creditos-electrodomesticos'} sub disabled={!p.perm_credito_electrodomesticos} />
+                                            <SidebarItem to="/creditos-electrodomesticos?ruta=1" icon={RouteIcon} label="Generar Ruta de Cobro" active={false} sub disabled={!p.perm_credito_electrodomesticos} />
                                             <SidebarItem to="/cancelacion-oficina" icon={Receipt} label="Cancelación Oficina" active={location.pathname === '/cancelacion-oficina'} sub disabled={!p.perm_credito_cobros} />
                                             <SidebarItem to="/cancelacion-movil" icon={Truck} label="Cancelación Móvil" active={location.pathname === '/cancelacion-movil'} sub disabled={!p.perm_credito_cobros_movil} />
-                                            <SidebarItemPendiente icon={FileSearch} label="Consulta General de Cartera" disabled={!p.perm_credito_consulta_cartera} />
-                                            <SidebarItemPendiente icon={BarChart3} label="Estado de Cuenta por Cliente" disabled={!p.perm_credito_estado_cuenta} />
+                                            <SidebarItem to="/creditos-electrodomesticos/consulta-cartera" icon={FileSearch} label="Consulta General de Cartera" active={location.pathname === '/creditos-electrodomesticos/consulta-cartera'} sub disabled={!p.perm_credito_consulta_cartera} />
+                                            <SidebarItem to="/creditos-electrodomesticos/estado-cuenta" icon={BarChart3} label="Estado de Cuenta por Cliente" active={location.pathname === '/creditos-electrodomesticos/estado-cuenta'} sub disabled={!p.perm_credito_estado_cuenta} />
                                         </div>
                                     )}
                                 </div>

@@ -27,6 +27,7 @@ const ConsultaTallaColorPage       = lz(() => import('./pages/ConsultaTallaColor
 const PreparacionesPinturaPage     = lz(() => import('./pages/PreparacionesPinturaPage'), 'PreparacionesPinturaPage')
 const NuevaPreparacionPinturaPage  = lz(() => import('./pages/NuevaPreparacionPinturaPage'), 'NuevaPreparacionPinturaPage')
 const ProductsPage                 = lz(() => import('./pages/ProductsPage'), 'ProductsPage')
+const CombosPage                   = lz(() => import('./pages/CombosPage'), 'CombosPage')
 const ClientsPage                  = lz(() => import('./pages/ClientsPage'), 'ClientsPage')
 const InvoicingPage                = lz(() => import('./pages/InvoicingPage'), 'InvoicingPage')
 const ConfigurationPage            = lz(() => import('./pages/ConfigurationPage'), 'ConfigurationPage')
@@ -42,6 +43,8 @@ const CodigosRetencionPage         = lz(() => import('./pages/CodigosRetencionPa
 const VendedoresPage               = lz(() => import('./pages/VendedoresPage'), 'VendedoresPage')
 const CobradoresPage               = lz(() => import('./pages/CobradoresPage'), 'CobradoresPage')
 const CreditosElectrodomesticosPage = lz(() => import('./pages/vendor/CreditosElectrodomesticosPage'), 'CreditosElectrodomesticosPage')
+const ConsultaGeneralCarteraCreditoPage = lz(() => import('./pages/vendor/ConsultaGeneralCarteraCreditoPage'), 'ConsultaGeneralCarteraCreditoPage')
+const EstadoCuentaClienteCreditoPage = lz(() => import('./pages/vendor/EstadoCuentaClienteCreditoPage'), 'EstadoCuentaClienteCreditoPage')
 const CancelacionOficinaPage = lz(() => import('./pages/vendor/CancelacionOficinaPage'), 'CancelacionOficinaPage')
 const CancelacionMovilPage = lz(() => import('./pages/vendor/CancelacionMovilPage'), 'CancelacionMovilPage')
 const CarteraCxcPage               = lz(() => import('./pages/CarteraCxcPage'), 'CarteraCxcPage')
@@ -365,6 +368,16 @@ function App() {
                 </ProtectedRoute>
               } />
 
+              <Route path="/combos" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <CombosPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
               <Route path="/clientes" element={
                 <ProtectedRoute>
                   <RoleProtectedRoute allowedRoles={['oficina']}>
@@ -550,6 +563,26 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <CreditosElectrodomesticosPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/creditos-electrodomesticos/consulta-cartera" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <ConsultaGeneralCarteraCreditoPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/creditos-electrodomesticos/estado-cuenta" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <EstadoCuentaClienteCreditoPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

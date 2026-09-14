@@ -51,6 +51,7 @@ const MODULOS = [
         key: 'inventario', label: 'Inventarios',
         items: [
             { field: 'perm_productos',             label: 'Artículos' },
+            { field: 'perm_combos',                label: 'Combos' },
             { field: 'perm_ordenes_compra',         label: 'Órdenes de Compra' },
             { field: 'perm_compras_inventario',     label: 'Compras Inventario' },
             { field: 'perm_preparaciones_pintura',  label: 'Preparaciones de Pintura' },
@@ -202,6 +203,7 @@ export function AdminPermisosPage() {
                     perm_guias_remision:        r.perm_guias_remision        ?? def.perm_guias_remision,
                     perm_preparaciones_pintura: r.perm_preparaciones_pintura ?? def.perm_preparaciones_pintura,
                     perm_productos:             r.perm_productos             ?? def.perm_productos,
+                    perm_combos:                r.perm_combos                ?? def.perm_combos,
                     perm_ordenes_compra:        r.perm_ordenes_compra        ?? def.perm_ordenes_compra,
                     perm_compras_inventario:    r.perm_compras_inventario    ?? def.perm_compras_inventario,
                     perm_ajuste_inventario:     r.perm_ajuste_inventario     ?? def.perm_ajuste_inventario,
