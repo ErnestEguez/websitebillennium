@@ -83,7 +83,7 @@ const MODULE_ACTIVE_TESTS: [string, (p: string) => boolean][] = [
     ['clientes',     p => ['/clientes', '/cartera', '/consultas/cartera'].some(x => p.startsWith(x))],
     ['cxp',          p => ['/proveedores', '/compras', '/cxp', '/reportes/compras', '/reportes/cxp', '/reportes/estado-cuenta', '/ajustes', '/retenciones', '/liquidaciones'].some(x => p.startsWith(x))],
     ['tesoreria',    p => p.startsWith('/teso/')],
-    ['contabilidad', p => ['/conta/', '/lp-'].some(x => p.includes(x))],
+    ['contabilidad', p => !p.startsWith('/conta/tributario') && ['/conta/', '/lp-'].some(x => p.includes(x))],
     ['tributario',   p => p.startsWith('/conta/tributario')],
     ['talento',      p => p.startsWith('/talento/')],
     ['nominas',      p => p.startsWith('/nominas/')],

@@ -122,6 +122,10 @@ export interface Compra {
     aplica_convenio_ddi: boolean
     orden_compra_id?:   string
     bodega_id?:         string
+    // true (default) = gasto del negocio, se declara en el Formulario 104.
+    // false = gasto personal del propietario -- útil solo para Impuesto a la
+    // Renta / reporte de gastos personales del SRI, nunca entra al 104.
+    es_gasto_negocio?:  boolean
     // Joins opcionales
     proveedor?: Pick<Proveedor, 'nombre_empresa' | 'ruc'>
     bodega?:    Pick<Bodega, 'nombre' | 'codigo'>

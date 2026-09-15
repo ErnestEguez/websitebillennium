@@ -52,6 +52,12 @@ const SECCIONES_READONLY = new Set(['liquidacion']) // se recalculan solos
 
 function f2(n: number) { return n.toFixed(2) }
 
+// Casilleros de CONTEO (111, 113, 115 -- número de comprobantes) se
+// muestran como entero, no como moneda; el resto sigue siendo monetario.
+function formatCasillero(c: Casillero, valor: number): string {
+    return c.tipo_dato === 'numero' ? String(Math.round(valor)) : formatMoneda(valor)
+}
+
 // ── Generador XML (cliente) ────────────────────────────────────────────────
 //
 // Este archivo NO es un formato de importación oficial del SRI (no existe
@@ -417,7 +423,7 @@ export function Formulario104DetallePage() {
                                                 </td>
                                                 <td className="py-2.5 px-4 text-xs text-slate-600">{c.descripcion}</td>
                                                 <td className="py-2.5 px-4 text-right text-xs font-mono">
-                                                    {formatMoneda(c.valor_calculado)}
+                                                    {formatCasillero(c, c.valor_calculado)}
                                                 </td>
                                                 <td className="py-2.5 px-4 text-right text-xs font-mono">
                                                     {isEditing ? (
@@ -431,12 +437,12 @@ export function Formulario104DetallePage() {
                                                         />
                                                     ) : (
                                                         <span className={c.ajuste_manual !== 0 ? 'text-amber-600 font-semibold' : ''}>
-                                                            {c.ajuste_manual !== 0 ? formatMoneda(c.ajuste_manual) : '—'}
+                                                            {c.ajuste_manual !== 0 ? formatCasillero(c, c.ajuste_manual) : '—'}
                                                         </span>
                                                     )}
                                                 </td>
                                                 <td className="py-2.5 px-4 text-right font-semibold text-sm font-mono">
-                                                    {formatMoneda(c.valor_final)}
+                                                    {formatCasillero(c, c.valor_final)}
                                                 </td>
                                                 {!enviado && !SECCIONES_READONLY.has(sec.key) && (
                                                     <td className="py-2.5 px-3">

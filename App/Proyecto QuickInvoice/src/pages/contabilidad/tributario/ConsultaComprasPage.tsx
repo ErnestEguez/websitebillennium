@@ -5,11 +5,21 @@ import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { cn, formatMoneda, mesNombre } from '../../../lib/utils'
 
+const REGIMEN_LABEL: Record<string, string> = {
+    GENERAL: 'Régimen General',
+    RIMPE_EMPRENDEDOR: 'RIMPE Emprendedor',
+    RIMPE_NEGOCIO_POPULAR: 'RIMPE Negocio Popular',
+}
+function esRimpe(tipoRegimen: string | null) {
+    return tipoRegimen === 'RIMPE_EMPRENDEDOR' || tipoRegimen === 'RIMPE_NEGOCIO_POPULAR'
+}
+
 interface Compra {
     id: string
     tipo: 'compra'
     proveedor_ruc: string
     proveedor_nombre: string
+    tipo_regimen: string | null
     numero: string
     clave_acceso: string | null
     fecha_emision: string
@@ -31,6 +41,9 @@ interface Compra {
     pct_ret_iva: number | null
     valor_ret_iva: number
     tipo_compra?: string
+    // true = gasto del negocio (entra al Formulario 104). false = gasto
+    // personal del propietario -- editable acá antes de declarar.
+    es_gasto_negocio: boolean
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -72,7 +85,7 @@ export function ConsultaComprasPage() {
         try {
             const comprasRes = await supabase
                 .from('ingresos_stock')
-                .select('id, numero_factura, clave_acceso, fecha_emision, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, tipo_compra, proveedor:proveedores(ruc, nombre_empresa), retenciones:retenciones_compras(tipo, codigo_retencion, porcentaje, valor)')
+                .select('id, numero_factura, clave_acceso, fecha_emision, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, tipo_compra, es_gasto_negocio, proveedor:proveedores(ruc, nombre_empresa, tipo_regimen), retenciones:retenciones_compras(tipo, codigo_retencion, porcentaje, valor)')
                 .eq('empresa_id', empresa.id)
                 .eq('estado', 'ACTIVO')
                 .gte('fecha_emision', desde)
@@ -91,6 +104,8 @@ export function ConsultaComprasPage() {
                     tipo:             'compra' as const,
                     proveedor_ruc:    r.proveedor?.ruc ?? '',
                     proveedor_nombre: r.proveedor?.nombre_empresa ?? '',
+                    tipo_regimen:     r.proveedor?.tipo_regimen ?? null,
+                    es_gasto_negocio: r.es_gasto_negocio ?? true,
                     numero:           r.numero_factura ?? '',
                     clave_acceso:     r.clave_acceso,
                     fecha_emision:    r.fecha_emision,
@@ -121,6 +136,16 @@ export function ConsultaComprasPage() {
         setCargando(false)
     }
 
+    async function toggleGastoNegocio(id: string, valorActual: boolean) {
+        const nuevoValor = !valorActual
+        setDatos(prev => prev.map(r => r.id === id ? { ...r, es_gasto_negocio: nuevoValor } : r))
+        const { error: er } = await supabase.from('ingresos_stock').update({ es_gasto_negocio: nuevoValor }).eq('id', id)
+        if (er) {
+            setDatos(prev => prev.map(r => r.id === id ? { ...r, es_gasto_negocio: valorActual } : r))
+            setError(`No se pudo actualizar: ${er.message}`)
+        }
+    }
+
     const filtradas = datos.filter(r => {
         if (busqueda.trim()) {
             const b = busqueda.toLowerCase()
@@ -147,13 +172,31 @@ export function ConsultaComprasPage() {
         retenidoIva:    filtradas.reduce((s, r) => s + r.valor_ret_iva,    0),
     }
 
+    // Gasto de negocio: lo único que declara el 104 (casillero 500/504/510,
+    // y su conteo va al casillero 115) — el resto son gastos personales del
+    // propietario, útiles solo para Impuesto a la Renta.
+    const gastoNegocio = filtradas.filter(r => r.es_gasto_negocio)
+    const totalGastoNegocio = gastoNegocio.reduce((s, r) => s + r.base_cero + r.base_iva5 + r.base_iva15, 0)
+
+    // Resumen por régimen del proveedor — no es un casillero oficial del
+    // 104 (el formulario del SRI no abre por régimen), es un reporte de
+    // gestión adicional sobre las compras que SÍ son gasto de negocio.
+    const rimpe   = gastoNegocio.filter(r => esRimpe(r.tipo_regimen))
+    const general = gastoNegocio.filter(r => !esRimpe(r.tipo_regimen))
+    const resumenRegimen = {
+        rimpe:   { compras: rimpe.length,   valor: rimpe.reduce((s, r) => s + r.total, 0) },
+        general: { compras: general.length, valor: general.reduce((s, r) => s + r.total, 0) },
+        suma:    { compras: gastoNegocio.length, valor: gastoNegocio.reduce((s, r) => s + r.total, 0) },
+    }
+
     function exportarExcel() {
         const headers = [
-            'numero', 'tipo', 'secuencial', 'clave_autorizacion', 'ruc_emisor', 'nombre_emisor',
+            'numero', 'tipo', 'secuencial', 'clave_autorizacion', 'ruc_emisor', 'nombre_emisor', 'regimen',
             'fecha_emision', 'subtotal_cero', 'subtotal_iva_15', 'subtotal_iva_5', 'subtotal_exento',
             'total_bases', 'iva 5%', 'iva 15%', 'importe_total',
             'Cód. Ret. Fuente', '% Ret. Fuente', 'Valor Ret. Fuente',
             'Cód. Ret. IVA', '% Ret. IVA', 'Valor Ret. IVA',
+            'Gasto Negocio',
         ]
 
         const filas = filtradas.map((r, i) => [
@@ -163,6 +206,7 @@ export function ConsultaComprasPage() {
             r.clave_acceso ?? '',
             r.proveedor_ruc,
             r.proveedor_nombre,
+            r.tipo_regimen ? (REGIMEN_LABEL[r.tipo_regimen] ?? r.tipo_regimen) : '',
             r.fecha_emision,
             r.base_cero,
             r.base_iva15,
@@ -178,14 +222,16 @@ export function ConsultaComprasPage() {
             r.codigo_ret_iva ?? '',
             r.pct_ret_iva ?? '',
             r.valor_ret_iva,
+            r.es_gasto_negocio ? 'Sí' : 'No',
         ])
 
         const filaTotales = [
-            '', '', '', '', '', '', 'TOTALES',
+            '', '', '', '', '', '', '', 'TOTALES',
             totales.base0, totales.base15, totales.base5, 0, totales.totalBases,
             totales.iva5, totales.iva15, totales.total,
             '', '', totales.retenidoFuente,
             '', '', totales.retenidoIva,
+            '',
         ]
 
         const nombreEmpresa = empresa?.razon_social || empresa?.nombre || ''
@@ -277,6 +323,48 @@ export function ConsultaComprasPage() {
                 ))}
             </div>
 
+            {/* Gasto de negocio (lo que declara el 104) vs por régimen del proveedor */}
+            {filtradas.length > 0 && (
+                <div className="card overflow-hidden">
+                    <div className="bg-indigo-700 px-5 py-3 text-white font-bold text-sm">
+                        Gasto de Negocio (declarable en Formulario 104) — por Régimen del Proveedor
+                    </div>
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-slate-50 border-b text-xs text-slate-500 uppercase tracking-wide">
+                                <th className="py-2 px-4 text-left">Régimen</th>
+                                <th className="py-2 px-4 text-right"># Facturas</th>
+                                <th className="py-2 px-4 text-right">Valor Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr className="border-b border-slate-100">
+                                <td className="py-2 px-4 text-slate-700">RIMPE</td>
+                                <td className="py-2 px-4 text-right font-mono">{resumenRegimen.rimpe.compras}</td>
+                                <td className="py-2 px-4 text-right font-mono">{formatMoneda(resumenRegimen.rimpe.valor)}</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="py-2 px-4 text-slate-700">Régimen General</td>
+                                <td className="py-2 px-4 text-right font-mono">{resumenRegimen.general.compras}</td>
+                                <td className="py-2 px-4 text-right font-mono">{formatMoneda(resumenRegimen.general.valor)}</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr className="bg-slate-50 border-t-2 border-slate-200 font-bold">
+                                <td className="py-2.5 px-4 text-xs uppercase tracking-wide text-slate-600">Suma (Casillero 115)</td>
+                                <td className="py-2.5 px-4 text-right font-mono">{resumenRegimen.suma.compras}</td>
+                                <td className="py-2.5 px-4 text-right font-mono">{formatMoneda(resumenRegimen.suma.valor)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    {gastoNegocio.length !== filtradas.length && (
+                        <p className="px-5 py-2.5 text-xs text-amber-700 bg-amber-50 border-t border-amber-100">
+                            {filtradas.length - gastoNegocio.length} compra(s) marcada(s) como gasto personal (no del negocio) — excluidas de esta tabla y del Formulario 104. Base total: {formatMoneda(totales.totalBases - totalGastoNegocio)}.
+                        </p>
+                    )}
+                </div>
+            )}
+
             {/* Tabla */}
             <div className="card overflow-hidden">
                 <div className="bg-slate-700 px-5 py-3 text-white font-bold text-sm flex items-center gap-2">
@@ -317,6 +405,7 @@ export function ConsultaComprasPage() {
                                     <th className="py-2 px-3 text-right">Total</th>
                                     <th className="py-2 px-3 text-center">Ret. Fuente</th>
                                     <th className="py-2 px-3 text-center">Ret. IVA</th>
+                                    <th className="py-2 px-3 text-center" title="Se declara en el Formulario 104">Gasto Negocio</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -341,6 +430,9 @@ export function ConsultaComprasPage() {
                                                 <td className="py-2 px-3">
                                                     <div className="font-medium text-slate-700 text-xs">{r.proveedor_nombre}</div>
                                                     <div className="text-slate-400 text-xs font-mono">{r.proveedor_ruc}</div>
+                                                    {esRimpe(r.tipo_regimen) && (
+                                                        <span className="inline-block mt-0.5 text-[10px] font-bold uppercase tracking-wide bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded">RIMPE</span>
+                                                    )}
                                                 </td>
                                                 <td className="py-2 px-3 font-mono text-xs text-slate-600">{r.numero}</td>
                                                 <td className="py-2 px-3 text-xs text-slate-500">{r.fecha_emision}</td>
@@ -383,10 +475,18 @@ export function ConsultaComprasPage() {
                                                         <span className="text-xs text-slate-300">—</span>
                                                     )}
                                                 </td>
+                                                <td className="py-2 px-3 text-center">
+                                                    <label className="inline-flex items-center cursor-pointer" title="Desmarca si es un gasto personal, no del negocio -- no entrará al Formulario 104">
+                                                        <input type="checkbox"
+                                                            checked={r.es_gasto_negocio}
+                                                            onChange={() => toggleGastoNegocio(r.id, r.es_gasto_negocio)}
+                                                        />
+                                                    </label>
+                                                </td>
                                             </tr>
                                             {isExp && (
                                                 <tr key={`${r.id}-det`} className="bg-slate-50 border-b border-slate-100">
-                                                    <td colSpan={14} className="px-8 py-3">
+                                                    <td colSpan={15} className="px-8 py-3">
                                                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Detalle</p>
                                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs font-mono text-slate-600">
                                                             <div><span className="text-slate-400">Base 0%:</span> {r.base_cero.toFixed(2)}</div>
@@ -438,6 +538,7 @@ export function ConsultaComprasPage() {
                                     <td className="py-2.5 px-3 text-center text-xs text-slate-500">
                                         {totales.retenidoIva > 0 ? formatMoneda(totales.retenidoIva) : ''}
                                     </td>
+                                    <td className="py-2.5 px-3 text-center text-xs text-slate-500">{gastoNegocio.length}/{filtradas.length}</td>
                                 </tr>
                             </tfoot>
                         </table>

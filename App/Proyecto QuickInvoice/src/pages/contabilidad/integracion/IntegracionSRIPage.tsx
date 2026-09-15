@@ -192,7 +192,7 @@ export function IntegracionSRIPage() {
     const [logGen, setLogGen]             = useState<string[]>([])
 
     // ── Migración a Compras/CxP ───────────────────────────────────────────
-    const [seleccionCompras, setSeleccionCompras] = useState<Record<string, { compras: boolean; cxp: boolean }>>({})
+    const [seleccionCompras, setSeleccionCompras] = useState<Record<string, { compras: boolean; cxp: boolean; gastoNegocio: boolean }>>({})
     const [migrando, setMigrando]         = useState(false)
     const [logMigracion, setLogMigracion] = useState<string[]>([])
 
@@ -626,6 +626,7 @@ export function IntegracionSRIPage() {
                     tipo_regimen_pago: '01' as const,
                     aplica_convenio_ddi: false,
                     observaciones: 'Migrado desde Integración SRI (Contabilidad)',
+                    es_gasto_negocio: seleccionCompras[c.id]?.gastoNegocio ?? true,
                 }
 
                 const detalle = [{
@@ -1018,22 +1019,38 @@ export function IntegracionSRIPage() {
                                                                         checked={!!seleccionCompras[c.id]?.compras}
                                                                         onChange={e => setSeleccionCompras(prev => ({
                                                                             ...prev,
-                                                                            [c.id]: { compras: e.target.checked, cxp: e.target.checked ? prev[c.id]?.cxp ?? false : false },
+                                                                            [c.id]: {
+                                                                                compras: e.target.checked,
+                                                                                cxp: e.target.checked ? prev[c.id]?.cxp ?? false : false,
+                                                                                gastoNegocio: e.target.checked ? prev[c.id]?.gastoNegocio ?? true : true,
+                                                                            },
                                                                         }))}
                                                                     />
                                                                     Compra
                                                                 </label>
                                                                 {seleccionCompras[c.id]?.compras && (
-                                                                    <label className="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer" title="Generar Cuenta por Pagar a crédito">
-                                                                        <input type="checkbox"
-                                                                            checked={!!seleccionCompras[c.id]?.cxp}
-                                                                            onChange={e => setSeleccionCompras(prev => ({
-                                                                                ...prev,
-                                                                                [c.id]: { compras: true, cxp: e.target.checked },
-                                                                            }))}
-                                                                        />
-                                                                        + CxP
-                                                                    </label>
+                                                                    <>
+                                                                        <label className="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer" title="Generar Cuenta por Pagar a crédito">
+                                                                            <input type="checkbox"
+                                                                                checked={!!seleccionCompras[c.id]?.cxp}
+                                                                                onChange={e => setSeleccionCompras(prev => ({
+                                                                                    ...prev,
+                                                                                    [c.id]: { ...prev[c.id], compras: true, cxp: e.target.checked },
+                                                                                }))}
+                                                                            />
+                                                                            + CxP
+                                                                        </label>
+                                                                        <label className="flex items-center gap-1 text-[10px] text-slate-500 cursor-pointer" title="Desmarca si es un gasto personal del propietario, no del negocio -- no entrará al Formulario 104">
+                                                                            <input type="checkbox"
+                                                                                checked={seleccionCompras[c.id]?.gastoNegocio ?? true}
+                                                                                onChange={e => setSeleccionCompras(prev => ({
+                                                                                    ...prev,
+                                                                                    [c.id]: { ...prev[c.id], compras: true, gastoNegocio: e.target.checked },
+                                                                                }))}
+                                                                            />
+                                                                            Gasto Negocio
+                                                                        </label>
+                                                                    </>
                                                                 )}
                                                             </div>
                                                         )}
