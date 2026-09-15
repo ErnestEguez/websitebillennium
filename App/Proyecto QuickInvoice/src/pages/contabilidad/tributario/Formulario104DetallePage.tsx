@@ -55,7 +55,7 @@ function f2(n: number) { return n.toFixed(2) }
 // Casilleros de CONTEO (111, 113, 115 -- número de comprobantes) se
 // muestran como entero, no como moneda; el resto sigue siendo monetario.
 function formatCasillero(c: Casillero, valor: number): string {
-    return c.tipo_dato === 'numero' ? String(Math.round(valor)) : formatMoneda(valor)
+    return c.tipo_dato === 'entero' ? String(Math.round(valor)) : formatMoneda(valor)
 }
 
 // ── Generador XML (cliente) ────────────────────────────────────────────────
