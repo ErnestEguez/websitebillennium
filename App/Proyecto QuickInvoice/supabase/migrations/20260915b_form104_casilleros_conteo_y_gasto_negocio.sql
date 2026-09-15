@@ -11,14 +11,14 @@
 -- lp_iva_104_mapeo_xml para v2024/v2025 antes de insertar.
 
 INSERT INTO contabilidad.lp_iva_104_mapeo_xml
-    (version_form, casillero, descripcion, seccion, tipo_dato, obligatorio, orden, activo)
+    (version_form, casillero, descripcion, etiqueta_xml, seccion, tipo_dato, obligatorio, orden, activo)
 VALUES
-    ('v2024', '111', 'Número de comprobantes de venta (facturas) declarados en el período', 'ventas',  'numero', false, 5,   true),
-    ('v2024', '113', 'Número de comprobantes de venta anulados en el período',               'ventas',  'numero', false, 15,  true),
-    ('v2024', '115', 'Número de comprobantes de compra (gasto de negocio) declarados',        'compras', 'numero', false, 145, true),
-    ('v2025', '111', 'Número de comprobantes de venta (facturas) declarados en el período', 'ventas',  'numero', false, 5,   true),
-    ('v2025', '113', 'Número de comprobantes de venta anulados en el período',               'ventas',  'numero', false, 15,  true),
-    ('v2025', '115', 'Número de comprobantes de compra (gasto de negocio) declarados',        'compras', 'numero', false, 145, true)
+    ('v2024', '111', 'Número de comprobantes de venta (facturas) declarados en el período', 'num_facturas_ventas',   'ventas',  'numero', false, 5,   true),
+    ('v2024', '113', 'Número de comprobantes de venta anulados en el período',               'num_facturas_anuladas', 'ventas',  'numero', false, 15,  true),
+    ('v2024', '115', 'Número de comprobantes de compra (gasto de negocio) declarados',        'num_compras_negocio',   'compras', 'numero', false, 145, true),
+    ('v2025', '111', 'Número de comprobantes de venta (facturas) declarados en el período', 'num_facturas_ventas',   'ventas',  'numero', false, 5,   true),
+    ('v2025', '113', 'Número de comprobantes de venta anulados en el período',               'num_facturas_anuladas', 'ventas',  'numero', false, 15,  true),
+    ('v2025', '115', 'Número de comprobantes de compra (gasto de negocio) declarados',        'num_compras_negocio',   'compras', 'numero', false, 145, true)
 ON CONFLICT DO NOTHING;
 
 CREATE OR REPLACE FUNCTION contabilidad.lp_calcular_104(p_empresa_id uuid, "p_año" integer, p_mes integer)
