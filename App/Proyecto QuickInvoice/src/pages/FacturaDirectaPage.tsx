@@ -27,6 +27,7 @@ import {
 import { RetencionesEditor } from '../components/vendor/RetencionesEditor'
 import type { RetLine } from '../components/vendor/RetencionesEditor'
 import { ModalCreditoElectrodomesticos, type CreditoElectroConfirmado } from '../components/vendor/ModalCreditoElectrodomesticos'
+import { ClavePrecioModal } from '../components/ClavePrecioModal'
 import { creditoElectrodomesticosService, type CreditoElectrodomesticos } from '../services/creditoElectrodomesticosService'
 import { documentosCreditoService, abrirPdfParaImprimir } from '../services/documentosCreditoService'
 import { productoSerialesService } from '../services/productoSerialesService'
@@ -231,15 +232,7 @@ export function FacturaDirectaPage() {
     // factura completa -- cada línea que se quiera tocar pide la clave.
     const claveRequerida = !!empresa?.requiere_clave_cambio_precio
     const [lineasPrecioDesbloqueado, setLineasPrecioDesbloqueado] = useState<Set<number>>(new Set())
-    function intentarDesbloquearPrecio(idx: number) {
-        const clave = window.prompt('Este cambio de precio requiere contraseña:')
-        if (clave === null) return
-        if (clave === (empresa?.clave_cambio_precio ?? '')) {
-            setLineasPrecioDesbloqueado(prev => new Set(prev).add(idx))
-        } else {
-            alert('Contraseña incorrecta.')
-        }
-    }
+    const [claveModalIdx, setClaveModalIdx] = useState<number | null>(null)
     const { enabled: vozIaHabilitada } = useIaFeatureEnabled('voz')
     const { isOnline } = useNetworkStatus()
     const [offlineSaved, setOfflineSaved] = useState(false)
@@ -1308,6 +1301,20 @@ export function FacturaDirectaPage() {
             )
         }
 
+        // "Efectivo Recibido" es solo para calcular el vuelto -- nunca se
+        // manda al SRI, así que un valor insuficiente ahí NO bloqueaba nada
+        // antes (el vuelto solo se topaba en $0, sin avisar). Eso dejó pasar
+        // una factura donde se digitó "1.00" en vez de "10.00" (faltó un
+        // dígito) — la factura salió bien (efectivo cobrado = total), pero
+        // el vuelto calculado fue $0 cuando en realidad faltaban $8.90.
+        if (tieneEfectivo && montoRecibido > 0 && montoRecibido < montoEfectivo - 0.01) {
+            return alert(
+                `"Efectivo Recibido" (${formatCurrency(montoRecibido)}) es menor al monto en efectivo de esta factura ` +
+                `(${formatCurrency(montoEfectivo)}).\n\n` +
+                `Revisa el valor — probablemente falta un dígito. Corrígelo (o bórralo si no vas a calcular vuelto) antes de generar la factura.`
+            )
+        }
+
         // ── Path Plan Acumulativo: NO genera factura electrónica — se acumula
         // en ventas_pa hasta que el cliente cancele el saldo total. No se puede
         // combinar con otras formas de pago en la misma venta.
@@ -2304,7 +2311,7 @@ export function FacturaDirectaPage() {
                                                             onBlur={() => limpiarPrecioRaw(idx)} />
                                                     </div>
                                                 ) : claveRequerida ? (
-                                                    <button type="button" onClick={() => intentarDesbloquearPrecio(idx)}
+                                                    <button type="button" onClick={() => setClaveModalIdx(idx)}
                                                         className="w-full px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-sm text-right text-slate-600 font-mono flex items-center justify-end gap-1.5 hover:bg-amber-100"
                                                         title="Cambio de precio protegido con contraseña — clic para desbloquear esta línea">
                                                         <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -2728,10 +2735,14 @@ export function FacturaDirectaPage() {
                                         onChange={e => setMontoRecibido(parseFloat(e.target.value) || 0)}
                                     />
                                 </div>
-                                {montoRecibido > 0 && (
+                                {montoRecibido > 0 && montoRecibido < montoEfectivo - 0.01 ? (
+                                    <div className="text-sm font-bold text-red-600 pt-1">
+                                        ⚠ Falta {formatCurrency(montoEfectivo - montoRecibido)} — este monto no alcanza a cubrir el efectivo de la factura ({formatCurrency(montoEfectivo)}). Revisa si falta un dígito.
+                                    </div>
+                                ) : montoRecibido > 0 && (
                                     <div className="flex justify-between text-sm pt-1">
                                         <span className="text-slate-500">Vuelto a entregar:</span>
-                                        <span className={cn('font-black text-lg', vuelto >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                                        <span className="font-black text-lg text-emerald-600">
                                             {formatCurrency(vuelto)}
                                         </span>
                                     </div>
@@ -2995,6 +3006,17 @@ export function FacturaDirectaPage() {
                 totalFactura={totales.total}
                 onCancel={() => setShowModalCreditoElectro(false)}
                 onConfirm={handleConfirmarCreditoElectro}
+            />
+        )}
+
+        {claveModalIdx !== null && (
+            <ClavePrecioModal
+                claveEsperada={empresa?.clave_cambio_precio ?? ''}
+                onCancelar={() => setClaveModalIdx(null)}
+                onCorrecta={() => {
+                    setLineasPrecioDesbloqueado(prev => new Set(prev).add(claveModalIdx))
+                    setClaveModalIdx(null)
+                }}
             />
         )}
         </>

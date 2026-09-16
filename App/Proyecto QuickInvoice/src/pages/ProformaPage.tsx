@@ -6,6 +6,7 @@ import { preparacionPinturaService } from '../services/preparacionPinturaService
 import { useAuth } from '../contexts/AuthContext'
 import { facturacionService, IMPRESION_POS_DEFAULTS, type SriConfig } from '../services/facturacionService'
 import { ConfigImpresionTicketModal } from '../components/ConfigImpresionTicketModal'
+import { ClavePrecioModal } from '../components/ClavePrecioModal'
 import {
     calcularLinea,
     calcularTotalesFactura,
@@ -396,15 +397,7 @@ export function ProformaPage() {
     // digitar la clave. Desbloqueo por línea, no por proforma completa.
     const claveRequeridaPrecio = !!empresa?.requiere_clave_cambio_precio
     const [lineasPrecioDesbloqueado, setLineasPrecioDesbloqueado] = useState<Set<number>>(new Set())
-    function intentarDesbloquearPrecio(idx: number) {
-        const clave = window.prompt('Este cambio de precio requiere contraseña:')
-        if (clave === null) return
-        if (clave === (empresa?.clave_cambio_precio ?? '')) {
-            setLineasPrecioDesbloqueado(prev => new Set(prev).add(idx))
-        } else {
-            alert('Contraseña incorrecta.')
-        }
-    }
+    const [claveModalIdx, setClaveModalIdx] = useState<number | null>(null)
 
     // Vista: 'lista' | 'form'
     const [vista, setVista] = useState<'lista' | 'form'>('lista')
@@ -1375,7 +1368,7 @@ export function ProformaPage() {
                                                             value={det.precio_unitario}
                                                             onChange={e => updateLinea(idx, 'precio_unitario', parseFloat(e.target.value) || 0)} />
                                                     ) : (
-                                                        <button type="button" onClick={() => intentarDesbloquearPrecio(idx)}
+                                                        <button type="button" onClick={() => setClaveModalIdx(idx)}
                                                             className="w-full px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-sm text-right text-slate-600 font-mono flex items-center justify-end gap-1.5 hover:bg-amber-100"
                                                             title="Cambio de precio protegido con contraseña — clic para desbloquear esta línea">
                                                             <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -1615,6 +1608,17 @@ export function ProformaPage() {
                         // recién guardado, sin tener que recargar la página.
                         supabase.from('empresas').select('direccion, email, ciudad, config_sri').eq('id', empresa.id).single()
                             .then(({ data }) => { if (data) setEmpresaExtra(data) })
+                    }}
+                />
+            )}
+
+            {claveModalIdx !== null && (
+                <ClavePrecioModal
+                    claveEsperada={empresa?.clave_cambio_precio ?? ''}
+                    onCancelar={() => setClaveModalIdx(null)}
+                    onCorrecta={() => {
+                        setLineasPrecioDesbloqueado(prev => new Set(prev).add(claveModalIdx))
+                        setClaveModalIdx(null)
                     }}
                 />
             )}
