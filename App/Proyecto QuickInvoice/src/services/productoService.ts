@@ -27,6 +27,11 @@ export interface Producto {
     cuenta_ingreso_codigo?: string | null
     cuenta_costo_id?: string | null
     cuenta_costo_codigo?: string | null
+    // Producto que se entrega automáticamente (a $0) por cada unidad vendida
+    // de este -- ej. Masilla implica Catalizador. Descuenta stock normal
+    // por Kardex, solo que no factura valor.
+    producto_relacionado_id?: string | null
+    cantidad_relacionada?: number | null
 }
 
 export interface Categoria {

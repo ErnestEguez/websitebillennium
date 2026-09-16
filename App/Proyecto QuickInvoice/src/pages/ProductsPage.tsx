@@ -437,6 +437,8 @@ export function ProductsPage() {
             cuenta_ingreso_codigo:     editingProduct.cuenta_ingreso_codigo     ?? null,
             cuenta_costo_id:           editingProduct.cuenta_costo_id           ?? null,
             cuenta_costo_codigo:       editingProduct.cuenta_costo_codigo       ?? null,
+            producto_relacionado_id:   editingProduct.producto_relacionado_id   || null,
+            cantidad_relacionada:      editingProduct.producto_relacionado_id ? (editingProduct.cantidad_relacionada || 1) : null,
         }
 
         try {
@@ -952,6 +954,40 @@ export function ProductsPage() {
                                     value={editingProduct?.descripcion || ''}
                                     onChange={(e) => setEditingProduct({ ...editingProduct, descripcion: e.target.value })}
                                 />
+                            </div>
+
+                            {/* Producto Relacionado — ferreterías: ej. Masilla implica Catalizador */}
+                            <div className="border-t border-slate-100 pt-4 space-y-3">
+                                <p className="flex items-center gap-1.5 text-xs font-black text-slate-400 uppercase tracking-widest">
+                                    <Layers className="w-3.5 h-3.5 text-amber-400" />
+                                    Producto Relacionado
+                                </p>
+                                <p className="text-xs text-slate-400 -mt-2">
+                                    Al vender este producto, se agrega automáticamente una línea del producto elegido, a $0
+                                    (descuenta stock igual que cualquier venta). Ej: 1 Lb. de Masilla → 1 unidad de Catalizador.
+                                </p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Producto a entregar</label>
+                                        <select className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                                            value={editingProduct?.producto_relacionado_id || ''}
+                                            onChange={e => setEditingProduct({ ...editingProduct, producto_relacionado_id: e.target.value || null })}>
+                                            <option value="">— Sin relación —</option>
+                                            {productos.filter(p => p.id !== editingProduct?.id).map(p => (
+                                                <option key={p.id} value={p.id}>{p.nombre}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {editingProduct?.producto_relacionado_id && (
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Cantidad por unidad vendida</label>
+                                            <input type="number" step="0.01" min="0.01" placeholder="1"
+                                                className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                                                value={editingProduct?.cantidad_relacionada ?? ''}
+                                                onChange={e => setEditingProduct({ ...editingProduct, cantidad_relacionada: e.target.value ? parseFloat(e.target.value) : null })} />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Cuentas contables */}

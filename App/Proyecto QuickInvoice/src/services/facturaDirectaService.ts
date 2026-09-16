@@ -27,6 +27,12 @@ export interface DetalleFacturaDirecta {
     // crédito de electrodomésticos, opcional. Se guarda tal cual en
     // comprobante_detalles.serial (y de ahí se replica a producto_seriales).
     serial?: string | null
+    // Producto Relacionado (ferreterías: ej. Masilla -> Catalizador): marca
+    // que esta línea se agregó/sincroniza automáticamente porque la línea
+    // del producto con este id tiene una relación configurada. Solo se usa
+    // en memoria mientras se arma la factura -- NO se persiste en
+    // comprobante_detalles (no existe esa columna ahí).
+    origen_relacion_producto_id?: string | null
 }
 
 export interface PagoFactura {
@@ -324,8 +330,13 @@ export const facturaDirectaService = {
         })
 
         // 5. Insertar detalles del comprobante
+        // NO se exige precio_unitario > 0 -- Producto Relacionado (ferreterías:
+        // ej. Masilla implica Catalizador) agrega líneas a $0 a propósito, que
+        // igual deben quedar en el documento y descontar Kardex. Una línea
+        // realmente vacía (sin producto_id ni nombre_producto) se sigue
+        // descartando igual.
         const detallesParaInsertar = detalles
-            .filter(d => d.cantidad > 0 && d.precio_unitario > 0)
+            .filter(d => d.cantidad > 0 && (d.producto_id || d.nombre_producto))
             .map(d => {
                 const l = calcularLinea(d)
                 return {
@@ -580,7 +591,7 @@ export const facturaDirectaService = {
                 }
 
                 const detallesContables = detalles
-                    .filter(d => d.cantidad > 0 && d.precio_unitario > 0)
+                    .filter(d => d.cantidad > 0 && (d.producto_id || d.nombre_producto))
                     .map(d => {
                         const l = calcularLinea(d)
                         const prodInfo = d.producto_id ? prodCostoMap[d.producto_id] : null

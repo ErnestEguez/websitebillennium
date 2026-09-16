@@ -944,7 +944,24 @@ export function FacturaDirectaPage() {
         setSerialesPorLinea(prev => { const next = { ...prev }; delete next[idx]; return next })
     }
     const updateLinea = (idx: number, field: keyof DetalleFacturaDirecta, value: any) => {
-        setDetalles(prev => prev.map((d, i) => i === idx ? { ...d, [field]: value } : d))
+        setDetalles(prev => {
+            const next = prev.map((d, i) => i === idx ? { ...d, [field]: value } : d)
+            // Producto Relacionado (ferreterías: ej. Masilla implica Catalizador):
+            // si cambia la cantidad de una línea cuyo producto tiene relación
+            // configurada, sincroniza la cantidad de SU línea relacionada (la
+            // que se agregó sola al elegir el producto) -- solo si esa línea
+            // todavía existe, nunca la vuelve a crear si el cajero la borró.
+            if (field === 'cantidad') {
+                const prodPrincipal = productos.find(p => p.id === prev[idx]?.producto_id)
+                if (prodPrincipal?.producto_relacionado_id && prodPrincipal.cantidad_relacionada) {
+                    const idxRelacionada = next.findIndex(d => d.origen_relacion_producto_id === prodPrincipal.id)
+                    if (idxRelacionada !== -1) {
+                        next[idxRelacionada] = { ...next[idxRelacionada], cantidad: (Number(value) || 0) * Number(prodPrincipal.cantidad_relacionada) }
+                    }
+                }
+            }
+            return next
+        })
     }
     // Precio con IVA incluido para mostrar en el campo "Precio Unitario" —
     // det.precio_unitario sigue siendo SIN IVA internamente (igual que el
@@ -998,6 +1015,30 @@ export function FacturaDirectaPage() {
             Promise.resolve(supabase.from('productos').select('stock').eq('id', prod.id).maybeSingle())
                 .then(({ data }) => setStockLinea(prev => ({ ...prev, [prod.id]: data ? Number(data.stock) : null })))
                 .catch(() => {})
+        }
+
+        // Producto Relacionado (ferreterías: ej. 1 Lb de Masilla implica 1
+        // Catalizador; 1 Galón implica 4) -- se agrega como línea nueva al
+        // final (mismo criterio que los componentes de un Combo, para no
+        // reindexar las líneas de en medio). Precio $0 a propósito: no
+        // factura valor propio, pero sí descuenta Kardex como cualquier
+        // línea real. Queda como línea normal, editable/borrable libremente.
+        if (prod.producto_relacionado_id && prod.cantidad_relacionada) {
+            const relacionado = productos.find(p => p.id === prod.producto_relacionado_id)
+            if (relacionado) {
+                setDetalles(prev => [...prev, {
+                    ...DETALLE_VACIO,
+                    producto_id: relacionado.id,
+                    nombre_producto: relacionado.nombre,
+                    cantidad: cantidadActual * Number(prod.cantidad_relacionada),
+                    precio_unitario: 0,
+                    iva_porcentaje: relacionado.iva_porcentaje ?? 15,
+                    origen_relacion_producto_id: prod.id,
+                }])
+                Promise.resolve(supabase.from('productos').select('stock').eq('id', relacionado.id).maybeSingle())
+                    .then(({ data }) => setStockLinea(prev => ({ ...prev, [relacionado.id]: data ? Number(data.stock) : null })))
+                    .catch(() => {})
+            }
         }
     }
 
