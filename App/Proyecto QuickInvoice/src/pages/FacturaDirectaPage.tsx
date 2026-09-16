@@ -39,7 +39,7 @@ import {
     CheckCircle2, Loader2, FilePlus, FileText, CreditCard,
     Package, Printer, User, Briefcase, ChevronDown, ChevronUp,
     Layers, RotateCw, PaintBucket, Copy, Barcode, Pencil, History, PauseCircle,
-    FileSignature,
+    FileSignature, Lock,
 } from 'lucide-react'
 import { vendedorService, type Vendedor } from '../services/vendedorService'
 import { bodegaService } from '../services/bodegaService'
@@ -224,6 +224,22 @@ export function FacturaDirectaPage() {
     // para que cualquier usuario lo haga (default false — no cambia el
     // comportamiento de ninguna empresa existente).
     const puedeEditarPrecio = isAdmin || !!empresa?.permitir_todos_editar_precio
+    // Candado por contraseña (Ajustes de Plataforma > Empresa, exclusivo de
+    // admin_plataforma) -- cuando está activo, manda por encima de
+    // puedeEditarPrecio: nadie edita el precio de una línea sin digitar la
+    // clave, sin importar su rol. El desbloqueo es por línea, no por
+    // factura completa -- cada línea que se quiera tocar pide la clave.
+    const claveRequerida = !!empresa?.requiere_clave_cambio_precio
+    const [lineasPrecioDesbloqueado, setLineasPrecioDesbloqueado] = useState<Set<number>>(new Set())
+    function intentarDesbloquearPrecio(idx: number) {
+        const clave = window.prompt('Este cambio de precio requiere contraseña:')
+        if (clave === null) return
+        if (clave === (empresa?.clave_cambio_precio ?? '')) {
+            setLineasPrecioDesbloqueado(prev => new Set(prev).add(idx))
+        } else {
+            alert('Contraseña incorrecta.')
+        }
+    }
     const { enabled: vozIaHabilitada } = useIaFeatureEnabled('voz')
     const { isOnline } = useNetworkStatus()
     const [offlineSaved, setOfflineSaved] = useState(false)
@@ -2048,6 +2064,7 @@ export function FacturaDirectaPage() {
                                 const margenLinea = configRentabilidad.activo && linea ? calcularMargenLinea(det) : null
                                 const semaforoLinea = margenLinea ? getSemaforoRentabilidad(margenLinea.margenPct, configRentabilidad.umbrales) : null
                                 const filtProd = productDropdown === idx ? searchResults : []
+                                const editablePrecioLinea = claveRequerida ? lineasPrecioDesbloqueado.has(idx) : puedeEditarPrecio
 
                                 return (
                                     <div key={idx} className="bg-slate-50 rounded-xl p-3 border border-slate-100 animate-in fade-in space-y-2">
@@ -2241,7 +2258,7 @@ export function FacturaDirectaPage() {
                                                 precio del catálogo fijo, sin poder editarlo. */}
                                             <div className="col-span-4 md:col-span-3">
                                                 <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">P. Unit. (IVA inc.)</label>
-                                                {puedeEditarPrecio && !esModoServicio && (() => {
+                                                {editablePrecioLinea && !esModoServicio && (() => {
                                                     const prod = productos.find(p => p.id === det.producto_id)
                                                     if (!prod || det.subproducto_id) return null
                                                     const niveles = nivelesDisponibles(prod)
@@ -2261,7 +2278,7 @@ export function FacturaDirectaPage() {
                                                         </select>
                                                     )
                                                 })()}
-                                                {puedeEditarPrecio ? (
+                                                {editablePrecioLinea ? (
                                                     <div className="relative">
                                                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
                                                         <input type="number" min="0" step="0.01"
@@ -2281,6 +2298,13 @@ export function FacturaDirectaPage() {
                                                             }}
                                                             onBlur={() => limpiarPrecioRaw(idx)} />
                                                     </div>
+                                                ) : claveRequerida ? (
+                                                    <button type="button" onClick={() => intentarDesbloquearPrecio(idx)}
+                                                        className="w-full px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-sm text-right text-slate-600 font-mono flex items-center justify-end gap-1.5 hover:bg-amber-100"
+                                                        title="Cambio de precio protegido con contraseña — clic para desbloquear esta línea">
+                                                        <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                                        {det.precio_unitario > 0 ? formatCurrency(precioConIvaDeLinea(det)) : '—'}
+                                                    </button>
                                                 ) : (
                                                     <div className="w-full px-3 py-2 rounded-lg border border-slate-100 bg-slate-50 text-sm text-right text-slate-600 font-mono"
                                                         title="Solo el administrador de la empresa puede cambiar el precio">

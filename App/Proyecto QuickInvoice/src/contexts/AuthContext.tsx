@@ -52,6 +52,12 @@ interface Empresa {
     // apagado por defecto. Solo admin_plataforma puede cambiarlo (ver
     // trg_bloquear_toggle_imagenes_cedulas_productos en la migración).
     permite_imagenes_cedulas_productos?: boolean
+    // Candado por contraseña para cambiar precios en Factura Directa y
+    // Proformas — apagado por defecto. Solo admin_plataforma puede
+    // cambiar ninguno de los dos campos (ver
+    // trg_bloquear_toggle_clave_cambio_precio en la migración).
+    requiere_clave_cambio_precio?: boolean
+    clave_cambio_precio?: string | null
 }
 
 export interface Modules {

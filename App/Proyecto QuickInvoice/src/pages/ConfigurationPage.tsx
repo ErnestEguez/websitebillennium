@@ -410,12 +410,14 @@ export function ConfigurationPage() {
             let configSriAntes: Record<string, any> | null = null
             let creditoElectroAntes = false
             let imagenesAntes = false
+            let claveCambioPrecioAntes = false
             if (editingEmpresa.id) {
                 const { data: empresaAntes } = await supabase
-                    .from('empresas').select('config_sri, habilita_ventas_electrodomesticos_credito, permite_imagenes_cedulas_productos').eq('id', editingEmpresa.id).single()
+                    .from('empresas').select('config_sri, habilita_ventas_electrodomesticos_credito, permite_imagenes_cedulas_productos, requiere_clave_cambio_precio').eq('id', editingEmpresa.id).single()
                 configSriAntes = empresaAntes?.config_sri ?? null
                 creditoElectroAntes = !!empresaAntes?.habilita_ventas_electrodomesticos_credito
                 imagenesAntes = !!empresaAntes?.permite_imagenes_cedulas_productos
+                claveCambioPrecioAntes = !!empresaAntes?.requiere_clave_cambio_precio
             }
 
             // ✅ Solo campos que existen en la tabla empresas del schema real
@@ -428,6 +430,8 @@ export function ConfigurationPage() {
                 usar_vendor_management: !!editingEmpresa.usar_vendor_management,
                 habilita_ventas_electrodomesticos_credito: !!editingEmpresa.habilita_ventas_electrodomesticos_credito,
                 permite_imagenes_cedulas_productos: !!editingEmpresa.permite_imagenes_cedulas_productos,
+                requiere_clave_cambio_precio: !!editingEmpresa.requiere_clave_cambio_precio,
+                clave_cambio_precio: editingEmpresa.clave_cambio_precio || null,
                 config_sri: {
                     // Preserva TODOS los campos existentes (mail_host, mail_port, mail_pass,
                     // mail_ssl, mail_cc, impresion_pos, y cualquier campo futuro que este
@@ -524,6 +528,11 @@ export function ConfigurationPage() {
                 if (imagenesAntes !== !!editingEmpresa.permite_imagenes_cedulas_productos) {
                     cambios.permite_imagenes_cedulas_productos = { antes: imagenesAntes, despues: !!editingEmpresa.permite_imagenes_cedulas_productos }
                 }
+                // No se audita el valor de la contraseña, solo si el candado cambió —
+                // mismo criterio que firma_password/mail_pass arriba.
+                if (claveCambioPrecioAntes !== !!editingEmpresa.requiere_clave_cambio_precio) {
+                    cambios.requiere_clave_cambio_precio = { antes: claveCambioPrecioAntes, despues: !!editingEmpresa.requiere_clave_cambio_precio }
+                }
                 auditService.logEvent({
                     empresaId,
                     modulo: 'configuracion',
@@ -541,6 +550,7 @@ export function ConfigurationPage() {
                         facturacion_masiva_enabled: !!editingEmpresa.facturacion_masiva_enabled,
                         habilita_ventas_electrodomesticos_credito: !!editingEmpresa.habilita_ventas_electrodomesticos_credito,
                         permite_imagenes_cedulas_productos: !!editingEmpresa.permite_imagenes_cedulas_productos,
+                        requiere_clave_cambio_precio: !!editingEmpresa.requiere_clave_cambio_precio,
                     },
                     nivel: 'compliance',
                 })
@@ -3398,6 +3408,40 @@ export function ConfigurationPage() {
                                         onChange={e => setEditingEmpresa({ ...editingEmpresa, permite_imagenes_cedulas_productos: e.target.checked })}
                                     />
                                 </label>
+                                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                                    <label className="flex items-center justify-between cursor-pointer">
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-800">Exigir Contraseña para Cambiar Precios</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                Apagado (por defecto): el cambio de precio en Factura Directa y Proformas funciona como hoy
+                                                (según "Permitir a Todos los Usuarios Cambiar el Precio" de cada empresa, o libre en Proformas).
+                                                Encendido: en ambas pantallas, cada línea de precio queda bloqueada hasta digitar la contraseña de abajo —
+                                                aplica a cualquier usuario, incluido el administrador de la empresa.
+                                            </p>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            className="w-5 h-5 ml-4 shrink-0 rounded border-slate-300 text-primary-600"
+                                            checked={!!editingEmpresa?.requiere_clave_cambio_precio}
+                                            onChange={e => setEditingEmpresa({ ...editingEmpresa, requiere_clave_cambio_precio: e.target.checked })}
+                                        />
+                                    </label>
+                                    {editingEmpresa?.requiere_clave_cambio_precio && (
+                                        <div>
+                                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                                Contraseña
+                                                <span className="ml-2 normal-case font-normal text-[10px] text-slate-400">en texto plano — solo tú como super-admin la ves y la cambias</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="Ej: 1234"
+                                                className="w-full max-w-xs px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+                                                value={editingEmpresa?.clave_cambio_precio ?? ''}
+                                                onChange={e => setEditingEmpresa({ ...editingEmpresa, clave_cambio_precio: e.target.value })}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

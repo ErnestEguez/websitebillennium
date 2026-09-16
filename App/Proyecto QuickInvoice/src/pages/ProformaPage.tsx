@@ -22,7 +22,7 @@ import {
     FileText, FilePlus, Search, Plus, Trash2, X, Save, Loader2,
     User, Briefcase, Package, ChevronDown, ChevronUp, ArrowLeft,
     CheckCircle2, RefreshCw, Ban, Eye, RotateCw,
-    FileCheck, Printer, PaintBucket, Mail, Settings,
+    FileCheck, Printer, PaintBucket, Mail, Settings, Lock,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -389,6 +389,22 @@ export function ProformaPage() {
     const navigate = useNavigate()
     const prepId = searchParams.get('prep_id')
     const { empresa, permisos } = useAuth()
+
+    // Candado por contraseña (Ajustes de Plataforma > Empresa, exclusivo de
+    // admin_plataforma) -- en Proformas el precio siempre fue libre para
+    // cualquiera; con esto activado, cada línea queda bloqueada hasta
+    // digitar la clave. Desbloqueo por línea, no por proforma completa.
+    const claveRequeridaPrecio = !!empresa?.requiere_clave_cambio_precio
+    const [lineasPrecioDesbloqueado, setLineasPrecioDesbloqueado] = useState<Set<number>>(new Set())
+    function intentarDesbloquearPrecio(idx: number) {
+        const clave = window.prompt('Este cambio de precio requiere contraseña:')
+        if (clave === null) return
+        if (clave === (empresa?.clave_cambio_precio ?? '')) {
+            setLineasPrecioDesbloqueado(prev => new Set(prev).add(idx))
+        } else {
+            alert('Contraseña incorrecta.')
+        }
+    }
 
     // Vista: 'lista' | 'form'
     const [vista, setVista] = useState<'lista' | 'form'>('lista')
@@ -1299,6 +1315,7 @@ export function ProformaPage() {
                                         const lin  = calcularLinea(det)
                                         // Productos: server-side ILIKE, resultados en searchResults
                                         const prods = esModoServicio ? [] : (productDropdown === idx ? searchResults : [])
+                                        const editablePrecioLinea = !claveRequeridaPrecio || lineasPrecioDesbloqueado.has(idx)
 
                                         return (
                                             <div key={idx} className="grid grid-cols-12 gap-2 items-start bg-slate-50/50 rounded-xl p-2 border border-slate-100">
@@ -1352,10 +1369,19 @@ export function ProformaPage() {
 
                                                 {/* Precio unitario */}
                                                 <div className="col-span-2">
-                                                    <input type="number" min="0" step="0.01"
-                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-violet-400"
-                                                        value={det.precio_unitario}
-                                                        onChange={e => updateLinea(idx, 'precio_unitario', parseFloat(e.target.value) || 0)} />
+                                                    {editablePrecioLinea ? (
+                                                        <input type="number" min="0" step="0.01"
+                                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-right outline-none focus:ring-2 focus:ring-violet-400"
+                                                            value={det.precio_unitario}
+                                                            onChange={e => updateLinea(idx, 'precio_unitario', parseFloat(e.target.value) || 0)} />
+                                                    ) : (
+                                                        <button type="button" onClick={() => intentarDesbloquearPrecio(idx)}
+                                                            className="w-full px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-sm text-right text-slate-600 font-mono flex items-center justify-end gap-1.5 hover:bg-amber-100"
+                                                            title="Cambio de precio protegido con contraseña — clic para desbloquear esta línea">
+                                                            <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                                            {formatCurrency(det.precio_unitario)}
+                                                        </button>
+                                                    )}
                                                 </div>
 
                                                 {/* Descuento % */}
