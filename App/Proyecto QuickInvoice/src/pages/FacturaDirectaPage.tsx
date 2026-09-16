@@ -2258,7 +2258,12 @@ export function FacturaDirectaPage() {
                                                 precio del catálogo fijo, sin poder editarlo. */}
                                             <div className="col-span-4 md:col-span-3">
                                                 <label className="text-[10px] text-slate-400 font-bold uppercase block mb-0.5 md:hidden">P. Unit. (IVA inc.)</label>
-                                                {editablePrecioLinea && !esModoServicio && (() => {
+                                                {/* Selector de nivel de precio (1-4) -- son precios YA
+                                                    preestablecidos en el catálogo, no una edición libre, así
+                                                    que se rige por el permiso de siempre (puedeEditarPrecio),
+                                                    nunca por el candado de contraseña -- ese candado protege
+                                                    solo el campo de abajo, cuando se digita un valor libre. */}
+                                                {puedeEditarPrecio && !esModoServicio && (() => {
                                                     const prod = productos.find(p => p.id === det.producto_id)
                                                     if (!prod || det.subproducto_id) return null
                                                     const niveles = nivelesDisponibles(prod)
