@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/utils'
 import { PrecioVolumenModal } from '../components/PrecioVolumenModal'
+import { BuscadorProducto } from '../components/BuscadorProducto'
 import {
     Plus,
     Search,
@@ -289,6 +290,12 @@ export function ProductsPage() {
     const [selectedCategoria, setSelectedCategoria] = useState<string>('')
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingProduct, setEditingProduct] = useState<Partial<Producto> | null>(null)
+    // Nombre a mostrar del Producto Relacionado ya guardado -- se resuelve
+    // aparte porque editingProduct.producto_relacionado_id es solo el id, y
+    // el producto relacionado puede no estar en el estado `productos` (que
+    // solo trae resultados de la búsqueda/categoría activa, no el catálogo
+    // completo -- ver ejecutarBusqueda).
+    const [nombreProductoRelacionado, setNombreProductoRelacionado] = useState('')
     const [subproductosProducto, setSubproductosProducto] = useState<(Producto & { id: string }) | null>(null)
     const [precioVolumenProducto, setPrecioVolumenProducto] = useState<any>(null)
     const [cuentasLP, setCuentasLP] = useState<CuentaLP[]>([])
@@ -353,6 +360,18 @@ export function ProductsPage() {
         if (!selectedBodegaId) { setStockPorBodega({}); return }
         cargarStockBodega(productos.map(p => p.id), selectedBodegaId)
     }, [selectedBodegaId, productos])
+
+    // Resuelve el nombre del Producto Relacionado ya guardado -- consulta
+    // directa por id, independiente del estado `productos` (que puede no
+    // incluirlo, ver comentario en su declaración).
+    useEffect(() => {
+        const id = editingProduct?.producto_relacionado_id
+        if (!id) { setNombreProductoRelacionado(''); return }
+        let cancelado = false
+        supabase.from('productos').select('nombre').eq('id', id).maybeSingle()
+            .then(({ data }) => { if (!cancelado) setNombreProductoRelacionado(data?.nombre ?? '') })
+        return () => { cancelado = true }
+    }, [editingProduct?.producto_relacionado_id])
 
     // Búsqueda server-side: se ejecuta solo al presionar Buscar o Enter
     async function ejecutarBusqueda() {
@@ -969,14 +988,26 @@ export function ProductsPage() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Producto a entregar</label>
-                                        <select className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                                            value={editingProduct?.producto_relacionado_id || ''}
-                                            onChange={e => setEditingProduct({ ...editingProduct, producto_relacionado_id: e.target.value || null })}>
-                                            <option value="">— Sin relación —</option>
-                                            {productos.filter(p => p.id !== editingProduct?.id).map(p => (
-                                                <option key={p.id} value={p.id}>{p.nombre}</option>
-                                            ))}
-                                        </select>
+                                        {editingProduct?.producto_relacionado_id ? (
+                                            <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-sm">
+                                                <span className="text-slate-700 font-medium truncate">{nombreProductoRelacionado || 'Cargando…'}</span>
+                                                <button type="button"
+                                                    onClick={() => setEditingProduct({ ...editingProduct, producto_relacionado_id: null, cantidad_relacionada: null })}
+                                                    className="text-slate-400 hover:text-red-500 shrink-0 ml-2">
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ) : empresa?.id && (
+                                            <BuscadorProducto
+                                                empresaId={empresa.id}
+                                                placeholder="Buscar producto a entregar..."
+                                                onSelect={p => {
+                                                    if (p.id === editingProduct?.id) { alert('Un producto no puede relacionarse consigo mismo.'); return }
+                                                    setNombreProductoRelacionado(p.nombre)
+                                                    setEditingProduct({ ...editingProduct, producto_relacionado_id: p.id, cantidad_relacionada: editingProduct?.cantidad_relacionada || 1 })
+                                                }}
+                                            />
+                                        )}
                                     </div>
                                     {editingProduct?.producto_relacionado_id && (
                                         <div>
