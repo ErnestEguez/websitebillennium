@@ -35,6 +35,7 @@ const CierresPage                  = lz(() => import('./pages/CierresPage'), 'Ci
 const ProveedoresPage              = lz(() => import('./pages/ProveedoresPage'), 'ProveedoresPage')
 const InventarioPage               = lz(() => import('./pages/InventarioPage'), 'InventarioPage')
 const ValorizacionInventarioPage   = lz(() => import('./pages/ValorizacionInventarioPage'), 'ValorizacionInventarioPage')
+const TomaInventarioPage           = lz(() => import('./pages/TomaInventarioPage'), 'TomaInventarioPage')
 const KardexPage                   = lz(() => import('./pages/KardexPage'), 'KardexPage')
 const AjusteInventarioPage         = lz(() => import('./pages/AjusteInventarioPage'), 'AjusteInventarioPage')
 const CambioCodigoArticulosPage    = lz(() => import('./pages/CambioCodigoArticulosPage'), 'CambioCodigoArticulosPage')
@@ -443,6 +444,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <ValorizacionInventarioPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/toma-inventario" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <TomaInventarioPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

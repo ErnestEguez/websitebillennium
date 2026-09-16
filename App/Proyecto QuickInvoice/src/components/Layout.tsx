@@ -79,7 +79,7 @@ interface SidebarItemProps {
 const MODULE_ACTIVE_TESTS: [string, (p: string) => boolean][] = [
     ['gerencia',     p => p === '/dashboard' || p.startsWith('/gerencia')],
     ['facturacion',  p => ['/nueva-factura', '/proformas', '/facturacion-en-vivo', '/facturacion', '/facturacion-masiva', '/vendedores', '/notas-credito', '/anulacion-facturas', '/guias-remision', '/cierres', '/consultas/ventas', '/consultas/talla-color'].some(x => p.startsWith(x))],
-    ['inventario',   p => ['/productos', '/combos', '/compras/ordenes', '/compras/nueva-inventario', '/inventario-valorizado', '/kardex', '/ajuste-inventario', '/transferencia-bodega', '/cambio-codigo-articulos'].some(x => p.startsWith(x))],
+    ['inventario',   p => ['/productos', '/combos', '/compras/ordenes', '/compras/nueva-inventario', '/inventario-valorizado', '/toma-inventario', '/kardex', '/ajuste-inventario', '/transferencia-bodega', '/cambio-codigo-articulos'].some(x => p.startsWith(x))],
     ['clientes',     p => ['/clientes', '/cartera', '/consultas/cartera'].some(x => p.startsWith(x))],
     ['cxp',          p => ['/proveedores', '/compras', '/cxp', '/reportes/compras', '/reportes/cxp', '/reportes/estado-cuenta', '/ajustes', '/retenciones', '/liquidaciones'].some(x => p.startsWith(x))],
     ['tesoreria',    p => p.startsWith('/teso/')],
@@ -367,7 +367,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             isOpen={openGroups.includes('inventario')}
                             onToggle={() => toggleGroup('inventario')}
                             isSidebarOpen={isSidebarOpen}
-                            anyActive={['/productos','/combos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/kardex','/ajuste-inventario','/transferencia-bodega','/cambio-codigo-articulos'].some(p => location.pathname.startsWith(p))}
+                            anyActive={['/productos','/combos','/compras/ordenes','/compras/nueva-inventario','/inventario-valorizado','/toma-inventario','/kardex','/ajuste-inventario','/transferencia-bodega','/cambio-codigo-articulos'].some(p => location.pathname.startsWith(p))}
                         >
                             <SidebarItem to="/productos"               icon={Package}           label="Artículos"             active={location.pathname === '/productos'} sub sentinelId="nav-productos" disabled={!p.perm_productos} />
                             <SidebarItem to="/combos"                  icon={PackagePlus}       label="Combos"                active={location.pathname === '/combos'} sub disabled={!p.perm_combos} />
@@ -376,6 +376,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             <SidebarItem to="/ajuste-inventario"        icon={SlidersHorizontal} label="Ajuste de Inventario"  active={location.pathname === '/ajuste-inventario'} sub disabled={!p.perm_ajuste_inventario} />
                             <SidebarItem to="/transferencia-bodega"     icon={ArrowLeftRight}    label="Transfer. Bodegas"     active={location.pathname === '/transferencia-bodega'} sub disabled={!p.perm_transferencia_bodega} />
                             <SidebarItem to="/inventario-valorizado"    icon={BarChart3}         label="Inventario Valorado"   active={location.pathname === '/inventario-valorizado'} sub disabled={!p.perm_inventario_valorizado} />
+                            <SidebarItem to="/toma-inventario"          icon={ClipboardList}     label="Toma de Inventarios"   active={location.pathname === '/toma-inventario'} sub disabled={!p.perm_toma_inventario} />
                             <SidebarItem to="/kardex"                   icon={ArrowDownUp}       label="Kardex"                active={location.pathname.startsWith('/kardex')} sub disabled={!p.perm_kardex} />
                             <SidebarItem to="/cambio-codigo-articulos"  icon={Barcode}           label="Cambio Código Artículos" active={location.pathname === '/cambio-codigo-articulos'} sub disabled={!p.perm_cambio_codigo_articulos} />
                         </ModuleSection>}

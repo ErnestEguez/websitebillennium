@@ -915,6 +915,25 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    'toma-inventario': {
+        titulo: 'Toma de Inventarios',
+        subtitulo: 'Listado para conteo físico de bodega, con exportación a Excel',
+        secciones: [
+            {
+                titulo: '¿Qué es y para qué sirve?',
+                texto: 'Genera la lista de artículos (Código, Descripción, Categoría, Stock del sistema) que necesitas para hacer un conteo físico en bodega — por ejemplo, para verificar solo la sección de brochas antes de contar toda la tienda. Busca por código o nombre usando * como comodín: escribe "Brochas*" y salen todos los artículos que empiezan con esa palabra. También puedes filtrar por categoría, o dejar la búsqueda vacía y presionar Buscar para traer todo el catálogo.',
+                tips: [
+                    'El buscador soporta catálogos grandes — no hay límite de artículos en el resultado.',
+                    'El Excel exportado ya trae columnas vacías de "Conteo Físico" y "Diferencia" para llenar a mano durante la toma.',
+                ],
+            },
+            {
+                titulo: 'Exportar y usar el listado',
+                texto: 'Usa "Exportar Excel" para llevar la lista impresa o en tablet a la bodega. El Stock que se muestra es el del sistema al momento de generar el reporte — compáralo contra el conteo físico real para detectar diferencias.',
+            },
+        ],
+    },
+
     // ════════════════════════════════════════════════════════════════════════
     //  CLIENTES — PROCESOS AVANZADOS
     // ════════════════════════════════════════════════════════════════════════
