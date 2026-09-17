@@ -194,7 +194,10 @@ function generarTicketCobroMovil(d: DatosUltimoCobro, anchoMm: 56 | 80): string 
 </style>
 </head>
 <body>
-<div class="emp">${esc(d.empresa.nombre)}</div>
+${d.empresa.logo_url
+    ? `<div class="c" style="margin-bottom:2px"><img src="${esc(d.empresa.logo_url)}" alt="Logo" style="max-width:40mm;max-height:18mm;object-fit:contain"></div>`
+    : `<div class="emp">${esc(d.empresa.nombre)}</div>`
+}
 <div class="c" style="font-size:6.5pt">RUC: ${esc(d.empresa.ruc)}</div>
 <hr class="sep">
 <div class="c b" style="font-size:8pt">RECIBO DE COBRO</div>

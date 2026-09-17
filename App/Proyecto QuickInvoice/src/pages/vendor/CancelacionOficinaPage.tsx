@@ -117,7 +117,6 @@ function generarComprobanteCobroA4(input: {
 <div class="header">
   <div class="emp">
     ${logoHtml}
-    <h1>${esc(emp.nombre)}</h1>
     <p>RUC: <strong>${esc(emp.ruc)}</strong></p>
   </div>
   <div class="doc-box">
