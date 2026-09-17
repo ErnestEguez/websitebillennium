@@ -241,6 +241,14 @@ export function FacturaDirectaPage() {
     const [clientes, setClientes] = useState<any[]>([])
     const [searchCliente, setSearchCliente] = useState('')
     const [selectedCliente, setSelectedCliente] = useState<any>(null)
+    // Respaldo al servidor cuando el catálogo local (cacheado hasta 15 min,
+    // ver catalogCacheService) no tiene un cliente que otro punto de venta
+    // acaba de crear — con varias cajas trabajando a la vez, la caché de
+    // ESTA máquina puede no enterarse todavía. Solo se dispara si la
+    // búsqueda local no encontró nada, para no duplicar tráfico en el caso
+    // normal (que sí encuentra localmente, instantáneo).
+    const [clientesLiveExtra, setClientesLiveExtra] = useState<any[]>([])
+    const [buscandoClienteLive, setBuscandoClienteLive] = useState(false)
     const [isClientFormOpen, setIsClientFormOpen] = useState(false)
     const [newClient, setNewClient] = useState({ identificacion: '', nombre: '', email: '', direccion: '', telefono: '' })
     // Tipo de documento elegido ANTES de escribir — así se aplica la validación
@@ -676,10 +684,50 @@ export function FacturaDirectaPage() {
     }, [selectedCliente?.id, empresa?.id])
 
     // ─── CLIENTE ──────────────────────────────────────────
-    const filteredClientes = clientes.filter(c =>
+    const filteredClientesLocal = clientes.filter(c =>
         coincideComodin(c.nombre ?? '', searchCliente) ||
         c.identificacion?.includes(searchCliente)
     )
+    const filteredClientes = filteredClientesLocal.length > 0
+        ? filteredClientesLocal
+        : clientesLiveExtra
+
+    // Si la búsqueda local no encontró nada, intenta en vivo contra el
+    // servidor (ver comentario en clientesLiveExtra) — debounce 400ms,
+    // mínimo 2 caracteres para no disparar con cada tecla inicial.
+    useEffect(() => {
+        setClientesLiveExtra([])
+        const texto = searchCliente.trim()
+        if (texto.length < 2 || filteredClientesLocal.length > 0 || !empresa?.id || !isOnline) return
+        const t = setTimeout(async () => {
+            setBuscandoClienteLive(true)
+            try {
+                const pattern = '%' + texto.replace(/\*/g, '%') + '%'
+                const { data } = await supabase
+                    .from('clientes')
+                    .select('*')
+                    .eq('empresa_id', empresa.id)
+                    .eq('activo', true)
+                    .or(`nombre.ilike.${pattern},identificacion.ilike.${pattern}`)
+                    .order('nombre')
+                    .limit(20)
+                if (data && data.length > 0) {
+                    setClientesLiveExtra(data)
+                    // Se agrega también al catálogo local para que quede
+                    // disponible al instante el resto de esta sesión (sin
+                    // esperar a que expire la caché de 15 min).
+                    setClientes(prev => {
+                        const idsExistentes = new Set(prev.map(c => c.id))
+                        const nuevos = data.filter(c => !idsExistentes.has(c.id))
+                        return nuevos.length > 0 ? [...prev, ...nuevos] : prev
+                    })
+                }
+            } catch { /* silencioso — se queda con "No se encontraron clientes" */ }
+            setBuscandoClienteLive(false)
+        }, 400)
+        return () => clearTimeout(t)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchCliente, empresa?.id, isOnline])
 
     // Al elegir cliente del buscador: seleccionarlo y revisar si tiene cartera
     // vencida o por vencer (próximos 30 días) para alertar antes de facturar.
@@ -1921,7 +1969,12 @@ export function FacturaDirectaPage() {
                                                         <User className="w-4 h-4 text-slate-300" />
                                                     </button>
                                                 ))}
-                                                {filteredClientes.length === 0 && (
+                                                {filteredClientes.length === 0 && buscandoClienteLive && (
+                                                    <div className="px-4 py-3 text-sm text-slate-400 flex items-center gap-2">
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Buscando en el servidor...
+                                                    </div>
+                                                )}
+                                                {filteredClientes.length === 0 && !buscandoClienteLive && (
                                                     <div className="px-4 py-3 text-sm text-slate-400">No se encontraron clientes</div>
                                                 )}
                                             </div>
