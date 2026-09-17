@@ -46,6 +46,7 @@ const CobradoresPage               = lz(() => import('./pages/CobradoresPage'), 
 const CreditosElectrodomesticosPage = lz(() => import('./pages/vendor/CreditosElectrodomesticosPage'), 'CreditosElectrodomesticosPage')
 const ConsultaGeneralCarteraCreditoPage = lz(() => import('./pages/vendor/ConsultaGeneralCarteraCreditoPage'), 'ConsultaGeneralCarteraCreditoPage')
 const EstadoCuentaClienteCreditoPage = lz(() => import('./pages/vendor/EstadoCuentaClienteCreditoPage'), 'EstadoCuentaClienteCreditoPage')
+const MigrarCarteraCreditoElectrodomesticosPage = lz(() => import('./pages/vendor/MigrarCarteraCreditoElectrodomesticosPage'), 'MigrarCarteraCreditoElectrodomesticosPage')
 const CancelacionOficinaPage = lz(() => import('./pages/vendor/CancelacionOficinaPage'), 'CancelacionOficinaPage')
 const CancelacionMovilPage = lz(() => import('./pages/vendor/CancelacionMovilPage'), 'CancelacionMovilPage')
 const CarteraCxcPage               = lz(() => import('./pages/CarteraCxcPage'), 'CarteraCxcPage')
@@ -594,6 +595,16 @@ function App() {
                   <RoleProtectedRoute allowedRoles={['oficina']}>
                     <Layout>
                       <EstadoCuentaClienteCreditoPage />
+                    </Layout>
+                  </RoleProtectedRoute>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/creditos-electrodomesticos/migrar-cartera" element={
+                <ProtectedRoute>
+                  <RoleProtectedRoute allowedRoles={['oficina']}>
+                    <Layout>
+                      <MigrarCarteraCreditoElectrodomesticosPage />
                     </Layout>
                   </RoleProtectedRoute>
                 </ProtectedRoute>

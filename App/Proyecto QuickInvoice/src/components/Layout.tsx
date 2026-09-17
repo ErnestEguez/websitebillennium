@@ -422,6 +422,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                                             <SidebarItem to="/cancelacion-movil" icon={Truck} label="Cancelación Móvil" active={location.pathname === '/cancelacion-movil'} sub disabled={!p.perm_credito_cobros_movil} />
                                             <SidebarItem to="/creditos-electrodomesticos/consulta-cartera" icon={FileSearch} label="Consulta General de Cartera" active={location.pathname === '/creditos-electrodomesticos/consulta-cartera'} sub disabled={!p.perm_credito_consulta_cartera} />
                                             <SidebarItem to="/creditos-electrodomesticos/estado-cuenta" icon={BarChart3} label="Estado de Cuenta por Cliente" active={location.pathname === '/creditos-electrodomesticos/estado-cuenta'} sub disabled={!p.perm_credito_estado_cuenta} />
+                                            <SidebarItem to="/creditos-electrodomesticos/migrar-cartera" icon={Wallet} label="Migrar Cartera" active={location.pathname === '/creditos-electrodomesticos/migrar-cartera'} sub disabled={!p.perm_credito_electrodomesticos} />
                                         </div>
                                     )}
                                 </div>

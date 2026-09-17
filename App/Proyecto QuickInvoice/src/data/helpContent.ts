@@ -123,6 +123,24 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    'migrar-cartera-credito-electrodomesticos': {
+        titulo: 'Migrar Cartera — Créditos Electrodomésticos',
+        subtitulo: 'Importa cuotas pendientes de un sistema externo, agrupadas por crédito',
+        secciones: [
+            {
+                titulo: '¿Cómo funciona?',
+                texto: 'El archivo trae una fila por cada CUOTA pendiente, no una fila por crédito — si un cliente tiene 5 cuotas por pagar, son 5 filas con el mismo número de factura. El sistema agrupa las filas por identificación + número de factura y arma un crédito completo con su cronograma de cuotas restante.',
+                tips: [
+                    'El cliente y el cobrador deben existir previamente en el sistema (búscalos por identificación y por nombre/código respectivamente) — si falta alguno, esa fila se omite con el motivo indicado.',
+                    'El crédito migrado no requiere una factura electrónica real detrás — queda marcado con origen "MIGRACION".',
+                    'No se preserva el desglose real de interés del sistema anterior: cada cuota pendiente se registra 100% como capital. El saldo y las fechas de vencimiento sí quedan exactos.',
+                    'Volver a importar el mismo archivo no duplica créditos ya migrados — se detecta por cliente + número de factura y se omite.',
+                ],
+                alerta: 'Antes de la primera importación hay que ejecutar el script SQL de la migración en Supabase (el banner rojo de la pantalla lo indica si falta).',
+            },
+        ],
+    },
+
     'cancelacion-oficina': {
         titulo: 'Cancelación Oficina',
         subtitulo: 'Cobro de cuotas de crédito de electrodomésticos en ventanilla',
