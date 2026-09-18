@@ -952,6 +952,29 @@ export const AYUDA: Record<string, PaginaAyuda> = {
         ],
     },
 
+    'deposito-cheques-custodia': {
+        titulo: 'Depósito de Cheques en Custodia',
+        subtitulo: 'Cheques a fecha recibidos de clientes como garantía de la deuda',
+        secciones: [
+            {
+                titulo: '¿Qué es un "cheque a fecha" en custodia?',
+                texto: 'Cuando un cliente entrega un cheque post-fechado como garantía de su deuda, se registra desde Cartera de Clientes → Cobro a Cliente eligiendo el método "Cheque a Fecha". Mientras el cheque no se deposite, las facturas que cubre SIGUEN PENDIENTES en la cartera del cliente — el cheque es solo una garantía física, no un pago.',
+                tips: [
+                    'Un cheque a fecha puede cubrir una o varias facturas del mismo cliente a la vez.',
+                    'Si el saldo de una factura ya tiene un cheque en custodia pledged, esa parte no se puede volver a cobrar ni pledgear otra vez hasta que el cheque se deposite o se retire.',
+                ],
+            },
+            {
+                titulo: 'Depositar un cheque',
+                texto: 'El día que envías físicamente el cheque al banco, entra a esta pantalla, presiona "Depositar" sobre el cheque correspondiente, elige la cuenta bancaria destino e ingresa el número del comprobante de depósito. Al confirmar: las facturas cubiertas se marcan como pagadas (baja el saldo de cartera), se acredita el saldo de la cuenta bancaria elegida y el cheque queda marcado como "Depositado".',
+            },
+            {
+                titulo: 'Retirar un cheque de custodia',
+                texto: 'Si el cliente retira el cheque o se acuerda otra forma de pago antes del depósito, usa el botón de anular (ícono de prohibido) e ingresa el motivo. Las facturas nunca dejaron de estar pendientes, así que no hay nada que revertir en la cartera.',
+            },
+        ],
+    },
+
     // ════════════════════════════════════════════════════════════════════════
     //  CLIENTES — PROCESOS AVANZADOS
     // ════════════════════════════════════════════════════════════════════════

@@ -173,6 +173,7 @@ const NuevoEgresoPage              = lz(() => import('./pages/tesoreria/egresos/
 const TesoAnticipos                = lz(() => import('./pages/tesoreria/anticipos/AnticiposPage'), 'AnticiposPage')
 const ChequesPage                  = lz(() => import('./pages/tesoreria/cheques/ChequesPage'), 'ChequesPage')
 const ChequesAFechaPage            = lz(() => import('./pages/tesoreria/cheques/ChequesAFechaPage'), 'ChequesAFechaPage')
+const DepositoChequesCustodiaPage  = lz(() => import('./pages/tesoreria/cheques/DepositoChequesCustodiaPage'), 'DepositoChequesCustodiaPage')
 const MovimientosPage              = lz(() => import('./pages/tesoreria/movimientos/MovimientosPage'), 'MovimientosPage')
 const ConciliacionesPage           = lz(() => import('./pages/tesoreria/conciliacion/ConciliacionesPage'), 'ConciliacionesPage')
 const NuevaConciliacionPage        = lz(() => import('./pages/tesoreria/conciliacion/NuevaConciliacionPage'), 'NuevaConciliacionPage')
@@ -898,6 +899,7 @@ function App() {
                         <Route path="anticipos"                element={<TesoAnticipos />} />
                         <Route path="cheques"                  element={<ChequesPage />} />
                         <Route path="cheques-fecha"            element={<ChequesAFechaPage />} />
+                        <Route path="cheques-custodia"         element={<DepositoChequesCustodiaPage />} />
                         <Route path="movimientos"              element={<MovimientosPage />} />
                         <Route path="conciliacion"             element={<ConciliacionesPage />} />
                         <Route path="conciliacion/:id"         element={<NuevaConciliacionPage />} />

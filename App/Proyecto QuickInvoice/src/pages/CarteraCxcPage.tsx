@@ -30,6 +30,12 @@ const METODOS_PAGO: { value: CarteraCxcPago['metodo_pago']; label: string }[] = 
     { value: 'otros',         label: 'Otros' },
 ]
 
+// Solo disponible en el cobro multi-factura (garantía en custodia, no paga de inmediato)
+const METODOS_PAGO_MULTI: { value: CarteraCxcPago['metodo_pago']; label: string }[] = [
+    ...METODOS_PAGO,
+    { value: 'cheque_fecha', label: '🗓️ Cheque a Fecha (queda en custodia)' },
+]
+
 const ESTADO_BADGE: Record<string, string> = {
     pendiente: 'bg-yellow-100 text-yellow-800',
     parcial:   'bg-blue-100 text-blue-800',
@@ -42,15 +48,13 @@ interface Distribucion {
     aplicado: number  // monto que se aplica a esta factura
 }
 
-/** Distribuye un pago FIFO entre facturas ordenadas por fecha_emision */
-function distribuirFIFO(facturas: CarteraCxc[], totalPago: number): Distribucion[] {
-    let resto = totalPago
-    return facturas.map(f => {
-        if (resto <= 0) return { cartera: f, aplicado: 0 }
-        const aplicado = Math.min(resto, Number(f.saldo))
-        resto = Math.round((resto - aplicado) * 100) / 100
-        return { cartera: f, aplicado: Math.round(aplicado * 100) / 100 }
-    })
+// Línea editable del cobro multi-factura: el usuario marca qué facturas
+// paga y cuánto aplica a cada una (reemplaza la distribución FIFO
+// automática — mismo patrón manual que "Pagos a Proveedores").
+interface LineaCobroManual {
+    carteraId: string
+    incluida: boolean
+    monto: string
 }
 
 export function CarteraCxcPage() {
@@ -130,11 +134,13 @@ export function CarteraCxcPage() {
     const [multiCliente, setMultiCliente] = useState('')
     const [multiClienteId, setMultiClienteId] = useState<string | null>(null)
     const [multiFacturas, setMultiFacturas] = useState<CarteraCxc[]>([])
-    const [multiTotal, setMultiTotal]   = useState('')
+    const [lineasManual, setLineasManual] = useState<LineaCobroManual[]>([])
+    const [montoEnCustodia, setMontoEnCustodia] = useState<Record<string, number>>({})
     const [multiMetodo, setMultiMetodo] = useState<CarteraCxcPago['metodo_pago']>('cheque')
     const [multiRef, setMultiRef]       = useState('')
     const [multiBanco, setMultiBanco]   = useState('')            // banco del cheque
     const [multiCuentaId, setMultiCuentaId] = useState('')        // cuenta bancaria destino
+    const [multiFechaCheque, setMultiFechaCheque] = useState('')  // fecha de cobro (cheque_fecha)
     const [savingMulti, setSavingMulti] = useState(false)
     const [loadingMultiFacturas, setLoadingMultiFacturas] = useState(false)
     const [avisoContable, setAvisoContable] = useState<string | null>(null)
@@ -336,6 +342,9 @@ export function CarteraCxcPage() {
         try {
             const facts = await carteraCxcService.getCarteraActivaPorCliente(empresa!.id, clienteId)
             setMultiFacturas(facts)
+            setLineasManual(facts.map(f => ({ carteraId: f.id, incluida: false, monto: String(f.saldo) })))
+            const custodia = await carteraCxcService.getMontoEnCustodiaPorCartera(facts.map(f => f.id))
+            setMontoEnCustodia(custodia)
         } catch (e: any) {
             alert(`Error: ${e.message}`)
         } finally {
@@ -343,24 +352,67 @@ export function CarteraCxcPage() {
         }
     }
 
-    // Distribución FIFO reactiva
+    function saldoDisponible(f: CarteraCxc): number {
+        return Math.max(0, Math.round((Number(f.saldo) - (montoEnCustodia[f.id] || 0)) * 100) / 100)
+    }
+
+    function toggleLineaManual(carteraId: string) {
+        setLineasManual(prev => prev.map(l => l.carteraId === carteraId ? { ...l, incluida: !l.incluida } : l))
+    }
+
+    function actualizarMontoManual(carteraId: string, val: string, saldoMax: number) {
+        setLineasManual(prev => prev.map(l => {
+            if (l.carteraId !== carteraId) return l
+            if (val === '') return { ...l, monto: '' }
+            const n = parseFloat(val)
+            return { ...l, monto: String(Math.min(isNaN(n) ? 0 : n, saldoMax)) }
+        }))
+    }
+
+    // Distribución manual: cada factura marcada aporta el valor que el usuario ingresó
     const distribucion: Distribucion[] = useMemo(() => {
-        const total = parseFloat(multiTotal)
-        if (isNaN(total) || total <= 0 || multiFacturas.length === 0) return []
-        return distribuirFIFO(multiFacturas, total)
-    }, [multiTotal, multiFacturas])
+        return multiFacturas.map(f => {
+            const linea = lineasManual.find(l => l.carteraId === f.id)
+            const aplicado = linea?.incluida ? Math.round((parseFloat(linea.monto) || 0) * 100) / 100 : 0
+            return { cartera: f, aplicado }
+        })
+    }, [multiFacturas, lineasManual])
 
     const totalSaldoCliente = multiFacturas.reduce((s, f) => s + Number(f.saldo), 0)
     const totalAplicado     = distribucion.reduce((s, d) => s + d.aplicado, 0)
-    const excede            = parseFloat(multiTotal) > totalSaldoCliente + 0.001
 
     // ── Pago multi-factura ──
     async function handlePagoMultiple() {
-        const total = parseFloat(multiTotal)
-        if (isNaN(total) || total <= 0) { alert('Ingresa un valor válido'); return }
-        if (excede) { alert(`El valor supera el total de la deuda (${formatCurrency(totalSaldoCliente)})`); return }
         const dists = distribucion.filter(d => d.aplicado > 0)
-        if (dists.length === 0) { alert('Sin facturas a pagar'); return }
+        if (dists.length === 0) { alert('Marca al menos una factura e ingresa el valor a aplicar'); return }
+        const total = totalAplicado
+
+        // Cheque a fecha: queda en custodia, NO paga las facturas todavía —
+        // se depositará después desde Tesorería → Depósito de Cheques en Custodia.
+        if (multiMetodo === 'cheque_fecha') {
+            if (!multiRef.trim()) { alert('Ingresa el número del cheque'); return }
+            if (!multiFechaCheque) { alert('Ingresa la fecha de cobro del cheque'); return }
+            try {
+                setSavingMulti(true)
+                const { cheque } = await carteraCxcService.registrarPagoConChequeCustodia(
+                    dists.map(d => ({ carteraId: d.cartera.id, valor: d.aplicado })),
+                    empresa!.id, multiClienteId!,
+                    { numeroCheque: multiRef.trim(), bancoEmisor: multiBanco.trim(), fechaCobro: multiFechaCheque },
+                )
+                alert(
+                    `Cheque Nro. ${cheque.numero_cheque} registrado en custodia por ${formatCurrency(total)}.\n\n` +
+                    `Las facturas seleccionadas siguen pendientes — se marcarán como pagadas cuando deposites ` +
+                    `el cheque desde Tesorería → Depósito de Cheques en Custodia.`
+                )
+                cerrarMultiModal()
+                await loadCartera()
+            } catch (e: any) {
+                alert(`Error: ${e.message}`)
+            } finally {
+                setSavingMulti(false)
+            }
+            return
+        }
 
         const ctaSeleccionada = cuentasBancarias.find(c => c.id === multiCuentaId)
         const ctaLabel = ctaSeleccionada
@@ -406,8 +458,8 @@ export function CarteraCxcPage() {
 
     function cerrarMultiModal() {
         setMultiModal(false); setMultiCliente(''); setMultiClienteId(null)
-        setMultiFacturas([]); setMultiTotal(''); setMultiRef('')
-        setMultiMetodo('cheque'); setMultiBanco(''); setMultiCuentaId('')
+        setMultiFacturas([]); setLineasManual([]); setMontoEnCustodia({}); setMultiRef('')
+        setMultiMetodo('cheque'); setMultiBanco(''); setMultiCuentaId(''); setMultiFechaCheque('')
     }
 
     // ── Imprimir comprobante de pago (A4 y 80mm) ──
@@ -1514,10 +1566,12 @@ export function CarteraCxcPage() {
                                             <label className="block text-sm font-semibold text-slate-700 mb-2">
                                                 2. Facturas pendientes — Total deuda: <span className="text-red-600">{formatCurrency(totalSaldoCliente)}</span>
                                             </label>
+                                            <p className="text-xs text-slate-400 mb-2">Marca las facturas que vas a abonar y edita el valor de cada una.</p>
                                             <div className="border border-slate-200 rounded-xl overflow-hidden">
                                                 <table className="w-full text-sm">
                                                     <thead className="bg-slate-50">
                                                         <tr>
+                                                            <th className="text-left px-3 py-2 text-xs text-slate-500 uppercase w-8"></th>
                                                             <th className="text-left px-3 py-2 text-xs text-slate-500 uppercase">Factura</th>
                                                             <th className="text-left px-3 py-2 text-xs text-slate-500 uppercase">Emisión</th>
                                                             <th className="text-right px-3 py-2 text-xs text-slate-500 uppercase">Saldo</th>
@@ -1525,15 +1579,43 @@ export function CarteraCxcPage() {
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
-                                                        {multiFacturas.map((f, i) => {
-                                                            const dist = distribucion[i]
+                                                        {multiFacturas.map(f => {
+                                                            const linea = lineasManual.find(l => l.carteraId === f.id)
+                                                            const disponible = saldoDisponible(f)
+                                                            const enCustodia = montoEnCustodia[f.id] || 0
                                                             return (
-                                                                <tr key={f.id} className={dist?.aplicado > 0 ? 'bg-green-50/50' : ''}>
-                                                                    <td className="px-3 py-2 font-mono text-slate-700">{numeroFacturaCartera(f)}</td>
+                                                                <tr key={f.id} className={linea?.incluida ? 'bg-green-50/50' : ''}>
+                                                                    <td className="px-3 py-2">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="w-4 h-4 accent-primary-600"
+                                                                            checked={linea?.incluida ?? false}
+                                                                            disabled={disponible <= 0}
+                                                                            onChange={() => toggleLineaManual(f.id)}
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-3 py-2 font-mono text-slate-700">
+                                                                        {numeroFacturaCartera(f)}
+                                                                        {enCustodia > 0 && (
+                                                                            <div className="text-[10px] font-sans text-amber-600 mt-0.5">
+                                                                                🗓️ {formatCurrency(enCustodia)} en cheque a fecha pendiente de depósito
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
                                                                     <td className="px-3 py-2 text-slate-500">{f.fecha_emision}</td>
                                                                     <td className="px-3 py-2 text-right text-red-600 font-medium">{formatCurrency(f.saldo)}</td>
-                                                                    <td className="px-3 py-2 text-right font-bold text-green-700">
-                                                                        {dist?.aplicado > 0 ? formatCurrency(dist.aplicado) : '—'}
+                                                                    <td className="px-3 py-2 text-right">
+                                                                        {linea?.incluida ? (
+                                                                            <input
+                                                                                type="number" min="0.01" step="0.01" max={disponible}
+                                                                                value={linea.monto}
+                                                                                onChange={e => actualizarMontoManual(f.id, e.target.value, disponible)}
+                                                                                className="w-24 px-2 py-1 rounded-lg border border-slate-300 text-right font-mono focus:ring-2 focus:ring-primary-500"
+                                                                                autoFocus
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="text-slate-300">—</span>
+                                                                        )}
                                                                     </td>
                                                                 </tr>
                                                             )
@@ -1549,49 +1631,62 @@ export function CarteraCxcPage() {
                                         <div className="space-y-3">
                                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                                 <div>
-                                                    <label className="block text-sm font-semibold text-slate-700 mb-1">3. Valor a pagar <span className="text-red-500">*</span></label>
-                                                    <input
-                                                        type="number" min="0.01" step="0.01"
-                                                        value={multiTotal}
-                                                        onChange={e => setMultiTotal(e.target.value)}
-                                                        className={`w-full px-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-primary-500 font-mono text-lg font-bold ${excede ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
-                                                        placeholder="0.00"
-                                                        autoFocus
-                                                    />
-                                                    {excede && <p className="text-xs text-red-500 mt-1">Supera la deuda total</p>}
+                                                    <label className="block text-sm font-semibold text-slate-700 mb-1">3. Total a pagar</label>
+                                                    <div className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono text-lg font-bold text-slate-800">
+                                                        {formatCurrency(totalAplicado)}
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-semibold text-slate-700 mb-1">Método</label>
                                                     <select
                                                         value={multiMetodo}
-                                                        onChange={e => { setMultiMetodo(e.target.value as CarteraCxcPago['metodo_pago']); setMultiBanco(''); setMultiCuentaId('') }}
+                                                        onChange={e => { setMultiMetodo(e.target.value as CarteraCxcPago['metodo_pago']); setMultiBanco(''); setMultiCuentaId(''); setMultiFechaCheque('') }}
                                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
                                                     >
-                                                        {METODOS_PAGO.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                                        {METODOS_PAGO_MULTI.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                                     </select>
                                                 </div>
                                                 <div>
                                                     <label className="block text-sm font-semibold text-slate-700 mb-1">
-                                                        {multiMetodo === 'cheque' ? 'Nro. de cheque' : multiMetodo === 'transferencia' ? 'Nro. comprobante' : 'Referencia'}
+                                                        {multiMetodo === 'cheque' || multiMetodo === 'cheque_fecha' ? 'Nro. de cheque' : multiMetodo === 'transferencia' ? 'Nro. comprobante' : 'Referencia'}
                                                     </label>
                                                     <input
                                                         type="text" value={multiRef} onChange={e => setMultiRef(e.target.value)}
                                                         className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
-                                                        placeholder={multiMetodo === 'cheque' ? 'Nro. cheque' : multiMetodo === 'transferencia' ? 'Nro. comprobante' : 'Referencia'}
+                                                        placeholder={multiMetodo === 'cheque' || multiMetodo === 'cheque_fecha' ? 'Nro. cheque' : multiMetodo === 'transferencia' ? 'Nro. comprobante' : 'Referencia'}
                                                     />
                                                 </div>
                                             </div>
 
-                                            {/* Banco emisor (cheque) */}
-                                            {multiMetodo === 'cheque' && (
-                                                <div>
-                                                    <label className="block text-sm font-semibold text-slate-700 mb-1">Banco emisor del cheque</label>
-                                                    <input
-                                                        type="text" value={multiBanco} onChange={e => setMultiBanco(e.target.value)}
-                                                        className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
-                                                        placeholder="Ej: Banco Pichincha"
-                                                    />
+                                            {/* Banco emisor + fecha de cobro (cheque / cheque a fecha) */}
+                                            {(multiMetodo === 'cheque' || multiMetodo === 'cheque_fecha') && (
+                                                <div className={multiMetodo === 'cheque_fecha' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : ''}>
+                                                    <div>
+                                                        <label className="block text-sm font-semibold text-slate-700 mb-1">Banco emisor del cheque</label>
+                                                        <input
+                                                            type="text" value={multiBanco} onChange={e => setMultiBanco(e.target.value)}
+                                                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                                            placeholder="Ej: Banco Pichincha"
+                                                        />
+                                                    </div>
+                                                    {multiMetodo === 'cheque_fecha' && (
+                                                        <div>
+                                                            <label className="block text-sm font-semibold text-slate-700 mb-1">Fecha de cobro del cheque <span className="text-red-500">*</span></label>
+                                                            <input
+                                                                type="date" value={multiFechaCheque} onChange={e => setMultiFechaCheque(e.target.value)}
+                                                                className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-primary-500"
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
+                                            )}
+
+                                            {multiMetodo === 'cheque_fecha' && (
+                                                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                    El cheque queda registrado como garantía ("en custodia"). Las facturas marcadas
+                                                    <strong> no se dan por pagadas todavía</strong> — se aplicarán recién cuando deposites
+                                                    el cheque desde Tesorería → Depósito de Cheques en Custodia.
+                                                </p>
                                             )}
 
                                             {/* Cuenta destino (transferencia) */}
@@ -1619,12 +1714,16 @@ export function CarteraCxcPage() {
                                     {totalAplicado > 0 && (
                                         <div className="bg-primary-50 border border-primary-200 rounded-xl px-5 py-4 flex justify-between items-center">
                                             <div>
-                                                <p className="text-sm text-primary-700">Pagos a registrar</p>
+                                                <p className="text-sm text-primary-700">{multiMetodo === 'cheque_fecha' ? 'Facturas a garantizar' : 'Pagos a registrar'}</p>
                                                 <p className="text-xs text-primary-500">{distribucion.filter(d => d.aplicado > 0).length} factura(s)</p>
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-2xl font-bold text-primary-800">{formatCurrency(totalAplicado)}</p>
-                                                <p className="text-xs text-primary-500">Saldo restante: {formatCurrency(Math.max(0, totalSaldoCliente - totalAplicado))}</p>
+                                                <p className="text-xs text-primary-500">
+                                                    {multiMetodo === 'cheque_fecha'
+                                                        ? 'Saldo pendiente tras el depósito: ' + formatCurrency(Math.max(0, totalSaldoCliente - totalAplicado))
+                                                        : 'Saldo restante: ' + formatCurrency(Math.max(0, totalSaldoCliente - totalAplicado))}
+                                                </p>
                                             </div>
                                         </div>
                                     )}
@@ -1638,7 +1737,7 @@ export function CarteraCxcPage() {
                             <button
                                 onClick={handlePagoMultiple}
                                 className="btn btn-primary flex items-center gap-2"
-                                disabled={savingMulti || totalAplicado <= 0 || excede}
+                                disabled={savingMulti || totalAplicado <= 0}
                             >
                                 {savingMulti
                                     ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

@@ -517,6 +517,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
                             <SidebarItem to="/teso/cheques"       icon={CheckSquare} label="Cheques"           active={location.pathname === '/teso/cheques'} sub disabled={!p.perm_cheques} />
                             <SidebarItem to="/teso/cheques-fecha" icon={CheckSquare} label="Cheques a Fecha"    active={location.pathname === '/teso/cheques-fecha'} sub disabled={!p.perm_cheques} />
+                            <SidebarItem to="/teso/cheques-custodia" icon={CheckSquare} label="Depósito Cheques Custodia" active={location.pathname === '/teso/cheques-custodia'} sub disabled={!p.perm_cheques} />
                             <SidebarItem to="/teso/movimientos"   icon={ArrowDownUp} label="Movimientos Banc."  active={location.pathname === '/teso/movimientos'} sub disabled={!p.perm_movimientos_banc} />
                             <SidebarItem to="/teso/conciliacion"  icon={BarChart3}   label="Conciliación"       active={location.pathname.startsWith('/teso/conciliacion')} sub disabled={!p.perm_conciliacion} />
                             <SidebarItem to="/teso/configuracion" icon={Settings} label="Configuración" active={location.pathname === '/teso/configuracion'} sub />

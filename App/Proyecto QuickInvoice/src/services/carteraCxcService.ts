@@ -1,6 +1,9 @@
 import { contabilidadVentasService } from './contabilidadVentasService'
+import { contableConfigService } from './contableConfigService'
+import { movimientoService } from './finance/movimientoService'
 import { supabase } from '../lib/supabase'
 import { auditService } from './auditoria/auditService'
+import type { LineaDistribucionContable } from '../types/finance'
 
 export interface CarteraCxc {
     id: string
@@ -35,16 +38,47 @@ export interface CarteraCxcPago {
     empresa_id: string
     fecha_pago: string
     valor: number
-    metodo_pago: 'efectivo' | 'transferencia' | 'cheque' | 'tarjeta' | 'nota_credito' | 'otros' | 'retencion_fuente' | 'retencion_iva'
+    metodo_pago: 'efectivo' | 'transferencia' | 'cheque' | 'cheque_fecha' | 'tarjeta' | 'nota_credito' | 'otros' | 'retencion_fuente' | 'retencion_iva'
     referencia: string | null
     usuario_id: string | null
     created_at: string
     // Reversa / trazabilidad contable
-    estado: 'activo' | 'reversado'
+    estado: 'activo' | 'reversado' | 'en_custodia'
     lp_comprobante_id: string | null
     reversado_at: string | null
     reversado_por: string | null
     motivo_reversa: string | null
+    // Solo cuando metodo_pago = 'cheque_fecha' — ver ChequeCliente
+    cheque_cliente_id?: string | null
+}
+
+// Cheque a fecha recibido de un cliente como garantía de la deuda ("en
+// custodia"): mientras no se deposite, las facturas que cubre siguen
+// pendientes — el pago se registra con estado 'en_custodia' (excluido del
+// cálculo de saldo por fn_actualizar_saldo_cxc) y solo pasa a 'activo' el
+// día que se deposita en el banco. Ver DepositoChequesCustodiaPage.tsx.
+export interface ChequeCliente {
+    id: string
+    empresa_id: string
+    cliente_id: string
+    numero_cheque: string
+    banco_emisor: string | null
+    monto: number
+    fecha_emision: string
+    fecha_cobro: string
+    estado: 'en_custodia' | 'depositado' | 'rechazado' | 'anulado'
+    cuenta_bancaria_destino_id: string | null
+    movimiento_bancario_id: string | null
+    numero_comprobante_deposito: string | null
+    fecha_deposito: string | null
+    lp_comprobante_id: string | null
+    observaciones: string | null
+    motivo_rechazo: string | null
+    created_by: string | null
+    created_at: string
+    updated_at: string
+    // joins
+    clientes?: { nombre: string; identificacion: string }
 }
 
 export const carteraCxcService = {
@@ -346,6 +380,241 @@ export const carteraCxcService = {
         const { data, error } = await supabase.from('cartera_cxc_pagos').insert(pagos).select()
         if (error) throw error
         return (data || []) as CarteraCxcPago[]
+    },
+
+    /**
+     * Registra un cheque a fecha recibido de un cliente como garantía de la
+     * deuda ("en custodia"). NO paga las facturas: inserta los pagos con
+     * estado='en_custodia' (fn_actualizar_saldo_cxc los ignora al calcular
+     * saldo, así que las facturas siguen pendientes hasta el depósito real
+     * — ver depositarChequeCustodia). No genera asiento contable todavía
+     * (no hubo movimiento de dinero real).
+     */
+    async registrarPagoConChequeCustodia(
+        distribuciones: { carteraId: string; valor: number }[],
+        empresaId: string,
+        clienteId: string,
+        cheque: { numeroCheque: string; bancoEmisor?: string; fechaCobro: string },
+    ): Promise<{ cheque: ChequeCliente; pagos: CarteraCxcPago[] }> {
+        const { data: { user } } = await supabase.auth.getUser()
+        const fecha = new Date().toISOString().split('T')[0]
+        const total = Math.round(distribuciones.reduce((s, d) => s + d.valor, 0) * 100) / 100
+
+        const { data: chequeData, error: errCheque } = await supabase
+            .from('cheques_clientes')
+            .insert({
+                empresa_id: empresaId,
+                cliente_id: clienteId,
+                numero_cheque: cheque.numeroCheque,
+                banco_emisor: cheque.bancoEmisor || null,
+                monto: total,
+                fecha_emision: fecha,
+                fecha_cobro: cheque.fechaCobro,
+                estado: 'en_custodia',
+                created_by: user?.id || null,
+            })
+            .select()
+            .single()
+        if (errCheque) throw errCheque
+
+        const pagos = distribuciones.map(d => ({
+            cartera_id: d.carteraId,
+            empresa_id: empresaId,
+            fecha_pago: fecha,
+            valor: d.valor,
+            metodo_pago: 'cheque_fecha' as const,
+            referencia: cheque.numeroCheque,
+            usuario_id: user?.id || null,
+            estado: 'en_custodia' as const,
+            cheque_cliente_id: chequeData.id,
+        }))
+        const { data: pagosData, error: errPagos } = await supabase.from('cartera_cxc_pagos').insert(pagos).select()
+        if (errPagos) throw errPagos
+
+        auditService.logEvent({
+            empresaId,
+            modulo: 'cartera_cxc',
+            accion: 'crear',
+            entidad: 'cheque_cliente',
+            entidadId: chequeData.id,
+            resumen: `Cheque a fecha recibido en custodia — Nro. ${cheque.numeroCheque} por ${total}`,
+            detalle: { cliente_id: clienteId, facturas: distribuciones.map(d => d.carteraId) },
+            nivel: 'sensible',
+        })
+
+        return { cheque: chequeData as ChequeCliente, pagos: (pagosData || []) as CarteraCxcPago[] }
+    },
+
+    async getChequesEnCustodia(empresaId: string): Promise<ChequeCliente[]> {
+        const { data, error } = await supabase
+            .from('cheques_clientes')
+            .select('*, clientes(nombre, identificacion)')
+            .eq('empresa_id', empresaId)
+            .eq('estado', 'en_custodia')
+            .order('fecha_cobro', { ascending: true })
+        if (error) throw error
+        return (data || []) as ChequeCliente[]
+    },
+
+    /** Facturas cubiertas por un cheque (para mostrar el detalle antes de depositar). */
+    async getFacturasDeCheque(chequeId: string) {
+        const { data, error } = await supabase
+            .from('cartera_cxc_pagos')
+            .select('id, valor, cartera_id, cartera_cxc(id, saldo, valor_original, numero_documento_externo, comprobantes(secuencial))')
+            .eq('cheque_cliente_id', chequeId)
+        if (error) throw error
+        return data || []
+    },
+
+    /**
+     * Deposita un cheque en custodia: activa los pagos que cubría (pasan de
+     * 'en_custodia' a 'activo' — el trigger recalcula el saldo de cada
+     * factura recién en este momento), registra el movimiento bancario
+     * (crédito a la cuenta destino, con su asiento contable si aplica) y
+     * marca el cheque como depositado.
+     */
+    async depositarChequeCustodia(
+        chequeId: string,
+        empresaId: string,
+        deposito: { cuentaBancariaId: string; numeroComprobante: string; fechaDeposito: string },
+    ): Promise<{ avisoContable: string | null }> {
+        const { data: { user } } = await supabase.auth.getUser()
+
+        const { data: cheque, error: errCheque } = await supabase
+            .from('cheques_clientes')
+            .select('*, clientes(nombre)')
+            .eq('id', chequeId)
+            .single()
+        if (errCheque) throw errCheque
+        if (cheque.estado !== 'en_custodia') throw new Error('Este cheque ya no está en custodia')
+
+        // Contrapartida contable del depósito: Cuentas por Cobrar Clientes
+        // (mismo concepto COBROS:CREDITO que usa contabilidadVentasService
+        // para un cobro normal). Si no hay mapeo configurado, el movimiento
+        // se registra igual, solo sin asiento (avisoContable no-fatal).
+        let lineas: LineaDistribucionContable[] = []
+        try {
+            const mapeoMap = await contableConfigService.getMapeoAsMap(empresaId)
+            const ctaCredito = mapeoMap['COBROS:CREDITO']
+            if (ctaCredito?.cuenta_id) {
+                lineas = [{
+                    cuenta_id: ctaCredito.cuenta_id,
+                    cuenta_codigo: ctaCredito.cuenta_codigo ?? '',
+                    cuenta_nombre: ctaCredito.cuenta_nombre ?? '',
+                    monto: Number(cheque.monto),
+                }]
+            }
+        } catch { /* sin mapeo — se ignora, el depósito se registra igual */ }
+
+        const movimiento = await movimientoService.crear(
+            {
+                empresa_id: empresaId,
+                cuenta_bancaria_id: deposito.cuentaBancariaId,
+                tipo: 'deposito',
+                fecha: deposito.fechaDeposito,
+                monto: Number(cheque.monto),
+                sentido: 'credito',
+                referencia: deposito.numeroComprobante,
+                descripcion: `Depósito cheque a fecha Nro. ${cheque.numero_cheque} — ${(cheque as any).clientes?.nombre ?? ''}`,
+                estado: 'activo',
+                conciliado: false,
+                conciliacion_id: null,
+                tiene_asiento: false,
+                comprobante_contable_id: null,
+                origen: 'manual',
+                origen_id: chequeId,
+                created_by: user?.id || null,
+            },
+            lineas,
+        )
+
+        const { error: errPagos } = await supabase
+            .from('cartera_cxc_pagos')
+            .update({ estado: 'activo', lp_comprobante_id: movimiento.comprobante_contable_id ?? null })
+            .eq('cheque_cliente_id', chequeId)
+            .eq('estado', 'en_custodia')
+        if (errPagos) throw errPagos
+        // El trigger fn_actualizar_saldo_cxc recalcula el saldo de cada factura al pasar estos pagos a 'activo'
+
+        const { error: errUpdate } = await supabase
+            .from('cheques_clientes')
+            .update({
+                estado: 'depositado',
+                cuenta_bancaria_destino_id: deposito.cuentaBancariaId,
+                movimiento_bancario_id: movimiento.id,
+                numero_comprobante_deposito: deposito.numeroComprobante,
+                fecha_deposito: deposito.fechaDeposito,
+                lp_comprobante_id: movimiento.comprobante_contable_id ?? null,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', chequeId)
+        if (errUpdate) throw errUpdate
+
+        auditService.logEvent({
+            empresaId,
+            modulo: 'cartera_cxc',
+            accion: 'crear',
+            entidad: 'cheque_cliente',
+            entidadId: chequeId,
+            resumen: `Depósito de cheque a fecha Nro. ${cheque.numero_cheque} por ${cheque.monto}`,
+            detalle: { cuenta_bancaria_id: deposito.cuentaBancariaId, numero_comprobante: deposito.numeroComprobante },
+            nivel: 'sensible',
+        })
+
+        return { avisoContable: (movimiento as any).avisoContable ?? null }
+    },
+
+    /** Rechaza/anula un cheque en custodia antes de depositarlo (p.ej. el cliente lo retira o se acuerda otra forma de pago). Las facturas nunca dejaron de estar pendientes, así que no hay saldo que restaurar. */
+    async anularChequeCustodia(chequeId: string, motivo: string): Promise<void> {
+        const { data: { user } } = await supabase.auth.getUser()
+
+        const { data: cheque, error: errCheque } = await supabase
+            .from('cheques_clientes').select('estado, numero_cheque, empresa_id').eq('id', chequeId).single()
+        if (errCheque) throw errCheque
+        if (cheque.estado !== 'en_custodia') throw new Error('Este cheque ya no está en custodia')
+
+        const { error: errPagos } = await supabase
+            .from('cartera_cxc_pagos')
+            .update({
+                estado: 'reversado',
+                motivo_reversa: motivo,
+                reversado_at: new Date().toISOString(),
+                reversado_por: user?.id || null,
+            })
+            .eq('cheque_cliente_id', chequeId)
+            .eq('estado', 'en_custodia')
+        if (errPagos) throw errPagos
+
+        const { error } = await supabase
+            .from('cheques_clientes')
+            .update({ estado: 'rechazado', motivo_rechazo: motivo, updated_at: new Date().toISOString() })
+            .eq('id', chequeId)
+        if (error) throw error
+
+        auditService.logEvent({
+            empresaId: cheque.empresa_id,
+            modulo: 'cartera_cxc',
+            accion: 'anular',
+            entidad: 'cheque_cliente',
+            entidadId: chequeId,
+            resumen: `Cheque a fecha Nro. ${cheque.numero_cheque} retirado de custodia`,
+            detalle: { motivo },
+            nivel: 'sensible',
+        })
+    },
+
+    /** Suma de cheques a fecha en custodia ya pledged contra cada factura — evita que se vuelva a cobrar (o pledgear otro cheque) por encima de lo ya comprometido, aunque el saldo visible todavía no baje. */
+    async getMontoEnCustodiaPorCartera(carteraIds: string[]): Promise<Record<string, number>> {
+        if (carteraIds.length === 0) return {}
+        const { data, error } = await supabase
+            .from('cartera_cxc_pagos')
+            .select('cartera_id, valor')
+            .in('cartera_id', carteraIds)
+            .eq('estado', 'en_custodia')
+        if (error) throw error
+        const map: Record<string, number> = {}
+        for (const p of data || []) map[p.cartera_id] = Math.round(((map[p.cartera_id] || 0) + Number(p.valor)) * 100) / 100
+        return map
     },
 
     async getEstadoCuentaCliente(empresaId: string, clienteId: string) {
