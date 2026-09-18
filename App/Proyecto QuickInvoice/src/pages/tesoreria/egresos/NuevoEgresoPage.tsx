@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useFormDraft } from '../../../hooks/useFormDraft'
 import { useNavigate } from 'react-router-dom'
-import { Search, Loader2, AlertCircle, X, CheckCircle2, ChevronDown, ChevronUp, ArrowRightLeft, RefreshCw } from 'lucide-react'
+import { Search, Loader2, AlertCircle, X, CheckCircle2, ChevronDown, ChevronUp, ArrowRightLeft, RefreshCw, Trash2, Pencil, Save } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { egresoService } from '../../../services/finance/egresoService'
 import { cuentasBancariasService, proveedoresService, cxpService } from '../../../services/finance/bancosService'
@@ -36,6 +36,12 @@ export function NuevoEgresoPage() {
     const [cxpLista, setCxpLista]         = useState<CxPSeleccion[]>([])
     const [cargCxp, setCargCxp]           = useState(false)
     const [expandCxp, setExpandCxp]       = useState<string | null>(null)
+    // Corrección de valor / eliminación — solo para facturas migradas (ver
+    // MigrarCxPPage.tsx) que todavía no tienen ningún pago en el sistema.
+    const [editandoValorId, setEditandoValorId] = useState<string | null>(null)
+    const [valorEditado, setValorEditado] = useState({ montoOriginal: '', saldoPendiente: '' })
+    const [guardandoValor, setGuardandoValor] = useState(false)
+    const [eliminandoId, setEliminandoId] = useState<string | null>(null)
     // Paso 2 — Anticipos disponibles del proveedor
     const [anticiposLista, setAnticiposLista] = useState<AnticipoSeleccion[]>([])
 
@@ -57,7 +63,12 @@ export function NuevoEgresoPage() {
         () => ({ paso, provSelec, busqProv, formaPago, cuentaId, referencia, concepto, numeroCheque, beneficiario, fechaCobro, esPostfechado }),
         (d) => {
             if (d.paso && d.paso < 3)  setPaso(d.paso as 1 | 2 | 3)
-            if (d.provSelec)           setProvSelec(d.provSelec)
+            // No basta con restaurar el proveedor -- seleccionarProveedor()
+            // es lo que trae sus facturas/anticipos pendientes. Restaurar
+            // solo el objeto con setProvSelec() dejaba cxpLista en [] hasta
+            // recargar toda la app (que borra este borrador de
+            // sessionStorage y fuerza a elegir el proveedor de nuevo).
+            if (d.provSelec)           seleccionarProveedor(d.provSelec)
             if (d.busqProv)            setBusqProv(d.busqProv)
             if (d.formaPago)           setFormaPago(d.formaPago)
             if (d.cuentaId)            setCuentaId(d.cuentaId)
@@ -117,6 +128,41 @@ export function NuevoEgresoPage() {
         setCxpLista(prev => prev.map(x =>
             x.cxp.id === id ? { ...x, monto: Math.min(n, x.cxp.saldo_pendiente) } : x
         ))
+    }
+
+    function abrirCorreccionValor(cxp: CuentaPorPagar) {
+        setEditandoValorId(cxp.id)
+        setValorEditado({ montoOriginal: String(cxp.monto_original), saldoPendiente: String(cxp.saldo_pendiente) })
+    }
+
+    async function guardarCorreccionValor(cxpId: string) {
+        const montoOriginal = parseFloat(valorEditado.montoOriginal) || 0
+        const saldoPendiente = parseFloat(valorEditado.saldoPendiente) || 0
+        setGuardandoValor(true); setError('')
+        try {
+            await cxpService.corregirValorMigrada(cxpId, montoOriginal, saldoPendiente)
+            setCxpLista(prev => prev.map(x => x.cxp.id === cxpId
+                ? { ...x, cxp: { ...x.cxp, monto_original: montoOriginal, saldo_pendiente: saldoPendiente }, monto: Math.min(x.monto, saldoPendiente) }
+                : x))
+            setEditandoValorId(null)
+        } catch (e: any) {
+            setError('No se pudo corregir el valor: ' + (e.message ?? e))
+        } finally {
+            setGuardandoValor(false)
+        }
+    }
+
+    async function eliminarCxpMigrada(cxp: CuentaPorPagar) {
+        if (!confirm(`¿Eliminar esta factura migrada (${cxp.numero_documento_externo ?? cxp.id})? Esta acción no se puede deshacer.`)) return
+        setEliminandoId(cxp.id); setError('')
+        try {
+            await cxpService.eliminarMigrada(cxp.id)
+            setCxpLista(prev => prev.filter(x => x.cxp.id !== cxp.id))
+        } catch (e: any) {
+            setError('No se pudo eliminar: ' + (e.message ?? e))
+        } finally {
+            setEliminandoId(null)
+        }
     }
 
     const seleccionadas    = cxpLista.filter(x => x.seleccionado)
@@ -403,6 +449,48 @@ export function NuevoEgresoPage() {
                                                 value={monto}
                                                 onChange={e => actualizarMonto(cxp.id, e.target.value)} />
                                             <span className="text-xs text-slate-400">máx. {formatMoneda(cxp.saldo_pendiente)}</span>
+                                        </div>
+                                    )}
+                                    {/* Corregir/eliminar — solo facturas migradas sin pagos todavía */}
+                                    {expandCxp === cxp.id && cxp.origen === 'MIGRACION' && cxp.estado === 'PENDIENTE' && (
+                                        <div className="mt-3 pt-3 border-t border-slate-200">
+                                            {editandoValorId === cxp.id ? (
+                                                <div className="flex items-end gap-3 flex-wrap">
+                                                    <div>
+                                                        <label className="label mb-0.5 block">Monto original</label>
+                                                        <input className="input max-w-[140px] text-right" type="number" step="0.01" min="0.01"
+                                                            value={valorEditado.montoOriginal}
+                                                            onChange={e => setValorEditado(v => ({ ...v, montoOriginal: e.target.value }))} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="label mb-0.5 block">Saldo pendiente</label>
+                                                        <input className="input max-w-[140px] text-right" type="number" step="0.01" min="0"
+                                                            value={valorEditado.saldoPendiente}
+                                                            onChange={e => setValorEditado(v => ({ ...v, saldoPendiente: e.target.value }))} />
+                                                    </div>
+                                                    <button onClick={() => guardarCorreccionValor(cxp.id)} disabled={guardandoValor}
+                                                        className="btn btn-primary gap-1.5 text-xs py-2">
+                                                        {guardandoValor ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                                        Guardar
+                                                    </button>
+                                                    <button onClick={() => setEditandoValorId(null)} className="btn btn-secondary text-xs py-2">
+                                                        Cancelar
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xs text-slate-400">Factura migrada, sin pagos aún —</span>
+                                                    <button onClick={() => abrirCorreccionValor(cxp)}
+                                                        className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1">
+                                                        <Pencil className="w-3.5 h-3.5" /> Corregir valor
+                                                    </button>
+                                                    <button onClick={() => eliminarCxpMigrada(cxp)} disabled={eliminandoId === cxp.id}
+                                                        className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 disabled:opacity-50">
+                                                        {eliminandoId === cxp.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                                        Eliminar
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

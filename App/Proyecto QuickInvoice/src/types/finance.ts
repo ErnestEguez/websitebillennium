@@ -274,6 +274,7 @@ export interface CuentaPorPagar {
     // registros migrados (origen='MIGRACION'), que no tienen compra_id real
     // detrás (ver MigrarCxPPage.tsx).
     numero_documento_externo?: string | null
+    origen?: 'COMPRA' | 'LIQUIDACION' | 'MIGRACION'
     // joins
     proveedor?: { nombre_empresa: string; ruc: string }
     compra?: { numero_factura: string; fecha_emision: string; tipo_compra: string } | null

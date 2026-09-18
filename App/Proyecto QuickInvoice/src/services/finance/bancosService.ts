@@ -156,6 +156,33 @@ export const cxpService = {
         return data as CuentaPorPagar[]
     },
 
+    // Solo para CxP migradas (origen='MIGRACION') que todavía no recibieron
+    // ningún pago en este sistema — corrige un error de digitación del
+    // Excel de migración. No toca facturas reales (origen COMPRA/LIQUIDACION)
+    // ni CxP que ya tengan pagos aplicados, para no dejar egreso_pagos_cxp
+    // apuntando a montos inconsistentes.
+    async eliminarMigrada(cxpId: string): Promise<void> {
+        const { error } = await supabaseFacturacion
+            .from('cuentas_por_pagar')
+            .delete()
+            .eq('id', cxpId)
+            .eq('origen', 'MIGRACION')
+            .eq('estado', 'PENDIENTE')
+        if (error) throw error
+    },
+
+    async corregirValorMigrada(cxpId: string, montoOriginal: number, saldoPendiente: number): Promise<void> {
+        if (montoOriginal <= 0) throw new Error('El monto original debe ser mayor a 0')
+        if (saldoPendiente < 0 || saldoPendiente > montoOriginal) throw new Error('El saldo debe estar entre 0 y el monto original')
+        const { error } = await supabaseFacturacion
+            .from('cuentas_por_pagar')
+            .update({ monto_original: montoOriginal, saldo_pendiente: saldoPendiente })
+            .eq('id', cxpId)
+            .eq('origen', 'MIGRACION')
+            .eq('estado', 'PENDIENTE')
+        if (error) throw error
+    },
+
     async registrarPago(pago: {
         empresa_id: string
         cxp_id: string
