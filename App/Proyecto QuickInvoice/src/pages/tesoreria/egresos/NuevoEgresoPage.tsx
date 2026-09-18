@@ -437,7 +437,13 @@ export function NuevoEgresoPage() {
                                             </div>
                                         </div>
                                         <button onClick={() => setExpandCxp(expandCxp === cxp.id ? null : cxp.id)}
-                                            className="text-slate-400 shrink-0">
+                                            title="Ver más detalle de esta factura"
+                                            className={cn(
+                                                'shrink-0 p-1.5 rounded-lg border transition-colors',
+                                                expandCxp === cxp.id
+                                                    ? 'bg-primary-100 border-primary-300 text-primary-700'
+                                                    : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+                                            )}>
                                             {expandCxp === cxp.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                         </button>
                                     </div>
