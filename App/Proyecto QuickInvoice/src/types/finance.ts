@@ -270,6 +270,10 @@ export interface CuentaPorPagar {
     observaciones: string | null
     created_at: string
     updated_at: string
+    // Número de factura/documento del sistema anterior — solo lo traen los
+    // registros migrados (origen='MIGRACION'), que no tienen compra_id real
+    // detrás (ver MigrarCxPPage.tsx).
+    numero_documento_externo?: string | null
     // joins
     proveedor?: { nombre_empresa: string; ruc: string }
     compra?: { numero_factura: string; fecha_emision: string; tipo_compra: string } | null

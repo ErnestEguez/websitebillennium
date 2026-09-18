@@ -376,6 +376,7 @@ export function NuevoEgresoPage() {
                                                 <p className="text-sm font-semibold text-slate-800 truncate">
                                                     {cxp.compra?.numero_factura
                                                         ?? (cxp.liquidacion ? `${cxp.liquidacion.establecimiento}-${cxp.liquidacion.punto_emision}-${cxp.liquidacion.secuencial}` : null)
+                                                        ?? cxp.numero_documento_externo
                                                         ?? cxp.observaciones?.split('—')[0]?.replace('LC ','').trim()
                                                         ?? '—'}
                                                 </p>

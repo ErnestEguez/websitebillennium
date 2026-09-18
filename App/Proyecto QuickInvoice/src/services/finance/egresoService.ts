@@ -58,13 +58,17 @@ export const egresoService = {
                 const cxpIds = [...new Set((pagosCxp as { egreso_id: string; cxp_id: string }[]).map(p => p.cxp_id))]
                 const { data: cxps } = await supabaseFacturacion
                     .from('cuentas_por_pagar')
-                    .select('id, compra:ingresos_stock(numero_factura), liquidacion:liquidaciones_compra(establecimiento, punto_emision, secuencial)')
+                    .select('id, numero_documento_externo, compra:ingresos_stock(numero_factura), liquidacion:liquidaciones_compra(establecimiento, punto_emision, secuencial)')
                     .in('id', cxpIds)
 
                 const facturaPorCxp = new Map<string, string>()
                 for (const c of (cxps ?? []) as any[]) {
+                    // compra/liquidacion = facturas digitadas normalmente;
+                    // numero_documento_externo = solo en CxP migradas (sin
+                    // compra_id real detrás) — ver MigrarCxPPage.tsx.
                     const nf = c.compra?.numero_factura
                         ?? (c.liquidacion ? `${c.liquidacion.establecimiento}-${c.liquidacion.punto_emision}-${c.liquidacion.secuencial}` : null)
+                        ?? c.numero_documento_externo
                     if (nf) facturaPorCxp.set(c.id, nf)
                 }
 
@@ -263,12 +267,16 @@ export const egresoService = {
             for (const p of eg.pagos_cxp as { cxp_id: string; monto_aplicado: number }[]) {
                 const { data: cxp } = await supabaseFacturacion
                     .from('cuentas_por_pagar')
-                    .select('compra:ingresos_stock(numero_factura), liquidacion:liquidaciones_compra(establecimiento, punto_emision, secuencial)')
+                    .select('numero_documento_externo, compra:ingresos_stock(numero_factura), liquidacion:liquidaciones_compra(establecimiento, punto_emision, secuencial)')
                     .eq('id', p.cxp_id)
                     .maybeSingle()
                 const c = cxp as any
+                // compra/liquidacion = facturas digitadas normalmente;
+                // numero_documento_externo = solo en CxP migradas (sin
+                // compra_id real detrás) — ver MigrarCxPPage.tsx.
                 const nf = c?.compra?.numero_factura
                     ?? (c?.liquidacion ? `${c.liquidacion.establecimiento}-${c.liquidacion.punto_emision}-${c.liquidacion.secuencial}` : null)
+                    ?? c?.numero_documento_externo
                     ?? p.cxp_id.slice(0, 8)
                 facturas.push({ numero_factura: nf, monto_aplicado: p.monto_aplicado })
             }

@@ -201,10 +201,14 @@ export function EstadoCuentaProveedorPage() {
             if (cxpIds.length > 0) {
                 const { data: cxps } = await supabase
                     .from('cuentas_por_pagar')
-                    .select('id, compra:ingresos_stock(numero_factura)')
+                    .select('id, numero_documento_externo, compra:ingresos_stock(numero_factura)')
                     .in('id', cxpIds)
                 for (const c of (cxps ?? []) as any[]) {
-                    if (c.compra?.numero_factura) facturaPorCxp.set(c.id, c.compra.numero_factura)
+                    // compra.numero_factura = facturas digitadas normalmente;
+                    // numero_documento_externo = solo en CxP migradas (sin
+                    // compra_id real detrás) — ver MigrarCxPPage.tsx.
+                    const numero = c.compra?.numero_factura ?? c.numero_documento_externo
+                    if (numero) facturaPorCxp.set(c.id, numero)
                 }
             }
 
