@@ -66,7 +66,8 @@ export function NotasCreditoProveedorPage() {
         return (
             nc.numero_nc?.toLowerCase().includes(q) ||
             nc.proveedor?.nombre_empresa?.toLowerCase().includes(q) ||
-            nc.compra?.numero_factura?.toLowerCase().includes(q)
+            nc.compra?.numero_factura?.toLowerCase().includes(q) ||
+            nc.numero_documento_externo?.toLowerCase().includes(q)
         )
     })
 
@@ -175,7 +176,7 @@ export function NotasCreditoProveedorPage() {
                                             <div className="font-medium text-slate-700 text-xs">{nc.proveedor?.nombre_empresa}</div>
                                             <div className="text-slate-400 text-xs font-mono">{nc.proveedor?.ruc}</div>
                                         </td>
-                                        <td className="py-2 px-3 font-mono text-xs text-slate-600">{nc.compra?.numero_factura || '—'}</td>
+                                        <td className="py-2 px-3 font-mono text-xs text-slate-600">{nc.compra?.numero_factura ?? nc.numero_documento_externo ?? '—'}</td>
                                         <td className="py-2 px-3 text-xs text-slate-600">{TIPO_LABEL[nc.tipo]}</td>
                                         <td className="py-2 px-3 text-xs text-slate-500">{nc.fecha_nc}</td>
                                         <td className="py-2 px-3 text-right font-semibold text-xs">{formatCurrency(nc.total)}</td>

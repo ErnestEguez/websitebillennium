@@ -50,7 +50,10 @@ export function NuevaNcProveedorPage() {
     const [searchText, setSearchText] = useState('')
     const [resultados, setResultados] = useState<any[]>([])
     const [buscando, setBuscando] = useState(false)
-    const [compra, setCompra] = useState<CompraConDetalle | null>(null)
+    // any además de CompraConDetalle: una factura migrada (compra._esMigrada
+    // === true) no es un ingresos_stock real, viene con una forma reducida
+    // desde ncProveedorService.buscarComprasParaNc().
+    const [compra, setCompra] = useState<CompraConDetalle | any>(null)
 
     // ── Step 2: tipo + datos
     const [tipo, setTipo] = useState<TipoNCProveedor>('DEVOLUCION_MERCADERIA')
@@ -149,41 +152,52 @@ export function NuevaNcProveedorPage() {
 
     // ─── Seleccionar compra origen ─────────────────────────
     async function seleccionarCompra(c: any) {
-        const full = await compraService.obtenerConDetalle(c.id)
-        setCompra(full)
-
-        if (full.tipo_compra === 'INVENTARIO' && full.detalle_ingresos_stock?.length) {
-            const devueltas = await ncProveedorService.getCantidadesDevueltas(full.id)
-            setItems(full.detalle_ingresos_stock.map(d => {
-                const yaDevuelta = devueltas[d.id!] || 0
-                const maxDisponible = r2(Math.max(0, d.cantidad - yaDevuelta))
-                return {
-                    id: d.id!,
-                    producto_id: d.producto_id,
-                    bodega_id: d.bodega_id ?? full.bodega_id ?? null,
-                    nombre: d.producto?.nombre ?? '',
-                    codigo: d.producto?.codigo ?? '',
-                    cantidadFacturada: d.cantidad,
-                    costoUnitario: d.costo_unitario,
-                    maxDisponible,
-                    incluir: false,
-                    cantidadNC: 0,
-                }
-            }))
-        } else {
+        let full: any
+        if (c._esMigrada) {
+            // Factura migrada: no existe un ingresos_stock real que buscar --
+            // c ya viene en la forma correcta desde buscarComprasParaNc().
+            // Nunca tiene detalle de producto/Kardex, así que solo admite
+            // N/C de Valor (nunca Devolución de Mercadería).
+            full = c
             setItems([])
             setTipo('NC_VALOR')
+        } else {
+            full = await compraService.obtenerConDetalle(c.id)
+            if (full.tipo_compra === 'INVENTARIO' && full.detalle_ingresos_stock?.length) {
+                const devueltas = await ncProveedorService.getCantidadesDevueltas(full.id)
+                setItems(full.detalle_ingresos_stock.map((d: any) => {
+                    const yaDevuelta = devueltas[d.id!] || 0
+                    const maxDisponible = r2(Math.max(0, d.cantidad - yaDevuelta))
+                    return {
+                        id: d.id!,
+                        producto_id: d.producto_id,
+                        bodega_id: d.bodega_id ?? full.bodega_id ?? null,
+                        nombre: d.producto?.nombre ?? '',
+                        codigo: d.producto?.codigo ?? '',
+                        cantidadFacturada: d.cantidad,
+                        costoUnitario: d.costo_unitario,
+                        maxDisponible,
+                        incluir: false,
+                        cantidadNC: 0,
+                    }
+                }))
+            } else {
+                setItems([])
+                setTipo('NC_VALOR')
+            }
         }
+        setCompra(full)
 
-        // Otras CxP pendientes del mismo proveedor (excluyendo la de esta compra)
+        // Otras CxP pendientes del mismo proveedor (excluyendo la de esta factura)
         if (full.proveedor_id) {
-            const { data } = await supabase
+            let q = supabase
                 .from('cuentas_por_pagar')
                 .select('id, saldo_pendiente, fecha_vencimiento, compra:ingresos_stock(numero_factura)')
                 .eq('proveedor_id', full.proveedor_id)
                 .in('estado', ['PENDIENTE', 'PARCIALMENTE_PAGADO'])
-                .neq('compra_id', full.id)
                 .order('fecha_vencimiento')
+            q = c._esMigrada ? q.neq('id', full.id) : q.neq('compra_id', full.id)
+            const { data } = await q
             setCxpAlternas((data ?? []) as any)
         }
 
@@ -269,7 +283,12 @@ export function NuevaNcProveedorPage() {
             const nc = await ncProveedorService.crear({
                 empresaId: empresa.id,
                 proveedorId: compra.proveedor_id!,
-                compraId: compra.id,
+                // Factura migrada: no hay compra_id real, se identifica por
+                // numeroDocumentoExterno + cxpOrigenId (compra.id acá es en
+                // realidad el id de la CxP misma, ver seleccionarCompra()).
+                compraId: compra._esMigrada ? null : compra.id,
+                numeroDocumentoExterno: compra._esMigrada ? compra.numero_documento_externo : undefined,
+                cxpOrigenId: compra._esMigrada ? compra.id : undefined,
                 tipo,
                 numeroNc: numeroNc || undefined,
                 autorizacionNc: autorizacionNc || undefined,
@@ -422,7 +441,12 @@ export function NuevaNcProveedorPage() {
                                     className="w-full text-left px-4 py-3 hover:bg-primary-50 transition-colors flex items-center justify-between gap-4"
                                 >
                                     <div>
-                                        <p className="font-mono text-sm font-bold text-slate-900">{c.numero_factura}</p>
+                                        <p className="font-mono text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                                            {c.numero_factura}
+                                            {c._esMigrada && (
+                                                <span className="text-[9px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Migrada</span>
+                                            )}
+                                        </p>
                                         <p className="text-xs text-slate-500">{c.proveedor?.nombre_empresa} — {c.fecha_emision}</p>
                                     </div>
                                     <div className="text-right shrink-0">
@@ -478,6 +502,11 @@ export function NuevaNcProveedorPage() {
                                     <option value="DEVOLUCION_MERCADERIA">Devolución de Mercadería</option>
                                     <option value="NC_VALOR">N/C Valor (descuento, sin devolución)</option>
                                 </select>
+                                {compra._esMigrada && (
+                                    <p className="text-xs text-amber-600 mt-1">
+                                        Factura migrada — no tiene detalle de producto real, solo admite N/C de Valor.
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Fecha de la N/C *</label>

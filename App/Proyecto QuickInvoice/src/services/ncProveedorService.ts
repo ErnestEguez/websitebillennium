@@ -23,7 +23,10 @@ export interface NCProveedor {
     id: string
     empresa_id: string
     proveedor_id: string
-    compra_id: string
+    compra_id: string | null
+    // Solo para N/C contra una factura migrada (sin compra_id real detrás
+    // — ver MigrarCxPPage.tsx).
+    numero_documento_externo?: string | null
     cxp_id?: string | null
     tipo: TipoNCProveedor
     numero_nc?: string | null
@@ -64,7 +67,14 @@ export interface NCProveedorConDetalle extends NCProveedor {
 export interface NcProveedorInput {
     empresaId: string
     proveedorId: string
-    compraId: string
+    // null solo para N/C contra una factura migrada (sin compra_id real
+    // detrás) — en ese caso numeroDocumentoExterno y cxpOrigenId son
+    // obligatorios en su lugar.
+    compraId: string | null
+    numeroDocumentoExterno?: string
+    // Solo aplica cuando compraId es null: el id de la CxP migrada, para
+    // resolver "aplicarMismaFactura" sin poder buscarla por compra_id.
+    cxpOrigenId?: string
     tipo: TipoNCProveedor
     numeroNc?: string
     autorizacionNc?: string
@@ -136,16 +146,47 @@ export const ncProveedorService = {
         const t = texto.trim()
         if (!t) return []
         const q = '%' + t.replace(/\*/g, '%') + '%'
-        const { data, error } = await supabase
-            .from('ingresos_stock')
-            .select('*, proveedor:proveedores(id, nombre_empresa, ruc), cxp:cuentas_por_pagar(id, saldo_pendiente, estado)')
-            .eq('empresa_id', empresaId)
-            .in('estado', ['ACTIVO', 'DEVUELTO'])
-            .or(`numero_factura.ilike.${q}`)
-            .order('fecha_ingreso', { ascending: false })
-            .limit(30)
-        if (error) throw error
-        return data ?? []
+        const [comprasRes, migradasRes] = await Promise.all([
+            supabase
+                .from('ingresos_stock')
+                .select('*, proveedor:proveedores(id, nombre_empresa, ruc), cxp:cuentas_por_pagar(id, saldo_pendiente, estado)')
+                .eq('empresa_id', empresaId)
+                .in('estado', ['ACTIVO', 'DEVUELTO'])
+                .or(`numero_factura.ilike.${q}`)
+                .order('fecha_ingreso', { ascending: false })
+                .limit(30),
+            // Facturas migradas (sin compra_id real detrás, ver MigrarCxPPage.tsx)
+            // — solo pueden usarse para N/C de Valor, nunca Devolución de
+            // Mercadería (no tienen detalle de producto/Kardex real).
+            supabase
+                .from('cuentas_por_pagar')
+                .select('id, proveedor_id, fecha_emision, fecha_vencimiento, monto_original, saldo_pendiente, estado, numero_documento_externo, proveedor:proveedores(id, nombre_empresa, ruc)')
+                .eq('empresa_id', empresaId)
+                .eq('origen', 'MIGRACION')
+                .in('estado', ['PENDIENTE', 'PARCIALMENTE_PAGADO'])
+                .ilike('numero_documento_externo', q)
+                .order('fecha_emision', { ascending: false })
+                .limit(30),
+        ])
+        if (comprasRes.error) throw comprasRes.error
+        if (migradasRes.error) throw migradasRes.error
+
+        const migradas = (migradasRes.data ?? []).map((c: any) => ({
+            id: c.id,
+            _esMigrada: true as const,
+            numero_factura: c.numero_documento_externo,
+            numero_documento_externo: c.numero_documento_externo,
+            proveedor_id: c.proveedor_id,
+            proveedor: c.proveedor,
+            fecha_emision: c.fecha_emision,
+            total: c.monto_original,
+            base_iva_0: 0, base_iva_5: 0, base_iva_15: 0,
+            clave_acceso: null,
+            tipo_compra: 'SERVICIO',
+            cxp: [{ id: c.id, saldo_pendiente: c.saldo_pendiente, estado: c.estado }],
+        }))
+
+        return [...(comprasRes.data ?? []), ...migradas]
     },
 
     /** Cantidad ya devuelta por línea (detalle_ingreso_id) para una compra, por N/C activas. */
@@ -192,8 +233,11 @@ export const ncProveedorService = {
             if (dup && dup.length > 0) throw new Error(`Ya existe una N/C activa con el número "${input.numeroNc.trim()}" para este proveedor.`)
         }
 
-        // 1. Validar cantidades devueltas (solo DEVOLUCION_MERCADERIA)
+        // 1. Validar cantidades devueltas (solo DEVOLUCION_MERCADERIA) — una
+        // factura migrada nunca tiene detalle de producto/Kardex real detrás,
+        // así que no puede hacer devolución de mercadería, solo N/C de valor.
         if (input.tipo === 'DEVOLUCION_MERCADERIA') {
+            if (!input.compraId) throw new Error('No se puede hacer devolución de mercadería sobre una factura migrada — usa N/C de Valor.')
             if (!input.detalle?.length) throw new Error('Agregue al menos una línea de producto a devolver')
             const yaDevuelto = await ncProveedorService.getCantidadesDevueltas(input.compraId)
             for (const d of input.detalle) {
@@ -205,10 +249,16 @@ export const ncProveedorService = {
         // 2. Determinar CxP destino y monto a aplicar
         let cxpIdDestino: string | null = null
         if (input.aplicarMismaFactura) {
-            const { data: cxpOrigen } = await supabase
-                .from('cuentas_por_pagar').select('id, saldo_pendiente')
-                .eq('compra_id', input.compraId).maybeSingle()
-            cxpIdDestino = cxpOrigen?.id ?? null
+            if (input.cxpOrigenId) {
+                // Factura migrada: ya conocemos su CxP directamente, no hay
+                // compra_id por el cual buscarla.
+                cxpIdDestino = input.cxpOrigenId
+            } else if (input.compraId) {
+                const { data: cxpOrigen } = await supabase
+                    .from('cuentas_por_pagar').select('id, saldo_pendiente')
+                    .eq('compra_id', input.compraId).maybeSingle()
+                cxpIdDestino = cxpOrigen?.id ?? null
+            }
         } else if (input.cxpDestinoId) {
             cxpIdDestino = input.cxpDestinoId
         }
@@ -228,6 +278,7 @@ export const ncProveedorService = {
                 empresa_id: input.empresaId,
                 proveedor_id: input.proveedorId,
                 compra_id: input.compraId,
+                numero_documento_externo: input.numeroDocumentoExterno || null,
                 cxp_id: cxpIdDestino,
                 tipo: input.tipo,
                 numero_nc: input.numeroNc || null,

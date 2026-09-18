@@ -57,7 +57,7 @@ export function ConsultaNcProveedoresPage() {
         try {
             const { data, error: err } = await supabase
                 .from('notas_credito_proveedores')
-                .select('id, tipo, numero_nc, autorizacion_nc, fecha_nc, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, proveedor:proveedores(ruc, nombre_empresa), compra:ingresos_stock(numero_factura, fecha_emision)')
+                .select('id, tipo, numero_nc, autorizacion_nc, fecha_nc, numero_documento_externo, base_iva_0, base_iva_5, base_iva_15, valor_iva, total, proveedor:proveedores(ruc, nombre_empresa), compra:ingresos_stock(numero_factura, fecha_emision)')
                 .eq('empresa_id', empresa.id)
                 .eq('estado', 'ACTIVA')
                 .gte('fecha_nc', desde)
@@ -74,7 +74,7 @@ export function ConsultaNcProveedoresPage() {
                 fecha_nc: r.fecha_nc,
                 ruc_emisor: r.proveedor?.ruc ?? '',
                 nombre_emisor: r.proveedor?.nombre_empresa ?? '',
-                numero_factura_origen: r.compra?.numero_factura ?? null,
+                numero_factura_origen: r.compra?.numero_factura ?? r.numero_documento_externo ?? null,
                 fecha_factura_origen: r.compra?.fecha_emision ?? null,
                 base_cero: r.base_iva_0 ?? 0,
                 base_iva5: r.base_iva_5 ?? 0,
