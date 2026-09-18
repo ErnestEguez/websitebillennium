@@ -83,13 +83,28 @@ export interface FacturaDirectaInput {
     omitir_kardex?: boolean
 }
 
-// Calcula los valores de una línea de detalle
+const r2 = (n: number) => Math.round(n * 100) / 100
+
+// Calcula los valores de una línea de detalle.
+//
+// El total se arma redondeando primero el precio unitario CON IVA a
+// centavos (el mismo valor que se le muestra al cliente, ver
+// precioConIvaDeLinea en FacturaDirectaPage.tsx) y recién ahí multiplicando
+// por la cantidad — no al revés. Redondear solo al final (cantidad × precio
+// × (1+iva) y luego a centavos) descuadra casos como precio_unitario=12.17
+// con IVA 15%: el precio unitario con IVA redondea a $14.00, pero 2
+// unidades daban $27.99 en vez de los $28.00 esperados. iva_valor se ajusta
+// para que subtotal_neto + iva_valor siga cuadrando exacto con el total.
 export function calcularLinea(detalle: DetalleFacturaDirecta) {
     const subtotal_bruto = detalle.precio_unitario * detalle.cantidad
     const descuento_valor = subtotal_bruto * (detalle.descuento / 100)
-    const subtotal_neto = subtotal_bruto - descuento_valor
-    const iva_valor = subtotal_neto * (detalle.iva_porcentaje / 100)
-    const total = subtotal_neto + iva_valor
+    const subtotal_neto = r2(subtotal_bruto - descuento_valor)
+
+    const precioUnitarioNeto = detalle.precio_unitario * (1 - detalle.descuento / 100)
+    const precioUnitarioConIva = r2(precioUnitarioNeto * (1 + detalle.iva_porcentaje / 100))
+    const total = r2(precioUnitarioConIva * detalle.cantidad)
+    const iva_valor = r2(total - subtotal_neto)
+
     return { subtotal_bruto, descuento_valor, subtotal_neto, iva_valor, total }
 }
 
@@ -164,7 +179,7 @@ export function calcularTotalesFactura(detalles: DetalleFacturaDirecta[]) {
         total += l.total
     }
 
-    return { subtotal, descuentos, iva, total }
+    return { subtotal: r2(subtotal), descuentos: r2(descuentos), iva: r2(iva), total: r2(total) }
 }
 
 export const facturaDirectaService = {
