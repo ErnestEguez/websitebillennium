@@ -157,29 +157,42 @@ export const cxpService = {
     },
 
     // Solo para CxP migradas (origen='MIGRACION') que todavía no recibieron
-    // ningún pago en este sistema — corrige un error de digitación del
-    // Excel de migración. No toca facturas reales (origen COMPRA/LIQUIDACION)
-    // ni CxP que ya tengan pagos aplicados, para no dejar egreso_pagos_cxp
-    // apuntando a montos inconsistentes.
+    // ningún pago DENTRO DE ESTA APP — corrige un error de digitación del
+    // Excel de migración. El saldo inicial de una fila migrada casi siempre
+    // difiere del monto_original (así se migra la deuda real que ya traía
+    // un abono histórico), así que el estado PARCIALMENTE_PAGADO por sí
+    // solo NO significa "ya se le aplicó un pago aquí" — eso solo lo sabe
+    // egreso_pagos_cxp. No toca facturas reales (origen COMPRA/LIQUIDACION).
+    async verificarSinPagosEnApp(cxpId: string): Promise<void> {
+        const { count, error } = await supabase
+            .from('egreso_pagos_cxp')
+            .select('id', { count: 'exact', head: true })
+            .eq('cxp_id', cxpId)
+        if (error) throw error
+        if (count) throw new Error('Esta factura ya tiene un pago aplicado en la app — no se puede eliminar ni corregir su valor. Usa un ajuste contable en su lugar.')
+    },
+
     async eliminarMigrada(cxpId: string): Promise<void> {
+        await this.verificarSinPagosEnApp(cxpId)
         const { error } = await supabaseFacturacion
             .from('cuentas_por_pagar')
             .delete()
             .eq('id', cxpId)
             .eq('origen', 'MIGRACION')
-            .eq('estado', 'PENDIENTE')
+            .in('estado', ['PENDIENTE', 'PARCIALMENTE_PAGADO'])
         if (error) throw error
     },
 
     async corregirValorMigrada(cxpId: string, montoOriginal: number, saldoPendiente: number): Promise<void> {
         if (montoOriginal <= 0) throw new Error('El monto original debe ser mayor a 0')
         if (saldoPendiente < 0 || saldoPendiente > montoOriginal) throw new Error('El saldo debe estar entre 0 y el monto original')
+        await this.verificarSinPagosEnApp(cxpId)
         const { error } = await supabaseFacturacion
             .from('cuentas_por_pagar')
             .update({ monto_original: montoOriginal, saldo_pendiente: saldoPendiente })
             .eq('id', cxpId)
             .eq('origen', 'MIGRACION')
-            .eq('estado', 'PENDIENTE')
+            .in('estado', ['PENDIENTE', 'PARCIALMENTE_PAGADO'])
         if (error) throw error
     },
 

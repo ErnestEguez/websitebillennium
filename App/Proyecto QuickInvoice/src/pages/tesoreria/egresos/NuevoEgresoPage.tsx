@@ -457,8 +457,11 @@ export function NuevoEgresoPage() {
                                             <span className="text-xs text-slate-400">máx. {formatMoneda(cxp.saldo_pendiente)}</span>
                                         </div>
                                     )}
-                                    {/* Corregir/eliminar — solo facturas migradas sin pagos todavía */}
-                                    {expandCxp === cxp.id && cxp.origen === 'MIGRACION' && cxp.estado === 'PENDIENTE' && (
+                                    {/* Corregir/eliminar — facturas migradas (el saldo real ya puede venir
+                                        distinto al original desde el Excel de migración; lo que de verdad
+                                        bloquea esto es que la factura ya tenga un pago hecho en esta app,
+                                        y eso se valida en el momento de guardar/eliminar). */}
+                                    {expandCxp === cxp.id && cxp.origen === 'MIGRACION' && cxp.estado !== 'PAGADO' && cxp.estado !== 'ANULADO' && (
                                         <div className="mt-3 pt-3 border-t border-slate-200">
                                             {editandoValorId === cxp.id ? (
                                                 <div className="flex items-end gap-3 flex-wrap">
@@ -485,7 +488,7 @@ export function NuevoEgresoPage() {
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-xs text-slate-400">Factura migrada, sin pagos aún —</span>
+                                                    <span className="text-xs text-slate-400">Factura migrada —</span>
                                                     <button onClick={() => abrirCorreccionValor(cxp)}
                                                         className="text-xs text-primary-600 hover:text-primary-800 font-medium flex items-center gap-1">
                                                         <Pencil className="w-3.5 h-3.5" /> Corregir valor
