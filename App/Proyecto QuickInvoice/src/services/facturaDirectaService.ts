@@ -102,8 +102,20 @@ export function calcularLinea(detalle: DetalleFacturaDirecta) {
 
     const precioUnitarioNeto = detalle.precio_unitario * (1 - detalle.descuento / 100)
     const precioUnitarioConIva = r2(precioUnitarioNeto * (1 + detalle.iva_porcentaje / 100))
-    const total = r2(precioUnitarioConIva * detalle.cantidad)
-    const iva_valor = r2(total - subtotal_neto)
+    let total = r2(precioUnitarioConIva * detalle.cantidad)
+    let iva_valor = r2(total - subtotal_neto)
+
+    // Salvaguarda: con precio unitario menor a un centavo y cantidad grande
+    // (ej. tornillos a $0.012 vendidos de a cientos), redondear el precio
+    // unitario con IVA a centavos ANTES de multiplicar por la cantidad
+    // amplifica el error y puede dejar el total por debajo del subtotal sin
+    // IVA — un iva_valor negativo, que el SRI rechaza (minInclusive 0.0) y
+    // que además descuadra el IVA total de la factura. En ese caso se cae
+    // al cálculo directo (subtotal × tasa), que no tiene ese riesgo.
+    if (iva_valor < 0) {
+        iva_valor = r2(subtotal_neto * (detalle.iva_porcentaje / 100))
+        total = r2(subtotal_neto + iva_valor)
+    }
 
     return { subtotal_bruto, descuento_valor, subtotal_neto, iva_valor, total }
 }
