@@ -112,6 +112,13 @@ export interface Empleado {
     contacto_emergencia_relacion?: string | null
     contacto_emergencia_telefono?: string | null
 
+    // Datos de cónyuge (Etapa 2F — pestaña "Datos Familiares")
+    conyuge_nombres?: string | null
+    conyuge_cedula?: string | null
+    conyuge_fecha_nacimiento?: string | null
+    conyuge_ocupacion?: string | null
+    conyuge_telefono?: string | null
+
     // Observaciones
     observaciones?: string | null
 
@@ -138,6 +145,31 @@ export interface HistorialSalario {
     sueldo_anterior: number
     sueldo_nuevo: number
     motivo?: string | null
+    created_at?: string
+}
+
+// ── Etapa 2F: Datos Familiares (hijos) y Estudios ────────────────────────────
+
+export interface EmpleadoHijo {
+    id: string
+    empresa_id: string
+    empleado_id: string
+    nombres: string
+    fecha_nacimiento?: string | null
+    created_at?: string
+}
+
+export type TipoInstitucionEstudio = 'ESCUELA' | 'COLEGIO' | 'UNIVERSIDAD' | 'INSTITUTO'
+
+export interface EmpleadoEstudio {
+    id: string
+    empresa_id: string
+    empleado_id: string
+    nombre_institucion: string
+    tipo_institucion: TipoInstitucionEstudio
+    ultimo_anio_aprobado?: string | null
+    titulo_obtenido?: string | null
+    anio_titulo?: string | null
     created_at?: string
 }
 

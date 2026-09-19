@@ -4,18 +4,28 @@ import { useAuth } from '../../contexts/AuthContext'
 import { empleadosService } from '../../services/nominas/empleadosService'
 import { estructuraOrganizativaService } from '../../services/nominas/estructuraOrganizativaService'
 import { historialSalariosService } from '../../services/nominas/historialSalariosService'
+import { hijosEmpleadoService, estudiosEmpleadoService } from '../../services/nominas/empleadoFamiliaService'
 import type {
     Empleado, SeccionNomina, CargoNomina,
     TipoJornada, TipoNomina, ModoDecimo, ModoFondoReserva,
     TipoContrato, EstadoCivil, HistorialSalario,
+    EmpleadoHijo, EmpleadoEstudio, TipoInstitucionEstudio,
 } from '../../types/nominas'
 import {
     Users, Plus, Edit2, Save, X, UserX, RotateCcw, Loader2,
     Briefcase, CreditCard, ShieldAlert, History, Trash2,
+    Heart, GraduationCap,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
-type TabForm = 'personal' | 'laboral' | 'nomina' | 'adicional'
+type TabForm = 'personal' | 'laboral' | 'nomina' | 'adicional' | 'familiares' | 'estudios'
+
+const TIPO_INSTITUCION_LABEL: Record<TipoInstitucionEstudio, string> = {
+    ESCUELA: 'Escuela',
+    COLEGIO: 'Colegio',
+    UNIVERSIDAD: 'Universidad',
+    INSTITUTO: 'Instituto',
+}
 
 const EMPTY: Omit<Empleado, 'id' | 'empresa_id' | 'created_at' | 'updated_at' | 'activo' | 'seccion' | 'cargo' | 'jefe'> = {
     nombres: '',
@@ -51,6 +61,11 @@ const EMPTY: Omit<Empleado, 'id' | 'empresa_id' | 'created_at' | 'updated_at' | 
     contacto_emergencia_nombre: null,
     contacto_emergencia_relacion: null,
     contacto_emergencia_telefono: null,
+    conyuge_nombres: null,
+    conyuge_cedula: null,
+    conyuge_fecha_nacimiento: null,
+    conyuge_ocupacion: null,
+    conyuge_telefono: null,
     observaciones: null,
 }
 
@@ -71,6 +86,22 @@ export function EmpleadosPage() {
     const [historialLoading, setHistorialLoading] = useState(false)
     const sueldoOriginalRef = useRef<number>(0)
     const [motivoCambio, setMotivoCambio] = useState('')
+
+    // Datos Familiares — hijos
+    const [hijos, setHijos] = useState<EmpleadoHijo[]>([])
+    const [hijosLoading, setHijosLoading] = useState(false)
+    const [nuevoHijoNombres, setNuevoHijoNombres] = useState('')
+    const [nuevoHijoFecha, setNuevoHijoFecha] = useState('')
+    const [guardandoHijo, setGuardandoHijo] = useState(false)
+
+    // Estudios / Nivel Académico
+    const [estudios, setEstudios] = useState<EmpleadoEstudio[]>([])
+    const [estudiosLoading, setEstudiosLoading] = useState(false)
+    const [nuevoEstudio, setNuevoEstudio] = useState({
+        nombre_institucion: '', tipo_institucion: 'COLEGIO' as TipoInstitucionEstudio,
+        ultimo_anio_aprobado: '', titulo_obtenido: '', anio_titulo: '',
+    })
+    const [guardandoEstudio, setGuardandoEstudio] = useState(false)
 
     useEffect(() => {
         if (empresa?.id) loadData()
@@ -99,6 +130,11 @@ export function EmpleadosPage() {
         setEditando({ ...EMPTY })
         setHistorial([])
         setMotivoCambio('')
+        setHijos([])
+        setEstudios([])
+        setNuevoHijoNombres('')
+        setNuevoHijoFecha('')
+        setNuevoEstudio({ nombre_institucion: '', tipo_institucion: 'COLEGIO', ultimo_anio_aprobado: '', titulo_obtenido: '', anio_titulo: '' })
         setTab('personal')
         sueldoOriginalRef.current = 0
         setModalOpen(true)
@@ -140,19 +176,41 @@ export function EmpleadosPage() {
             contacto_emergencia_nombre: emp.contacto_emergencia_nombre ?? null,
             contacto_emergencia_relacion: emp.contacto_emergencia_relacion ?? null,
             contacto_emergencia_telefono: emp.contacto_emergencia_telefono ?? null,
+            conyuge_nombres: emp.conyuge_nombres ?? null,
+            conyuge_cedula: emp.conyuge_cedula ?? null,
+            conyuge_fecha_nacimiento: emp.conyuge_fecha_nacimiento ?? null,
+            conyuge_ocupacion: emp.conyuge_ocupacion ?? null,
+            conyuge_telefono: emp.conyuge_telefono ?? null,
             observaciones: emp.observaciones ?? null,
         })
         sueldoOriginalRef.current = emp.sueldo_base
         setMotivoCambio('')
+        setNuevoHijoNombres('')
+        setNuevoHijoFecha('')
+        setNuevoEstudio({ nombre_institucion: '', tipo_institucion: 'COLEGIO', ultimo_anio_aprobado: '', titulo_obtenido: '', anio_titulo: '' })
         setTab('personal')
         setModalOpen(true)
-        // Cargar historial salarial en paralelo
+        // Cargar historial salarial, hijos y estudios en paralelo
         setHistorial([])
         setHistorialLoading(true)
         historialSalariosService.listar(emp.id)
             .then(h => setHistorial(h))
             .catch(console.error)
             .finally(() => setHistorialLoading(false))
+
+        setHijos([])
+        setHijosLoading(true)
+        hijosEmpleadoService.listar(emp.id)
+            .then(h => setHijos(h))
+            .catch(console.error)
+            .finally(() => setHijosLoading(false))
+
+        setEstudios([])
+        setEstudiosLoading(true)
+        estudiosEmpleadoService.listar(emp.id)
+            .then(e => setEstudios(e))
+            .catch(console.error)
+            .finally(() => setEstudiosLoading(false))
     }
 
     async function handleSave() {
@@ -209,6 +267,11 @@ export function EmpleadosPage() {
                 contacto_emergencia_nombre: editando.contacto_emergencia_nombre || null,
                 contacto_emergencia_relacion: editando.contacto_emergencia_relacion || null,
                 contacto_emergencia_telefono: editando.contacto_emergencia_telefono || null,
+                conyuge_nombres: editando.conyuge_nombres || null,
+                conyuge_cedula: editando.conyuge_cedula || null,
+                conyuge_fecha_nacimiento: editando.conyuge_fecha_nacimiento || null,
+                conyuge_ocupacion: editando.conyuge_ocupacion || null,
+                conyuge_telefono: editando.conyuge_telefono || null,
                 observaciones: editando.observaciones || null,
             }
             if (editando.id) {
@@ -259,6 +322,70 @@ export function EmpleadosPage() {
         }
     }
 
+    async function handleAgregarHijo() {
+        if (!editando.id) return
+        if (!nuevoHijoNombres.trim()) { alert('Ingresa el nombre del hijo/a'); return }
+        try {
+            setGuardandoHijo(true)
+            const hijo = await hijosEmpleadoService.crear({
+                empresa_id: empresa!.id,
+                empleado_id: editando.id,
+                nombres: nuevoHijoNombres.trim(),
+                fecha_nacimiento: nuevoHijoFecha || null,
+            })
+            setHijos(h => [...h, hijo].sort((a, b) => (a.fecha_nacimiento ?? '').localeCompare(b.fecha_nacimiento ?? '')))
+            setNuevoHijoNombres('')
+            setNuevoHijoFecha('')
+        } catch (e: any) {
+            alert(`Error: ${e.message}`)
+        } finally {
+            setGuardandoHijo(false)
+        }
+    }
+
+    async function handleEliminarHijo(id: string) {
+        if (!confirm('¿Eliminar este hijo/a de la ficha?')) return
+        try {
+            await hijosEmpleadoService.eliminar(id)
+            setHijos(h => h.filter(x => x.id !== id))
+        } catch (e: any) {
+            alert(`Error: ${e.message}`)
+        }
+    }
+
+    async function handleAgregarEstudio() {
+        if (!editando.id) return
+        if (!nuevoEstudio.nombre_institucion.trim()) { alert('Ingresa el nombre de la institución'); return }
+        try {
+            setGuardandoEstudio(true)
+            const estudio = await estudiosEmpleadoService.crear({
+                empresa_id: empresa!.id,
+                empleado_id: editando.id,
+                nombre_institucion: nuevoEstudio.nombre_institucion.trim(),
+                tipo_institucion: nuevoEstudio.tipo_institucion,
+                ultimo_anio_aprobado: nuevoEstudio.ultimo_anio_aprobado.trim() || null,
+                titulo_obtenido: nuevoEstudio.titulo_obtenido.trim() || null,
+                anio_titulo: nuevoEstudio.anio_titulo.trim() || null,
+            })
+            setEstudios(e => [...e, estudio])
+            setNuevoEstudio({ nombre_institucion: '', tipo_institucion: 'COLEGIO', ultimo_anio_aprobado: '', titulo_obtenido: '', anio_titulo: '' })
+        } catch (e: any) {
+            alert(`Error: ${e.message}`)
+        } finally {
+            setGuardandoEstudio(false)
+        }
+    }
+
+    async function handleEliminarEstudio(id: string) {
+        if (!confirm('¿Eliminar este registro de estudios?')) return
+        try {
+            await estudiosEmpleadoService.eliminar(id)
+            setEstudios(e => e.filter(x => x.id !== id))
+        } catch (e: any) {
+            alert(`Error: ${e.message}`)
+        }
+    }
+
     const nombresCompletos = (e: Empleado) => `${e.apellidos} ${e.nombres}`
     const sueldoCambio = editando.id && Number(editando.sueldo_base) !== sueldoOriginalRef.current
 
@@ -273,10 +400,12 @@ export function EmpleadosPage() {
     }
 
     const TABS: { key: TabForm; label: string; icon: any }[] = [
-        { key: 'personal',  label: 'Personal',  icon: Users },
-        { key: 'laboral',   label: 'Laboral',   icon: Briefcase },
-        { key: 'nomina',    label: 'Nómina',    icon: CreditCard },
-        { key: 'adicional', label: '+ Info',    icon: ShieldAlert },
+        { key: 'personal',   label: 'Personal',   icon: Users },
+        { key: 'laboral',    label: 'Laboral',    icon: Briefcase },
+        { key: 'nomina',     label: 'Nómina',     icon: CreditCard },
+        { key: 'familiares', label: 'Familiares', icon: Heart },
+        { key: 'estudios',   label: 'Estudios',   icon: GraduationCap },
+        { key: 'adicional',  label: '+ Info',     icon: ShieldAlert },
     ]
 
     return (
@@ -695,6 +824,206 @@ export function EmpleadosPage() {
                                             <p className="text-xs text-slate-400 mt-2">Sin configurar: se usará el default de la empresa al generar el anticipo.</p>
                                         )}
                                     </div>
+                                </>
+                            )}
+
+                            {/* ── Tab: FAMILIARES ── */}
+                            {tab === 'familiares' && (
+                                <>
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Datos de Cónyuge</p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-600 mb-1">Nombres completos</label>
+                                                <input className="input w-full" value={editando.conyuge_nombres ?? ''}
+                                                    onChange={e => setEditando(v => ({ ...v, conyuge_nombres: e.target.value || null }))}
+                                                    placeholder="Ej: María López" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-600 mb-1">Cédula</label>
+                                                <input className="input w-full" value={editando.conyuge_cedula ?? ''}
+                                                    onChange={e => setEditando(v => ({ ...v, conyuge_cedula: e.target.value || null }))}
+                                                    placeholder="1712345678" maxLength={13} />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4 mt-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha de nacimiento</label>
+                                                <input type="date" className="input w-full" value={editando.conyuge_fecha_nacimiento ?? ''}
+                                                    onChange={e => setEditando(v => ({ ...v, conyuge_fecha_nacimiento: e.target.value || null }))} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-slate-600 mb-1">Ocupación</label>
+                                                <input className="input w-full" value={editando.conyuge_ocupacion ?? ''}
+                                                    onChange={e => setEditando(v => ({ ...v, conyuge_ocupacion: e.target.value || null }))}
+                                                    placeholder="Ej: Comerciante" />
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 max-w-[50%]">
+                                            <label className="block text-xs font-semibold text-slate-600 mb-1">Teléfono</label>
+                                            <input className="input w-full" value={editando.conyuge_telefono ?? ''}
+                                                onChange={e => setEditando(v => ({ ...v, conyuge_telefono: e.target.value || null }))}
+                                                placeholder="0991234567" />
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-slate-100 pt-4">
+                                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Hijos</p>
+
+                                        {!editando.id ? (
+                                            <p className="text-sm text-slate-400">Guarda el empleado primero para poder agregar hijos.</p>
+                                        ) : (
+                                            <>
+                                                <div className="flex items-end gap-3">
+                                                    <div className="flex-1">
+                                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Nombres</label>
+                                                        <input className="input w-full" value={nuevoHijoNombres}
+                                                            onChange={e => setNuevoHijoNombres(e.target.value)}
+                                                            placeholder="Ej: Ana Pérez López" />
+                                                    </div>
+                                                    <div className="w-44">
+                                                        <label className="block text-xs font-semibold text-slate-600 mb-1">Fecha de nacimiento</label>
+                                                        <input type="date" className="input w-full" value={nuevoHijoFecha}
+                                                            onChange={e => setNuevoHijoFecha(e.target.value)} />
+                                                    </div>
+                                                    <button onClick={handleAgregarHijo} disabled={guardandoHijo}
+                                                        className="btn btn-secondary flex items-center gap-1.5 whitespace-nowrap">
+                                                        {guardandoHijo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                                                        Agregar
+                                                    </button>
+                                                </div>
+
+                                                {hijosLoading ? (
+                                                    <div className="flex items-center gap-2 text-slate-400 text-sm mt-3">
+                                                        <Loader2 className="w-4 h-4 animate-spin" />Cargando...
+                                                    </div>
+                                                ) : hijos.length === 0 ? (
+                                                    <p className="text-sm text-slate-400 mt-3">Sin hijos registrados.</p>
+                                                ) : (
+                                                    <table className="w-full text-xs mt-3">
+                                                        <thead>
+                                                            <tr className="text-slate-500 border-b border-slate-100">
+                                                                <th className="text-left py-1.5 pr-3">Nombres</th>
+                                                                <th className="text-left py-1.5 pr-3">Fecha de nacimiento</th>
+                                                                <th className="py-1.5 w-8" />
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-50">
+                                                            {hijos.map(h => (
+                                                                <tr key={h.id} className="hover:bg-slate-50">
+                                                                    <td className="py-1.5 pr-3 text-slate-700">{h.nombres}</td>
+                                                                    <td className="py-1.5 pr-3 text-slate-500">{h.fecha_nacimiento ?? '—'}</td>
+                                                                    <td className="py-1.5 text-right">
+                                                                        <button onClick={() => handleEliminarHijo(h.id)}
+                                                                            className="p-1 text-slate-300 hover:text-red-400 transition-colors">
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ── Tab: ESTUDIOS / NIVEL ACADÉMICO ── */}
+                            {tab === 'estudios' && (
+                                <>
+                                    {!editando.id ? (
+                                        <p className="text-sm text-slate-400">Guarda el empleado primero para poder agregar estudios.</p>
+                                    ) : (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Nombre de la institución</label>
+                                                    <input className="input w-full" value={nuevoEstudio.nombre_institucion}
+                                                        onChange={e => setNuevoEstudio(v => ({ ...v, nombre_institucion: e.target.value }))}
+                                                        placeholder="Ej: Universidad Central del Ecuador" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Tipo de institución</label>
+                                                    <select className="input w-full" value={nuevoEstudio.tipo_institucion}
+                                                        onChange={e => setNuevoEstudio(v => ({ ...v, tipo_institucion: e.target.value as TipoInstitucionEstudio }))}>
+                                                        <option value="ESCUELA">Escuela</option>
+                                                        <option value="COLEGIO">Colegio</option>
+                                                        <option value="UNIVERSIDAD">Universidad</option>
+                                                        <option value="INSTITUTO">Instituto</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-4 mt-3">
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Último año aprobado</label>
+                                                    <input className="input w-full" value={nuevoEstudio.ultimo_anio_aprobado}
+                                                        onChange={e => setNuevoEstudio(v => ({ ...v, ultimo_anio_aprobado: e.target.value }))}
+                                                        placeholder="Ej: 3ro Bachillerato / 8vo Semestre" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Título obtenido</label>
+                                                    <input className="input w-full" value={nuevoEstudio.titulo_obtenido}
+                                                        onChange={e => setNuevoEstudio(v => ({ ...v, titulo_obtenido: e.target.value }))}
+                                                        placeholder="Ej: Ingeniero Comercial" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Año del título</label>
+                                                    <input className="input w-full" value={nuevoEstudio.anio_titulo}
+                                                        onChange={e => setNuevoEstudio(v => ({ ...v, anio_titulo: e.target.value }))}
+                                                        placeholder="Ej: 2020" maxLength={4} />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-end mt-3">
+                                                <button onClick={handleAgregarEstudio} disabled={guardandoEstudio}
+                                                    className="btn btn-secondary flex items-center gap-1.5">
+                                                    {guardandoEstudio ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                                                    Agregar estudio
+                                                </button>
+                                            </div>
+
+                                            <div className="border-t border-slate-100 pt-4 mt-1">
+                                                {estudiosLoading ? (
+                                                    <div className="flex items-center gap-2 text-slate-400 text-sm">
+                                                        <Loader2 className="w-4 h-4 animate-spin" />Cargando...
+                                                    </div>
+                                                ) : estudios.length === 0 ? (
+                                                    <p className="text-sm text-slate-400">Sin estudios registrados.</p>
+                                                ) : (
+                                                    <table className="w-full text-xs">
+                                                        <thead>
+                                                            <tr className="text-slate-500 border-b border-slate-100">
+                                                                <th className="text-left py-1.5 pr-3">Institución</th>
+                                                                <th className="text-left py-1.5 pr-3">Tipo</th>
+                                                                <th className="text-left py-1.5 pr-3">Último año aprobado</th>
+                                                                <th className="text-left py-1.5 pr-3">Título</th>
+                                                                <th className="text-left py-1.5 pr-3">Año</th>
+                                                                <th className="py-1.5 w-8" />
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-50">
+                                                            {estudios.map(e => (
+                                                                <tr key={e.id} className="hover:bg-slate-50">
+                                                                    <td className="py-1.5 pr-3 text-slate-700">{e.nombre_institucion}</td>
+                                                                    <td className="py-1.5 pr-3 text-slate-500">{TIPO_INSTITUCION_LABEL[e.tipo_institucion]}</td>
+                                                                    <td className="py-1.5 pr-3 text-slate-500">{e.ultimo_anio_aprobado ?? '—'}</td>
+                                                                    <td className="py-1.5 pr-3 text-slate-500">{e.titulo_obtenido ?? '—'}</td>
+                                                                    <td className="py-1.5 pr-3 text-slate-500">{e.anio_titulo ?? '—'}</td>
+                                                                    <td className="py-1.5 text-right">
+                                                                        <button onClick={() => handleEliminarEstudio(e.id)}
+                                                                            className="p-1 text-slate-300 hover:text-red-400 transition-colors">
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
                                 </>
                             )}
 

@@ -1487,6 +1487,14 @@ export const AYUDA: Record<string, PaginaAyuda> = {
                 titulo: 'Proceso de salida',
                 texto: 'Cuando un empleado se desvincula (renuncia, despido, conclusión de contrato): activa el proceso de salida para calcular los valores a liquidar (haberes pendientes, décimos proporcionales, vacaciones no gozadas, fondos de reserva) y registra el aviso de salida al IESS dentro de los 3 días hábiles.',
             },
+            {
+                titulo: 'Pestaña "Familiares" — cónyuge e hijos',
+                texto: 'Registra los datos del cónyuge (nombres, cédula, fecha de nacimiento, ocupación, teléfono) y los hijos del empleado. Los hijos se agregan uno por uno con nombre y fecha de nacimiento — no hay límite de hijos por empleado. Esta pestaña solo se puede editar sobre un empleado ya guardado: si es un registro nuevo, primero guárdalo desde la pestaña "Personal" y luego vuelve a editarlo para agregar hijos.',
+            },
+            {
+                titulo: 'Pestaña "Estudios" — nivel académico',
+                texto: 'Registra el historial académico del empleado: nombre de la institución, tipo (Escuela, Colegio, Universidad, Instituto), último año aprobado y título obtenido con su año. Se pueden agregar varios registros por empleado (por ejemplo, colegio y luego universidad). Igual que "Familiares", solo está disponible al editar un empleado ya guardado.',
+            },
         ],
     },
 
