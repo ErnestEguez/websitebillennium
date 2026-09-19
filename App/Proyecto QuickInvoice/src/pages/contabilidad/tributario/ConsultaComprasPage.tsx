@@ -158,25 +158,36 @@ export function ConsultaComprasPage() {
         return true
     })
 
-    const totales = {
-        compras:   datos.length,
-        base0:     filtradas.reduce((s, r) => s + r.base_cero,   0),
-        base5:     filtradas.reduce((s, r) => s + r.base_iva5,   0),
-        iva5:      filtradas.reduce((s, r) => s + r.iva5,         0),
-        base15:    filtradas.reduce((s, r) => s + r.base_iva15,  0),
-        iva15:     filtradas.reduce((s, r) => s + r.iva15,        0),
-        iva:       filtradas.reduce((s, r) => s + r.iva,          0),
-        totalBases: filtradas.reduce((s, r) => s + r.base_cero + r.base_iva5 + r.base_iva15, 0),
-        total:     filtradas.reduce((s, r) => s + r.total,        0),
-        retenidoFuente: filtradas.reduce((s, r) => s + r.valor_ret_fuente, 0),
-        retenidoIva:    filtradas.reduce((s, r) => s + r.valor_ret_iva,    0),
+    // Suma las columnas de Base/IVA/Total/Retenciones sobre cualquier
+    // subconjunto de filas — se usa tanto para el total general (todas las
+    // compras) como para el total de solo gasto de negocio.
+    function sumarColumnas(filas: typeof datos) {
+        return {
+            compras:   filas.length,
+            base0:     filas.reduce((s, r) => s + r.base_cero,   0),
+            base5:     filas.reduce((s, r) => s + r.base_iva5,   0),
+            iva5:      filas.reduce((s, r) => s + r.iva5,         0),
+            base15:    filas.reduce((s, r) => s + r.base_iva15,  0),
+            iva15:     filas.reduce((s, r) => s + r.iva15,        0),
+            iva:       filas.reduce((s, r) => s + r.iva,          0),
+            totalBases: filas.reduce((s, r) => s + r.base_cero + r.base_iva5 + r.base_iva15, 0),
+            total:     filas.reduce((s, r) => s + r.total,        0),
+            retenidoFuente: filas.reduce((s, r) => s + r.valor_ret_fuente, 0),
+            retenidoIva:    filas.reduce((s, r) => s + r.valor_ret_iva,    0),
+        }
     }
 
     // Gasto de negocio: lo único que declara el 104 (casillero 500/504/510,
     // y su conteo va al casillero 115) — el resto son gastos personales del
-    // propietario, útiles solo para Impuesto a la Renta.
+    // propietario, útiles solo para Impuesto a la Renta. Las filas marcadas
+    // como gasto personal SIGUEN visibles en la tabla de abajo (no se
+    // ocultan) — solo quedan fuera de este total y del 104.
     const gastoNegocio = filtradas.filter(r => r.es_gasto_negocio)
-    const totalGastoNegocio = gastoNegocio.reduce((s, r) => s + r.base_cero + r.base_iva5 + r.base_iva15, 0)
+
+    // Total general: TODAS las compras filtradas (negocio + personal).
+    const totales = sumarColumnas(filtradas)
+    // Total de solo gasto de negocio: el que de verdad se declara en el 104.
+    const totalesNegocio = sumarColumnas(gastoNegocio)
 
     // Resumen por régimen del proveedor — no es un casillero oficial del
     // 104 (el formulario del SRI no abre por régimen), es un reporte de
@@ -225,8 +236,17 @@ export function ConsultaComprasPage() {
             r.es_gasto_negocio ? 'Sí' : 'No',
         ])
 
+        const filaTotalNegocio = [
+            '', '', '', '', '', '', '', 'TOTAL GASTO DE NEGOCIO (declarable 104)',
+            totalesNegocio.base0, totalesNegocio.base15, totalesNegocio.base5, 0, totalesNegocio.totalBases,
+            totalesNegocio.iva5, totalesNegocio.iva15, totalesNegocio.total,
+            '', '', totalesNegocio.retenidoFuente,
+            '', '', totalesNegocio.retenidoIva,
+            '',
+        ]
+
         const filaTotales = [
-            '', '', '', '', '', '', '', 'TOTALES',
+            '', '', '', '', '', '', '', 'TOTAL GENERAL (todas, incl. gasto personal)',
             totales.base0, totales.base15, totales.base5, 0, totales.totalBases,
             totales.iva5, totales.iva15, totales.total,
             '', '', totales.retenidoFuente,
@@ -244,6 +264,7 @@ export function ConsultaComprasPage() {
             [],
             headers,
             ...filas,
+            filaTotalNegocio,
             filaTotales,
         ]
 
@@ -308,13 +329,14 @@ export function ConsultaComprasPage() {
                 </div>
             </div>
 
-            {/* Resumen */}
+            {/* Resumen — TODAS las compras (negocio + personal). Para el total
+                que sí declara el 104, ver "Gasto de Negocio" más abajo. */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Compras',        value: totales.compras,              color: 'text-blue-600' },
-                    { label: 'Total Bases',    value: formatMoneda(totales.totalBases), color: 'text-amber-600' },
-                    { label: 'Total IVA',      value: formatMoneda(totales.iva),    color: 'text-indigo-600' },
-                    { label: 'Total General',  value: formatMoneda(totales.total),  color: 'text-slate-800' },
+                    { label: 'Compras (todas)',       value: totales.compras,                  color: 'text-blue-600' },
+                    { label: 'Total Bases (todas)',   value: formatMoneda(totales.totalBases), color: 'text-amber-600' },
+                    { label: 'Total IVA (todas)',     value: formatMoneda(totales.iva),        color: 'text-indigo-600' },
+                    { label: 'Total General (todas)', value: formatMoneda(totales.total),      color: 'text-slate-800' },
                 ].map(({ label, value, color }) => (
                     <div key={label} className="card p-4">
                         <p className={`text-xl font-bold ${color}`}>{value}</p>
@@ -359,7 +381,7 @@ export function ConsultaComprasPage() {
                     </table>
                     {gastoNegocio.length !== filtradas.length && (
                         <p className="px-5 py-2.5 text-xs text-amber-700 bg-amber-50 border-t border-amber-100">
-                            {filtradas.length - gastoNegocio.length} compra(s) marcada(s) como gasto personal (no del negocio) — excluidas de esta tabla y del Formulario 104. Base total: {formatMoneda(totales.totalBases - totalGastoNegocio)}.
+                            {filtradas.length - gastoNegocio.length} compra(s) marcada(s) como gasto personal (no del negocio) — siguen visibles en la tabla de abajo (checkbox desmarcado), pero quedan fuera de esta suma y del Formulario 104. Base total excluida: {formatMoneda(totales.totalBases - totalesNegocio.totalBases)}.
                         </p>
                     )}
                 </div>
@@ -523,8 +545,29 @@ export function ConsultaComprasPage() {
                                 })}
                             </tbody>
                             <tfoot>
-                                <tr className="bg-slate-50 border-t-2 font-semibold text-sm">
-                                    <td colSpan={5} className="py-2.5 px-3 text-right text-xs text-slate-500 uppercase">Totales</td>
+                                <tr className="bg-indigo-50 border-t-2 border-indigo-200 font-semibold text-sm">
+                                    <td colSpan={5} className="py-2.5 px-3 text-right text-xs text-indigo-700 uppercase" title="Solo compras marcadas como gasto de negocio — es lo que se declara en el Formulario 104">
+                                        Total Gasto de Negocio (declarable 104)
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totalesNegocio.base0)}</td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totalesNegocio.base5)}</td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totalesNegocio.iva5)}</td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totalesNegocio.base15)}</td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totalesNegocio.iva15)}</td>
+                                    <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totalesNegocio.totalBases)}</td>
+                                    <td className="py-2.5 px-3 text-right">{formatMoneda(totalesNegocio.total)}</td>
+                                    <td className="py-2.5 px-3 text-center text-xs text-slate-500">
+                                        {totalesNegocio.retenidoFuente > 0 ? formatMoneda(totalesNegocio.retenidoFuente) : ''}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center text-xs text-slate-500">
+                                        {totalesNegocio.retenidoIva > 0 ? formatMoneda(totalesNegocio.retenidoIva) : ''}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center text-xs text-slate-500">{gastoNegocio.length}/{filtradas.length}</td>
+                                </tr>
+                                <tr className="bg-slate-50 border-t border-slate-200 font-semibold text-sm">
+                                    <td colSpan={5} className="py-2.5 px-3 text-right text-xs text-slate-500 uppercase" title="Todas las compras filtradas, incluyendo las marcadas como gasto personal">
+                                        Total General (todas, incl. gasto personal)
+                                    </td>
                                     <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.base0)}</td>
                                     <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.base5)}</td>
                                     <td className="py-2.5 px-3 text-right text-xs">{formatMoneda(totales.iva5)}</td>
@@ -538,7 +581,7 @@ export function ConsultaComprasPage() {
                                     <td className="py-2.5 px-3 text-center text-xs text-slate-500">
                                         {totales.retenidoIva > 0 ? formatMoneda(totales.retenidoIva) : ''}
                                     </td>
-                                    <td className="py-2.5 px-3 text-center text-xs text-slate-500">{gastoNegocio.length}/{filtradas.length}</td>
+                                    <td className="py-2.5 px-3 text-center text-xs text-slate-500">{filtradas.length}</td>
                                 </tr>
                             </tfoot>
                         </table>
